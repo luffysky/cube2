@@ -64,6 +64,7 @@
         <button id="itemBox" class="slot" type="button" data-ta="a.ITEM" hidden><span class="slot-label" data-t="item"></span><canvas id="itemCv"></canvas></button>
         <div id="oppMini" class="slot" hidden><span class="slot-label" id="oppName"></span><canvas id="oppCv"></canvas></div>
         <div id="chips" class="chips" aria-live="off"></div>
+        <div id="sideL" class="sidekeys" hidden></div>
       </div>
       <div id="wellWrap">
         <canvas id="wellCv"></canvas>
@@ -72,19 +73,19 @@
         <div id="toast" class="toast" role="status" hidden></div>
       </div>
       <div id="colR" class="col">
-        <div class="slot"><span class="slot-label" data-t="next"></span><canvas id="nextCv"></canvas></div>
-        <div id="tools" class="col"></div>
+        <div id="nextBox" class="slot"><span class="slot-label" data-t="next"></span><canvas id="nextCv"></canvas></div>
+        <div id="tools" class="col" hidden></div>
         <button id="pauseBtn" class="tool" type="button" data-t="pause"></button>
+        <div id="sideR" class="sidekeys" hidden>
+          <button class="key" type="button" id="halfKey" data-k="180" data-t="k.half" hidden></button>
+          <button class="key" type="button" id="holdKey" data-k="HOLD" data-t="hold"></button>
+          <button class="key" type="button" id="itemKey" data-k="ITEM" data-ta="a.ITEM" hidden></button>
+        </div>
       </div>
     </main>
     <footer id="pad" hidden>
       <button class="key" type="button" data-k="L" data-ta="a.L"><svg viewBox="0 0 32 32"><path d="M20 6 10 16l10 10"/></svg></button>
       <button class="key" type="button" data-k="R" data-ta="a.R"><svg viewBox="0 0 32 32"><path d="m12 6 10 10-10 10"/></svg></button>
-      <div class="mid">
-        <button class="key" type="button" data-k="HOLD" data-t="hold"></button>
-        <button class="key" type="button" id="halfKey" data-k="180" data-t="k.half" hidden></button>
-        <button class="key" type="button" id="itemKey" data-k="ITEM" data-ta="a.ITEM" hidden></button>
-      </div>
       <button class="key" type="button" data-k="CCW" data-ta="a.CCW"><svg viewBox="0 0 32 32"><path d="M9 13a9 9 0 1 1 1.5 9.5"/><path d="M8 5v8h8"/></svg><span data-t="k.ccw"></span></button>
       <button class="key" type="button" data-k="CW" data-ta="a.CW"><svg viewBox="0 0 32 32"><path d="M23 13a9 9 0 1 0-1.5 9.5"/><path d="M24 5v8h-8"/></svg><span data-t="k.cw"></span></button>
       <button class="key" type="button" data-k="D" data-ta="a.D"><svg viewBox="0 0 32 32"><path d="m8 12 8 9 8-9"/></svg><span data-t="k.soft"></span></button>

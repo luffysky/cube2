@@ -166,41 +166,45 @@
 
     // Touch keys. A thumb can slide between left and right without lifting; every other key needs its own tap,
     // and a key stays down until the finger lifts even if it drifts off the edge.
-    var pad = el.pad, ptrs = {}, SLIDE = { L: 1, R: 1 };
-    function keyAt(x, y) {
+    // The keys live in three places: the pad under the wall and the two side strips beside it (hold, item, half turn).
+    var ptrs = {}, SLIDE = { L: 1, R: 1 };
+    function keyAt(root, x, y) {
       var e = document.elementFromPoint(x, y);
       e = e && e.closest ? e.closest('.key') : null;
-      return e && pad.contains(e) ? e : null;
+      return e && root.contains(e) ? e : null;
     }
     function press(k) { k.classList.add('on'); act(k.dataset.k, true); buzz(7); }
     function lift(k) { k.classList.remove('on'); act(k.dataset.k, false); }
-    pad.addEventListener('pointerdown', function (e) {
-      e.preventDefault();
-      sfx.wake();
-      var k = keyAt(e.clientX, e.clientY);
-      if (!k) return;
-      try { pad.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
-      ptrs[e.pointerId] = k;
-      press(k);
-    });
-    pad.addEventListener('pointermove', function (e) {
-      if (!(e.pointerId in ptrs)) return;
-      var cur = ptrs[e.pointerId], k = keyAt(e.clientX, e.clientY);
-      if (!cur || !k || k === cur || !SLIDE[cur.dataset.k] || !SLIDE[k.dataset.k]) return;
-      lift(cur);
-      ptrs[e.pointerId] = k;
-      press(k);
-    });
     function end(e) {
       var cur = ptrs[e.pointerId];
       if (cur) lift(cur);
       delete ptrs[e.pointerId];
       sfx.wake();
     }
-    pad.addEventListener('pointerup', end);
-    pad.addEventListener('pointercancel', end);
-    pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    pad.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    function bindKeys(root) {
+      root.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        sfx.wake();
+        var k = keyAt(root, e.clientX, e.clientY);
+        if (!k) return;
+        try { root.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+        ptrs[e.pointerId] = k;
+        press(k);
+      });
+      root.addEventListener('pointermove', function (e) {
+        if (!(e.pointerId in ptrs)) return;
+        var cur = ptrs[e.pointerId], k = keyAt(root, e.clientX, e.clientY);
+        if (!cur || !k || k === cur || !SLIDE[cur.dataset.k] || !SLIDE[k.dataset.k]) return;
+        lift(cur);
+        ptrs[e.pointerId] = k;
+        press(k);
+      });
+      root.addEventListener('pointerup', end);
+      root.addEventListener('pointercancel', end);
+      root.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      root.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    }
+    bindKeys(el.pad); bindKeys(el.sideL); bindKeys(el.sideR);
     document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
     el.play.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     el.holdBox.addEventListener('click', function () { sfx.wake(); act('HOLD', true); });
@@ -379,10 +383,23 @@
       K.hud();
     }
     el.play.classList.toggle('nohold', k === 'dojo');
-    el.itemBox.hidden = !itemsOn();
-    el.itemKey.hidden = !itemsOn();
+    sideKeys();
     setTools();
     sideKey = ''; chipKey = '';
+  }
+  // The keys beside the wall. Hold and the half turn sit above the rotate keys, the item key above the move keys;
+  // on a touch screen the item key also shows what is in the bag, so the item box at the top is not needed there.
+  function sideKeys() {
+    var items = itemsOn(), k = S ? S.kind : '';
+    var spin = set.swap ? el.sideL : el.sideR, move = set.swap ? el.sideR : el.sideL;
+    if (el.holdKey.parentNode !== spin) { spin.appendChild(el.halfKey); spin.appendChild(el.holdKey); }
+    if (el.itemKey.parentNode !== move) move.appendChild(el.itemKey);
+    el.itemBox.hidden = !items || env.touch;
+    el.itemKey.hidden = !items;
+    el.halfKey.hidden = !set.half;
+    el.holdKey.hidden = k === 'dojo' || k === 'lesson';   // nothing to hold in a drill or a lesson
+    spin.hidden = !env.touch || (el.holdKey.hidden && el.halfKey.hidden);
+    move.hidden = !env.touch || el.itemKey.hidden;
   }
 
   function tool(a, key, pressed) { return '<button class="tool" type="button" data-act="' + a + '"' + (pressed != null ? ' aria-pressed="' + pressed + '"' : '') + '>' + t(key) + '</button>'; }
@@ -393,6 +410,7 @@
     else if (k === 'dojo') h = tool('demo', 'tool.demo') + tool('restart', 'restart') + tool('hint', 'tool.hint', set.hint ? 'true' : 'false');
     else if (K && K.tools) h = K.tools();
     el.tools.innerHTML = h;
+    el.tools.hidden = !h;
   }
 
   // ---------- spin dojo ----------
@@ -969,7 +987,7 @@
   }
   function applySettings() {
     el.pad.classList.toggle('swap', set.swap);
-    el.halfKey.hidden = !set.half;
+    sideKeys();
     sfx.vol();
     if (S && S.me) {
       S.me.sdf = sdfVal();
@@ -1160,13 +1178,14 @@
   }
 
   // ---------- layout ----------
-  var side = 66, pc = 12, nextN = 5, itemH = 28, sideKey = '', chipKey = '';
+  var side = 66, pc = 12, pn = 12, nextN = 5, itemH = 28, sideKey = '', chipKey = '';
   function layout() {
     if (screen !== 'play' || !S) return;
     var W = el.app.clientWidth, H = el.app.clientHeight, hasOpp = !!S.opp;
     var wide = W >= 820 && W > H * 1.05, flip = wide && hasOpp;
     if (S.flip !== flip) { S.flip = flip; setupHud(); }
     el.pad.hidden = !env.touch;
+    sideKeys();
     el.stage.classList.toggle('wide', flip);
     var hudH = el.hud.offsetHeight || 48, stripH = el.strip.hidden ? 0 : el.strip.offsetHeight + 6;
     var padMin = env.touch ? [128, 152, 184][set.pad] : 0;
@@ -1184,22 +1203,56 @@
     }
     el.stage.style.setProperty('--side', side + 'px');
     V.me.resize(cell);
+    // Both side columns are as tall as the wall. What must be there takes its room first (hold, the side keys, tools);
+    // the other player's little wall and the queue of coming pieces then share what is left.
+    var wellH = el.wellWrap.offsetHeight;
+    el.colL.style.height = el.colR.style.height = wellH + 'px';
+    var kh = clamp(Math.round(wellH * 0.13), 44, 72);
+    el.stage.style.setProperty('--kh', kh + 'px');
     el.oppMini.hidden = !hasOpp || wide;
     el.oppWide.hidden = !flip;
+    pc = Math.max(7, Math.floor((side - 10) / 4.3));
+    itemH = Math.round(Math.min(pc * 2.4, (side - 8) * 0.56));
+    View.sizeCanvas(el.holdCv, side - 8, Math.round(pc * 2.7));
+    View.sizeCanvas(el.itemCv, side - 8, itemH);
     if (hasOpp) {
       var home = wide ? el.oppFrame : el.oppMini;
       if (el.oppCv.parentNode !== home) home.appendChild(el.oppCv);
       V.opp.plain = !wide;
       V.opp.sky = wide ? SKY : 0;
+      if (!wide) {
+        var kids = el.colL.children, used = 0, shown = 0, c;
+        for (var ci = 0; ci < kids.length; ci++) {
+          c = kids[ci];
+          if (c.hidden) continue;
+          shown++;
+          if (c !== el.oppMini && c !== el.chips) used += c.offsetHeight;
+        }
+        // leave room for one status chip under it
+        var oppRoom = wellH - used - (shown - 1) * 8 - 30 - (el.oppName.offsetHeight + 9);
+        oppCell = clamp(Math.floor(oppRoom / VIS), 3, oppCell);
+      }
       V.opp.resize(oppCell);
     }
-    pc = Math.max(7, Math.floor((side - 10) / 4.3));
-    nextN = cell * (VIS + SKY) >= pc * 2.9 * 5 + 150 ? 5 : cell * (VIS + SKY) >= pc * 2.9 * 4 + 150 ? 4 : 3;
-    if (S.kind === 'dojo') nextN = 2;
-    itemH = Math.round(Math.min(pc * 2.4, (side - 8) * 0.56));
-    View.sizeCanvas(el.holdCv, side - 8, Math.round(pc * 2.7));
-    View.sizeCanvas(el.nextCv, side - 8, Math.round(pc * 2.9 * nextN));
-    View.sizeCanvas(el.itemCv, side - 8, itemH);
+    var maxN = S.kind === 'dojo' ? 2 : 5, minN = S.kind === 'dojo' ? 1 : 3, small = Math.max(8, Math.round(pc * 0.62)), n, q;
+    var nextRoom = function () {
+      el.nextBox.style.flex = '1 1 0';
+      var r = el.nextBox.clientHeight - el.nextBox.firstElementChild.offsetHeight - 9;
+      el.nextBox.style.flex = '';
+      return r;
+    };
+    var room = nextRoom(), least = Math.ceil(minN * 2.9 * 7), keysR = el.sideR.hidden ? 0 : el.sideR.querySelectorAll('.key:not([hidden])').length;
+    if (room < least && keysR) {
+      // a very short wall: the side keys give up some height so the queue still fits
+      el.stage.style.setProperty('--kh', Math.max(34, kh - Math.ceil((least - room) / keysR)) + 'px');
+      room = nextRoom();
+    }
+    // as many coming pieces as fit; they are drawn a little smaller before one is dropped
+    for (n = maxN; n >= minN; n--) {
+      q = Math.min(pc, Math.floor(room / (2.9 * n)));
+      if (q >= small || n === minN) { nextN = n; pn = Math.max(6, q); break; }
+    }
+    View.sizeCanvas(el.nextCv, side - 8, Math.round(pn * 2.9 * nextN));
     sideKey = '';
     if (wide) {
       var a = (flip ? el.oppWide : el.colL).getBoundingClientRect(), b = el.colR.getBoundingClientRect(), o = el.app.getBoundingClientRect();
@@ -1217,7 +1270,7 @@
   }
   var lookKey = '';
   function drawSide() {
-    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
+    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + pn + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
     if (key === sideKey) return;
     sideKey = key;
     var dpr = env.dpr, w = side - 8, x = el.holdCv.getContext('2d'), i;
@@ -1227,8 +1280,8 @@
     el.holdBox.classList.toggle('used', me.holdUsed);
     x = el.nextCv.getContext('2d');
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.clearRect(0, 0, w, pc * 3 * nextN);
-    for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pc * 2.9 * (i + 0.5), pc);
+    x.clearRect(0, 0, w, pn * 3 * nextN);
+    for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pn * 2.9 * (i + 0.5), pn);
     if (itemsOn()) {
       var inv = me.inv, big = itemH, sm = Math.floor((big - 2) / 2);
       x = el.itemCv.getContext('2d');
@@ -1237,7 +1290,12 @@
       if (inv[0]) View.drawItem(x, inv[0], 0, 0, big);
       if (inv[1]) View.drawItem(x, inv[1], big + 4, 0, sm);
       if (inv[2]) View.drawItem(x, inv[2], big + 4, sm + 2, sm);
-      el.itemKey.innerHTML = (inv[0] ? '<b style="color:' + ITEMS[inv[0]].color + '">' + View.itemSvg(inv[0]) + '</b>' : '') + esc(t('item'));
+      var bag = '', more = '';
+      for (i = 0; i < inv.length && i < 3; i++) {
+        var tile = '<i class="itile" style="--c:' + ITEMS[inv[i]].color + '">' + View.itemSvg(inv[i]) + '</i>';
+        if (i) more += tile; else bag = tile;
+      }
+      el.itemKey.innerHTML = bag ? bag + (more ? '<b>' + more + '</b>' : '') : esc(t('item'));
       el.itemKey.classList.toggle('empty', !inv[0]);
       el.itemBox.classList.toggle('empty', !inv[0]);
     }
@@ -1420,7 +1478,8 @@
   // ---------- boot ----------
   function start(data) {
     ['app', 'menu', 'play', 'hud', 'hudL', 'hudC', 'hudR', 'strip', 'stage', 'colL', 'colR', 'holdBox', 'holdCv', 'itemBox', 'itemCv', 'oppMini', 'oppName', 'oppCv',
-      'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'itemKey', 'halfKey', 'toast', 'mtoast', 'rotate',
+      'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextBox', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'sideL', 'sideR', 'itemKey', 'halfKey', 'holdKey',
+      'toast', 'mtoast', 'rotate',
       'sheet', 'sheetCard', 'demoCv'].forEach(function (id) { el[id] = $(id); });
     loadStore();
     rebuildKeys();

@@ -145,7 +145,7 @@
     'p.got': ['拿到「{0}」', 'Got {0}', '「{0}」を入手', '「{0}」 획득'],
     'p.blocked': ['擋下 {0} 排', 'Blocked {0}', '{0}段を防いだ', '{0}줄 막음'],
     'tip.keys': ['{0} {1} 移動　{2} 順轉　{3} 逆轉　{4} 軟降　{5} 硬降　{6} 暫存', '{0} {1} move · {2} rotate right · {3} rotate left · {4} soft drop · {5} hard drop · {6} hold', '{0} {1} 移動　{2} 右回転　{3} 左回転　{4} ソフト　{5} ハード　{6} ホールド', '{0} {1} 이동 · {2} 우회전 · {3} 좌회전 · {4} 소프트 · {5} 하드 · {6} 홀드'],
-    'tip.itemTouch': ['按下面中間的「道具」鍵就能用。', 'Tap the Item key in the middle to use it.', '下中央の「アイテム」キーで使えます。', '가운데 아래 「아이템」 키로 사용합니다.'],
+    'tip.itemTouch': ['按牆旁邊的「道具」鍵就能用。', 'Tap the Item key beside the wall to use it.', '壁の横の「アイテム」キーで使えます。', '벽 옆의 「아이템」 키로 사용합니다.'],
     'tip.itemKey': ['按 {0} 用道具。', 'Press {0} to use the item.', '{0} でアイテムを使います。', '{0} 키로 아이템을 사용합니다.'],
     'itemFull': ['道具滿了，這顆沒拿到。', 'Item bag is full. This one was lost.', 'アイテムがいっぱいで拾えませんでした。', '아이템이 가득 차서 얻지 못했습니다.'],
     'foeUsed': ['對手用了「{0}」', 'Rival used {0}', '相手が「{0}」を使った', '상대가 「{0}」 사용'],
@@ -327,7 +327,7 @@
     'kb.space': ['空白鍵', 'Space', 'スペース', '스페이스'],
     // help
     'h.touch': ['觸控', 'Touch', 'タッチ', '터치'],
-    'h.touchP': ['拇指可以在左、右兩顆鍵之間直接滑過去，不用抬手。點一下「暫存」格或「道具」格也有用。', 'Slide your thumb between the left and right keys without lifting. Tapping the Hold or Item box works too.', '左右キーの間は指を離さずスライドできます。「ホールド」「アイテム」の枠をタップしても使えます。', '좌우 키 사이는 손가락을 떼지 않고 밀어도 됩니다. 「홀드」「아이템」 칸을 눌러도 됩니다.'],
+    'h.touchP': ['拇指可以在左、右兩顆鍵之間直接滑過去，不用抬手。「暫存」鍵在牆的旁邊、旋轉鍵的正上方，「道具」鍵在另一邊；點左上角的「暫存」格也有用。', 'Slide your thumb between the left and right keys without lifting. The Hold key sits beside the wall, right above the rotate keys, and the Item key is on the other side. Tapping the Hold box at the top works too.', '左右キーの間は指を離さずスライドできます。「ホールド」キーは壁の横、回転キーのすぐ上にあり、「アイテム」キーは反対側です。上の「ホールド」枠をタップしても使えます。', '좌우 키 사이는 손가락을 떼지 않고 밀어도 됩니다. 「홀드」 키는 벽 옆, 회전 키 바로 위에 있고 「아이템」 키는 반대쪽에 있습니다. 위쪽 「홀드」 칸을 눌러도 됩니다.'],
     'h.spin': ['轉進去怎麼算', 'What counts as a spin', 'スピンの判定', '스핀 판정'],
     'h.spin1': ['T 的最後一個動作是旋轉，而且四個斜角有三個被擋住，就是 T 轉。', 'A T whose last move was a rotation, with three of its four corners blocked, is a T-spin.', 'Tの最後の操作が回転で、四隅のうち3つがふさがっていればTスピン。', 'T의 마지막 조작이 회전이고 네 모서리 중 셋이 막혀 있으면 T스핀입니다.'],
     'h.spin2': ['Z、S、L、J、I 也能轉：最後一個動作是旋轉，轉完左右上下都動不了，就算。', 'Z, S, L, J and I can spin too: last move a rotation, and afterwards the piece cannot move in any direction.', 'Z・S・L・J・Iも回せます。最後が回転で、上下左右どこにも動けなければ成立。', 'Z·S·L·J·I도 가능합니다. 마지막이 회전이고 상하좌우 어디로도 못 움직이면 인정됩니다.'],

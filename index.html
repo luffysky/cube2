@@ -142,8 +142,17 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 #holdBox.used canvas { opacity: 0.4; }
 #itemBox { align-items: flex-start; }
 #itemBox.empty canvas { opacity: 0.5; }
-#play.nohold #holdBox, #play.nohold .key[data-k="HOLD"] { opacity: 0.35; }
-.chips { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-height: 46px; }
+#play.nohold #holdBox { opacity: 0.35; }
+.chips { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; flex: 1 1 0; min-height: 0; overflow: hidden; }
+/* 兩邊的欄位由程式設成跟牆一樣高：「下一個」只佔它需要的高度，暫存、道具這些側邊按鍵貼在最下面，就在拇指上方。 */
+#nextBox { flex: none; min-height: 0; overflow: hidden; }
+.sidekeys { display: flex; flex-direction: column; gap: 8px; flex: none; margin-top: auto; touch-action: none; }
+.sidekeys .key { height: var(--kh, 56px); border-radius: 14px; font-size: 13px; color: var(--ink); }
+/* 道具鍵直接畫出袋子裡有什麼：大的那個是下一個會用掉的，旁邊兩個小的排在後面。袋子空了才寫「道具」兩個字。 */
+.sidekeys .key[data-k="ITEM"] { flex-direction: row; gap: 4px; --it: min(34px, calc(var(--kh, 56px) - 20px)); }
+.sidekeys .key[data-k="ITEM"] .itile { width: var(--it); height: var(--it); border-width: 2px; border-radius: 7px; }
+.sidekeys .key[data-k="ITEM"] b { display: grid; gap: 2px; }
+.sidekeys .key[data-k="ITEM"] b .itile { width: calc(var(--it) / 2 - 1px); height: calc(var(--it) / 2 - 1px); border-width: 1.5px; border-radius: 4px; }
 .chip { font: italic 700 15px/1 var(--num); padding: 4px 8px 5px; border-radius: 7px; background: var(--panel); border: 1px solid var(--edge); white-space: nowrap; }
 .chip.gold { background: var(--gold); border-color: var(--gold); color: #1B2530; }
 .chip.ice { background: #BEE8FF; border-color: #BEE8FF; color: #12384A; }
@@ -186,14 +195,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 /* ---------- 觸控按鍵 ---------- */
 #pad {
   flex: 1 1 auto; min-height: 150px; max-height: 236px; width: 100%; max-width: 620px; margin: 0 auto; touch-action: none;
-  display: grid; grid-template-columns: 1fr 1fr 62px 1fr 1fr; grid-template-rows: 1.2fr 1fr; gap: 8px; padding: 4px 12px 12px;
-  grid-template-areas: "L R M CCW CW" "D D M HD HD";
+  display: grid; grid-template-columns: 1fr 1fr 6px 1fr 1fr; grid-template-rows: 1.2fr 1fr; gap: 8px; padding: 4px 12px 12px;
+  grid-template-areas: "L R . CCW CW" "D D . HD HD";
 }
-#pad.swap { grid-template-areas: "CCW CW M L R" "HD HD M D D"; }
-.mid { grid-area: M; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.mid .key { flex: 1 1 0; border-radius: 14px; }
-.key[data-k="ITEM"] b { display: block; width: 26px; height: 26px; }
-.key[data-k="ITEM"] b svg { width: 26px; height: 26px; stroke: none; }
+/* 中間不放按鍵：左手管移動、右手管旋轉，兩邊之間留一道空隙，拇指不會按錯。 */
+#pad.swap { grid-template-areas: "CCW CW . L R" "HD HD . D D"; }
+.key[data-k="ITEM"] svg { stroke: none; }
 .key[data-k="ITEM"].empty { opacity: 0.45; }
 .key {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; padding: 0;
@@ -421,6 +428,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         <button id="itemBox" class="slot" type="button" data-ta="a.ITEM" hidden><span class="slot-label" data-t="item"></span><canvas id="itemCv"></canvas></button>
         <div id="oppMini" class="slot" hidden><span class="slot-label" id="oppName"></span><canvas id="oppCv"></canvas></div>
         <div id="chips" class="chips" aria-live="off"></div>
+        <div id="sideL" class="sidekeys" hidden></div>
       </div>
       <div id="wellWrap">
         <canvas id="wellCv"></canvas>
@@ -429,19 +437,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         <div id="toast" class="toast" role="status" hidden></div>
       </div>
       <div id="colR" class="col">
-        <div class="slot"><span class="slot-label" data-t="next"></span><canvas id="nextCv"></canvas></div>
-        <div id="tools" class="col"></div>
+        <div id="nextBox" class="slot"><span class="slot-label" data-t="next"></span><canvas id="nextCv"></canvas></div>
+        <div id="tools" class="col" hidden></div>
         <button id="pauseBtn" class="tool" type="button" data-t="pause"></button>
+        <div id="sideR" class="sidekeys" hidden>
+          <button class="key" type="button" id="halfKey" data-k="180" data-t="k.half" hidden></button>
+          <button class="key" type="button" id="holdKey" data-k="HOLD" data-t="hold"></button>
+          <button class="key" type="button" id="itemKey" data-k="ITEM" data-ta="a.ITEM" hidden></button>
+        </div>
       </div>
     </main>
     <footer id="pad" hidden>
       <button class="key" type="button" data-k="L" data-ta="a.L"><svg viewBox="0 0 32 32"><path d="M20 6 10 16l10 10"/></svg></button>
       <button class="key" type="button" data-k="R" data-ta="a.R"><svg viewBox="0 0 32 32"><path d="m12 6 10 10-10 10"/></svg></button>
-      <div class="mid">
-        <button class="key" type="button" data-k="HOLD" data-t="hold"></button>
-        <button class="key" type="button" id="halfKey" data-k="180" data-t="k.half" hidden></button>
-        <button class="key" type="button" id="itemKey" data-k="ITEM" data-ta="a.ITEM" hidden></button>
-      </div>
       <button class="key" type="button" data-k="CCW" data-ta="a.CCW"><svg viewBox="0 0 32 32"><path d="M9 13a9 9 0 1 1 1.5 9.5"/><path d="M8 5v8h8"/></svg><span data-t="k.ccw"></span></button>
       <button class="key" type="button" data-k="CW" data-ta="a.CW"><svg viewBox="0 0 32 32"><path d="M23 13a9 9 0 1 0-1.5 9.5"/><path d="M24 5v8h-8"/></svg><span data-t="k.cw"></span></button>
       <button class="key" type="button" data-k="D" data-ta="a.D"><svg viewBox="0 0 32 32"><path d="m8 12 8 9 8-9"/></svg><span data-t="k.soft"></span></button>
@@ -1256,7 +1264,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'p.got': ['拿到「{0}」', 'Got {0}', '「{0}」を入手', '「{0}」 획득'],
     'p.blocked': ['擋下 {0} 排', 'Blocked {0}', '{0}段を防いだ', '{0}줄 막음'],
     'tip.keys': ['{0} {1} 移動　{2} 順轉　{3} 逆轉　{4} 軟降　{5} 硬降　{6} 暫存', '{0} {1} move · {2} rotate right · {3} rotate left · {4} soft drop · {5} hard drop · {6} hold', '{0} {1} 移動　{2} 右回転　{3} 左回転　{4} ソフト　{5} ハード　{6} ホールド', '{0} {1} 이동 · {2} 우회전 · {3} 좌회전 · {4} 소프트 · {5} 하드 · {6} 홀드'],
-    'tip.itemTouch': ['按下面中間的「道具」鍵就能用。', 'Tap the Item key in the middle to use it.', '下中央の「アイテム」キーで使えます。', '가운데 아래 「아이템」 키로 사용합니다.'],
+    'tip.itemTouch': ['按牆旁邊的「道具」鍵就能用。', 'Tap the Item key beside the wall to use it.', '壁の横の「アイテム」キーで使えます。', '벽 옆의 「아이템」 키로 사용합니다.'],
     'tip.itemKey': ['按 {0} 用道具。', 'Press {0} to use the item.', '{0} でアイテムを使います。', '{0} 키로 아이템을 사용합니다.'],
     'itemFull': ['道具滿了，這顆沒拿到。', 'Item bag is full. This one was lost.', 'アイテムがいっぱいで拾えませんでした。', '아이템이 가득 차서 얻지 못했습니다.'],
     'foeUsed': ['對手用了「{0}」', 'Rival used {0}', '相手が「{0}」を使った', '상대가 「{0}」 사용'],
@@ -1438,7 +1446,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'kb.space': ['空白鍵', 'Space', 'スペース', '스페이스'],
     // help
     'h.touch': ['觸控', 'Touch', 'タッチ', '터치'],
-    'h.touchP': ['拇指可以在左、右兩顆鍵之間直接滑過去，不用抬手。點一下「暫存」格或「道具」格也有用。', 'Slide your thumb between the left and right keys without lifting. Tapping the Hold or Item box works too.', '左右キーの間は指を離さずスライドできます。「ホールド」「アイテム」の枠をタップしても使えます。', '좌우 키 사이는 손가락을 떼지 않고 밀어도 됩니다. 「홀드」「아이템」 칸을 눌러도 됩니다.'],
+    'h.touchP': ['拇指可以在左、右兩顆鍵之間直接滑過去，不用抬手。「暫存」鍵在牆的旁邊、旋轉鍵的正上方，「道具」鍵在另一邊；點左上角的「暫存」格也有用。', 'Slide your thumb between the left and right keys without lifting. The Hold key sits beside the wall, right above the rotate keys, and the Item key is on the other side. Tapping the Hold box at the top works too.', '左右キーの間は指を離さずスライドできます。「ホールド」キーは壁の横、回転キーのすぐ上にあり、「アイテム」キーは反対側です。上の「ホールド」枠をタップしても使えます。', '좌우 키 사이는 손가락을 떼지 않고 밀어도 됩니다. 「홀드」 키는 벽 옆, 회전 키 바로 위에 있고 「아이템」 키는 반대쪽에 있습니다. 위쪽 「홀드」 칸을 눌러도 됩니다.'],
     'h.spin': ['轉進去怎麼算', 'What counts as a spin', 'スピンの判定', '스핀 판정'],
     'h.spin1': ['T 的最後一個動作是旋轉，而且四個斜角有三個被擋住，就是 T 轉。', 'A T whose last move was a rotation, with three of its four corners blocked, is a T-spin.', 'Tの最後の操作が回転で、四隅のうち3つがふさがっていればTスピン。', 'T의 마지막 조작이 회전이고 네 모서리 중 셋이 막혀 있으면 T스핀입니다.'],
     'h.spin2': ['Z、S、L、J、I 也能轉：最後一個動作是旋轉，轉完左右上下都動不了，就算。', 'Z, S, L, J and I can spin too: last move a rotation, and afterwards the piece cannot move in any direction.', 'Z・S・L・J・Iも回せます。最後が回転で、上下左右どこにも動けなければ成立。', 'Z·S·L·J·I도 가능합니다. 마지막이 회전이고 상하좌우 어디로도 못 움직이면 인정됩니다.'],
@@ -3960,41 +3968,45 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 
     // Touch keys. A thumb can slide between left and right without lifting; every other key needs its own tap,
     // and a key stays down until the finger lifts even if it drifts off the edge.
-    var pad = el.pad, ptrs = {}, SLIDE = { L: 1, R: 1 };
-    function keyAt(x, y) {
+    // The keys live in three places: the pad under the wall and the two side strips beside it (hold, item, half turn).
+    var ptrs = {}, SLIDE = { L: 1, R: 1 };
+    function keyAt(root, x, y) {
       var e = document.elementFromPoint(x, y);
       e = e && e.closest ? e.closest('.key') : null;
-      return e && pad.contains(e) ? e : null;
+      return e && root.contains(e) ? e : null;
     }
     function press(k) { k.classList.add('on'); act(k.dataset.k, true); buzz(7); }
     function lift(k) { k.classList.remove('on'); act(k.dataset.k, false); }
-    pad.addEventListener('pointerdown', function (e) {
-      e.preventDefault();
-      sfx.wake();
-      var k = keyAt(e.clientX, e.clientY);
-      if (!k) return;
-      try { pad.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
-      ptrs[e.pointerId] = k;
-      press(k);
-    });
-    pad.addEventListener('pointermove', function (e) {
-      if (!(e.pointerId in ptrs)) return;
-      var cur = ptrs[e.pointerId], k = keyAt(e.clientX, e.clientY);
-      if (!cur || !k || k === cur || !SLIDE[cur.dataset.k] || !SLIDE[k.dataset.k]) return;
-      lift(cur);
-      ptrs[e.pointerId] = k;
-      press(k);
-    });
     function end(e) {
       var cur = ptrs[e.pointerId];
       if (cur) lift(cur);
       delete ptrs[e.pointerId];
       sfx.wake();
     }
-    pad.addEventListener('pointerup', end);
-    pad.addEventListener('pointercancel', end);
-    pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    pad.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    function bindKeys(root) {
+      root.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        sfx.wake();
+        var k = keyAt(root, e.clientX, e.clientY);
+        if (!k) return;
+        try { root.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+        ptrs[e.pointerId] = k;
+        press(k);
+      });
+      root.addEventListener('pointermove', function (e) {
+        if (!(e.pointerId in ptrs)) return;
+        var cur = ptrs[e.pointerId], k = keyAt(root, e.clientX, e.clientY);
+        if (!cur || !k || k === cur || !SLIDE[cur.dataset.k] || !SLIDE[k.dataset.k]) return;
+        lift(cur);
+        ptrs[e.pointerId] = k;
+        press(k);
+      });
+      root.addEventListener('pointerup', end);
+      root.addEventListener('pointercancel', end);
+      root.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      root.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    }
+    bindKeys(el.pad); bindKeys(el.sideL); bindKeys(el.sideR);
     document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
     el.play.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     el.holdBox.addEventListener('click', function () { sfx.wake(); act('HOLD', true); });
@@ -4173,10 +4185,23 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       K.hud();
     }
     el.play.classList.toggle('nohold', k === 'dojo');
-    el.itemBox.hidden = !itemsOn();
-    el.itemKey.hidden = !itemsOn();
+    sideKeys();
     setTools();
     sideKey = ''; chipKey = '';
+  }
+  // The keys beside the wall. Hold and the half turn sit above the rotate keys, the item key above the move keys;
+  // on a touch screen the item key also shows what is in the bag, so the item box at the top is not needed there.
+  function sideKeys() {
+    var items = itemsOn(), k = S ? S.kind : '';
+    var spin = set.swap ? el.sideL : el.sideR, move = set.swap ? el.sideR : el.sideL;
+    if (el.holdKey.parentNode !== spin) { spin.appendChild(el.halfKey); spin.appendChild(el.holdKey); }
+    if (el.itemKey.parentNode !== move) move.appendChild(el.itemKey);
+    el.itemBox.hidden = !items || env.touch;
+    el.itemKey.hidden = !items;
+    el.halfKey.hidden = !set.half;
+    el.holdKey.hidden = k === 'dojo' || k === 'lesson';   // nothing to hold in a drill or a lesson
+    spin.hidden = !env.touch || (el.holdKey.hidden && el.halfKey.hidden);
+    move.hidden = !env.touch || el.itemKey.hidden;
   }
 
   function tool(a, key, pressed) { return '<button class="tool" type="button" data-act="' + a + '"' + (pressed != null ? ' aria-pressed="' + pressed + '"' : '') + '>' + t(key) + '</button>'; }
@@ -4187,6 +4212,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     else if (k === 'dojo') h = tool('demo', 'tool.demo') + tool('restart', 'restart') + tool('hint', 'tool.hint', set.hint ? 'true' : 'false');
     else if (K && K.tools) h = K.tools();
     el.tools.innerHTML = h;
+    el.tools.hidden = !h;
   }
 
   // ---------- spin dojo ----------
@@ -4763,7 +4789,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   }
   function applySettings() {
     el.pad.classList.toggle('swap', set.swap);
-    el.halfKey.hidden = !set.half;
+    sideKeys();
     sfx.vol();
     if (S && S.me) {
       S.me.sdf = sdfVal();
@@ -4954,13 +4980,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   }
 
   // ---------- layout ----------
-  var side = 66, pc = 12, nextN = 5, itemH = 28, sideKey = '', chipKey = '';
+  var side = 66, pc = 12, pn = 12, nextN = 5, itemH = 28, sideKey = '', chipKey = '';
   function layout() {
     if (screen !== 'play' || !S) return;
     var W = el.app.clientWidth, H = el.app.clientHeight, hasOpp = !!S.opp;
     var wide = W >= 820 && W > H * 1.05, flip = wide && hasOpp;
     if (S.flip !== flip) { S.flip = flip; setupHud(); }
     el.pad.hidden = !env.touch;
+    sideKeys();
     el.stage.classList.toggle('wide', flip);
     var hudH = el.hud.offsetHeight || 48, stripH = el.strip.hidden ? 0 : el.strip.offsetHeight + 6;
     var padMin = env.touch ? [128, 152, 184][set.pad] : 0;
@@ -4978,22 +5005,56 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     }
     el.stage.style.setProperty('--side', side + 'px');
     V.me.resize(cell);
+    // Both side columns are as tall as the wall. What must be there takes its room first (hold, the side keys, tools);
+    // the other player's little wall and the queue of coming pieces then share what is left.
+    var wellH = el.wellWrap.offsetHeight;
+    el.colL.style.height = el.colR.style.height = wellH + 'px';
+    var kh = clamp(Math.round(wellH * 0.13), 44, 72);
+    el.stage.style.setProperty('--kh', kh + 'px');
     el.oppMini.hidden = !hasOpp || wide;
     el.oppWide.hidden = !flip;
+    pc = Math.max(7, Math.floor((side - 10) / 4.3));
+    itemH = Math.round(Math.min(pc * 2.4, (side - 8) * 0.56));
+    View.sizeCanvas(el.holdCv, side - 8, Math.round(pc * 2.7));
+    View.sizeCanvas(el.itemCv, side - 8, itemH);
     if (hasOpp) {
       var home = wide ? el.oppFrame : el.oppMini;
       if (el.oppCv.parentNode !== home) home.appendChild(el.oppCv);
       V.opp.plain = !wide;
       V.opp.sky = wide ? SKY : 0;
+      if (!wide) {
+        var kids = el.colL.children, used = 0, shown = 0, c;
+        for (var ci = 0; ci < kids.length; ci++) {
+          c = kids[ci];
+          if (c.hidden) continue;
+          shown++;
+          if (c !== el.oppMini && c !== el.chips) used += c.offsetHeight;
+        }
+        // leave room for one status chip under it
+        var oppRoom = wellH - used - (shown - 1) * 8 - 30 - (el.oppName.offsetHeight + 9);
+        oppCell = clamp(Math.floor(oppRoom / VIS), 3, oppCell);
+      }
       V.opp.resize(oppCell);
     }
-    pc = Math.max(7, Math.floor((side - 10) / 4.3));
-    nextN = cell * (VIS + SKY) >= pc * 2.9 * 5 + 150 ? 5 : cell * (VIS + SKY) >= pc * 2.9 * 4 + 150 ? 4 : 3;
-    if (S.kind === 'dojo') nextN = 2;
-    itemH = Math.round(Math.min(pc * 2.4, (side - 8) * 0.56));
-    View.sizeCanvas(el.holdCv, side - 8, Math.round(pc * 2.7));
-    View.sizeCanvas(el.nextCv, side - 8, Math.round(pc * 2.9 * nextN));
-    View.sizeCanvas(el.itemCv, side - 8, itemH);
+    var maxN = S.kind === 'dojo' ? 2 : 5, minN = S.kind === 'dojo' ? 1 : 3, small = Math.max(8, Math.round(pc * 0.62)), n, q;
+    var nextRoom = function () {
+      el.nextBox.style.flex = '1 1 0';
+      var r = el.nextBox.clientHeight - el.nextBox.firstElementChild.offsetHeight - 9;
+      el.nextBox.style.flex = '';
+      return r;
+    };
+    var room = nextRoom(), least = Math.ceil(minN * 2.9 * 7), keysR = el.sideR.hidden ? 0 : el.sideR.querySelectorAll('.key:not([hidden])').length;
+    if (room < least && keysR) {
+      // a very short wall: the side keys give up some height so the queue still fits
+      el.stage.style.setProperty('--kh', Math.max(34, kh - Math.ceil((least - room) / keysR)) + 'px');
+      room = nextRoom();
+    }
+    // as many coming pieces as fit; they are drawn a little smaller before one is dropped
+    for (n = maxN; n >= minN; n--) {
+      q = Math.min(pc, Math.floor(room / (2.9 * n)));
+      if (q >= small || n === minN) { nextN = n; pn = Math.max(6, q); break; }
+    }
+    View.sizeCanvas(el.nextCv, side - 8, Math.round(pn * 2.9 * nextN));
     sideKey = '';
     if (wide) {
       var a = (flip ? el.oppWide : el.colL).getBoundingClientRect(), b = el.colR.getBoundingClientRect(), o = el.app.getBoundingClientRect();
@@ -5011,7 +5072,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   }
   var lookKey = '';
   function drawSide() {
-    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
+    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + pn + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
     if (key === sideKey) return;
     sideKey = key;
     var dpr = env.dpr, w = side - 8, x = el.holdCv.getContext('2d'), i;
@@ -5021,8 +5082,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     el.holdBox.classList.toggle('used', me.holdUsed);
     x = el.nextCv.getContext('2d');
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.clearRect(0, 0, w, pc * 3 * nextN);
-    for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pc * 2.9 * (i + 0.5), pc);
+    x.clearRect(0, 0, w, pn * 3 * nextN);
+    for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pn * 2.9 * (i + 0.5), pn);
     if (itemsOn()) {
       var inv = me.inv, big = itemH, sm = Math.floor((big - 2) / 2);
       x = el.itemCv.getContext('2d');
@@ -5031,7 +5092,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (inv[0]) View.drawItem(x, inv[0], 0, 0, big);
       if (inv[1]) View.drawItem(x, inv[1], big + 4, 0, sm);
       if (inv[2]) View.drawItem(x, inv[2], big + 4, sm + 2, sm);
-      el.itemKey.innerHTML = (inv[0] ? '<b style="color:' + ITEMS[inv[0]].color + '">' + View.itemSvg(inv[0]) + '</b>' : '') + esc(t('item'));
+      var bag = '', more = '';
+      for (i = 0; i < inv.length && i < 3; i++) {
+        var tile = '<i class="itile" style="--c:' + ITEMS[inv[i]].color + '">' + View.itemSvg(inv[i]) + '</i>';
+        if (i) more += tile; else bag = tile;
+      }
+      el.itemKey.innerHTML = bag ? bag + (more ? '<b>' + more + '</b>' : '') : esc(t('item'));
       el.itemKey.classList.toggle('empty', !inv[0]);
       el.itemBox.classList.toggle('empty', !inv[0]);
     }
@@ -5214,7 +5280,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   // ---------- boot ----------
   function start(data) {
     ['app', 'menu', 'play', 'hud', 'hudL', 'hudC', 'hudR', 'strip', 'stage', 'colL', 'colR', 'holdBox', 'holdCv', 'itemBox', 'itemCv', 'oppMini', 'oppName', 'oppCv',
-      'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'itemKey', 'halfKey', 'toast', 'mtoast', 'rotate',
+      'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextBox', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'sideL', 'sideR', 'itemKey', 'halfKey', 'holdKey',
+      'toast', 'mtoast', 'rotate',
       'sheet', 'sheetCard', 'demoCv'].forEach(function (id) { el[id] = $(id); });
     loadStore();
     rebuildKeys();

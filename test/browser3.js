@@ -149,17 +149,17 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   {
     const { ctx, page } = await open('phone', { viewport: { width: 390, height: 760 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
     await page.tap('[data-go="battle"]'); await page.tap('[data-do="fight"]'); await sleep(2400);
-    ok(await page.evaluate(() => !document.getElementById('itemKey').hidden && !document.getElementById('itemBox').hidden), 'phone shows the item key and slot');
+    ok(await page.evaluate(() => !document.getElementById('itemKey').hidden && document.getElementById('itemBox').hidden), 'phone shows the item key; the item slot is folded into it');
     await ev(page, 'S.me.inv = [1, 6, 3];');
     await sleep(120);
     await page.screenshot({ path: path.join(OUT, 'n9-phone-items.png') });
-    ok(await page.evaluate(() => !!document.querySelector('#itemKey b svg') && /道具/.test(document.getElementById('itemKey').textContent)), 'item key shows the next item');
+    ok(await page.evaluate(() => !!document.querySelector('#itemKey .itile svg') && document.querySelectorAll('#itemKey .itile').length === 3), 'item key shows the bag');
     await page.tap('#itemKey'); await sleep(80);
     ok(await ev(page, 'return S.me.inv.join("")') === '63', 'tapping the item key uses the first item');
-    await page.tap('#itemBox'); await sleep(80);
-    ok(await ev(page, 'return S.me.inv.join("")') === '3' && await ev(page, 'return S.freeze.opp > 0'), 'tapping the item slot works too');
+    await page.tap('#itemKey'); await sleep(80);
+    ok(await ev(page, 'return S.me.inv.join("")') === '3' && await ev(page, 'return S.freeze.opp > 0'), 'a second tap uses the next one');
     const fit = await page.evaluate(() => { const p = document.getElementById('pad').getBoundingClientRect(), l = document.getElementById('colL').getBoundingClientRect(), w = document.getElementById('wellWrap').getBoundingClientRect(); return [Math.round(p.bottom), innerHeight, Math.round(l.bottom), Math.round(w.bottom)]; });
-    ok(fit[0] <= fit[1] + 1, 'phone layout still fits with the item slot', fit);
+    ok(fit[0] <= fit[1] + 1, 'phone layout still fits with the item key', fit);
     await page.tap('#pauseBtn'); await page.tap('[data-do="help"]'); await sleep(150);
     await page.evaluate(() => { const c = document.getElementById('sheetCard'); c.scrollTop = c.scrollHeight; });
     await sleep(100);
