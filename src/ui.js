@@ -370,7 +370,7 @@
     } else if (k === 'sprint') {
       el.hudL.innerHTML = stat('linesLeft', t('linesLeft'));
       el.hudC.innerHTML = '<div id="clock">0:00.00</div><div id="ptsMe" class="pts"></div>';
-      el.hudR.innerHTML = '<div class="stat"><b id="bestT">' + (save.best ? fmtTime(save.best) : '—') + '</b><span>' + t('best') + '</span></div>';
+      el.hudR.innerHTML = '<div class="stat"><b id="bestT">' + (Meta.data.tot.sprint ? fmtTime(Meta.data.tot.sprint) : '—') + '</b><span>' + t('best') + '</span></div>';
     } else if (k === 'practice') {
       el.hudL.innerHTML = stat('pAtk', t('pAtk')) + stat('pSpin', t('pSpin'));
       el.hudC.innerHTML = '<div class="hud-title">' + t('m.practice') + '</div><div id="ptsMe" class="pts"></div>';
@@ -470,7 +470,7 @@
     buzz([20, 40, 60]);
     banner(t('b.pass'), 'good', 1400);
     if (S.drill + 1 > save.dojo) { save.dojo = S.drill + 1; saveStore(); }
-    var got = Meta.firstClear('drills', S.drill, 15);
+    var got = Meta.firstClear('drills', S.drill);
     if (got) toast(t('firstClear', got), 2600);
     txt('dDone', save.dojo + '/' + DRILLS.length);
     S.state = 'wait'; S.wait = 1500; S.target = null;
@@ -785,7 +785,7 @@
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used });
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played });
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -803,9 +803,8 @@
   function endSprint() {
     S.state = 'over';
     input.clear();
-    S.newBest = !save.best || S.time < save.best;
-    if (S.newBest) { save.best = Math.round(S.time); saveStore(); }
-    S.reward = Meta.finish({ mode: 'sprint', result: 1, time: S.time, newBest: S.newBest, stats: S.me.stats });
+    S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats });
+    S.newBest = S.reward.best;
     sfx.setDuck(0.4);
     sfx.play('win');
     openSheet('sprintEnd');
@@ -897,7 +896,7 @@
         (S.why === 'left' ? '' : btn('again', 'again', true)) + (S.mode === 'ai' ? btn('battle', 'changeFoe') : '') + btn('menu', 'toMenu', S.why === 'left') + '</div>';
     } else if (name === 'sprintEnd') {
       var s = S.me.stats;
-      h = '<h2>' + t(S.newBest ? 'sp.new' : 'sp.done') + '</h2><div class="score"><div><b>' + fmtTime(S.time) + '</b><span>' + t('sp.this') + '</span></div><i></i><div><b>' + fmtTime(save.best) + '</b><span>' + t('best') + '</span></div></div>' +
+      h = '<h2>' + t(S.newBest ? 'sp.new' : 'sp.done') + '</h2><div class="score"><div><b>' + fmtTime(S.time) + '</b><span>' + t('sp.this') + '</span></div><i></i><div><b>' + fmtTime(Meta.data.tot.sprint) + '</b><span>' + t('best') + '</span></div></div>' +
         rewardHtml(S.reward) + '<table class="cmp"><tbody><tr><td>' + t('score') + '</td><td>' + L.num(s.score) + '</td></tr><tr><td>' + t('st.pps') + '</td><td>' + (s.pieces / (S.time / 1000)).toFixed(2) +
         '</td></tr><tr><td>' + t('sp.used') + '</td><td>' + s.pieces + '</td></tr><tr><td>' + t('sp.spins') + '</td><td>' + (s.spins + s.minis + s.xspins) + '</td></tr><tr><td>' + t('st.quad') + '</td><td>' + s.quads + '</td></tr></tbody></table>' +
         '<div class="row">' + btn('again', 'sp.again', true) + btn('menu', 'toMenu') + '</div>';
@@ -1170,7 +1169,7 @@
     txt('mCoins', L.num(d.coins));
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
-    txt('mSprint', save.best ? fmtTime(save.best) : '');
+    txt('mSprint', d.tot.sprint ? fmtTime(d.tot.sprint) : '');
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');
     txt('mOpen', d.first.openers.length ? d.first.openers.length + '/' + o.length : '');
@@ -1484,6 +1483,8 @@
     loadStore();
     rebuildKeys();
     Meta.load();
+    // the sprint record used to live with the settings; it belongs with the rest of the player's record
+    if (save.best && !Meta.data.tot.sprint) { Meta.data.tot.sprint = Math.round(save.best); Meta.save(); }
     L.set(set.lang || '');
     View.readTheme();
     V.me = new View.BoardView(el.wellCv, { meter: true });

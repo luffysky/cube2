@@ -1,0 +1,274 @@
+'use strict';
+/* Accounts, cloud saves and leaderboards: everything that talks to the database.
+
+   An account has no email and no password. A device holds a random id and a random secret; the database keeps only
+   a hash of the secret, so a copy of the database does not let anyone sign in. A second device joins an account
+   with a short one-time code that the first device asks for. */
+
+const crypto = require('crypto');
+const rules = require('./rules.js');
+const DAY = 86400000;
+
+const LIMIT = {
+  NEW_PER_IP_DAY: 40,        // accounts one address may create in a day
+  CODE_TRIES: 12, CODE_WINDOW: 10 * 60000,   // code guesses one address may make in ten minutes
+  CODE_TTL: 10 * 60000,
+  DEVICES: 5,                // devices kept on one account; the oldest drops off
+  BOARD_ROWS: 50,
+  SAVE_TRIES: 4
+};
+const BOARDS = { rp: 1, score: 1, sprint: 1 };
+const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: nothing to misread
+const PUB_ABC = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+const sha = s => crypto.createHash('sha256').update(String(s)).digest('base64url');
+function pick(abc, n) { let s = ''; for (let i = 0; i < n; i++) s += abc[crypto.randomInt(abc.length)]; return s; }
+const newSecret = () => crypto.randomBytes(32).toString('base64url');
+function fail(status, why, extra) { return Object.assign({ status, body: Object.assign({ ok: false, why }, extra || {}) }); }
+function good(body) { return { status: 200, body: Object.assign({ ok: true }, body) }; }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, SECRET = /^[A-Za-z0-9_-]{43}$/;
+// "Bearer <id>.<secret>" → { id, hash } or null
+function readCred(header) {
+  if (typeof header !== 'string' || header.length > 120 || header.slice(0, 7) !== 'Bearer ') return null;
+  const s = header.slice(7), dot = s.indexOf('.');
+  if (dot < 0) return null;
+  const id = s.slice(0, dot), secret = s.slice(dot + 1);
+  if (!UUID.test(id) || !SECRET.test(secret)) return null;
+  return { id, hash: sha(secret) };
+}
+
+// Counts one more use of something inside a time window and says how many that makes.
+async function bump(db, what, who, windowMs, now) {
+  const slot = Math.floor(now / windowMs), key = what + ':' + who + ':' + slot;
+  const rows = await db.query(
+    'INSERT INTO zz.rate (k, n, exp) VALUES ($1, 1, $2) ON CONFLICT (k) DO UPDATE SET n = zz.rate.n + 1 RETURNING n',
+    [key, (slot + 2) * windowMs]);
+  return rows[0].n;
+}
+async function findPlayer(db, cred) {
+  const rows = await db.query(
+    'SELECT p.id, p.pub, p.state, p.srv, p.ver FROM zz.keys k JOIN zz.players p ON p.id = k.pid WHERE k.hash = $1 AND p.id = $2',
+    [cred.hash, cred.id]);
+  return rows[0] || null;
+}
+const INSERT_PLAYER = 'INSERT INTO zz.players (id, pub, name, state, srv, rp, season, made, seen) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $8)';
+
+// ---------- a new account ----------
+async function hello(db, body, ip, now) {
+  if (await bump(db, 'new', ip, DAY, now) > LIMIT.NEW_PER_IP_DAY) return fail(429, 'slow');
+  const state = rules.importState(body.st, now), secret = newSecret();
+  for (let tries = 0; ; tries++) {
+    const id = crypto.randomUUID(), pub = pick(PUB_ABC, 8);
+    try {
+      await db.batch([
+        [INSERT_PLAYER, [id, pub, state.name, JSON.stringify(state), JSON.stringify(rules.freshSrv(now)), state.rp, state.season, now]],
+        ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), id, now]],
+        ['DELETE FROM zz.rate WHERE exp < $1', [now]]
+      ]);
+      return good({ id, key: secret, pub, st: state, ver: 1, now });
+    } catch (e) {
+      if (e && e.code === '23505' && tries < 3) continue;   // the public tag was taken: draw another
+      throw e;
+    }
+  }
+}
+
+// ---------- load the record, apply what the page reports, save ----------
+const SAVE = `
+  WITH u AS (
+    UPDATE zz.players SET state = $3::jsonb, srv = $4::jsonb, ver = ver + 1, name = $5, rp = $6, season = $7, rg = $8, seen = $9
+    WHERE id = $1 AND ver = $2 RETURNING id
+  ), s AS (
+    INSERT INTO zz.scores (pid, board, season, val, at)
+    SELECT u.id, m.board, m.season, m.val, $9 FROM u, jsonb_to_recordset($10::jsonb) AS m(board text, season text, val integer)
+    ON CONFLICT (pid, board, season) DO UPDATE SET val = EXCLUDED.val, at = EXCLUDED.at WHERE EXCLUDED.val > zz.scores.val
+    RETURNING 1
+  )
+  SELECT (SELECT count(*)::int FROM u) AS saved`;
+async function sync(db, cred, ops, now) {
+  for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
+    const row = await findPlayer(db, cred);
+    if (!row) return fail(401, 'auth');
+    if (!ops.length) return good({ st: rules.current(row.state, now), ver: row.ver, pub: row.pub, res: [], now });
+    const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks)]);
+    if (saved[0] && saved[0].saved === 1) return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
+    // another device saved in between: read again and repeat on top of that
+  }
+  return fail(409, 'busy');
+}
+
+// ---------- moving to another device ----------
+function showCode(c) { return c.slice(0, 4) + '-' + c.slice(4); }
+function readCode(v) {
+  if (typeof v !== 'string' || v.length > 24) return '';
+  const c = v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return c.length === 8 ? c : '';
+}
+async function makeCode(db, cred, now) {
+  const row = await findPlayer(db, cred);
+  if (!row) return fail(401, 'auth');
+  const code = pick(CODE_ABC, 8), exp = now + LIMIT.CODE_TTL;
+  await db.batch([
+    ['DELETE FROM zz.codes WHERE pid = $1 OR exp < $2', [row.id, now]],
+    ['INSERT INTO zz.codes (hash, pid, exp) VALUES ($1, $2, $3)', [sha(code), row.id, exp]]
+  ]);
+  return good({ code: showCode(code), exp, now });
+}
+// go false: only show whose save the code belongs to. go true: this device joins that account.
+async function redeem(db, body, old, ip, now) {
+  const code = readCode(body.code);
+  if (await bump(db, 'code', ip, LIMIT.CODE_WINDOW, now) > LIMIT.CODE_TRIES) return fail(429, 'slow');
+  if (!code) return fail(404, 'code');
+  const hash = sha(code);
+  if (!body.go) {
+    const rows = await db.query('SELECT p.id, p.pub, p.state FROM zz.codes c JOIN zz.players p ON p.id = c.pid WHERE c.hash = $1 AND c.exp > $2', [hash, now]);
+    if (!rows[0]) return fail(404, 'code');
+    const d = rules.current(rows[0].state, now);
+    return good({ peek: { pub: rows[0].pub, name: d.name, rp: d.rp, coins: d.coins, games: d.tot.games, same: !!old && old.id === rows[0].id }, now });
+  }
+  // the code is used up and the new device key is made in one statement, so a code can never open two doors
+  const secret = newSecret();
+  const used = await db.query(
+    'WITH c AS (DELETE FROM zz.codes WHERE hash = $1 AND exp > $2 RETURNING pid) INSERT INTO zz.keys (hash, pid, made) SELECT $3, pid, $2 FROM c RETURNING pid',
+    [hash, now, sha(secret)]);
+  if (!used[0]) return fail(404, 'code');
+  const pid = used[0].pid, q = [
+    ['DELETE FROM zz.keys WHERE pid = $1 AND hash NOT IN (SELECT hash FROM zz.keys WHERE pid = $1 ORDER BY made DESC, hash LIMIT ' + LIMIT.DEVICES + ')', [pid]],
+    ['SELECT id, pub, state, ver FROM zz.players WHERE id = $1', [pid]]
+  ];
+  if (old && old.id !== pid) {
+    // this device leaves the account it was on; an account no device can reach any more is removed
+    q.push(['DELETE FROM zz.keys WHERE hash = $1 AND pid = $2', [old.hash, old.id]]);
+    q.push(['DELETE FROM zz.players p WHERE p.id = $1 AND NOT EXISTS (SELECT 1 FROM zz.keys k WHERE k.pid = p.id)', [old.id]]);
+  }
+  const out = await db.batch(q), row = out[1][0];
+  if (!row) return fail(404, 'code');
+  return good({ id: row.id, key: secret, pub: row.pub, st: rules.current(row.state, now), ver: row.ver, now });
+}
+async function wipe(db, cred) {
+  const rows = await db.query('DELETE FROM zz.players p USING zz.keys k WHERE k.pid = p.id AND k.hash = $1 AND p.id = $2 RETURNING p.id', [cred.hash, cred.id]);
+  return rows[0] ? good({}) : fail(401, 'auth');
+}
+
+// ---------- leaderboards ----------
+const PUB = /^[a-z0-9]{8}$/;
+async function board(db, b, scope, me, now) {
+  if (!BOARDS.hasOwnProperty(b)) return fail(400, 'board');
+  const season = rules.seasonOf(now), mine = typeof me === 'string' && PUB.test(me) ? me : '';
+  let top, own;
+  if (b === 'rp') {
+    top = ['SELECT pub AS p, name AS n, rp AS v FROM zz.players WHERE season = $1 AND rg > 0 AND NOT ban ORDER BY rp DESC, seen LIMIT ' + LIMIT.BOARD_ROWS, [season]];
+    own = [`SELECT me.rp AS v, 1 + (SELECT count(*)::int FROM zz.players o WHERE o.season = $1 AND o.rg > 0 AND NOT o.ban AND (o.rp > me.rp OR (o.rp = me.rp AND o.seen < me.seen))) AS rank
+            FROM zz.players me WHERE me.pub = $2 AND me.season = $1 AND me.rg > 0 AND NOT me.ban`, [season, mine]];
+    scope = 'season';
+  } else {
+    scope = scope === 'all' ? 'all' : 'season';
+    const s = scope === 'all' ? 'all' : season;
+    top = ['SELECT p.pub AS p, p.name AS n, s.val AS v FROM zz.scores s JOIN zz.players p ON p.id = s.pid WHERE s.board = $1 AND s.season = $2 AND NOT p.ban ORDER BY s.val DESC, s.at LIMIT ' + LIMIT.BOARD_ROWS, [b, s]];
+    own = [`SELECT ms.val AS v, 1 + (SELECT count(*)::int FROM zz.scores o JOIN zz.players op ON op.id = o.pid
+              WHERE o.board = $1 AND o.season = $2 AND NOT op.ban AND (o.val > ms.val OR (o.val = ms.val AND o.at < ms.at))) AS rank
+            FROM zz.scores ms JOIN zz.players mp ON mp.id = ms.pid WHERE mp.pub = $3 AND ms.board = $1 AND ms.season = $2 AND NOT mp.ban`, [b, s, mine]];
+  }
+  const out = await db.batch(mine ? [top, own] : [top]), flip = b === 'sprint' ? -1 : 1;
+  const row = mine && out[1][0];
+  return good({ b, scope, season, top: out[0].map(r => ({ p: r.p, n: r.n, v: r.v * flip })), me: row ? { rank: row.rank, v: row.v * flip } : null, now });
+}
+
+// ---------- rooms for online matches ----------
+// Two players find each other with a five-character code and then pass game messages through the server: each seat
+// posts into the other seat's letter box and collects its own. It works from any network, because all either side
+// ever does is ordinary HTTPS requests to this site.
+//
+// A seat is held by a key the page makes up itself; only its hash is stored. Messages are numbered by the sender,
+// kept until the receiver says how far it has read (ack), and a number that arrives twice is stored once. So a
+// request that is repeated after a lost answer neither loses nor doubles anything.
+const ROOM = {
+  TTL: 3 * 3600000,          // a room lives this long, then it and its letters are removed
+  OPEN_PER_HOUR: 40, JOIN_TRIES: 60, JOIN_WINDOW: 10 * 60000,
+  MAIL_MAX: 400,             // letters that may wait unread in one box
+  BATCH: 80, MSG_BYTES: 4096, INBOX: 120
+};
+const SEAT = /^[A-Za-z0-9_-]{20,64}$/;
+function readRoom(v) {
+  if (typeof v !== 'string' || v.length > 16) return '';
+  const c = v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return c.length === 5 ? c : '';
+}
+async function roomOpen(db, body, ip, now) {
+  if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
+  if (await bump(db, 'room', ip, 3600000, now) > ROOM.OPEN_PER_HOUR) return fail(429, 'slow');
+  for (let tries = 0; ; tries++) {
+    const code = pick(CODE_ABC, 5);
+    try {
+      await db.batch([
+        ['DELETE FROM zz.rooms WHERE exp < $1', [now]],
+        ['INSERT INTO zz.rooms (code, hk, exp) VALUES ($1, $2, $3)', [code, sha(body.key), now + ROOM.TTL]]
+      ]);
+      return good({ code, now });
+    } catch (e) {
+      if (e && e.code === '23505' && tries < 6) continue;   // that code is in use: draw another
+      throw e;
+    }
+  }
+}
+async function roomJoin(db, body, ip, now) {
+  const code = readRoom(body.code);
+  if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
+  if (await bump(db, 'join', ip, ROOM.JOIN_WINDOW, now) > ROOM.JOIN_TRIES) return fail(429, 'slow');
+  if (!code) return fail(404, 'room');
+  const hash = sha(body.key);
+  // taking the free seat; asking again with the same key (a retry) is fine
+  const got = await db.query('UPDATE zz.rooms SET jk = $2 WHERE code = $1 AND exp > $3 AND hk <> $2 AND (jk IS NULL OR jk = $2) RETURNING code', [code, hash, now]);
+  if (got[0]) return good({ code, now });
+  const there = await db.query('SELECT 1 AS x FROM zz.rooms WHERE code = $1 AND exp > $2', [code, now]);
+  return there[0] ? fail(409, 'full') : fail(404, 'room');
+}
+function cleanMail(v) {
+  if (v == null) return [];
+  if (!Array.isArray(v) || v.length > ROOM.BATCH) return null;
+  const out = [];
+  for (const x of v) {
+    if (!x || typeof x !== 'object' || typeof x.n !== 'number' || x.n !== Math.floor(x.n) || x.n < 1 || x.n > 2e9 || !x.m || typeof x.m !== 'object' || Array.isArray(x.m)) return null;
+    if (JSON.stringify(x.m).length > ROOM.MSG_BYTES) return null;
+    out.push({ n: x.n, m: x.m });
+  }
+  return out;
+}
+const EXCHANGE = `
+  WITH seat AS (
+    SELECT code, (jk IS NOT NULL) AS paired FROM zz.rooms
+    WHERE code = $1 AND exp > $7 AND (CASE WHEN $2::int = 0 THEN hk ELSE jk END) = $3
+  ), put AS (
+    INSERT INTO zz.mail (room, dst, n, body)
+    SELECT seat.code, $4::int, (x->>'n')::int, x->'m' FROM seat, jsonb_array_elements($5::jsonb) AS x
+    WHERE (SELECT count(*) FROM zz.mail q WHERE q.room = seat.code AND q.dst = $4::int) < $8::int
+    ON CONFLICT (room, dst, n) DO NOTHING
+    RETURNING 1
+  ), del AS (
+    DELETE FROM zz.mail m USING seat WHERE m.room = seat.code AND m.dst = $2::int AND m.n <= $6::int RETURNING 1
+  )
+  SELECT (SELECT count(*)::int FROM seat) AS ok, (SELECT paired FROM seat) AS paired,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('n', w.n, 'm', w.body) ORDER BY w.n)
+              FROM (SELECT m.n, m.body FROM zz.mail m, seat WHERE m.room = seat.code AND m.dst = $2::int AND m.n > $6::int ORDER BY m.n LIMIT ${ROOM.INBOX}) w), '[]'::jsonb) AS inbox`;
+// One round of the conversation: hand over what I have to say, say how far I have read, collect what is waiting for me.
+async function roomExchange(db, body, now) {
+  const code = readRoom(body.code), role = body.role === 1 ? 1 : 0;
+  if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
+  const out = cleanMail(body.out), ack = Math.max(0, Math.min(2e9, Math.floor(+body.ack || 0)));
+  if (!out) return fail(400, 'mail');
+  const rows = await db.query(EXCHANGE, [code, role, sha(body.key), 1 - role, JSON.stringify(out), ack, now, ROOM.MAIL_MAX]);
+  const r = rows[0];
+  if (!r || !r.ok) return fail(404, 'room');
+  return good({ paired: !!r.paired, in: r.inbox || [], now });
+}
+// The host closes the room: the code stops working at once and anything still waiting is dropped.
+async function roomClose(db, body) {
+  const code = readRoom(body.code);
+  if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
+  await db.query('DELETE FROM zz.rooms WHERE code = $1 AND hk = $2', [code, sha(body.key)]);
+  return good({});
+}
+
+module.exports = { LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomExchange, roomClose };

@@ -374,6 +374,21 @@ html[lang="ko"] { --display: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Goth
 /* 捲軸藏起來。內容照樣可以用滾輪、觸控和鍵盤捲動。 */
 html, body, #menu, #sheetCard { scrollbar-width: none; -ms-overflow-style: none; }
 html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #sheetCard::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ---------- 排行榜、雲端存檔 ---------- */
+.lb { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lb li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 7px 12px 7px 7px; background: var(--panel); border: 1px solid var(--edge); border-radius: 11px; }
+.lb i { display: grid; place-items: center; width: 34px; height: 30px; border-radius: 7px; background: var(--floor); font: italic 700 16px/1 var(--num); font-variant-numeric: tabular-nums; color: var(--muted); }
+.lb li:first-child i { background: var(--gold); color: #1B2530; }
+.lb.solo li:first-child i { background: var(--floor); color: var(--muted); }
+.lb b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.lb em { margin-left: 8px; padding: 1px 7px 2px; border-radius: 99px; background: var(--wall); color: var(--wall-ink); font-size: 11px; font-style: normal; font-weight: 700; vertical-align: 1px; }
+.lb span { font: italic 700 18px/1 var(--num); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.lb span small { display: block; margin-bottom: 3px; font: 700 11px/1.2 var(--display); color: var(--muted); }
+.lb li.me { border-color: var(--gold); box-shadow: inset 4px 0 0 var(--gold); }
+.lb-none { padding: 22px 12px; text-align: center; background: var(--panel); border: 1px dashed var(--edge-deep); border-radius: 12px; }
+.lb-wait { text-align: center; padding: 18px 0; }
+.roomcode.xfer { font-size: clamp(26px, 9.4vw, 44px); letter-spacing: 0.08em; }
 </style>
 </head>
 <body>
@@ -408,6 +423,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       <footer class="menu-foot">
         <button class="link" type="button" data-sheet="shop" data-t="m.shop"></button>
         <button class="link" type="button" data-sheet="jobs"><span data-t="m.jobs"></span><i class="dot" id="mJobsDot" hidden></i></button>
+        <button class="link" type="button" data-sheet="board" data-t="m.board" id="mBoard" hidden></button>
         <button class="link" type="button" data-sheet="settings" data-t="m.settings"></button>
         <button class="link" type="button" data-sheet="help" data-t="m.help"></button>
       </footer>
@@ -2027,11 +2043,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 </script>
 <script>
 /* 轉磚 meta: coins, ranked ladder, daily jobs, the shop catalogue and what the player owns.
-   Pure logic plus one localStorage record. Runs in the page and in Node tests. */
+   Pure logic plus one localStorage record. Runs in the page, in Node tests and on the server:
+   the page works out every change at once so nothing waits on the network, and when a cloud save is linked
+   the server repeats the same change on its own copy (Meta.run) and its result is the one that counts. */
 (function (root) {
   'use strict';
   var ZZ = root.ZZ || require('./engine.js');
   var KEY = 'zhuanzhuan.meta.v1', DAY = 86400000;
+  var TZ = 480;   // the game's day and season turn over at midnight UTC+8 for every player, on every device and on the server
+  function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
 
   // ---------- ladder ----------
   var TIERS = ['陶土', '紅磚', '青瓦', '白瓷', '琉璃', '鎏金', '窯神'];
@@ -2153,13 +2173,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0 },
-      tot: { games: 0, wins: 0, best: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
+      tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
       first: { drills: [], openers: [] },
       note: null
     };
   }
   var Meta = {
-    data: blank(), now: function () { return Date.now(); }, onChange: null, store: null,
+    data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
     TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
     SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find
   };
@@ -2176,25 +2196,33 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     }
     if (from && from.note && typeof from.note === 'object') into.note = from.note;
   }
-  Meta.dayNo = function () { var d = new Date(Meta.now()); return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / DAY); };
-  Meta.seasonId = function () { var d = new Date(Meta.now()); return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1); };
+  // Reports a change the player made (kind, arguments) to whoever keeps the cloud copy. Silent while Meta.run replays one.
+  function emit(k, a) { if (Meta.onOp && !Meta.quiet) Meta.onOp(k, a); }
+  Meta.dayNo = function () { return Math.floor((Meta.now() + TZ * 60000) / DAY); };
+  Meta.seasonId = function () { var d = new Date(Meta.now() + TZ * 60000); return d.getUTCFullYear() + '-' + (d.getUTCMonth() < 9 ? '0' : '') + (d.getUTCMonth() + 1); };
   Meta.save = function () {
     var st = storage();
     try { if (st) st.setItem(KEY, JSON.stringify(Meta.data)); } catch (e) { /* kept in memory only */ }
     if (Meta.onChange) Meta.onChange();
   };
-  Meta.load = function () {
-    var d = blank(), st = storage();
-    try {
-      var raw = st && st.getItem(KEY);
-      if (raw) merge(d, JSON.parse(raw));
-    } catch (e) { /* start fresh */ }
+  // Takes a saved record (from this device or from the server), fills in whatever it lacks and brings it up to today.
+  Meta.use = function (obj) {
+    var d = blank();
+    if (obj && typeof obj === 'object') merge(d, obj);
     while (d.items.length < 8) d.items.push(0);
     Meta.data = d;
     Meta.rollSeason();
     Meta.rollDay();
     Meta.tidy();
     return d;
+  };
+  Meta.load = function () {
+    var st = storage(), obj = null;
+    try {
+      var raw = st && st.getItem(KEY);
+      if (raw) obj = JSON.parse(raw);
+    } catch (e) { /* start fresh */ }
+    return Meta.use(obj);
   };
   Meta.reset = function () { Meta.data = blank(); Meta.rollSeason(); Meta.rollDay(); };
 
@@ -2227,6 +2255,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var coins = LOGIN[(d.streak - 1) % LOGIN.length];
     if (Meta.isSub()) coins *= 2;
     Meta.earn(coins);
+    emit('login', []);
     return coins;
   };
   Meta.jobs = function () {
@@ -2242,7 +2271,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (!j || !def || j.paid || j.n < def.need) return 0;
     j.paid = true;
     Meta.earn(def.coin);
+    emit('job', [j.id]);
     return def.coin;
+  };
+  // The same claim by the job's name, which still means the same thing if the day has turned over in between.
+  Meta.claimJobId = function (id) {
+    Meta.rollDay();
+    var jobs = Meta.data.daily.jobs;
+    for (var i = 0; i < jobs.length; i++) if (jobs[i].id === id) return Meta.claimJob(i);
+    return 0;
   };
 
   // ---------- money ----------
@@ -2256,8 +2293,20 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Meta.isSub = function () { return Meta.data.sub.until > Meta.now(); };
   Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
   // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
-  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); };
-  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); };
+  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
+  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); emit('unsub', []); };
+  // A name is at most 12 characters, with nothing that could be read as markup.
+  Meta.cleanName = function (v) {
+    return Array.from(String(v == null ? '' : v).replace(/[<>&"'`\\\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 12).join('').trim();
+  };
+  Meta.setName = function (v) {
+    v = Meta.cleanName(v);
+    if (v === Meta.data.name) return false;
+    Meta.data.name = v;
+    Meta.save();
+    emit('name', [v]);
+    return true;
+  };
 
   Meta.owns = function (kind, id) { return Meta.data.owned[kind].indexOf(id) >= 0; };
   Meta.state = function (kind, id) {
@@ -2276,6 +2325,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (!Meta.spend(it.price)) return { ok: false, why: 'poor', n: it.price - Meta.data.coins };
     Meta.data.owned[kind].push(id);
     Meta.save();
+    emit('buy', [kind, id]);
     return { ok: true };
   };
   Meta.setPrice = function (id) {
@@ -2295,6 +2345,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (!Meta.spend(p.price)) return { ok: false, why: 'poor', n: p.price - Meta.data.coins };
     KINDS.forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
     Meta.save();
+    emit('set', [id]);
     return { ok: true };
   };
   Meta.setUsable = function (id) {
@@ -2302,9 +2353,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     return !!st && KINDS.every(function (k) { return Meta.canUse(k, st.parts[k]); });
   };
   Meta.equip = function (kind, id) {
-    if (!Meta.canUse(kind, id)) return false;
+    if (KINDS.indexOf(kind) < 0 || !Meta.canUse(kind, id)) return false;
     Meta.data.equip[kind] = id;
     Meta.save();
+    emit('wear', [kind, id]);
     return true;
   };
   Meta.equipSet = function (id) {
@@ -2312,6 +2364,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (!st || !Meta.setUsable(id)) return false;
     KINDS.forEach(function (k) { Meta.data.equip[k] = st.parts[k]; });
     Meta.save();
+    emit('wset', [id]);
     return true;
   };
   // Anything worn that is no longer allowed (a membership ran out) goes back to the stock look.
@@ -2329,6 +2382,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (!Meta.spend(p)) return { ok: false, why: 'poor', n: p - Meta.data.coins };
     Meta.data.items[id]++;
     Meta.save();
+    emit('item', [id]);
     return { ok: true };
   };
   Meta.toggleBring = function (id) {
@@ -2337,6 +2391,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     else if (b.length < BRING_MAX && Meta.data.items[id] > 0) b.push(id);
     else return false;
     Meta.save();
+    emit('bring', [id]);
     return true;
   };
   // Takes the chosen items out of stock when a match starts. Returns what actually goes in.
@@ -2344,17 +2399,37 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var d = Meta.data, out = [];
     d.bring.forEach(function (id) { if (d.items[id] > 0) { d.items[id]--; out.push(id); } });
     d.bring = d.bring.filter(function (id) { return d.items[id] > 0; });
-    if (out.length) Meta.save();
+    if (out.length) { Meta.save(); emit('take', []); }
     return out;
   };
 
   // ---------- after a match ----------
   var WIN_AI = [10, 15, 22, 30, 40];
-  // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, time, newBest }
+  var MODES = { ai: 1, rank: 1, ghost: 1, net: 1, sprint: 1 };
+  // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
+  // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
+  //   ms: how long it was played (for a sprint, the finishing time)
+  Meta.cleanMatch = function (m) {
+    m = m && typeof m === 'object' ? m : {};
+    var st = m.stats && typeof m.stats === 'object' ? m.stats : {}, mode = typeof m.mode === 'string' && MODES.hasOwnProperty(m.mode) ? m.mode : 'ai', sprint = mode === 'sprint';
+    var ms = int(m.ms != null ? m.ms : m.time, 0, 3600000), sec = ms / 1000;
+    var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
+    return {
+      mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 4),
+      ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
+      ms: ms, time: sprint ? ms : 0,
+      stats: {
+        score: cap(st.score, 3000, 5000), sent: sprint ? 0 : cap(st.sent, 6, 20), spins: cap(st.spins, 1.5, 4), minis: cap(st.minis, 1.5, 4),
+        xspins: cap(st.xspins, 1.5, 4), quads: cap(st.quads, 1, 3), maxCombo: int(st.maxCombo, 0, 40), lines: cap(st.lines, 5, 8), pieces: cap(st.pieces, 6, 10)
+      }
+    };
+  };
+  // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, ms }
   Meta.finish = function (m) {
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
+    m = Meta.cleanMatch(m);
     m.battle = m.mode !== 'sprint';
-    var st = m.stats || {}, sc = st.score || 0;
+    var st = m.stats, sc = st.score;
     function add(key, n) { n = Math.round(n); if (n > 0) parts.push({ key: key, n: n }); }
     if (m.battle) {
       add('score', Math.min(80, Math.floor(sc / 400)));
@@ -2370,7 +2445,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (m.result > 0) {
         add('sprint', 15);
         add('speed', m.time < 60000 ? 40 : m.time < 90000 ? 20 : m.time < 120000 ? 10 : 0);
-        if (m.newBest) add('best', 20);
+        if (!d.tot.sprint || m.time < d.tot.sprint) { d.tot.sprint = m.time; out.best = true; add('best', 20); }
       }
     }
     var sum = 0;
@@ -2401,16 +2476,54 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     });
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
+    delete m.battle;
+    emit('fin', [m]);
     return out;
   };
-  // First time through a drill or an opener lesson pays once.
-  Meta.firstClear = function (kind, id, coins) {
-    var list = Meta.data.first[kind];
-    if (!list || list.indexOf(id) >= 0) return 0;
-    list.push(id);
-    return Meta.earn(coins);
+  // First time through a drill or an opener lesson pays once. What it pays is looked up here, not taken from the caller.
+  Meta.firstCoin = function (kind, id) {
+    if (kind === 'drills') return typeof id === 'number' && id === Math.floor(id) && id >= 0 && id < (ZZ.DRILLS ? ZZ.DRILLS.length : 0) ? 15 : 0;
+    if (kind === 'openers') { var list = ZZ.OPENERS || []; for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].coin; }
+    return 0;
   };
-  Meta.takeNote = function () { var n = Meta.data.note; if (n) { Meta.data.note = null; Meta.save(); } return n; };
+  Meta.firstClear = function (kind, id) {
+    var coins = Meta.firstCoin(kind, id);
+    if (!coins || Meta.data.first[kind].indexOf(id) >= 0) return 0;
+    Meta.data.first[kind].push(id);
+    Meta.earn(coins);
+    emit('first', [kind, id]);
+    return coins;
+  };
+  Meta.takeNote = function () { var n = Meta.data.note; if (n) { Meta.data.note = null; Meta.save(); emit('note', []); } return n; };
+
+  // ---------- one change, by name ----------
+  // The cloud copy is kept in step by repeating each change there: kind 'buy' with ['tile', 'neon'], and so on.
+  // Everything arriving here may come from outside, so each argument is checked before it is used.
+  function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
+  function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
+  var RUN = {
+    fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
+    buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
+    set: function (a) { return Meta.buySet(str(a[0])); },
+    item: function (a) { return Meta.buyItem(int(a[0], 0, 99)); },
+    wear: function (a) { return yes(Meta.equip(a[0], str(a[1]))); },
+    wset: function (a) { return yes(Meta.equipSet(str(a[0]))); },
+    bring: function (a) { return yes(Meta.toggleBring(int(a[0], 0, 99))); },
+    take: function () { Meta.takeBring(); return yes(1); },
+    login: function () { return yes(Meta.claimLogin()); },
+    job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
+    first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
+    name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
+    sub: function () { Meta.subscribe(); return yes(1); },
+    unsub: function () { Meta.cancelSub(); return yes(1); },
+    note: function () { Meta.takeNote(); return yes(1); }
+  };
+  Meta.OPS = Object.keys(RUN);
+  Meta.run = function (k, a) {
+    if (typeof k !== 'string' || !RUN.hasOwnProperty(k) || !Array.isArray(a)) return { ok: false, why: 'op' };
+    Meta.quiet++;
+    try { return RUN[k](a); } finally { Meta.quiet--; }
+  };
 
   ZZ.Meta = Meta;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
@@ -4172,7 +4285,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     } else if (k === 'sprint') {
       el.hudL.innerHTML = stat('linesLeft', t('linesLeft'));
       el.hudC.innerHTML = '<div id="clock">0:00.00</div><div id="ptsMe" class="pts"></div>';
-      el.hudR.innerHTML = '<div class="stat"><b id="bestT">' + (save.best ? fmtTime(save.best) : '—') + '</b><span>' + t('best') + '</span></div>';
+      el.hudR.innerHTML = '<div class="stat"><b id="bestT">' + (Meta.data.tot.sprint ? fmtTime(Meta.data.tot.sprint) : '—') + '</b><span>' + t('best') + '</span></div>';
     } else if (k === 'practice') {
       el.hudL.innerHTML = stat('pAtk', t('pAtk')) + stat('pSpin', t('pSpin'));
       el.hudC.innerHTML = '<div class="hud-title">' + t('m.practice') + '</div><div id="ptsMe" class="pts"></div>';
@@ -4272,7 +4385,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     buzz([20, 40, 60]);
     banner(t('b.pass'), 'good', 1400);
     if (S.drill + 1 > save.dojo) { save.dojo = S.drill + 1; saveStore(); }
-    var got = Meta.firstClear('drills', S.drill, 15);
+    var got = Meta.firstClear('drills', S.drill);
     if (got) toast(t('firstClear', got), 2600);
     txt('dDone', save.dojo + '/' + DRILLS.length);
     S.state = 'wait'; S.wait = 1500; S.target = null;
@@ -4587,7 +4700,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used });
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played });
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -4605,9 +4718,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function endSprint() {
     S.state = 'over';
     input.clear();
-    S.newBest = !save.best || S.time < save.best;
-    if (S.newBest) { save.best = Math.round(S.time); saveStore(); }
-    S.reward = Meta.finish({ mode: 'sprint', result: 1, time: S.time, newBest: S.newBest, stats: S.me.stats });
+    S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats });
+    S.newBest = S.reward.best;
     sfx.setDuck(0.4);
     sfx.play('win');
     openSheet('sprintEnd');
@@ -4699,7 +4811,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         (S.why === 'left' ? '' : btn('again', 'again', true)) + (S.mode === 'ai' ? btn('battle', 'changeFoe') : '') + btn('menu', 'toMenu', S.why === 'left') + '</div>';
     } else if (name === 'sprintEnd') {
       var s = S.me.stats;
-      h = '<h2>' + t(S.newBest ? 'sp.new' : 'sp.done') + '</h2><div class="score"><div><b>' + fmtTime(S.time) + '</b><span>' + t('sp.this') + '</span></div><i></i><div><b>' + fmtTime(save.best) + '</b><span>' + t('best') + '</span></div></div>' +
+      h = '<h2>' + t(S.newBest ? 'sp.new' : 'sp.done') + '</h2><div class="score"><div><b>' + fmtTime(S.time) + '</b><span>' + t('sp.this') + '</span></div><i></i><div><b>' + fmtTime(Meta.data.tot.sprint) + '</b><span>' + t('best') + '</span></div></div>' +
         rewardHtml(S.reward) + '<table class="cmp"><tbody><tr><td>' + t('score') + '</td><td>' + L.num(s.score) + '</td></tr><tr><td>' + t('st.pps') + '</td><td>' + (s.pieces / (S.time / 1000)).toFixed(2) +
         '</td></tr><tr><td>' + t('sp.used') + '</td><td>' + s.pieces + '</td></tr><tr><td>' + t('sp.spins') + '</td><td>' + (s.spins + s.minis + s.xspins) + '</td></tr><tr><td>' + t('st.quad') + '</td><td>' + s.quads + '</td></tr></tbody></table>' +
         '<div class="row">' + btn('again', 'sp.again', true) + btn('menu', 'toMenu') + '</div>';
@@ -4972,7 +5084,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     txt('mCoins', L.num(d.coins));
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
-    txt('mSprint', save.best ? fmtTime(save.best) : '');
+    txt('mSprint', d.tot.sprint ? fmtTime(d.tot.sprint) : '');
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');
     txt('mOpen', d.first.openers.length ? d.first.openers.length + '/' + o.length : '');
@@ -5286,6 +5398,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     loadStore();
     rebuildKeys();
     Meta.load();
+    // the sprint record used to live with the settings; it belongs with the rest of the player's record
+    if (save.best && !Meta.data.tot.sprint) { Meta.data.tot.sprint = Math.round(save.best); Meta.save(); }
     L.set(set.lang || '');
     View.readTheme();
     V.me = new View.BoardView(el.wellCv, { meter: true });
@@ -5344,11 +5458,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 })();
 </script>
 <script>
-/* 轉磚 net: two players, device to device. One opens a room and gets a code; the other joins with it.
-   The room is found through a PeerJS broker, then play data flows straight between the two browsers (WebRTC).
+/* 轉磚 net: two players, each on their own device. One opens a room and gets a code; the other joins with it.
    Each side runs its own game. What crosses the wire: a picture of the wall after every change, the events the other
    screen needs for its effects, attack lines, item hits and a final tally. Nothing received is trusted: every field is checked.
-   Test hooks in the page address: ?net=bc uses a BroadcastChannel instead of WebRTC, ?peer=host:port/path uses your own broker. */
+
+   How the two sides reach each other depends on where the page is served:
+   - With the game's own API (Vercel): through /api/room. Each side posts its messages and collects the other's with
+     plain HTTPS requests, a few times a second. It needs nothing but ordinary web access, so it works on any network.
+   - On a plain static host: through a public PeerJS broker and a direct WebRTC link. No server of ours is involved,
+     but it only works when that broker is up and the two networks let a direct link through.
+   Test hooks in the page address: ?net=bc uses a BroadcastChannel, ?net=peer forces the PeerJS way,
+   ?peer=host:port/path uses your own PeerJS broker. */
 (function () {
   'use strict';
   var ZZ = window.ZZ, App = ZZ.App, TYPES = ZZ.TYPES, ROWS = ZZ.ROWS, COLS = ZZ.COLS;
@@ -5358,7 +5478,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     code: '', host: false, me: '', foe: '', err: '', cfg: { minutes: 2, items: false },
     wantAgain: false, foeAgain: false, onChange: null
   };
-  var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0;
+  var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0, epoch = 0, relayed = false;
   var qs = (function () { try { return new URLSearchParams(window.location.search); } catch (e) { return { get: function () { return null; } }; } })();
 
   function changed() { if (Net.onChange) Net.onChange(); }
@@ -5412,6 +5532,125 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   BcConn.prototype.send = function (d) { this.ch.postMessage({ k: 'd', d: d }); };
   BcConn.prototype.close = function () { try { this.ch.postMessage({ k: 'close' }); this.ch.close(); } catch (e) { /* closed */ } };
 
+  // ---------- our own relay ----------
+  function rpc(body, last) {
+    var o = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', keepalive: !!last }, t = 0;
+    if (typeof AbortController === 'function') { var ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 9000); }
+    return window.fetch('api/room', o).then(function (res) {
+      return res.text().then(function (text) {
+        clearTimeout(t);
+        var j = null;
+        try { j = JSON.parse(text); } catch (e) { /* not ours */ }
+        return { status: res.status, body: j && typeof j === 'object' ? j : null };
+      });
+    }, function (e) { clearTimeout(t); throw e; });
+  }
+  function seatKey() {
+    var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', s = '', buf = new Uint8Array(32), i;
+    try { window.crypto.getRandomValues(buf); } catch (e) { for (i = 0; i < 32; i++) buf[i] = Math.floor(Math.random() * 256); }
+    for (i = 0; i < 32; i++) s += abc[buf[i] % abc.length];
+    return s;
+  }
+  // One seat in a room. Looks like a data connection to the rest of this file: on('open' | 'data' | 'close'), send, close.
+  // Every message gets a number. A batch is offered again until the server has confirmed it, the server keeps each
+  // number once, and what comes back is only taken in order, so nothing is lost or doubled when a request goes missing.
+  function Relay(code, key, role) {
+    this.code = code; this.key = key; this.role = role;
+    this.h = {}; this.out = []; this.nOut = 0; this.ack = 0;
+    this.open = false; this.dead = false; this.closing = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
+    this.heard = Date.now(); this.said = Date.now(); this.born = Date.now();
+    this.pump(0);
+  }
+  Relay.prototype.on = function (ev, fn) { this.h[ev] = fn; };
+  Relay.prototype.fire = function (ev, d) { if (this.h[ev]) this.h[ev](d); };
+  // how long to wait between rounds: quick while a match is on, relaxed in the lobby, slow while waiting alone
+  Relay.prototype.pace = function () {
+    if (Net.state === 'playing') return 110;
+    if (this.open) return 500;
+    var waited = Date.now() - this.born;      // nobody has joined yet: look less often the longer the room sits open
+    return waited < 120000 ? 1300 : waited < 600000 ? 2500 : 5000;
+  };
+  Relay.prototype.send = function (m) {
+    if (this.dead || this.closing) return;
+    var last = this.out[this.out.length - 1];
+    // only the newest picture of the wall is worth sending
+    if (m && m.t === 's' && last && !last.s && last.m.t === 's') last.m = m;
+    else this.out.push({ n: ++this.nOut, m: m });
+    this.said = Date.now();
+    this.pump(m && (m.t === 's' || m.t === 'e') ? 90 : 0);
+  };
+  Relay.prototype.pump = function (ms) {
+    var self = this, at = Date.now() + ms;
+    if (this.dead || this.closing || this.busy) return;
+    if (this.t && this.due <= at) return;      // an earlier round is already booked
+    clearTimeout(this.t);
+    this.due = at;
+    this.t = setTimeout(function () { self.t = 0; self.round(false); }, ms);
+  };
+  Relay.prototype.round = function (last) {
+    var self = this, batch = [], size = 0, i;
+    if (this.dead || this.closing || this.busy) return;
+    // silence from the other side for too long means they are gone (a phone that went to sleep, a closed tab)
+    if (this.open && Date.now() - this.heard > (Net.state === 'playing' ? 15000 : 70000)) { this.dead = true; return this.fire('close'); }
+    if (this.open && Net.state !== 'playing' && Date.now() - this.said > 5000) { this.out.push({ n: ++this.nOut, m: { t: 'p' } }); this.said = Date.now(); }
+    for (i = 0; i < this.out.length && batch.length < 60; i++) {
+      var len = JSON.stringify(this.out[i].m).length;
+      if (batch.length && size + len > 16000) break;
+      size += len; this.out[i].s = 1;
+      batch.push({ n: this.out[i].n, m: this.out[i].m });
+    }
+    var top = batch.length ? batch[batch.length - 1].n : 0, retry = function () {
+      self.busy = false;
+      if (self.dead) return;
+      if (self.closing) return self.finish();
+      for (var k = 0; k < self.out.length; k++) delete self.out[k].s;
+      if (++self.fails > 14) { self.dead = true; return self.fire('close'); }
+      self.pump(Math.min(3000, 250 * self.fails));
+    };
+    this.busy = true;
+    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: batch }, last).then(function (r) {
+      var b = r.body;
+      if (self.dead) return;
+      if (r.status === 404) { self.dead = true; return self.fire('close'); }      // the room is gone
+      if (r.status !== 200 || !b || !b.ok) return retry();
+      self.busy = false; self.fails = 0;
+      self.out = self.out.filter(function (o) { return o.n > top; });
+      if (self.closing) return self.finish();
+      if (b.paired && !self.open) { self.open = true; self.heard = Date.now(); self.fire('open'); }
+      var got = Array.isArray(b.in) ? b.in : [], any = false;
+      for (var k = 0; k < got.length && !self.dead && !self.closing; k++) {
+        var it = got[k];
+        if (!it || typeof it.n !== 'number' || it.n <= self.ack) continue;
+        self.ack = it.n; self.heard = Date.now(); any = true;
+        self.fire('data', it.m);
+      }
+      if (self.dead) return;
+      if (self.closing) return self.finish();
+      self.pump(self.out.length || any ? Math.min(110, self.pace()) : self.pace());
+    }, retry);
+  };
+  Relay.prototype.close = function () {
+    if (this.dead || this.closing) return;
+    this.closing = true;
+    clearTimeout(this.t); this.t = 0;
+    if (!this.busy) this.finish();      // otherwise the round in flight calls finish() when it lands
+  };
+  // The last word: hand over what is still waiting (the goodbye), then stop. The host also takes the room down.
+  Relay.prototype.finish = function () {
+    var self = this, rest = this.out.slice(0, 60).map(function (o) { return { n: o.n, m: o.m }; });
+    if (this.dead) return;
+    this.dead = true; this.out = [];
+    var end = function () { if (self.role === 0) rpc({ a: 'close', code: self.code, key: self.key }, true).then(null, function () { /* it runs out by itself */ }); };
+    if (!rest.length) return end();
+    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest }, true).then(end, end);
+  };
+  function transport(cb) {
+    var mode = qs.get('net'), C = ZZ.Cloud;
+    if (mode === 'bc') return cb('bc');
+    if (mode === 'peer' || qs.get('peer') || !C || !C.whenKnown) return cb('peer');
+    C.whenKnown(function (on) { cb(on ? 'relay' : 'peer'); });
+  }
+
   function wire(c) {
     link = c;
     c.on('open', function () {
@@ -5431,16 +5670,32 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function reset(name, host) {
     shut();
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = '';
-    Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null;
+    Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
+    epoch++;
   }
 
   Net.open = function (name) {
     reset(name, true);
     setState('opening');
-    loadLib(function (ok) {
-      if (Net.state !== 'opening') return;
-      if (!ok) return fail('lib');
-      tryOpen(0);
+    var run = epoch;
+    transport(function (kind) {
+      if (run !== epoch || Net.state !== 'opening') return;
+      if (kind === 'relay') {
+        var key = seatKey();
+        relayed = true;
+        return rpc({ a: 'open', key: key }).then(function (r) {
+          if (run !== epoch || Net.state !== 'opening') return;
+          if (r.status !== 200 || !r.body || !r.body.ok || !r.body.code) return fail(r.status === 429 ? 'slow' : 'server');
+          Net.code = String(r.body.code);
+          wire(new Relay(Net.code, key, 0));
+          setState('waiting');
+        }, function () { if (run === epoch && Net.state === 'opening') fail('server'); });
+      }
+      loadLib(function (ok) {
+        if (run !== epoch || Net.state !== 'opening') return;
+        if (!ok) return fail('lib');
+        tryOpen(0);
+      });
     });
   };
   function tryOpen(n) {
@@ -5470,14 +5725,28 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     Net.code = code;
     if (code.length !== 5) { Net.err = 'room'; return setState('error'); }
     setState('joining');
-    loadLib(function (ok) {
-      if (Net.state !== 'joining') return;
-      if (!ok) return fail('lib');
-      joinT = setTimeout(function () { if (Net.state === 'joining') fail('room'); }, 14000);
-      if (qs.get('net') === 'bc') return wire(new BcConn(code, false));
-      try { peer = new window.Peer(peerOpts()); } catch (e) { return fail('server'); }
-      peer.on('open', function () { wire(peer.connect(PREFIX + code, { reliable: true, serialization: 'json' })); });
-      peer.on('error', function (e) { if (Net.state === 'joining') fail(e && e.type === 'peer-unavailable' ? 'room' : 'server'); });
+    var run = epoch;
+    transport(function (kind) {
+      if (run !== epoch || Net.state !== 'joining') return;
+      if (kind === 'relay') {
+        var key = seatKey();
+        relayed = true;
+        joinT = setTimeout(function () { if (run === epoch && Net.state === 'joining') fail('server'); }, 20000);
+        return rpc({ a: 'join', code: code, key: key }).then(function (r) {
+          if (run !== epoch || Net.state !== 'joining') return;
+          if (r.status !== 200 || !r.body || !r.body.ok) return fail(r.status === 404 ? 'room' : r.status === 409 ? 'full' : r.status === 429 ? 'slow' : 'server');
+          wire(new Relay(code, key, 1));
+        }, function () { if (run === epoch && Net.state === 'joining') fail('server'); });
+      }
+      loadLib(function (ok) {
+        if (run !== epoch || Net.state !== 'joining') return;
+        if (!ok) return fail('lib');
+        joinT = setTimeout(function () { if (Net.state === 'joining') fail('room'); }, 14000);
+        if (qs.get('net') === 'bc') return wire(new BcConn(code, false));
+        try { peer = new window.Peer(peerOpts()); } catch (e) { return fail('server'); }
+        peer.on('open', function () { wire(peer.connect(PREFIX + code, { reliable: true, serialization: 'json' })); });
+        peer.on('error', function (e) { if (Net.state === 'joining') fail(e && e.type === 'peer-unavailable' ? 'room' : 'server'); });
+      });
     });
   };
   Net.leave = function () {
@@ -5630,7 +5899,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     send({ t: 'end', downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score });
     if (foeEnd) return settle(cb);
     endWait = cb;
-    setTimeout(function () { if (endWait === cb) { endWait = null; settle(cb); } }, 1500);
+    // through the relay the other side's tally takes a little longer to arrive
+    setTimeout(function () { if (endWait === cb) { endWait = null; settle(cb); } }, relayed ? 4000 : 1500);
   };
   function dropped() {
     if (!link && !peer) return;
@@ -5671,6 +5941,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     send(pack(S.me));
   };
   Net.link = function () { return !!link; };
+  Net.relayed = function () { return relayed; };
+  // back from the background: catch up at once instead of waiting for the next round
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && link && link.pump && !link.dead) link.pump(0); });
 
   ZZ.Net = Net;
 })();
@@ -5754,8 +6027,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'net.rules': ['{0}　{1}', '{0} · {1}', '{0}　{1}', '{0} · {1}'],
     'net.itemsOn': ['有道具', 'items on', 'アイテムあり', '아이템 있음'],
     'net.itemsOff': ['沒有道具', 'no items', 'アイテムなし', '아이템 없음'],
-    'net.e.lib': ['連線元件載不進來。如果這頁是在 Claude 的預覽裡開的，連線對戰請改用 GitHub 上的版本。', 'The networking component failed to load. Inside the Claude preview, online play is not available; use the GitHub version instead.', '通信コンポーネントを読み込めません。Claudeのプレビュー内ではオンライン対戦は使えません。GitHub版をご利用ください。', '통신 구성 요소를 불러오지 못했습니다. Claude 미리보기에서는 온라인 대전을 쓸 수 없습니다. GitHub 버전을 이용하세요.'],
-    'net.e.server': ['連不上配對伺服器。如果這頁是在 Claude 的預覽裡開的，連線會被擋住，請改用 GitHub 上的版本。', 'Cannot reach the matchmaking server. Inside the Claude preview the connection is blocked; use the GitHub version instead.', 'マッチングサーバーに接続できません。Claudeのプレビュー内では接続がブロックされます。GitHub版をご利用ください。', '매칭 서버에 연결할 수 없습니다. Claude 미리보기에서는 연결이 차단됩니다. GitHub 버전을 이용하세요.'],
+    'net.e.lib': ['連線元件載不進來。如果這頁是在預覽裡開的，連線對戰請到正式站玩。', 'The networking component failed to load. Online play does not work inside a preview; use the live site.', '通信コンポーネントを読み込めません。プレビュー内ではオンライン対戦は使えません。公開サイトをご利用ください。', '통신 구성 요소를 불러오지 못했습니다. 미리보기에서는 온라인 대전을 쓸 수 없습니다. 정식 사이트를 이용하세요.'],
+    'net.e.server': ['連不上配對伺服器。確認網路之後再試一次。', 'Cannot reach the matchmaking server. Check your connection and try again.', 'マッチングサーバーに接続できません。通信環境を確認してもう一度お試しください。', '매칭 서버에 연결할 수 없습니다. 네트워크를 확인하고 다시 시도하세요.'],
+    'net.e.slow': ['試太多次了，等幾分鐘再試。', 'Too many tries. Wait a few minutes and try again.', '試行回数が多すぎます。数分待ってからお試しください。', '시도 횟수가 너무 많습니다. 몇 분 후 다시 시도하세요.'],
+    'net.noteRelay': ['對戰資料經由本站的伺服器轉送，行動網路和 Wi-Fi 都連得上。', "Match data is relayed through this site's server, so it works on mobile data and Wi-Fi alike.", '対戦データはこのサイトのサーバーを経由するので、モバイル回線でもWi-Fiでもつながります。', '대전 데이터는 이 사이트의 서버를 거쳐 전달되므로 모바일 데이터와 Wi-Fi 모두에서 연결됩니다.'],
+    'net.keepOpen': ['等朋友的時候，請把遊戲留在畫面上；切到別的 App 太久，房間會斷。', 'Keep the game on screen while you wait. If you stay in another app too long, the room drops.', '待っている間はゲームを画面に表示したままにしてください。別のアプリに長くいると部屋が切れます。', '기다리는 동안 게임을 화면에 띄워 두세요. 다른 앱에 오래 있으면 방이 끊깁니다.'],
     'net.e.room': ['找不到這個房間。確認代碼，或請朋友重開。', 'Room not found. Check the code or ask your friend to reopen it.', '部屋が見つかりません。コードを確認するか、作り直してもらってください。', '방을 찾을 수 없습니다. 코드를 확인하거나 다시 만들어 달라고 하세요.'],
     'net.e.full': ['房間已經有人了。', 'That room is already full.', 'その部屋は満員です。', '방이 이미 찼습니다.'],
     'net.e.lost': ['連線斷了。', 'The connection was lost.', '接続が切れました。', '연결이 끊겼습니다.'],
@@ -5785,7 +6061,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       '<div class="bar"><i style="width:' + pct + '%"></i></div></div><div class="ladder">';
     for (i = 0; i < 7; i++) h += '<span' + (i === r.tier ? ' class="on"' : i < r.tier ? ' class="past"' : '') + '>' + t('tier' + i) + '</span>';
     h += '</div><p>' + t('rk.season', Meta.seasonId()) + '　' + t('rk.record', d.rgames) + '</p>' + App.ul(['rk.r1', 'rk.r2', 'rk.r3', 'rk.r4']) +
-      '<p class="note">' + esc(t('rk.next', foeName(f), t('pps', f.cfg.pps))) + '</p><div class="row">' + btn('close', 'cancel') + btn('rankGo', 'rk.start', true) + '</div>';
+      '<p class="note">' + esc(t('rk.next', foeName(f), t('pps', f.cfg.pps))) + '</p><div class="row">' + btn('close', 'cancel') + (ZZ.Cloud && ZZ.Cloud.on ? btn('board', 'lb.open') : '') + btn('rankGo', 'rk.start', true) + '</div>';
     return h;
   };
   function startRank() {
@@ -5916,7 +6192,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       say('');
     },
     win: function () {
-      var S = App.S(), got = Meta.firstClear('openers', S.les.id, S.les.coin);
+      var S = App.S(), got = Meta.firstClear('openers', S.les.id);
       App.sfx.play('win');
       App.buzz([20, 40, 60]);
       App.banner(t('b.pass'), 'good', 1400);
@@ -5964,7 +6240,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
-        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('net.keepOpen') + '</p>' : '') +
+        '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.host) {
@@ -5976,9 +6253,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       }
     } else {
       if (st === 'error') h += '<p class="warn">' + t('net.e.' + Net.err) + '</p>';
-      h += '<div class="row">' + btn('netOpen', 'net.open', true) + '</div><h3>' + t('net.or') + '</h3>' +
+      // arriving through a friend's invite link, joining is the main thing to do
+      h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
-        btn('netJoin', 'net.join') + '</div><p class="note">' + t('net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+        btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.on ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
     }
     return h;
   };
@@ -6097,7 +6375,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'jb.claim': ['領取', 'Claim', '受け取る', '받기'],
     'jb.claimed': ['已領', 'Claimed', '受取済み', '수령 완료'],
     'jb.today': ['今天的任務', "Today's jobs", '今日の任務', '오늘의 임무'],
-    'jb.resets': ['每天午夜換新。', 'New jobs at midnight.', '毎日0時に更新。', '매일 자정에 갱신.'],
+    'jb.resets': ['每天午夜換新（台灣時間）。', 'New jobs every day at 00:00 Taiwan time (UTC+8).', '毎日0時（台湾時間・UTC+8）に更新。', '매일 자정(대만 시간, UTC+8)에 갱신.'],
     'jb.got': ['+{0} 金幣', '+{0} coins', '+{0}コイン', '+{0}코인'],
     'j.win': ['贏 2 場對戰', 'Win 2 matches', '対戦で2勝', '대전 2승'],
     'j.play': ['打完 3 場對戰', 'Play 3 matches', '対戦を3回', '대전 3판'],
@@ -6118,6 +6396,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'pf.games': ['對戰場數', 'Matches', '対戦数', '대전 수'],
     'pf.wins': ['勝場', 'Wins', '勝利', '승리'],
     'pf.best': ['最高分', 'Best score', '最高スコア', '최고 점수'],
+    'pf.sprint': ['40 行最快', 'Fastest 40 lines', '40ライン最速', '40줄 최고 기록'],
     'pf.tspins': ['T 轉總數', 'T-spins', 'Tスピン合計', 'T스핀 합계'],
     'pf.sent': ['送出總行數', 'Lines sent', '送ったライン合計', '보낸 줄 합계'],
     'pf.kos': ['擊倒總數', 'KOs', 'KO合計', 'KO 합계'],
@@ -6242,7 +6521,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function dropPic(key) {
     Pics.del(key);
     Meta.data.custom[key] = false;
-    if (Meta.data.equip[key] === 'custom') Meta.data.equip[key] = key === 'tile' ? 'glaze' : 'wall';
+    if (Meta.data.equip[key] === 'custom') Meta.equip(key, key === 'tile' ? 'glaze' : 'wall');
     Meta.save();
     var o = {}; o[key] = null;
     View.setLook({ img: o });
@@ -6340,7 +6619,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       View.setLook({ dim: +el.value });
       return true;
     }
-    if (el.id === 'pName') { Meta.data.name = el.value.replace(/[<>&"]/g, '').slice(0, 12); Meta.save(); return true; }
+    if (el.id === 'pName') { Meta.setName(el.value); return true; }
     return false;
   });
   App.clicks.push(function (d) {
@@ -6394,11 +6673,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   // ---------- profile ----------
   App.sheets.profile = function () {
     var d = Meta.data, r = Meta.rankOf(d.rp), pct = r.top ? 100 : Math.round(r.into / r.need * 100), tt = d.tot;
-    var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
+    var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
     var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
       '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div><table class="cmp"><tbody>';
     rows.forEach(function (x) { h += '<tr><td>' + t(x[0]) + '</td><td>' + x[1] + '</td></tr>'; });
-    return h + '</tbody></table><div class="row">' + btn('close', 'done', true) + '</div>';
+    return h + '</tbody></table>' + (App.profileExtra ? App.profileExtra() : '') + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
 
   // Bring the saved pictures back when the page opens.
@@ -6407,12 +6686,618 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (!Meta.data.custom[key]) return;
       Pics.get(key, function (url) {
         if (url) useUrl(key, url);
-        else { Meta.data.custom[key] = false; if (Meta.data.equip[key] === 'custom') Meta.data.equip[key] = key === 'tile' ? 'glaze' : 'wall'; Meta.save(); App.applyLook(); }
+        else { Meta.data.custom[key] = false; if (Meta.data.equip[key] === 'custom') Meta.equip(key, key === 'tile' ? 'glaze' : 'wall'); Meta.save(); App.applyLook(); }
       });
     });
   });
   ZZ.Pics = Pics;
 })();
+</script>
+<script>
+/* 轉磚 cloud: keeps the player's record on the server and shows the leaderboards.
+
+   The game never waits for the network. Every change (a purchase, a finished match…) is worked out on the spot by
+   ZZ.Meta as before; this file hears about it through Meta.onOp, puts it in a queue and sends the queue to /api/rpc.
+   The server repeats each change on its own copy and answers with the record as it sees it. That answer replaces
+   the local record, and anything still waiting in the queue is played on top of it again. So the screen always
+   shows "what the server has confirmed, plus what it has not heard yet", and the server always has the last word.
+
+   A device is known by a random id and secret kept in localStorage. There is no account to sign up for: the first
+   real change makes one, and a one-time code links a second device to it.
+
+   Where the page is served without the API (a plain static host, the Claude preview) none of this happens and the
+   game stays on the device exactly as before. */
+(function (root) {
+  'use strict';
+  var ZZ = root.ZZ || require('./engine.js');
+  var Meta = ZZ.Meta, KEY = 'zhuanzhuan.cloud.v1', BATCH = 40, QUEUE_MAX = 1000;
+
+  var Cloud = {
+    api: 'api/',      // relative, so the game also works from a sub-folder
+    on: false,        // the API answered and has a database behind it
+    dead: false,      // this host has no API: stay local, do not keep asking
+    seen: false,      // the API has answered from this address before
+    gone: false,      // this device was unlinked on purpose; do not make a new account by itself
+    cred: null,       // { id, key }
+    pub: '',          // the short public tag shown on leaderboards
+    q: [],            // changes the server has not confirmed yet: { i, k, a }
+    base: null,       // with no account yet: the record as it was before the first queued change
+    busy: null, fails: 0, last: 0, skew: 0, want: false, auto: true,
+    delay: { op: 700, fin: 60 },
+    fetch: null, store: null, later: null, now: function () { return Date.now(); },
+    onChange: null, onAdopt: null, onNote: null
+  };
+  var probeFails = 0, timer = 0, pullNext = false, known = false, waiters = [];
+  // Other parts of the game (online rooms) ask whether the API is here; they get their answer once the first look is done.
+  Cloud.whenKnown = function (cb) { if (known || Cloud.dead) cb(Cloud.on); else waiters.push(cb); };
+  function nowKnown() {
+    known = true;
+    var w = waiters; waiters = [];
+    for (var i = 0; i < w.length; i++) w[i](Cloud.on);
+  }
+
+  // ---------- what is kept on the device ----------
+  function storage() {
+    if (Cloud.store) return Cloud.store;
+    try { return root.localStorage || null; } catch (e) { return null; }
+  }
+  function readStore() {
+    try {
+      var st = storage(), raw = st && st.getItem(KEY), v = raw ? JSON.parse(raw) : null;
+      return v && typeof v === 'object' ? v : null;
+    } catch (e) { return null; }
+  }
+  function persist() {
+    var st = storage(), c = Cloud.cred;
+    var v = { id: c ? c.id : '', key: c ? c.key : '', pub: Cloud.pub, gone: Cloud.gone, seen: Cloud.seen, base: c ? null : Cloud.base,
+      q: Cloud.q.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) };
+    try { if (st) st.setItem(KEY, JSON.stringify(v)); } catch (e) { /* kept in memory for this visit */ }
+  }
+  function load() {
+    var v = readStore() || {};
+    Cloud.cred = typeof v.id === 'string' && v.id && typeof v.key === 'string' && v.key ? { id: v.id, key: v.key } : null;
+    Cloud.pub = typeof v.pub === 'string' ? v.pub : '';
+    Cloud.gone = !!v.gone; Cloud.seen = !!v.seen;
+    Cloud.q = Array.isArray(v.q) ? v.q.filter(function (o) { return o && typeof o.i === 'string' && typeof o.k === 'string' && Array.isArray(o.a); }).slice(-QUEUE_MAX) : [];
+    Cloud.base = !Cloud.cred && v.base && typeof v.base === 'object' && Cloud.q.length ? v.base : null;
+  }
+  function snapshot() { return JSON.parse(JSON.stringify(Meta.data)); }
+  function changed() { if (Cloud.onChange) Cloud.onChange(); }
+  function opId() {
+    var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', s = '', i, buf;
+    try { buf = new Uint8Array(16); (root.crypto || require('crypto').webcrypto).getRandomValues(buf); } catch (e) { buf = null; }
+    for (i = 0; i < 16; i++) s += abc[(buf ? buf[i] : Math.floor(Math.random() * 256)) % abc.length];
+    return s;
+  }
+
+  // ---------- talking to the API ----------
+  function call(method, path, body, auth) {
+    var f = Cloud.fetch || (typeof root.fetch === 'function' ? function (u, o) { return root.fetch(u, o); } : null);
+    if (!f) return Promise.reject(new Error('no fetch'));
+    var o = { method: method, headers: {}, credentials: 'omit', cache: 'no-store' }, ctl = null, t = 0;
+    if (body) { o.body = JSON.stringify(body); o.headers['Content-Type'] = 'application/json'; o.keepalive = o.body.length < 60000; }
+    if (auth && Cloud.cred) o.headers.Authorization = 'Bearer ' + Cloud.cred.id + '.' + Cloud.cred.key;
+    if (typeof AbortController === 'function') { ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 15000); }
+    var done = function () { if (t) clearTimeout(t); };
+    return f(Cloud.api + path, o).then(function (res) {
+      return res.text().then(function (text) {
+        done();
+        var j = null;
+        try { j = JSON.parse(text); } catch (e) { /* not ours */ }
+        return { status: res.status, body: j && typeof j === 'object' ? j : null };
+      });
+    }, function (e) { done(); throw e; });
+  }
+  function clockFrom(serverNow) {
+    if (typeof serverNow !== 'number') return;
+    var s = serverNow - Cloud.now();
+    if (Math.abs(s - Cloud.skew) > 1500) Cloud.skew = s;   // the game day follows the server's clock, not the device's
+  }
+  function later(fn, ms) { return (Cloud.later || setTimeout)(fn, ms); }
+  function schedule(ms) {
+    if (!Cloud.auto) return;
+    if (timer) clearTimeout(timer);
+    timer = later(function () { timer = 0; Cloud.flush(); }, ms);
+  }
+
+  // ---------- the queue ----------
+  function push(k, a) {
+    if (Cloud.dead || Cloud.gone) return;
+    var q = Cloud.q, last = q[q.length - 1];
+    a = JSON.parse(JSON.stringify(a));
+    // typing a name or trying on looks: only where it ends up matters
+    if (last && !last.s && last.k === k && (k === 'name' || k === 'wset' || (k === 'wear' && last.a[0] === a[0]))) { last.a = a; last.i = opId(); }
+    else q.push({ i: opId(), k: k, a: a });
+    if (q.length > QUEUE_MAX) {
+      if (Cloud.cred) q.splice(0, q.length - QUEUE_MAX);
+      else { Cloud.q = []; Cloud.base = snapshot(); }   // no account yet: what happened so far simply becomes the starting record
+    }
+    persist();
+    schedule(k === 'fin' ? Cloud.delay.fin : Cloud.delay.op);
+  }
+  // The server's record becomes ours; what it has not heard yet is played on top again.
+  function adopt(st) {
+    var before = JSON.stringify(Meta.data), look = JSON.stringify(Meta.data.equip), keep = Meta.data.custom, i;
+    Meta.quiet++;
+    try {
+      Meta.use(st);
+      Meta.data.custom = keep;   // the player's own pictures live on this device only
+      ['tile', 'bg'].forEach(function (k) { if (Meta.data.equip[k] === 'custom' && !keep[k]) Meta.data.equip[k] = k === 'tile' ? 'glaze' : 'wall'; });
+      for (i = 0; i < Cloud.q.length; i++) Meta.run(Cloud.q[i].k, Cloud.q[i].a);
+    } finally { Meta.quiet--; }
+    Meta.save();
+    if (Cloud.onAdopt) Cloud.onAdopt(JSON.stringify(Meta.data) !== before, JSON.stringify(Meta.data.equip) !== look);
+  }
+  function take(b) {
+    Cloud.cred = { id: b.id, key: b.key };
+    Cloud.pub = b.pub || '';
+    Cloud.base = null; Cloud.want = false; Cloud.gone = false;
+    Cloud.last = Cloud.now();
+    clockFrom(b.now);
+    persist();
+  }
+  function lost() {
+    Cloud.cred = null; Cloud.pub = ''; Cloud.q = []; Cloud.base = null; Cloud.gone = true;
+    persist();
+    if (Cloud.onNote) Cloud.onNote('lost');
+  }
+  function unmark() { Cloud.q.forEach(function (o) { delete o.s; }); }
+
+  // One request. Answers 'more' (go on), 'done' or 'wait' (try again later).
+  function step() {
+    if (!Cloud.cred) {
+      // another tab may have made the account a moment ago
+      var other = readStore();
+      if (other && other.id && other.key) { Cloud.cred = { id: other.id, key: other.key }; Cloud.pub = other.pub || ''; Cloud.base = null; return Promise.resolve('more'); }
+      return call('POST', 'rpc', { a: 'hello', st: Cloud.base || snapshot() }).then(function (r) {
+        var b = r.body;
+        if (r.status === 200 && b && b.ok && b.id && b.key) { take(b); adopt(b.st); return 'more'; }
+        if (r.status === 429) Cloud.fails = Math.max(Cloud.fails, 6);
+        return 'wait';
+      });
+    }
+    var batch = Cloud.q.slice(0, BATCH), ids = {};
+    batch.forEach(function (o) { o.s = 1; ids[o.i] = 1; });
+    var drop = function () { Cloud.q = Cloud.q.filter(function (o) { return !ids[o.i]; }); };
+    return call('POST', 'rpc', { a: 'sync', ops: batch.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) }, true).then(function (r) {
+      var b = r.body;
+      if (r.status === 200 && b && b.ok && b.st) {
+        drop();
+        clockFrom(b.now);
+        if (b.pub) Cloud.pub = b.pub;
+        Cloud.last = Cloud.now();
+        adopt(b.st);
+        persist();
+        if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && (x.why === 'fast' || x.why === 'range' || x.why === 'slow'); })) Cloud.onNote('rejected');
+        return Cloud.q.length ? 'more' : 'done';
+      }
+      if (r.status === 401) { lost(); return 'done'; }
+      if (r.status === 400 || r.status === 413 || r.status === 415) { drop(); persist(); return Cloud.q.length ? 'more' : 'done'; }   // the server will never take these as they are
+      unmark();
+      return 'wait';
+    });
+  }
+  function run(pull) {
+    if (Cloud.cred && !Cloud.q.length && !pull) return Promise.resolve('done');
+    return step().then(null, function () { unmark(); return 'wait'; }).then(function (v) { return v === 'more' ? run(false) : v; });
+  }
+  // Sends what is waiting. pull: also ask for the record when nothing is waiting (another device may have played).
+  Cloud.flush = function (pull) {
+    if (Cloud.busy) { if (pull) pullNext = true; return Cloud.busy; }
+    if (!Cloud.on || Cloud.dead || Cloud.gone) return Promise.resolve('idle');
+    if (Cloud.cred ? !Cloud.q.length && !pull : !Cloud.q.length && !Cloud.want) return Promise.resolve('idle');
+    Cloud.busy = run(pull).then(function (v) {
+      Cloud.busy = null;
+      if (v === 'wait') {
+        Cloud.fails++;
+        if (Cloud.auto) later(function () { Cloud.flush(); }, Math.min(300000, 2000 * Math.pow(2, Math.min(8, Cloud.fails))));
+      } else Cloud.fails = 0;
+      changed();
+      if (v !== 'wait' && (pullNext || (Cloud.q.length && Cloud.cred))) { var p = pullNext; pullNext = false; return Cloud.flush(p); }
+      pullNext = false;
+      return v;
+    });
+    changed();
+    return Cloud.busy;
+  };
+
+  // ---------- is there an API here at all ----------
+  function none() {
+    Cloud.dead = true; Cloud.on = false;
+    if (!Cloud.cred) { Cloud.q = []; Cloud.base = null; persist(); }
+    nowKnown();
+    changed();
+  }
+  function probe() {
+    if (Cloud.dead) return Promise.resolve(false);
+    var again = function () {
+      probeFails++;
+      if (!Cloud.seen && !Cloud.cred && probeFails >= 3) { none(); return false; }
+      if (Cloud.auto) later(probe, Math.min(300000, 4000 * Math.pow(2, Math.min(7, probeFails))));
+      nowKnown();
+      changed();
+      return false;
+    };
+    return call('GET', 'health').then(function (r) {
+      var b = r.body;
+      if (r.status === 200 && b && b.app === 'zhuanzhuan') {
+        probeFails = 0;
+        if (!b.db) { Cloud.on = false; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
+        Cloud.on = true;
+        if (!Cloud.seen) { Cloud.seen = true; persist(); }
+        nowKnown();
+        changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
+        Cloud.flush(!!Cloud.cred);
+        return true;
+      }
+      if (r.status === 404 || r.status === 405 || (r.status < 500 && !b)) { none(); return false; }   // a plain static host
+      return again();
+    }, again);
+  }
+  Cloud.probe = probe;
+
+  // ---------- start ----------
+  Cloud.init = function (o) {
+    o = o || {};
+    if (o.fetch) Cloud.fetch = o.fetch;
+    if (o.store) Cloud.store = o.store;
+    if (o.now) Cloud.now = o.now;
+    if (o.auto != null) Cloud.auto = o.auto;
+    Cloud.dead = false; Cloud.on = false; Cloud.busy = null; Cloud.fails = 0; Cloud.skew = 0; probeFails = 0; pullNext = false; known = false;
+    load();
+    if (!Cloud.cred && !Cloud.base) Cloud.base = snapshot();
+    Meta.now = function () { return Cloud.now() + Cloud.skew; };
+    Meta.onOp = push;
+    if (o.local) { none(); return Promise.resolve(false); }
+    return probe();
+  };
+
+  // ---------- what the screens ask ----------
+  // none: no server here · new: no account yet · ok · busy · wait: cannot reach it right now · gone: unlinked
+  Cloud.status = function () {
+    if (Cloud.dead) return 'none';
+    if (!known) return 'busy';          // still finding out whether a server is here
+    if (!Cloud.on && !Cloud.cred && !Cloud.seen) return 'none';
+    if (Cloud.gone) return 'gone';
+    if (Cloud.busy) return 'busy';
+    if (!Cloud.on || Cloud.fails) return 'wait';
+    return Cloud.cred ? 'ok' : 'new';
+  };
+  function answer(r) { return r.body || { ok: false, why: r.status === 429 ? 'slow' : 'net' }; }
+  var offline = function () { return { ok: false, why: 'net' }; };
+  // Makes the account now if there is none (normally the first change does that).
+  Cloud.ensure = function () {
+    if (Cloud.cred) return Promise.resolve(true);
+    if (!Cloud.on) return Promise.resolve(false);
+    if (Cloud.gone) { Cloud.gone = false; Cloud.q = []; Cloud.base = snapshot(); }
+    Cloud.want = true;
+    persist();
+    return Cloud.flush().then(function () { return !!Cloud.cred; });
+  };
+  Cloud.restart = Cloud.ensure;
+  Cloud.code = function () {
+    return Cloud.ensure().then(function (ok) {
+      if (!ok) return offline();
+      return Cloud.flush().then(function () { return call('POST', 'rpc', { a: 'code' }, true); }).then(answer, offline);
+    });
+  };
+  // go false: whose save is behind this code. go true: this device switches to it.
+  Cloud.redeem = function (code, go) {
+    if (!Cloud.on) return Promise.resolve(offline());
+    return call('POST', 'rpc', { a: 'redeem', code: String(code || '').slice(0, 24), go: !!go }, true).then(function (r) {
+      var b = answer(r);
+      if (go && r.status === 200 && b.ok && b.id && b.key) {
+        Cloud.q = [];
+        take(b);
+        adopt(b.st);
+        changed();
+      }
+      return b;
+    }, offline);
+  };
+  Cloud.wipe = function () {
+    if (!Cloud.cred) return Promise.resolve({ ok: true });
+    return call('POST', 'rpc', { a: 'delete' }, true).then(function (r) {
+      var b = answer(r);
+      if ((r.status === 200 && b.ok) || r.status === 401) {
+        Cloud.cred = null; Cloud.pub = ''; Cloud.q = []; Cloud.base = null; Cloud.gone = true; Cloud.want = false;
+        persist();
+        changed();
+        return { ok: true };
+      }
+      return b;
+    }, offline);
+  };
+  var boards = {};
+  Cloud.board = function (b, scope) {
+    var key = b + '|' + scope + '|' + Cloud.pub, hit = boards[key];
+    if (hit && Cloud.now() - hit.at < 20000) return Promise.resolve(hit.data);
+    return call('GET', 'board?b=' + encodeURIComponent(b) + '&s=' + encodeURIComponent(scope) + (Cloud.pub ? '&me=' + encodeURIComponent(Cloud.pub) : '')).then(function (r) {
+      if (r.status !== 200 || !r.body || !r.body.ok) return null;
+      boards[key] = { at: Cloud.now(), data: r.body };
+      return r.body;
+    }, function () { return null; });
+  };
+  Cloud._forget = function () { boards = {}; };
+
+  ZZ.Cloud = Cloud;
+  if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
+  if (!ZZ.App || typeof document === 'undefined') return;
+
+  // =====================================================================================================
+  // The screens: a cloud block in the profile, the device and data sheet, and the leaderboards.
+  // =====================================================================================================
+  var App = ZZ.App, L = ZZ.L, t = L.t, esc = App.esc, btn = App.btn;
+  var $ = function (id) { return document.getElementById(id); };
+
+  L.add({
+    'm.board': ['排行榜', 'Leaderboards', 'ランキング', '랭킹'],
+    'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
+    'lb.score': ['單場最高分', 'Best score', '最高スコア', '최고 점수'],
+    'lb.sprint': ['40 行競速', '40-line sprint', '40ライン', '40줄 스프린트'],
+    'lb.season': ['本季', 'This season', '今シーズン', '이번 시즌'],
+    'lb.all': ['歷來', 'All time', '歴代', '역대'],
+    'lb.loading': ['讀取中…', 'Loading…', '読み込み中…', '불러오는 중…'],
+    'lb.empty': ['還沒有人上榜，第一名等你來拿。', 'Nobody is on this board yet. First place is open.', 'まだ誰も載っていません。1位は空いています。', '아직 아무도 없습니다. 1위가 비어 있습니다.'],
+    'lb.fail': ['排行榜現在讀不到，等一下再試。', 'The leaderboard cannot be loaded right now. Try again in a moment.', '現在ランキングを読み込めません。少し待ってからお試しください。', '지금 랭킹을 불러올 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'lb.retry': ['再試一次', 'Try again', 'もう一度', '다시 시도'],
+    'lb.me': ['你目前第 {0} 名', 'You are in place {0}', '現在{0}位', '현재 {0}위'],
+    'lb.none.rp': ['打一場排位賽就會上榜。', 'Play a ranked match to get on this board.', 'ランクマッチを1回プレイすると載ります。', '랭크전을 한 판 하면 등록됩니다.'],
+    'lb.none.score': ['打完一場對戰就會上榜。', 'Finish a match to get on this board.', '対戦を1回終えると載ります。', '대전을 한 판 마치면 등록됩니다.'],
+    'lb.none.sprint': ['跑完一次 40 行競速就會上榜。', 'Finish a 40-line sprint to get on this board.', '40ラインを完走すると載ります。', '40줄 스프린트를 완주하면 등록됩니다.'],
+    'lb.you': ['你', 'You', 'あなた', '나'],
+    'lb.anon': ['磚友 {0}', 'Player {0}', 'プレイヤー {0}', '플레이어 {0}'],
+    'lb.seasonNote': ['{0} 賽季。每月一號換季（台灣時間），段位榜和本季成績會重新開始。', 'Season {0}. A new season starts on the 1st of each month (Taiwan time); the rating board and season scores start over.', 'シーズン {0}。毎月1日（台湾時間）に切り替わり、レートと今シーズンの記録はリセットされます。', '{0} 시즌. 매월 1일(대만 시간)에 새 시즌이 시작되며 레이팅과 이번 시즌 기록이 초기화됩니다.'],
+    'lb.open': ['看排行榜', 'See the leaderboards', 'ランキングを見る', '랭킹 보기'],
+    // cloud save
+    'cl.title': ['雲端存檔', 'Cloud save', 'クラウドセーブ', '클라우드 저장'],
+    'cl.none': ['這個版本沒有連上伺服器，進度只存在這台裝置。', 'This copy of the game is not connected to a server. Progress stays on this device.', 'このバージョンはサーバーに接続していません。進行状況はこの端末にだけ保存されます。', '이 버전은 서버에 연결되어 있지 않습니다. 진행 상황은 이 기기에만 저장됩니다.'],
+    'cl.new': ['打完第一場，或買了第一樣東西，就會自動開始存到雲端。', 'Your progress starts saving to the cloud after your first match or purchase.', '最初の対戦か買い物のあと、自動でクラウドに保存されます。', '첫 대전이나 첫 구매 후 자동으로 클라우드에 저장됩니다.'],
+    'cl.ok': ['進度已經存到雲端。', 'Your progress is saved to the cloud.', '進行状況はクラウドに保存済みです。', '진행 상황이 클라우드에 저장되었습니다.'],
+    'cl.busy': ['同步中…', 'Syncing…', '同期中…', '동기화 중…'],
+    'cl.wait': ['現在連不上伺服器。進度先留在這台裝置，連上後會自動補傳。', 'The server cannot be reached right now. Progress is kept on this device and sent when the connection is back.', '現在サーバーに接続できません。進行状況はこの端末に保存され、接続が戻ると自動で送信されます。', '지금 서버에 연결할 수 없습니다. 진행 상황은 이 기기에 보관되며 연결되면 자동으로 전송됩니다.'],
+    'cl.gone': ['這台裝置沒有連著雲端存檔，進度只存在這裡。', 'This device is not linked to a cloud save. Progress stays here.', 'この端末はクラウドセーブに接続していません。進行状況はここにだけ保存されます。', '이 기기는 클라우드 저장에 연결되어 있지 않습니다. 진행 상황은 여기에만 저장됩니다.'],
+    'cl.start': ['開始存到雲端', 'Start a cloud save', 'クラウドセーブを始める', '클라우드 저장 시작'],
+    'cl.manage': ['換裝置・管理資料', 'Devices and data', '端末の引き継ぎ・データ管理', '기기 이전·데이터 관리'],
+    'cl.tag': ['你在排行榜上的代號：{0}', 'Your tag on the leaderboards: {0}', 'ランキングでのタグ：{0}', '랭킹에 표시되는 태그: {0}'],
+    'cl.what': ['雲端只存你的名字、遊戲進度和排行榜成績。不用註冊，也不存信箱或密碼。自己的圖片和對戰錄影留在裝置上。', 'The cloud keeps your name, your progress and your leaderboard scores. There is no sign-up, and no email or password is stored. Your own pictures and recorded matches stay on the device.', 'クラウドに保存されるのは名前、進行状況、ランキングの記録だけです。登録は不要で、メールアドレスやパスワードは保存しません。自分の画像と対戦記録は端末に残ります。', '클라우드에는 이름, 진행 상황, 랭킹 기록만 저장됩니다. 가입이 필요 없고 이메일이나 비밀번호는 저장하지 않습니다. 내 사진과 대전 기록은 기기에 남습니다.'],
+    'cl.move': ['換到另一台裝置', 'Move to another device', '別の端末に引き継ぐ', '다른 기기로 옮기기'],
+    'cl.moveP': ['在有進度的那台按「產生引繼碼」，再到另一台輸入。之後兩台共用同一份進度。', 'Get a transfer code on the device that has your progress, then enter it on the other one. Both devices share the same progress from then on.', '進行状況がある端末で「引き継ぎコードを発行」を押し、もう一方の端末で入力します。以後、両方の端末で同じ進行状況を使います。', '진행 상황이 있는 기기에서 「이전 코드 발급」을 누르고 다른 기기에서 입력하세요. 이후 두 기기가 같은 진행 상황을 함께 씁니다.'],
+    'cl.getCode': ['產生引繼碼', 'Get a transfer code', '引き継ぎコードを発行', '이전 코드 발급'],
+    'cl.codeIs': ['引繼碼，{0} 分鐘內有效，只能用一次', 'Transfer code, valid for {0} minutes, works once', '引き継ぎコード（{0}分間有効・1回限り）', '이전 코드 ({0}분간 유효, 1회용)'],
+    'cl.codeWarn': ['拿到這組碼的人可以進入你的存檔，不要給別人。', 'Anyone with this code can get into your save. Keep it to yourself.', 'このコードを知っている人はあなたのセーブに入れます。他人に教えないでください。', '이 코드를 아는 사람은 내 저장 데이터에 들어올 수 있습니다. 남에게 알려 주지 마세요.'],
+    'cl.enter': ['輸入另一台的引繼碼', 'Enter a code from another device', '別の端末のコードを入力', '다른 기기의 코드 입력'],
+    'cl.enterPh': ['例如 ABCD-EFGH', 'e.g. ABCD-EFGH', '例：ABCD-EFGH', '예: ABCD-EFGH'],
+    'cl.check': ['查看', 'Look up', '確認', '확인'],
+    'cl.found': ['找到這份存檔', 'Found this save', 'このセーブが見つかりました', '이 저장 데이터를 찾았습니다'],
+    'cl.foundRow': ['{0}　{1}　{2} 金幣　{3} 場', '{0} · {1} · {2} coins · {3} matches', '{0}　{1}　{2}コイン　{3}戦', '{0} · {1} · {2}코인 · {3}판'],
+    'cl.replace': ['換過去之後，這台裝置現在的進度（{0}、{1} 金幣）會被取代，救不回來。', 'After switching, the progress now on this device ({0}, {1} coins) is replaced and cannot be brought back.', '切り替えると、この端末の現在の進行状況（{0}、{1}コイン）は置き換えられ、元に戻せません。', '전환하면 이 기기의 현재 진행 상황({0}, {1}코인)은 대체되며 되돌릴 수 없습니다.'],
+    'cl.same': ['這台裝置已經在用這份存檔了。', 'This device is already using that save.', 'この端末はすでにこのセーブを使っています。', '이 기기는 이미 이 저장 데이터를 사용 중입니다.'],
+    'cl.use': ['換成這份存檔', 'Switch to this save', 'このセーブに切り替える', '이 저장 데이터로 전환'],
+    'cl.moved': ['換好了，這台裝置現在用的是這份存檔。', 'Done. This device now uses that save.', '切り替えました。この端末はこのセーブを使います。', '전환했습니다. 이 기기는 이제 이 저장 데이터를 사용합니다.'],
+    'cl.badCode': ['這組碼不對，或是已經過期。', 'That code is wrong or has run out.', 'コードが違うか、有効期限が切れています。', '코드가 틀렸거나 만료되었습니다.'],
+    'cl.slow': ['試太多次了，等十分鐘再試。', 'Too many tries. Wait ten minutes and try again.', '試行回数が多すぎます。10分待ってからお試しください。', '시도 횟수가 너무 많습니다. 10분 후 다시 시도하세요.'],
+    'cl.err': ['現在連不上伺服器，等一下再試。', 'The server cannot be reached right now. Try again in a moment.', '現在サーバーに接続できません。少し待ってからお試しください。', '지금 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
+    'cl.delP': ['會刪掉雲端上的存檔和排行榜成績，所有連著的裝置都會斷開。這台裝置上的進度不受影響。刪了就救不回來。', 'This deletes your cloud save and your leaderboard scores and unlinks every device. Progress on this device is not touched. It cannot be undone.', 'クラウドのセーブとランキングの記録を削除し、すべての端末の接続を解除します。この端末の進行状況には影響しません。元に戻せません。', '클라우드 저장 데이터와 랭킹 기록을 삭제하고 모든 기기의 연결을 해제합니다. 이 기기의 진행 상황에는 영향이 없습니다. 되돌릴 수 없습니다.'],
+    'cl.delYes': ['確定刪除', 'Yes, delete', '削除する', '삭제'],
+    'cl.deleted': ['雲端資料已經刪除。', 'Cloud data deleted.', 'クラウドのデータを削除しました。', '클라우드 데이터를 삭제했습니다.'],
+    'cl.lost': ['雲端存檔已經不在了，可能是在別台裝置刪掉的。進度還留在這台裝置。', 'The cloud save no longer exists. It may have been deleted from another device. Your progress is still on this device.', 'クラウドセーブはもう存在しません。別の端末で削除された可能性があります。進行状況はこの端末に残っています。', '클라우드 저장 데이터가 더 이상 없습니다. 다른 기기에서 삭제했을 수 있습니다. 진행 상황은 이 기기에 남아 있습니다.'],
+    'cl.rejected': ['有一筆紀錄伺服器沒有收，進度以雲端為準。', 'The server did not accept one of your results. Your progress follows the cloud copy.', 'サーバーが受け付けなかった記録があります。進行状況はクラウドの内容に合わせました。', '서버가 받지 않은 기록이 있습니다. 진행 상황은 클라우드 기준으로 맞췄습니다.']
+  });
+
+  var ui = { code: '', codeExp: 0, entered: '', peek: null, msg: '', del: false, wait: false };
+  var lb = { b: 'rp', scope: 'season', data: null, state: 'idle', ask: 0 };
+
+  function stateText() {
+    var st = Cloud.status();
+    return t('cl.' + st);
+  }
+  function rankText(rp) { return App.rankName(Meta.rankOf(rp)); }
+  function nameOf(n, pub) { return n || t('lb.anon', String(pub || '').slice(0, 4).toUpperCase()); }
+
+  // ---------- the cloud block in the profile ----------
+  App.profileExtra = function () {
+    var st = Cloud.status(), h = '<h3>' + t('cl.title') + '</h3><p class="note" id="clState">' + esc(stateText()) + '</p>';
+    if (st === 'none') return h;
+    return h + '<div class="row">' + (st === 'gone' ? btn('cloudStart', 'cl.start') : btn('cloud', 'cl.manage')) + '</div>';
+  };
+  App.acts.cloud = function () { ui.msg = ''; ui.peek = null; ui.del = false; App.openSheet('cloud'); };
+  App.acts.cloudStart = function () {
+    Cloud.ensure().then(function (ok) {
+      if (!ok) App.toast(t('cl.err'), 3200);
+      refresh();
+    });
+    refresh();
+  };
+
+  // ---------- devices and data ----------
+  App.dismiss.cloud = 1;
+  App.sheets.cloud = function () {
+    var st = Cloud.status(), d = Meta.data, h = '<h2>' + t('cl.title') + '</h2><p class="note" id="clState">' + esc(stateText()) + '</p>';
+    if (Cloud.pub) h += '<p class="note">' + esc(t('cl.tag', Cloud.pub.toUpperCase())) + '</p>';
+    h += '<p>' + t('cl.what') + '</p>';
+    if (st === 'none') return h + '<div class="row">' + btn('close', 'close') + '</div>';
+    if (ui.msg) h += '<p class="warn" role="status">' + esc(ui.msg) + '</p>';
+    h += '<h3>' + t('cl.move') + '</h3><p>' + t('cl.moveP') + '</p>';
+    if (ui.code && ui.codeExp > Date.now()) {
+      h += '<p class="note">' + esc(t('cl.codeIs', 10)) + '</p><div class="roomcode xfer" aria-label="' + esc(ui.code) + '">' + esc(ui.code) + '</div><p class="warn">' + t('cl.codeWarn') + '</p>';
+    } else h += '<div class="row">' + btn('cloudCode', 'cl.getCode') + '</div>';
+    h += '<h3>' + t('cl.enter') + '</h3><div class="joinrow"><input id="clCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="' + esc(t('cl.enterPh')) + '" value="' + esc(ui.entered) + '">' +
+      btn('cloudPeek', 'cl.check') + '</div>';
+    if (ui.peek) {
+      var p = ui.peek;
+      h += '<div class="plan"><b>' + t('cl.found') + '</b><p>' + esc(t('cl.foundRow', nameOf(p.name, p.pub), rankText(p.rp), L.num(p.coins), p.games)) + '</p>';
+      if (p.same) h += '<p class="note">' + t('cl.same') + '</p></div>';
+      else h += '<p class="warn">' + esc(t('cl.replace', rankText(d.rp), L.num(d.coins))) + '</p><div class="row">' + btn('cloudUse', 'cl.use', true) + '</div></div>';
+    }
+    if (Cloud.cred) {
+      h += '<h3>' + t('cl.del') + '</h3><p class="note">' + t('cl.delP') + '</p><div class="row">' +
+        (ui.del ? btn('cloudDelNo', 'cancel') + btn('cloudDelYes', 'cl.delYes') : btn('cloudDel', 'cl.del')) + '</div>';
+    }
+    return h + '<div class="row">' + btn('close', 'done', true) + '</div>';
+  };
+  function refresh() {
+    var sh = App.sheet(), e;
+    if (sh === 'cloud') { if (document.activeElement && document.activeElement.id === 'clCode') { e = $('clState'); if (e) e.textContent = stateText(); } else App.openSheet('cloud'); }
+    else if (sh === 'profile') { if (document.activeElement && document.activeElement.id === 'pName') { e = $('clState'); if (e) e.textContent = stateText(); } else App.openSheet('profile'); }
+  }
+  function say(b) { return t(b && b.why === 'slow' ? 'cl.slow' : b && b.why === 'code' ? 'cl.badCode' : 'cl.err'); }
+  App.acts.cloudCode = function () {
+    if (ui.wait) return;
+    ui.wait = true; ui.msg = '';
+    Cloud.code().then(function (b) {
+      ui.wait = false;
+      if (b && b.ok && b.code) { ui.code = b.code; ui.codeExp = Date.now() + 10 * 60000 - 5000; }
+      else ui.msg = say(b);
+      if (App.sheet() === 'cloud') App.openSheet('cloud');
+    });
+  };
+  App.acts.cloudPeek = function () {
+    var e = $('clCode');
+    if (e) ui.entered = e.value;
+    if (ui.wait || !ui.entered.replace(/[^A-Za-z0-9]/g, '')) return;
+    ui.wait = true; ui.msg = ''; ui.peek = null;
+    Cloud.redeem(ui.entered, false).then(function (b) {
+      ui.wait = false;
+      if (b && b.ok && b.peek) ui.peek = b.peek; else ui.msg = say(b);
+      if (App.sheet() === 'cloud') App.openSheet('cloud');
+    });
+  };
+  App.acts.cloudUse = function () {
+    if (ui.wait || !ui.peek) return;
+    ui.wait = true; ui.msg = '';
+    Cloud.redeem(ui.entered, true).then(function (b) {
+      ui.wait = false;
+      if (b && b.ok) { ui.peek = null; ui.entered = ''; ui.code = ''; App.sfx.play('win'); App.toast(t('cl.moved'), 3200); Cloud._forget(); }
+      else { ui.peek = null; ui.msg = say(b); }
+      if (App.sheet() === 'cloud') App.openSheet('cloud');
+    });
+  };
+  App.acts.cloudDel = function () { ui.del = true; App.openSheet('cloud'); };
+  App.acts.cloudDelNo = function () { ui.del = false; App.openSheet('cloud'); };
+  App.acts.cloudDelYes = function () {
+    if (ui.wait) return;
+    ui.wait = true; ui.msg = '';
+    Cloud.wipe().then(function (b) {
+      ui.wait = false; ui.del = false; ui.code = '';
+      if (b && b.ok) { App.toast(t('cl.deleted'), 3200); Cloud._forget(); } else ui.msg = say(b);
+      if (App.sheet() === 'cloud') App.openSheet('cloud');
+    });
+  };
+  App.inputs.push(function (el) {
+    if (el.id !== 'clCode') return false;
+    ui.entered = el.value;
+    return true;
+  });
+
+  // ---------- leaderboards ----------
+  var BOARDS = ['rp', 'score', 'sprint'];
+  function valueOf(b, v) {
+    if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
+    return b === 'sprint' ? App.fmtTime(v) : L.num(v);
+  }
+  function fetchBoard() {
+    var ask = ++lb.ask, b = lb.b, scope = b === 'rp' ? 'season' : lb.scope;
+    lb.state = 'load'; lb.data = null;
+    Cloud.board(b, scope).then(function (data) {
+      if (ask !== lb.ask) return;
+      lb.data = data; lb.state = data ? 'ok' : 'fail';
+      if (App.sheet() === 'board') App.openSheet('board');
+    });
+  }
+  App.dismiss.board = 1;
+  App.sheets.board = function () {
+    var h = '<h2>' + t('m.board') + '</h2><div class="tabs" role="tablist">', i, b = lb.b;
+    for (i = 0; i < BOARDS.length; i++) h += '<button type="button" role="tab" aria-selected="' + (b === BOARDS[i]) + '" data-lb="' + BOARDS[i] + '">' + t('lb.' + BOARDS[i]) + '</button>';
+    h += '</div>';
+    if (b !== 'rp') {
+      h += '<div class="seg" role="radiogroup" aria-label="' + esc(t('lb.season')) + '">' +
+        ['season', 'all'].map(function (s) { return '<button type="button" role="radio" aria-checked="' + (lb.scope === s) + '" data-lbs="' + s + '">' + t('lb.' + s) + '</button>'; }).join('') + '</div>';
+    }
+    if (lb.state === 'load' || lb.state === 'idle') h += '<p class="note lb-wait">' + t('lb.loading') + '</p>';
+    else if (lb.state === 'fail') h += '<p class="warn">' + t('lb.fail') + '</p><div class="row">' + btn('boardRetry', 'lb.retry') + '</div>';
+    else {
+      var d = lb.data, top = d.top || [], mine = false;
+      if (!top.length) h += '<p class="lb-none">' + t('lb.empty') + '</p>';
+      else {
+        h += '<ol class="lb">';
+        for (i = 0; i < top.length; i++) {
+          var r = top[i], me = !!Cloud.pub && r.p === Cloud.pub;
+          if (me) mine = true;
+          h += '<li' + (me ? ' class="me"' : '') + '><i>' + (i + 1) + '</i><b>' + esc(nameOf(r.n, r.p)) + (me ? '<em>' + t('lb.you') + '</em>' : '') + '</b><span>' + valueOf(b, r.v) + '</span></li>';
+        }
+        h += '</ol>';
+      }
+      if (d.me && !mine) h += '<ol class="lb solo"><li class="me"><i>' + d.me.rank + '</i><b>' + esc(nameOf(Meta.data.name, Cloud.pub)) + '<em>' + t('lb.you') + '</em></b><span>' + valueOf(b, d.me.v) + '</span></li></ol>';
+      else if (d.me) h += '<p class="note">' + esc(t('lb.me', d.me.rank)) + '</p>';
+      else h += '<p class="note">' + t('lb.none.' + b) + '</p>';
+      if (b === 'rp' || lb.scope === 'season') h += '<p class="note">' + esc(t('lb.seasonNote', d.season || Meta.seasonId())) + '</p>';
+    }
+    return h + '<div class="row">' + btn('close', 'close', true) + '</div>';
+  };
+  var boardWasOpen = false;
+  App.opened.board = function () {
+    if (!boardWasOpen) { boardWasOpen = true; fetchBoard(); }
+  };
+  App.closed.board = function () { boardWasOpen = false; lb.state = 'idle'; lb.data = null; lb.ask++; };
+  App.acts.boardRetry = function () { Cloud._forget(); fetchBoard(); App.openSheet('board'); };
+  App.acts.board = function () { App.openSheet('board'); };
+  App.clicks.push(function (d) {
+    if (d.lb) { if (d.lb !== lb.b) { lb.b = d.lb; fetchBoard(); App.openSheet('board'); App.el.sheetCard.scrollTop = 0; } return true; }
+    if (d.lbs) { if (d.lbs !== lb.scope) { lb.scope = d.lbs; fetchBoard(); App.openSheet('board'); } return true; }
+    return false;
+  });
+
+  // ---------- wiring ----------
+  function showLink() { var e = $('mBoard'); if (e) e.hidden = !Cloud.on; }
+  var wasOn = null;
+  Cloud.onChange = function () {
+    showLink();
+    refresh();
+    // the online lobby words its note by whether the relay is there; redraw it once that is known
+    if (wasOn !== Cloud.on) {
+      wasOn = Cloud.on;
+      var net = ZZ.Net, active = document.activeElement;
+      if (App.sheet() === 'online' && net && (net.state === 'idle' || net.state === 'error') && !(active && active.id === 'nCode')) App.openSheet('online');
+    }
+  };
+  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : 'cl.rejected'), 4600); };
+  Cloud.onAdopt = function (any, look) {
+    // progress kept with the settings follows the record: drills passed, so a second device does not start the dojo over
+    var done = Meta.data.first.drills, sv = App.save, top = 0, i;
+    for (i = 0; i < done.length; i++) top = Math.max(top, done[i] + 1);
+    if (top > sv.dojo) { sv.dojo = top; App.saveStore(); }
+    if (look) App.applyLook();
+    if (!any) return;
+    var sh = App.sheet(), active = document.activeElement;
+    if ((sh === 'shop' || sh === 'jobs' || sh === 'rank' || sh === 'battle') && !(active && /^(INPUT|SELECT)$/.test(active.tagName))) App.openSheet(sh);
+    else refresh();
+    if (App.screen() === 'menu') App.updateMenu();
+  };
+  // First among the start-up steps, so that nothing the others do goes unheard.
+  App.boot.unshift(function () {
+    var local = false;
+    try { local = !/^https?:$/.test(window.location.protocol) || /[?&]cloud=off\b/.test(window.location.search); } catch (e) { local = true; }
+    Cloud.init({ local: local });
+    showLink();
+    window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); });
+    window.addEventListener('pagehide', function () { Cloud.flush(); });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && Cloud.on && Cloud.cred && Date.now() - Cloud.last > 60000) Cloud.flush(true);
+    });
+    window.addEventListener('storage', function (e) {
+      if (e.key !== KEY) return;
+      // another tab linked, unlinked or switched the save: follow it
+      var v = readStore() || {}, id = Cloud.cred ? Cloud.cred.id : '';
+      if ((v.id || '') === id && !!v.gone === Cloud.gone) return;
+      Cloud.cred = v.id && v.key ? { id: v.id, key: v.key } : null;
+      Cloud.pub = v.pub || ''; Cloud.gone = !!v.gone; Cloud.q = []; Cloud.base = null;
+      if (Cloud.cred && Cloud.on) Cloud.flush(true);
+      Cloud.onChange();
+    });
+  });
+})(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
 window.ZZ.start();

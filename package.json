@@ -1,0 +1,17 @@
+{
+  "name": "zhuanzhuan",
+  "version": "3.2.0",
+  "private": true,
+  "description": "轉磚對戰：一頁式的落下方塊對戰遊戲，加上一組放在 Vercel 的小 API（匿名帳號、雲端存檔、排行榜）",
+  "scripts": {
+    "make": "node build.js",
+    "dev": "node tools/dev-server.js",
+    "test": "node test/run.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16"
+  }
+}

@@ -1,0 +1,118 @@
+'use strict';
+/* The one door to the database.
+
+   The connection string is read from the environment (Vercel puts it there when the Neon store is linked to the
+   project) and never appears anywhere else: not in the repository, not in a response, not in a log line.
+   Queries go to Neon over HTTPS, one request per query or per small transaction, so nothing stays connected
+   between requests. Every value travels as a parameter; no SQL is ever built from what a player sent.
+
+   Tests and the local dev server swap in an in-process Postgres with use(). */
+
+let impl = null, tried = false;
+const TIMEOUT_MS = 8000;
+
+function fromEnv() {
+  const url = process.env.DATABASE_URL || process.env.DATABASE_POSTGRES_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || '';
+  if (!url) return null;
+  const { neon } = require('@neondatabase/serverless');
+  const sql = neon(url);
+  const opts = () => ({ fetchOptions: { signal: AbortSignal.timeout(TIMEOUT_MS) } });
+  return {
+    // rows of one statement
+    query: (text, params) => sql.query(text, params || [], opts()),
+    // several statements in one transaction, one round trip; gives the rows of each
+    batch: list => sql.transaction(list.map(q => sql.query(q[0], q[1] || [])), opts())
+  };
+}
+function get() {
+  if (!impl && !tried) { tried = true; impl = fromEnv(); }
+  return impl;
+}
+function use(next) { impl = next; tried = true; }
+function configured() { return !!get(); }
+
+// ---------- tables ----------
+// Everything lives in its own schema, zz, so it cannot collide with anything else kept in the same database.
+// Times are milliseconds since 1970 in a float column and always come from the caller, which keeps them testable.
+const SCHEMA = [
+  'SELECT pg_advisory_xact_lock(7226001)',   // two cold starts at once must not both create the tables
+  'CREATE SCHEMA IF NOT EXISTS zz',
+  `CREATE TABLE IF NOT EXISTS zz.players (
+     id uuid PRIMARY KEY,
+     pub text NOT NULL UNIQUE,
+     name text NOT NULL DEFAULT '',
+     state jsonb NOT NULL,
+     srv jsonb NOT NULL DEFAULT '{}'::jsonb,
+     ver integer NOT NULL DEFAULT 1,
+     rp integer NOT NULL DEFAULT 0,
+     season text NOT NULL DEFAULT '',
+     rg integer NOT NULL DEFAULT 0,
+     ban boolean NOT NULL DEFAULT false,
+     made double precision NOT NULL,
+     seen double precision NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS players_rank ON zz.players (season, rp DESC, seen) WHERE rg > 0 AND NOT ban',
+  `CREATE TABLE IF NOT EXISTS zz.keys (
+     hash text PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     made double precision NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS keys_pid ON zz.keys (pid)',
+  `CREATE TABLE IF NOT EXISTS zz.codes (
+     hash text PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     exp double precision NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS codes_pid ON zz.codes (pid)',
+  `CREATE TABLE IF NOT EXISTS zz.scores (
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     board text NOT NULL,
+     season text NOT NULL,
+     val integer NOT NULL,
+     at double precision NOT NULL,
+     PRIMARY KEY (pid, board, season)
+   )`,
+  'CREATE INDEX IF NOT EXISTS scores_top ON zz.scores (board, season, val DESC, at)',
+  `CREATE TABLE IF NOT EXISTS zz.rate (
+     k text PRIMARY KEY,
+     n integer NOT NULL,
+     exp double precision NOT NULL
+   )`,
+  // online matches: a room has two seats, and each seat has a letter box the other seat posts into
+  `CREATE TABLE IF NOT EXISTS zz.rooms (
+     code text PRIMARY KEY,
+     hk text NOT NULL,
+     jk text,
+     exp double precision NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS zz.mail (
+     room text NOT NULL REFERENCES zz.rooms(code) ON DELETE CASCADE,
+     dst smallint NOT NULL,
+     n integer NOT NULL,
+     body jsonb NOT NULL,
+     PRIMARY KEY (room, dst, n)
+   )`
+];
+let migrating = null;
+function migrate() {
+  if (!migrating) {
+    migrating = get().batch(SCHEMA.map(q => [q, []])).then(() => true, e => { migrating = null; throw e; });
+  }
+  return migrating;
+}
+// undefined table, undefined schema, undefined column: the tables are not there yet (or are older than this code)
+function missing(e) { return !!e && (e.code === '42P01' || e.code === '3F000' || e.code === '42703'); }
+
+// Runs fn(db). The tables are created the first time something finds them missing, so a normal request pays nothing for it.
+async function run(fn) {
+  const db = get();
+  if (!db) { const e = new Error('no database configured'); e.status = 503; e.why = 'nodb'; throw e; }
+  try { return await fn(db); } catch (e) {
+    if (!missing(e)) throw e;
+    migrating = null;
+    await migrate();
+    return await fn(db);
+  }
+}
+
+module.exports = { get, use, configured, run, migrate, missing, SCHEMA };

@@ -1,9 +1,13 @@
 /* 轉磚 meta: coins, ranked ladder, daily jobs, the shop catalogue and what the player owns.
-   Pure logic plus one localStorage record. Runs in the page and in Node tests. */
+   Pure logic plus one localStorage record. Runs in the page, in Node tests and on the server:
+   the page works out every change at once so nothing waits on the network, and when a cloud save is linked
+   the server repeats the same change on its own copy (Meta.run) and its result is the one that counts. */
 (function (root) {
   'use strict';
   var ZZ = root.ZZ || require('./engine.js');
   var KEY = 'zhuanzhuan.meta.v1', DAY = 86400000;
+  var TZ = 480;   // the game's day and season turn over at midnight UTC+8 for every player, on every device and on the server
+  function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
 
   // ---------- ladder ----------
   var TIERS = ['陶土', '紅磚', '青瓦', '白瓷', '琉璃', '鎏金', '窯神'];
@@ -125,13 +129,13 @@
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0 },
-      tot: { games: 0, wins: 0, best: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
+      tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
       first: { drills: [], openers: [] },
       note: null
     };
   }
   var Meta = {
-    data: blank(), now: function () { return Date.now(); }, onChange: null, store: null,
+    data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
     TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
     SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find
   };
@@ -148,25 +152,33 @@
     }
     if (from && from.note && typeof from.note === 'object') into.note = from.note;
   }
-  Meta.dayNo = function () { var d = new Date(Meta.now()); return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / DAY); };
-  Meta.seasonId = function () { var d = new Date(Meta.now()); return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1); };
+  // Reports a change the player made (kind, arguments) to whoever keeps the cloud copy. Silent while Meta.run replays one.
+  function emit(k, a) { if (Meta.onOp && !Meta.quiet) Meta.onOp(k, a); }
+  Meta.dayNo = function () { return Math.floor((Meta.now() + TZ * 60000) / DAY); };
+  Meta.seasonId = function () { var d = new Date(Meta.now() + TZ * 60000); return d.getUTCFullYear() + '-' + (d.getUTCMonth() < 9 ? '0' : '') + (d.getUTCMonth() + 1); };
   Meta.save = function () {
     var st = storage();
     try { if (st) st.setItem(KEY, JSON.stringify(Meta.data)); } catch (e) { /* kept in memory only */ }
     if (Meta.onChange) Meta.onChange();
   };
-  Meta.load = function () {
-    var d = blank(), st = storage();
-    try {
-      var raw = st && st.getItem(KEY);
-      if (raw) merge(d, JSON.parse(raw));
-    } catch (e) { /* start fresh */ }
+  // Takes a saved record (from this device or from the server), fills in whatever it lacks and brings it up to today.
+  Meta.use = function (obj) {
+    var d = blank();
+    if (obj && typeof obj === 'object') merge(d, obj);
     while (d.items.length < 8) d.items.push(0);
     Meta.data = d;
     Meta.rollSeason();
     Meta.rollDay();
     Meta.tidy();
     return d;
+  };
+  Meta.load = function () {
+    var st = storage(), obj = null;
+    try {
+      var raw = st && st.getItem(KEY);
+      if (raw) obj = JSON.parse(raw);
+    } catch (e) { /* start fresh */ }
+    return Meta.use(obj);
   };
   Meta.reset = function () { Meta.data = blank(); Meta.rollSeason(); Meta.rollDay(); };
 
@@ -199,6 +211,7 @@
     var coins = LOGIN[(d.streak - 1) % LOGIN.length];
     if (Meta.isSub()) coins *= 2;
     Meta.earn(coins);
+    emit('login', []);
     return coins;
   };
   Meta.jobs = function () {
@@ -214,7 +227,15 @@
     if (!j || !def || j.paid || j.n < def.need) return 0;
     j.paid = true;
     Meta.earn(def.coin);
+    emit('job', [j.id]);
     return def.coin;
+  };
+  // The same claim by the job's name, which still means the same thing if the day has turned over in between.
+  Meta.claimJobId = function (id) {
+    Meta.rollDay();
+    var jobs = Meta.data.daily.jobs;
+    for (var i = 0; i < jobs.length; i++) if (jobs[i].id === id) return Meta.claimJob(i);
+    return 0;
   };
 
   // ---------- money ----------
@@ -228,8 +249,20 @@
   Meta.isSub = function () { return Meta.data.sub.until > Meta.now(); };
   Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
   // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
-  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); };
-  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); };
+  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
+  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); emit('unsub', []); };
+  // A name is at most 12 characters, with nothing that could be read as markup.
+  Meta.cleanName = function (v) {
+    return Array.from(String(v == null ? '' : v).replace(/[<>&"'`\\\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 12).join('').trim();
+  };
+  Meta.setName = function (v) {
+    v = Meta.cleanName(v);
+    if (v === Meta.data.name) return false;
+    Meta.data.name = v;
+    Meta.save();
+    emit('name', [v]);
+    return true;
+  };
 
   Meta.owns = function (kind, id) { return Meta.data.owned[kind].indexOf(id) >= 0; };
   Meta.state = function (kind, id) {
@@ -248,6 +281,7 @@
     if (!Meta.spend(it.price)) return { ok: false, why: 'poor', n: it.price - Meta.data.coins };
     Meta.data.owned[kind].push(id);
     Meta.save();
+    emit('buy', [kind, id]);
     return { ok: true };
   };
   Meta.setPrice = function (id) {
@@ -267,6 +301,7 @@
     if (!Meta.spend(p.price)) return { ok: false, why: 'poor', n: p.price - Meta.data.coins };
     KINDS.forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
     Meta.save();
+    emit('set', [id]);
     return { ok: true };
   };
   Meta.setUsable = function (id) {
@@ -274,9 +309,10 @@
     return !!st && KINDS.every(function (k) { return Meta.canUse(k, st.parts[k]); });
   };
   Meta.equip = function (kind, id) {
-    if (!Meta.canUse(kind, id)) return false;
+    if (KINDS.indexOf(kind) < 0 || !Meta.canUse(kind, id)) return false;
     Meta.data.equip[kind] = id;
     Meta.save();
+    emit('wear', [kind, id]);
     return true;
   };
   Meta.equipSet = function (id) {
@@ -284,6 +320,7 @@
     if (!st || !Meta.setUsable(id)) return false;
     KINDS.forEach(function (k) { Meta.data.equip[k] = st.parts[k]; });
     Meta.save();
+    emit('wset', [id]);
     return true;
   };
   // Anything worn that is no longer allowed (a membership ran out) goes back to the stock look.
@@ -301,6 +338,7 @@
     if (!Meta.spend(p)) return { ok: false, why: 'poor', n: p - Meta.data.coins };
     Meta.data.items[id]++;
     Meta.save();
+    emit('item', [id]);
     return { ok: true };
   };
   Meta.toggleBring = function (id) {
@@ -309,6 +347,7 @@
     else if (b.length < BRING_MAX && Meta.data.items[id] > 0) b.push(id);
     else return false;
     Meta.save();
+    emit('bring', [id]);
     return true;
   };
   // Takes the chosen items out of stock when a match starts. Returns what actually goes in.
@@ -316,17 +355,37 @@
     var d = Meta.data, out = [];
     d.bring.forEach(function (id) { if (d.items[id] > 0) { d.items[id]--; out.push(id); } });
     d.bring = d.bring.filter(function (id) { return d.items[id] > 0; });
-    if (out.length) Meta.save();
+    if (out.length) { Meta.save(); emit('take', []); }
     return out;
   };
 
   // ---------- after a match ----------
   var WIN_AI = [10, 15, 22, 30, 40];
-  // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, time, newBest }
+  var MODES = { ai: 1, rank: 1, ghost: 1, net: 1, sprint: 1 };
+  // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
+  // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
+  //   ms: how long it was played (for a sprint, the finishing time)
+  Meta.cleanMatch = function (m) {
+    m = m && typeof m === 'object' ? m : {};
+    var st = m.stats && typeof m.stats === 'object' ? m.stats : {}, mode = typeof m.mode === 'string' && MODES.hasOwnProperty(m.mode) ? m.mode : 'ai', sprint = mode === 'sprint';
+    var ms = int(m.ms != null ? m.ms : m.time, 0, 3600000), sec = ms / 1000;
+    var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
+    return {
+      mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 4),
+      ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
+      ms: ms, time: sprint ? ms : 0,
+      stats: {
+        score: cap(st.score, 3000, 5000), sent: sprint ? 0 : cap(st.sent, 6, 20), spins: cap(st.spins, 1.5, 4), minis: cap(st.minis, 1.5, 4),
+        xspins: cap(st.xspins, 1.5, 4), quads: cap(st.quads, 1, 3), maxCombo: int(st.maxCombo, 0, 40), lines: cap(st.lines, 5, 8), pieces: cap(st.pieces, 6, 10)
+      }
+    };
+  };
+  // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, ms }
   Meta.finish = function (m) {
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
+    m = Meta.cleanMatch(m);
     m.battle = m.mode !== 'sprint';
-    var st = m.stats || {}, sc = st.score || 0;
+    var st = m.stats, sc = st.score;
     function add(key, n) { n = Math.round(n); if (n > 0) parts.push({ key: key, n: n }); }
     if (m.battle) {
       add('score', Math.min(80, Math.floor(sc / 400)));
@@ -342,7 +401,7 @@
       if (m.result > 0) {
         add('sprint', 15);
         add('speed', m.time < 60000 ? 40 : m.time < 90000 ? 20 : m.time < 120000 ? 10 : 0);
-        if (m.newBest) add('best', 20);
+        if (!d.tot.sprint || m.time < d.tot.sprint) { d.tot.sprint = m.time; out.best = true; add('best', 20); }
       }
     }
     var sum = 0;
@@ -373,16 +432,54 @@
     });
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
+    delete m.battle;
+    emit('fin', [m]);
     return out;
   };
-  // First time through a drill or an opener lesson pays once.
-  Meta.firstClear = function (kind, id, coins) {
-    var list = Meta.data.first[kind];
-    if (!list || list.indexOf(id) >= 0) return 0;
-    list.push(id);
-    return Meta.earn(coins);
+  // First time through a drill or an opener lesson pays once. What it pays is looked up here, not taken from the caller.
+  Meta.firstCoin = function (kind, id) {
+    if (kind === 'drills') return typeof id === 'number' && id === Math.floor(id) && id >= 0 && id < (ZZ.DRILLS ? ZZ.DRILLS.length : 0) ? 15 : 0;
+    if (kind === 'openers') { var list = ZZ.OPENERS || []; for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].coin; }
+    return 0;
   };
-  Meta.takeNote = function () { var n = Meta.data.note; if (n) { Meta.data.note = null; Meta.save(); } return n; };
+  Meta.firstClear = function (kind, id) {
+    var coins = Meta.firstCoin(kind, id);
+    if (!coins || Meta.data.first[kind].indexOf(id) >= 0) return 0;
+    Meta.data.first[kind].push(id);
+    Meta.earn(coins);
+    emit('first', [kind, id]);
+    return coins;
+  };
+  Meta.takeNote = function () { var n = Meta.data.note; if (n) { Meta.data.note = null; Meta.save(); emit('note', []); } return n; };
+
+  // ---------- one change, by name ----------
+  // The cloud copy is kept in step by repeating each change there: kind 'buy' with ['tile', 'neon'], and so on.
+  // Everything arriving here may come from outside, so each argument is checked before it is used.
+  function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
+  function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
+  var RUN = {
+    fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
+    buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
+    set: function (a) { return Meta.buySet(str(a[0])); },
+    item: function (a) { return Meta.buyItem(int(a[0], 0, 99)); },
+    wear: function (a) { return yes(Meta.equip(a[0], str(a[1]))); },
+    wset: function (a) { return yes(Meta.equipSet(str(a[0]))); },
+    bring: function (a) { return yes(Meta.toggleBring(int(a[0], 0, 99))); },
+    take: function () { Meta.takeBring(); return yes(1); },
+    login: function () { return yes(Meta.claimLogin()); },
+    job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
+    first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
+    name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
+    sub: function () { Meta.subscribe(); return yes(1); },
+    unsub: function () { Meta.cancelSub(); return yes(1); },
+    note: function () { Meta.takeNote(); return yes(1); }
+  };
+  Meta.OPS = Object.keys(RUN);
+  Meta.run = function (k, a) {
+    if (typeof k !== 'string' || !RUN.hasOwnProperty(k) || !Array.isArray(a)) return { ok: false, why: 'op' };
+    Meta.quiet++;
+    try { return RUN[k](a); } finally { Meta.quiet--; }
+  };
 
   ZZ.Meta = Meta;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;

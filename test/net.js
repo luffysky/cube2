@@ -1,25 +1,35 @@
 'use strict';
 // Two pages play an online match against each other. Default transport is the in-browser test channel (?net=bc);
-// set ZZ_PEER=host:port/path to go through a real PeerJS broker and WebRTC instead.
+// set ZZ_RELAY=1 to go through the game's own API (the test starts tools/dev-server.js for it),
+// or ZZ_PEER=host:port/path to go through a real PeerJS broker and WebRTC instead.
 const { chromium } = require('/opt/npm-tools/node_modules/playwright');
+const { spawn } = require('child_process');
 const path = require('path');
-const BASE = process.env.ZZ_URL || 'http://127.0.0.1:8765/index.html';
+const RELAY = !!process.env.ZZ_RELAY, PORT = 8773;
+const BASE = RELAY ? 'http://127.0.0.1:' + PORT + '/index.html' : process.env.ZZ_URL || 'http://127.0.0.1:8765/index.html';
 const PEER = process.env.ZZ_PEER || '';
-const Q = PEER ? '?peer=' + encodeURIComponent(PEER) : '?net=bc&code=TEST2';
+const Q = RELAY ? '' : PEER ? '?peer=' + encodeURIComponent(PEER) : '?net=bc&code=TEST2';
+const W = RELAY ? 2.2 : 1;      // the relay needs a round trip or two more than a direct channel
 const OUT = path.join(__dirname, '..', 'shots');
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const nap = ms => new Promise(r => setTimeout(r, ms));
+const sleep = ms => nap(ms * W);
+const until = async (fn, ms) => { for (const end = Date.now() + ms; Date.now() < end;) { if (await fn()) return true; await nap(120); } return false; };
 let pass = 0, fail = 0;
 const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL: ' + n + (extra !== undefined ? '  ' + JSON.stringify(extra) : '')); } };
 (async () => {
+  let srv = null;
+  if (RELAY) { srv = spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'dev-server.js'), String(PORT)], { stdio: ['ignore', 'pipe', 'inherit'] }); await new Promise(r => srv.stdout.once('data', r)); }
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required', '--disable-features=WebRtcHideLocalIpsWithMdns', '--allow-loopback-in-peer-connection'] });
-  const problems = [];
+  const problems = [], reqs = [];
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 }, deviceScaleFactor: 1, locale: 'zh-TW' });
   async function open(name) {
     const page = await ctx.newPage();
     page.on('pageerror', e => problems.push(name + ' pageerror: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 5).join('\n')));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.g|ERR_|Failed to load resource/.test(m.text())) problems.push(name + ' console: ' + m.text()); });
+    page.on('request', r => { if (!/^data:/.test(r.url())) reqs.push(r.url()); });
     await page.goto(BASE + Q);
     await sleep(600);
+    if (RELAY) for (let i = 0; i < 40 && !(await page.evaluate(() => ZZ.Cloud.on)); i++) await nap(150);
     return page;
   }
   const ev = (page, expr) => page.evaluate('(function(){var p=ZZ.peek();var S=p.S;var N=ZZ.Net;' + expr + '})()');
@@ -42,13 +52,15 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   await A.evaluate(() => document.getElementById('nItems').click()); await sleep(300);
   ok((await ev(B, 'return N.cfg.minutes === 1 && N.cfg.items === true')), 'guest sees the host rules', await ev(B, 'return N.cfg'));
   await B.screenshot({ path: path.join(OUT, 'n_guest.png') });
-  await A.click('[data-do="netStart"]'); await sleep(2800);
+  await A.click('[data-do="netStart"]'); await nap(RELAY ? 4600 : 2800);
   ok((await ev(A, 'return S && S.mode === "net" && S.state === "play"')) && (await ev(B, 'return S && S.mode === "net" && S.state === "play"')), 'both are playing');
   ok((await ev(A, 'return S.me.seed')) === (await ev(B, 'return S.me.seed')), 'same piece order for both');
   ok((await ev(A, 'return S.oppName')) === '小華', 'opponent name on the HUD');
   // A stacks a few pieces; B's mirror of A shows the same wall
   for (let i = 0; i < 8; i++) { await A.bringToFront(); await A.keyboard.press(['KeyA', 'KeyD', 'KeyA', 'KeyD'][i % 4]); await A.keyboard.press('Space'); await sleep(120); }
   await sleep(500);
+  // (a page that is not in front runs its timers once a second, so in this two-tab test the watching side can lag)
+  if (RELAY) await until(() => ev(B, 'return S.opp.stats.pieces === 8'), 8000);
   const wallA = await ev(A, 'return S.me.grid.map(function(r){return Array.prototype.join.call(r,"")}).join("|")');
   const wallB = await ev(B, 'return S.opp.grid.map(function(r){return Array.prototype.join.call(r,"")}).join("|")');
   ok(wallA === wallB && /[1-7]/.test(wallA), 'guest mirrors the host wall');
@@ -85,7 +97,14 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   await B.click('[data-do="menu"]'); await sleep(1200);
   const left = await ev(A, 'return {sheet:p.sheet, why:S.why, r:S.result}');
   ok(left.sheet === 'battleEnd' && left.why === 'left' && left.r === 1, 'the one who stayed wins', left);
+  if (RELAY) {
+    // what the relay asked of the server during all that
+    const rooms = reqs.filter(u => /\/api\/room$/.test(u)).length;
+    ok(rooms > 20 && reqs.every(u => /^http:\/\/127\.0\.0\.1:/.test(u) || /fonts\.(googleapis|gstatic)\.com/.test(u)), 'everything went through this site, nothing through a public broker', [rooms, reqs.filter(u => !/^http:\/\/127\.0\.0\.1:/.test(u) && !/fonts\./.test(u)).slice(0, 5)]);
+    ok(await ev(A, 'return !window.Peer'), 'the PeerJS library was never loaded');
+  }
   await browser.close();
-  console.log('net checks (' + (PEER ? 'peer ' + PEER : 'test channel') + '): ' + pass + ' passed, ' + fail + ' failed');
+  if (srv) srv.kill();
+  console.log('net checks (' + (RELAY ? 'own relay' : PEER ? 'peer ' + PEER : 'test channel') + '): ' + pass + ' passed, ' + fail + ' failed');
   console.log(problems.length ? problems.join('\n') : 'no page errors');
 })();

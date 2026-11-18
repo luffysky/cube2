@@ -1,8 +1,14 @@
-/* 轉磚 net: two players, device to device. One opens a room and gets a code; the other joins with it.
-   The room is found through a PeerJS broker, then play data flows straight between the two browsers (WebRTC).
+/* 轉磚 net: two players, each on their own device. One opens a room and gets a code; the other joins with it.
    Each side runs its own game. What crosses the wire: a picture of the wall after every change, the events the other
    screen needs for its effects, attack lines, item hits and a final tally. Nothing received is trusted: every field is checked.
-   Test hooks in the page address: ?net=bc uses a BroadcastChannel instead of WebRTC, ?peer=host:port/path uses your own broker. */
+
+   How the two sides reach each other depends on where the page is served:
+   - With the game's own API (Vercel): through /api/room. Each side posts its messages and collects the other's with
+     plain HTTPS requests, a few times a second. It needs nothing but ordinary web access, so it works on any network.
+   - On a plain static host: through a public PeerJS broker and a direct WebRTC link. No server of ours is involved,
+     but it only works when that broker is up and the two networks let a direct link through.
+   Test hooks in the page address: ?net=bc uses a BroadcastChannel, ?net=peer forces the PeerJS way,
+   ?peer=host:port/path uses your own PeerJS broker. */
 (function () {
   'use strict';
   var ZZ = window.ZZ, App = ZZ.App, TYPES = ZZ.TYPES, ROWS = ZZ.ROWS, COLS = ZZ.COLS;
@@ -12,7 +18,7 @@
     code: '', host: false, me: '', foe: '', err: '', cfg: { minutes: 2, items: false },
     wantAgain: false, foeAgain: false, onChange: null
   };
-  var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0;
+  var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0, epoch = 0, relayed = false;
   var qs = (function () { try { return new URLSearchParams(window.location.search); } catch (e) { return { get: function () { return null; } }; } })();
 
   function changed() { if (Net.onChange) Net.onChange(); }
@@ -66,6 +72,125 @@
   BcConn.prototype.send = function (d) { this.ch.postMessage({ k: 'd', d: d }); };
   BcConn.prototype.close = function () { try { this.ch.postMessage({ k: 'close' }); this.ch.close(); } catch (e) { /* closed */ } };
 
+  // ---------- our own relay ----------
+  function rpc(body, last) {
+    var o = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', keepalive: !!last }, t = 0;
+    if (typeof AbortController === 'function') { var ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 9000); }
+    return window.fetch('api/room', o).then(function (res) {
+      return res.text().then(function (text) {
+        clearTimeout(t);
+        var j = null;
+        try { j = JSON.parse(text); } catch (e) { /* not ours */ }
+        return { status: res.status, body: j && typeof j === 'object' ? j : null };
+      });
+    }, function (e) { clearTimeout(t); throw e; });
+  }
+  function seatKey() {
+    var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', s = '', buf = new Uint8Array(32), i;
+    try { window.crypto.getRandomValues(buf); } catch (e) { for (i = 0; i < 32; i++) buf[i] = Math.floor(Math.random() * 256); }
+    for (i = 0; i < 32; i++) s += abc[buf[i] % abc.length];
+    return s;
+  }
+  // One seat in a room. Looks like a data connection to the rest of this file: on('open' | 'data' | 'close'), send, close.
+  // Every message gets a number. A batch is offered again until the server has confirmed it, the server keeps each
+  // number once, and what comes back is only taken in order, so nothing is lost or doubled when a request goes missing.
+  function Relay(code, key, role) {
+    this.code = code; this.key = key; this.role = role;
+    this.h = {}; this.out = []; this.nOut = 0; this.ack = 0;
+    this.open = false; this.dead = false; this.closing = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
+    this.heard = Date.now(); this.said = Date.now(); this.born = Date.now();
+    this.pump(0);
+  }
+  Relay.prototype.on = function (ev, fn) { this.h[ev] = fn; };
+  Relay.prototype.fire = function (ev, d) { if (this.h[ev]) this.h[ev](d); };
+  // how long to wait between rounds: quick while a match is on, relaxed in the lobby, slow while waiting alone
+  Relay.prototype.pace = function () {
+    if (Net.state === 'playing') return 110;
+    if (this.open) return 500;
+    var waited = Date.now() - this.born;      // nobody has joined yet: look less often the longer the room sits open
+    return waited < 120000 ? 1300 : waited < 600000 ? 2500 : 5000;
+  };
+  Relay.prototype.send = function (m) {
+    if (this.dead || this.closing) return;
+    var last = this.out[this.out.length - 1];
+    // only the newest picture of the wall is worth sending
+    if (m && m.t === 's' && last && !last.s && last.m.t === 's') last.m = m;
+    else this.out.push({ n: ++this.nOut, m: m });
+    this.said = Date.now();
+    this.pump(m && (m.t === 's' || m.t === 'e') ? 90 : 0);
+  };
+  Relay.prototype.pump = function (ms) {
+    var self = this, at = Date.now() + ms;
+    if (this.dead || this.closing || this.busy) return;
+    if (this.t && this.due <= at) return;      // an earlier round is already booked
+    clearTimeout(this.t);
+    this.due = at;
+    this.t = setTimeout(function () { self.t = 0; self.round(false); }, ms);
+  };
+  Relay.prototype.round = function (last) {
+    var self = this, batch = [], size = 0, i;
+    if (this.dead || this.closing || this.busy) return;
+    // silence from the other side for too long means they are gone (a phone that went to sleep, a closed tab)
+    if (this.open && Date.now() - this.heard > (Net.state === 'playing' ? 15000 : 70000)) { this.dead = true; return this.fire('close'); }
+    if (this.open && Net.state !== 'playing' && Date.now() - this.said > 5000) { this.out.push({ n: ++this.nOut, m: { t: 'p' } }); this.said = Date.now(); }
+    for (i = 0; i < this.out.length && batch.length < 60; i++) {
+      var len = JSON.stringify(this.out[i].m).length;
+      if (batch.length && size + len > 16000) break;
+      size += len; this.out[i].s = 1;
+      batch.push({ n: this.out[i].n, m: this.out[i].m });
+    }
+    var top = batch.length ? batch[batch.length - 1].n : 0, retry = function () {
+      self.busy = false;
+      if (self.dead) return;
+      if (self.closing) return self.finish();
+      for (var k = 0; k < self.out.length; k++) delete self.out[k].s;
+      if (++self.fails > 14) { self.dead = true; return self.fire('close'); }
+      self.pump(Math.min(3000, 250 * self.fails));
+    };
+    this.busy = true;
+    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: batch }, last).then(function (r) {
+      var b = r.body;
+      if (self.dead) return;
+      if (r.status === 404) { self.dead = true; return self.fire('close'); }      // the room is gone
+      if (r.status !== 200 || !b || !b.ok) return retry();
+      self.busy = false; self.fails = 0;
+      self.out = self.out.filter(function (o) { return o.n > top; });
+      if (self.closing) return self.finish();
+      if (b.paired && !self.open) { self.open = true; self.heard = Date.now(); self.fire('open'); }
+      var got = Array.isArray(b.in) ? b.in : [], any = false;
+      for (var k = 0; k < got.length && !self.dead && !self.closing; k++) {
+        var it = got[k];
+        if (!it || typeof it.n !== 'number' || it.n <= self.ack) continue;
+        self.ack = it.n; self.heard = Date.now(); any = true;
+        self.fire('data', it.m);
+      }
+      if (self.dead) return;
+      if (self.closing) return self.finish();
+      self.pump(self.out.length || any ? Math.min(110, self.pace()) : self.pace());
+    }, retry);
+  };
+  Relay.prototype.close = function () {
+    if (this.dead || this.closing) return;
+    this.closing = true;
+    clearTimeout(this.t); this.t = 0;
+    if (!this.busy) this.finish();      // otherwise the round in flight calls finish() when it lands
+  };
+  // The last word: hand over what is still waiting (the goodbye), then stop. The host also takes the room down.
+  Relay.prototype.finish = function () {
+    var self = this, rest = this.out.slice(0, 60).map(function (o) { return { n: o.n, m: o.m }; });
+    if (this.dead) return;
+    this.dead = true; this.out = [];
+    var end = function () { if (self.role === 0) rpc({ a: 'close', code: self.code, key: self.key }, true).then(null, function () { /* it runs out by itself */ }); };
+    if (!rest.length) return end();
+    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest }, true).then(end, end);
+  };
+  function transport(cb) {
+    var mode = qs.get('net'), C = ZZ.Cloud;
+    if (mode === 'bc') return cb('bc');
+    if (mode === 'peer' || qs.get('peer') || !C || !C.whenKnown) return cb('peer');
+    C.whenKnown(function (on) { cb(on ? 'relay' : 'peer'); });
+  }
+
   function wire(c) {
     link = c;
     c.on('open', function () {
@@ -85,16 +210,32 @@
   function reset(name, host) {
     shut();
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = '';
-    Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null;
+    Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
+    epoch++;
   }
 
   Net.open = function (name) {
     reset(name, true);
     setState('opening');
-    loadLib(function (ok) {
-      if (Net.state !== 'opening') return;
-      if (!ok) return fail('lib');
-      tryOpen(0);
+    var run = epoch;
+    transport(function (kind) {
+      if (run !== epoch || Net.state !== 'opening') return;
+      if (kind === 'relay') {
+        var key = seatKey();
+        relayed = true;
+        return rpc({ a: 'open', key: key }).then(function (r) {
+          if (run !== epoch || Net.state !== 'opening') return;
+          if (r.status !== 200 || !r.body || !r.body.ok || !r.body.code) return fail(r.status === 429 ? 'slow' : 'server');
+          Net.code = String(r.body.code);
+          wire(new Relay(Net.code, key, 0));
+          setState('waiting');
+        }, function () { if (run === epoch && Net.state === 'opening') fail('server'); });
+      }
+      loadLib(function (ok) {
+        if (run !== epoch || Net.state !== 'opening') return;
+        if (!ok) return fail('lib');
+        tryOpen(0);
+      });
     });
   };
   function tryOpen(n) {
@@ -124,14 +265,28 @@
     Net.code = code;
     if (code.length !== 5) { Net.err = 'room'; return setState('error'); }
     setState('joining');
-    loadLib(function (ok) {
-      if (Net.state !== 'joining') return;
-      if (!ok) return fail('lib');
-      joinT = setTimeout(function () { if (Net.state === 'joining') fail('room'); }, 14000);
-      if (qs.get('net') === 'bc') return wire(new BcConn(code, false));
-      try { peer = new window.Peer(peerOpts()); } catch (e) { return fail('server'); }
-      peer.on('open', function () { wire(peer.connect(PREFIX + code, { reliable: true, serialization: 'json' })); });
-      peer.on('error', function (e) { if (Net.state === 'joining') fail(e && e.type === 'peer-unavailable' ? 'room' : 'server'); });
+    var run = epoch;
+    transport(function (kind) {
+      if (run !== epoch || Net.state !== 'joining') return;
+      if (kind === 'relay') {
+        var key = seatKey();
+        relayed = true;
+        joinT = setTimeout(function () { if (run === epoch && Net.state === 'joining') fail('server'); }, 20000);
+        return rpc({ a: 'join', code: code, key: key }).then(function (r) {
+          if (run !== epoch || Net.state !== 'joining') return;
+          if (r.status !== 200 || !r.body || !r.body.ok) return fail(r.status === 404 ? 'room' : r.status === 409 ? 'full' : r.status === 429 ? 'slow' : 'server');
+          wire(new Relay(code, key, 1));
+        }, function () { if (run === epoch && Net.state === 'joining') fail('server'); });
+      }
+      loadLib(function (ok) {
+        if (run !== epoch || Net.state !== 'joining') return;
+        if (!ok) return fail('lib');
+        joinT = setTimeout(function () { if (Net.state === 'joining') fail('room'); }, 14000);
+        if (qs.get('net') === 'bc') return wire(new BcConn(code, false));
+        try { peer = new window.Peer(peerOpts()); } catch (e) { return fail('server'); }
+        peer.on('open', function () { wire(peer.connect(PREFIX + code, { reliable: true, serialization: 'json' })); });
+        peer.on('error', function (e) { if (Net.state === 'joining') fail(e && e.type === 'peer-unavailable' ? 'room' : 'server'); });
+      });
     });
   };
   Net.leave = function () {
@@ -284,7 +439,8 @@
     send({ t: 'end', downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score });
     if (foeEnd) return settle(cb);
     endWait = cb;
-    setTimeout(function () { if (endWait === cb) { endWait = null; settle(cb); } }, 1500);
+    // through the relay the other side's tally takes a little longer to arrive
+    setTimeout(function () { if (endWait === cb) { endWait = null; settle(cb); } }, relayed ? 4000 : 1500);
   };
   function dropped() {
     if (!link && !peer) return;
@@ -325,6 +481,9 @@
     send(pack(S.me));
   };
   Net.link = function () { return !!link; };
+  Net.relayed = function () { return relayed; };
+  // back from the background: catch up at once instead of waiting for the next round
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && link && link.pump && !link.dead) link.pump(0); });
 
   ZZ.Net = Net;
 })();

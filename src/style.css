@@ -363,3 +363,18 @@ html[lang="ko"] { --display: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Goth
 /* 捲軸藏起來。內容照樣可以用滾輪、觸控和鍵盤捲動。 */
 html, body, #menu, #sheetCard { scrollbar-width: none; -ms-overflow-style: none; }
 html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #sheetCard::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ---------- 排行榜、雲端存檔 ---------- */
+.lb { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lb li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 7px 12px 7px 7px; background: var(--panel); border: 1px solid var(--edge); border-radius: 11px; }
+.lb i { display: grid; place-items: center; width: 34px; height: 30px; border-radius: 7px; background: var(--floor); font: italic 700 16px/1 var(--num); font-variant-numeric: tabular-nums; color: var(--muted); }
+.lb li:first-child i { background: var(--gold); color: #1B2530; }
+.lb.solo li:first-child i { background: var(--floor); color: var(--muted); }
+.lb b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.lb em { margin-left: 8px; padding: 1px 7px 2px; border-radius: 99px; background: var(--wall); color: var(--wall-ink); font-size: 11px; font-style: normal; font-weight: 700; vertical-align: 1px; }
+.lb span { font: italic 700 18px/1 var(--num); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.lb span small { display: block; margin-bottom: 3px; font: 700 11px/1.2 var(--display); color: var(--muted); }
+.lb li.me { border-color: var(--gold); box-shadow: inset 4px 0 0 var(--gold); }
+.lb-none { padding: 22px 12px; text-align: center; background: var(--panel); border: 1px dashed var(--edge-deep); border-radius: 12px; }
+.lb-wait { text-align: center; padding: 18px 0; }
+.roomcode.xfer { font-size: clamp(26px, 9.4vw, 44px); letter-spacing: 0.08em; }
