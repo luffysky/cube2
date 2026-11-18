@@ -1,0 +1,389 @@
+/* 轉磚 meta: coins, ranked ladder, daily jobs, the shop catalogue and what the player owns.
+   Pure logic plus one localStorage record. Runs in the page and in Node tests. */
+(function (root) {
+  'use strict';
+  var ZZ = root.ZZ || require('./engine.js');
+  var KEY = 'zhuanzhuan.meta.v1', DAY = 86400000;
+
+  // ---------- ladder ----------
+  var TIERS = ['陶土', '紅磚', '青瓦', '白瓷', '琉璃', '鎏金', '窯神'];
+  var DIVS = ['III', 'II', 'I'], STEP = 100, TOP_RP = 18 * STEP;
+  function rankOf(rp) {
+    rp = Math.max(0, Math.round(rp || 0));
+    if (rp >= TOP_RP) return { tier: 6, div: 0, name: TIERS[6], rp: rp, into: rp - TOP_RP, need: 0, floor: TOP_RP, top: true };
+    var i = Math.floor(rp / STEP), tier = Math.floor(i / 3), div = i % 3;
+    return { tier: tier, div: div, name: TIERS[tier] + ' ' + DIVS[div], rp: rp, into: rp - i * STEP, need: STEP, floor: tier * 3 * STEP, top: false };
+  }
+  // Win or lose, how far the rating moves. Losing never drops you out of the tier you have reached.
+  function rpDelta(rp, result, koDiff, streak) {
+    var r = rankOf(rp);
+    if (result > 0) return 20 + Math.min(10, Math.max(0, koDiff) * 3) + (streak >= 3 ? 5 : 0);
+    if (result === 0) return 2;
+    var loss = r.tier >= 5 ? 20 : r.tier >= 3 ? 16 : 12;
+    return -Math.min(loss, rp - r.floor);
+  }
+  var FOES = ['阿土', '磚頭伯', '小釉', '瓦片姐', '泥作仔', '阿窯', '磨石嬸', '水泥哥', '砌牆王', '青花妹', '老窯頭', '白瓷姨', '琉璃仔', '金磚爺'];
+  // The opponent for a rating: speed and care rise smoothly, the playing style switches at the level boundaries.
+  function botFor(rp, rnd) {
+    var L = ZZ.Bot.LEVELS, t = Math.max(0, Math.min(rp, 2400)) / 450, i = Math.min(3, Math.floor(t)), f = Math.min(1, t - i);
+    var a = L[i], b = L[i + 1], near = f < 0.5 ? a : b, over = Math.max(0, t - 4);
+    var r = rnd ? rnd() : Math.random();
+    return {
+      name: FOES[Math.floor(r * FOES.length) % FOES.length],
+      pps: Math.round((a.pps + (b.pps - a.pps) * f + over * 0.6) * 100) / 100,
+      noise: Math.round((a.noise + (b.noise - a.noise) * f) * 10) / 10,
+      depth: near.depth, hold: near.hold, w: near.w, level: f < 0.5 ? i : i + 1
+    };
+  }
+
+  // ---------- catalogue ----------
+  // price in coins. rank: free once that tier has been reached. sub: members only.
+  var CATALOG = {
+    tile: [
+      { id: 'glaze', name: '釉面磚', price: 0 },
+      { id: 'pixel', name: '像素', price: 400 },
+      { id: 'mosaic', name: '馬賽克', price: 600 },
+      { id: 'brick', name: '紅磚', price: 600 },
+      { id: 'candy', name: '軟糖', price: 900 },
+      { id: 'glass', name: '玻璃磚', price: 900 },
+      { id: 'wood', name: '積木', price: 900 },
+      { id: 'neon', name: '霓虹燈管', price: 1200 },
+      { id: 'gem', name: '寶石', rank: 3 },
+      { id: 'custom', name: '自己的圖', sub: true }
+    ],
+    bg: [
+      { id: 'wall', name: '水泥牆', price: 0 },
+      { id: 'blueprint', name: '藍圖', price: 500 },
+      { id: 'board', name: '黑板', price: 500 },
+      { id: 'stone', name: '磨石子', price: 500 },
+      { id: 'night', name: '夜空', price: 700 },
+      { id: 'tatami', name: '榻榻米', price: 700 },
+      { id: 'dusk', name: '暮色', price: 700 },
+      { id: 'neongrid', name: '霓虹格線', price: 900 },
+      { id: 'ember', name: '窯火', rank: 4 },
+      { id: 'custom', name: '自己的圖', sub: true }
+    ],
+    theme: [
+      { id: 'auto', name: '磨石子', price: 0 },
+      { id: 'ink', name: '墨', price: 600 },
+      { id: 'kiln', name: '窯燒', price: 800 },
+      { id: 'qinghua', name: '青花', price: 800 },
+      { id: 'matcha', name: '抹茶', price: 800 },
+      { id: 'sakura', name: '櫻花', price: 800 },
+      { id: 'market', name: '夜市', price: 1000 }
+    ],
+    fx: [
+      { id: 'shard', name: '碎磚', price: 0 },
+      { id: 'star', name: '星屑', price: 600 },
+      { id: 'bubble', name: '泡泡', price: 600 },
+      { id: 'petal', name: '花瓣', price: 800 }
+    ],
+    set: [
+      { id: 'market', name: '霓虹夜市', parts: { tile: 'neon', bg: 'neongrid', theme: 'market', fx: 'star' } },
+      { id: 'qinghua', name: '青花瓷', parts: { tile: 'glass', bg: 'blueprint', theme: 'qinghua', fx: 'bubble' } },
+      { id: 'kiln', name: '窯邊紅磚', parts: { tile: 'brick', bg: 'dusk', theme: 'kiln', fx: 'shard' } },
+      { id: 'washitsu', name: '和室', parts: { tile: 'wood', bg: 'tatami', theme: 'matcha', fx: 'petal' } },
+      { id: 'candy', name: '糖果屋', parts: { tile: 'candy', bg: 'night', theme: 'sakura', fx: 'bubble' } }
+    ]
+  };
+  var KINDS = ['tile', 'bg', 'theme', 'fx'];
+  var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
+  var ITEM_PRICE = [0, 40, 50, 40, 60, 50, 60, 60];
+  var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30;
+  var PLAN = { name: '轉磚會員', month: 90, year: 890 };   // planned prices in NT$, shown in the shop; nothing is charged yet
+  function find(kind, id) {
+    var list = CATALOG[kind] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  // ---------- daily jobs ----------
+  var JOBS = [
+    { id: 'win', text: '贏 2 場對戰', need: 2, coin: 60, on: function (m) { return m.battle && m.result > 0 ? 1 : 0; } },
+    { id: 'play', text: '打完 3 場對戰', need: 3, coin: 40, on: function (m) { return m.battle ? 1 : 0; } },
+    { id: 'tspin', text: '做出 5 次 T 轉', need: 5, coin: 60, on: function (m) { return m.stats.spins + m.stats.minis; } },
+    { id: 'send', text: '送出 40 行', need: 40, coin: 50, on: function (m) { return m.battle ? m.stats.sent : 0; } },
+    { id: 'quad', text: '四消 3 次', need: 3, coin: 40, on: function (m) { return m.stats.quads; } },
+    { id: 'ko', text: '擊倒對手 4 次', need: 4, coin: 50, on: function (m) { return m.battle ? m.ko : 0; } },
+    { id: 'rank', text: '打 2 場排位賽', need: 2, coin: 60, on: function (m) { return m.mode === 'rank' ? 1 : 0; } },
+    { id: 'combo', text: '打出 5 連擊', need: 1, coin: 40, on: function (m) { return m.stats.maxCombo >= 5 ? 1 : 0; } },
+    { id: 'xspin', text: '用 T 以外的方塊轉進去 2 次', need: 2, coin: 50, on: function (m) { return m.stats.xspins; } },
+    { id: 'sprint', text: '跑完一次 40 行競速', need: 1, coin: 40, on: function (m) { return m.mode === 'sprint' && m.result > 0 ? 1 : 0; } },
+    { id: 'score', text: '單場拿到 20000 分', need: 1, coin: 60, on: function (m) { return m.stats.score >= 20000 ? 1 : 0; } },
+    { id: 'item', text: '用掉 3 個道具', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } }
+  ];
+  var LOGIN = [20, 30, 40, 50, 60, 80, 120];
+  function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
+
+  // ---------- state ----------
+  function blank() {
+    return {
+      v: 1, coins: 200, name: '', rp: 0, peak: 0, season: '', rgames: 0, streak: 0,
+      owned: { tile: [], bg: [], theme: [], fx: [] },
+      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
+      items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
+      sub: { until: 0, demo: true },
+      custom: { tile: false, bg: false, dim: 45 },
+      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0 },
+      tot: { games: 0, wins: 0, best: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
+      first: { drills: [], openers: [] },
+      note: null
+    };
+  }
+  var Meta = {
+    data: blank(), now: function () { return Date.now(); }, onChange: null, store: null,
+    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
+    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find
+  };
+  function storage() {
+    if (Meta.store) return Meta.store;
+    try { return root.localStorage || null; } catch (e) { return null; }
+  }
+  function merge(into, from) {
+    for (var k in into) {
+      if (!from || from[k] == null) continue;
+      if (Array.isArray(into[k])) { if (Array.isArray(from[k])) into[k] = from[k].slice(); }
+      else if (typeof into[k] === 'object' && into[k]) { if (typeof from[k] === 'object') merge(into[k], from[k]); }
+      else if (typeof into[k] === typeof from[k]) into[k] = from[k];
+    }
+    if (from && from.note && typeof from.note === 'object') into.note = from.note;
+  }
+  Meta.dayNo = function () { var d = new Date(Meta.now()); return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / DAY); };
+  Meta.seasonId = function () { var d = new Date(Meta.now()); return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1); };
+  Meta.save = function () {
+    var st = storage();
+    try { if (st) st.setItem(KEY, JSON.stringify(Meta.data)); } catch (e) { /* kept in memory only */ }
+    if (Meta.onChange) Meta.onChange();
+  };
+  Meta.load = function () {
+    var d = blank(), st = storage();
+    try {
+      var raw = st && st.getItem(KEY);
+      if (raw) merge(d, JSON.parse(raw));
+    } catch (e) { /* start fresh */ }
+    while (d.items.length < 8) d.items.push(0);
+    Meta.data = d;
+    Meta.rollSeason();
+    Meta.rollDay();
+    Meta.tidy();
+    return d;
+  };
+  Meta.reset = function () { Meta.data = blank(); Meta.rollSeason(); Meta.rollDay(); };
+
+  // A new month starts a new season: a reward for the tier reached, then the rating settles back part of the way.
+  Meta.rollSeason = function () {
+    var d = Meta.data, s = Meta.seasonId();
+    if (d.season === s) return;
+    if (d.season && d.rgames > 0) {
+      var r = rankOf(d.peak), coins = 60 + r.tier * 90;
+      d.coins += coins;
+      d.note = { kind: 'season', coins: coins, name: r.name };
+      d.rp = Math.round(d.rp * 0.7 / 10) * 10;
+    }
+    d.season = s; d.peak = d.rp; d.rgames = 0;
+  };
+  Meta.rollDay = function () {
+    var d = Meta.data.daily, day = Meta.dayNo();
+    if (d.day === day && d.jobs.length) return;
+    // three jobs a day, picked by the date so everyone gets the same set
+    var rnd = new ZZ.RNG(day * 2654435761), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
+    for (var i = 0; i < 3; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
+    d.day = day; d.jobs = jobs;
+  };
+  Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
+  Meta.claimLogin = function () {
+    var d = Meta.data.daily, day = Meta.dayNo();
+    if (d.login === day) return 0;
+    d.streak = d.login === day - 1 ? d.streak + 1 : 1;
+    d.login = day;
+    var coins = LOGIN[(d.streak - 1) % LOGIN.length];
+    if (Meta.isSub()) coins *= 2;
+    Meta.earn(coins);
+    return coins;
+  };
+  Meta.jobs = function () {
+    Meta.rollDay();
+    return Meta.data.daily.jobs.map(function (j, i) {
+      var def = job(j.id) || { text: '', need: 1, coin: 0 };
+      return { i: i, id: j.id, text: def.text, need: def.need, coin: def.coin, n: Math.min(j.n, def.need), done: j.n >= def.need, paid: j.paid };
+    });
+  };
+  Meta.jobsReady = function () { return Meta.jobs().filter(function (j) { return j.done && !j.paid; }).length; };
+  Meta.claimJob = function (i) {
+    var j = Meta.data.daily.jobs[i], def = j && job(j.id);
+    if (!j || !def || j.paid || j.n < def.need) return 0;
+    j.paid = true;
+    Meta.earn(def.coin);
+    return def.coin;
+  };
+
+  // ---------- money ----------
+  Meta.earn = function (n) { n = Math.max(0, Math.round(n)); Meta.data.coins += n; Meta.data.tot.coins += n; Meta.save(); return n; };
+  Meta.spend = function (n) {
+    if (n < 0 || Meta.data.coins < n) return false;
+    Meta.data.coins -= n;
+    Meta.save();
+    return true;
+  };
+  Meta.isSub = function () { return Meta.data.sub.until > Meta.now(); };
+  Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
+  // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
+  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); };
+  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); };
+
+  Meta.owns = function (kind, id) { return Meta.data.owned[kind].indexOf(id) >= 0; };
+  Meta.state = function (kind, id) {
+    var it = find(kind, id);
+    if (!it) return 'none';
+    if (it.sub) return Meta.isSub() ? 'ok' : 'sub';
+    if (it.price === 0 || Meta.owns(kind, id)) return 'ok';
+    if (it.rank != null) return rankOf(Math.max(Meta.data.peak, Meta.data.rp)).tier >= it.rank ? 'ok' : (Meta.isSub() ? 'ok' : 'rank');
+    return Meta.isSub() ? 'ok' : 'buy';
+  };
+  Meta.canUse = function (kind, id) { return Meta.state(kind, id) === 'ok'; };
+  Meta.buy = function (kind, id) {
+    var it = find(kind, id);
+    if (!it || it.sub || it.rank != null || !it.price) return { ok: false, why: '這個不能用金幣買。' };
+    if (Meta.owns(kind, id)) return { ok: false, why: '已經有了。' };
+    if (!Meta.spend(it.price)) return { ok: false, why: '金幣不夠，還差 ' + (it.price - Meta.data.coins) + '。' };
+    Meta.data.owned[kind].push(id);
+    Meta.save();
+    return { ok: true };
+  };
+  Meta.setPrice = function (id) {
+    var st = find('set', id), sum = 0, miss = 0;
+    if (!st) return { price: 0, full: 0, miss: 0 };
+    KINDS.forEach(function (k) {
+      var it = find(k, st.parts[k]);
+      if (!it || !it.price) return;
+      sum += it.price;
+      if (!Meta.owns(k, it.id)) miss += it.price;
+    });
+    return { price: Math.round(miss * SET_OFF / 10) * 10, full: sum, miss: miss };
+  };
+  Meta.buySet = function (id) {
+    var st = find('set', id), p = Meta.setPrice(id);
+    if (!st || !p.miss) return { ok: false, why: '這套你都有了。' };
+    if (!Meta.spend(p.price)) return { ok: false, why: '金幣不夠，還差 ' + (p.price - Meta.data.coins) + '。' };
+    KINDS.forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
+    Meta.save();
+    return { ok: true };
+  };
+  Meta.setUsable = function (id) {
+    var st = find('set', id);
+    return !!st && KINDS.every(function (k) { return Meta.canUse(k, st.parts[k]); });
+  };
+  Meta.equip = function (kind, id) {
+    if (!Meta.canUse(kind, id)) return false;
+    Meta.data.equip[kind] = id;
+    Meta.save();
+    return true;
+  };
+  Meta.equipSet = function (id) {
+    var st = find('set', id);
+    if (!st || !Meta.setUsable(id)) return false;
+    KINDS.forEach(function (k) { Meta.data.equip[k] = st.parts[k]; });
+    Meta.save();
+    return true;
+  };
+  // Anything worn that is no longer allowed (a membership ran out) goes back to the stock look.
+  Meta.tidy = function () {
+    var d = Meta.data, def = blank().equip;
+    KINDS.forEach(function (k) { if (!Meta.canUse(k, d.equip[k])) d.equip[k] = def[k]; });
+    d.bring = d.bring.filter(function (id) { return id >= 1 && id <= 7; }).slice(0, BRING_MAX);
+  };
+
+  // ---------- items carried into a match ----------
+  Meta.buyItem = function (id) {
+    var p = ITEM_PRICE[id];
+    if (!p) return { ok: false, why: '沒有這個道具。' };
+    if (Meta.data.items[id] >= 99) return { ok: false, why: '最多放 99 個。' };
+    if (!Meta.spend(p)) return { ok: false, why: '金幣不夠，還差 ' + (p - Meta.data.coins) + '。' };
+    Meta.data.items[id]++;
+    Meta.save();
+    return { ok: true };
+  };
+  Meta.toggleBring = function (id) {
+    var b = Meta.data.bring, i = b.indexOf(id);
+    if (i >= 0) b.splice(i, 1);
+    else if (b.length < BRING_MAX && Meta.data.items[id] > 0) b.push(id);
+    else return false;
+    Meta.save();
+    return true;
+  };
+  // Takes the chosen items out of stock when a match starts. Returns what actually goes in.
+  Meta.takeBring = function () {
+    var d = Meta.data, out = [];
+    d.bring.forEach(function (id) { if (d.items[id] > 0) { d.items[id]--; out.push(id); } });
+    d.bring = d.bring.filter(function (id) { return d.items[id] > 0; });
+    if (out.length) Meta.save();
+    return out;
+  };
+
+  // ---------- after a match ----------
+  var WIN_AI = [10, 15, 22, 30, 40];
+  // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, time, newBest }
+  Meta.finish = function (m) {
+    var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
+    m.battle = m.mode !== 'sprint';
+    var st = m.stats || {}, sc = st.score || 0;
+    function add(label, n) { n = Math.round(n); if (n > 0) parts.push({ label: label, n: n }); }
+    if (m.battle) {
+      add('分數', Math.min(80, Math.floor(sc / 400)));
+      if (m.result > 0) add('贏了', m.mode === 'rank' ? 30 : m.mode === 'net' ? 25 : m.mode === 'ghost' ? 20 : WIN_AI[m.level] || 10);
+      else add(m.result === 0 ? '平手' : '打完一場', m.result === 0 ? 10 : 5);
+      add('擊倒', Math.min(5, m.ko || 0) * 4);
+      if (m.result > 0 && d.daily.win !== Meta.dayNo()) { d.daily.win = Meta.dayNo(); add('今天第一勝', 50); }
+      d.tot.games++; if (m.result > 0) d.tot.wins++;
+      d.tot.tspins += (st.spins || 0) + (st.minis || 0); d.tot.sent += st.sent || 0; d.tot.kos += m.ko || 0;
+      if (m.mode === 'net') d.tot.online++;
+      if (sc > d.tot.best) { d.tot.best = sc; out.best = true; }
+    } else {
+      if (m.result > 0) {
+        add('跑完 40 行', 15);
+        add('速度', m.time < 60000 ? 40 : m.time < 90000 ? 20 : m.time < 120000 ? 10 : 0);
+        if (m.newBest) add('新紀錄', 20);
+      }
+    }
+    var sum = 0;
+    parts.forEach(function (p) { sum += p.n; });
+    if (Meta.isSub() && sum) { var extra = Math.round(sum * (SUB_BOOST - 1)); parts.push({ label: '會員加成', n: extra }); sum += extra; }
+    out.coins = sum;
+
+    if (m.mode === 'rank') {
+      var before = d.rp, rb = rankOf(before);
+      d.streak = m.result > 0 ? d.streak + 1 : 0;
+      d.rp = Math.max(0, before + rpDelta(before, m.result, (m.ko || 0) - (m.koOpp || 0), d.streak));
+      d.rgames++;
+      var ra = rankOf(d.rp), up = ra.tier * 3 + ra.div > rb.tier * 3 + rb.div || (ra.top && !rb.top);
+      out.rank = { before: before, after: d.rp, delta: d.rp - before, from: rb, to: ra, up: up, bonus: 0 };
+      if (d.rp > d.peak) {
+        // first time at a new division this season
+        if (up) { out.rank.bonus = 40 + ra.tier * 20; parts.push({ label: '升上 ' + ra.name, n: out.rank.bonus }); out.coins += out.rank.bonus; }
+        d.peak = d.rp;
+      }
+    }
+
+    Meta.rollDay();
+    d.daily.jobs.forEach(function (j) {
+      var def = job(j.id);
+      if (!def || j.paid || j.n >= def.need) return;
+      j.n += def.on(m) || 0;
+      if (j.n >= def.need) out.jobs.push(def.text);
+    });
+    d.coins += out.coins; d.tot.coins += out.coins;
+    Meta.save();
+    return out;
+  };
+  // First time through a drill or an opener lesson pays once.
+  Meta.firstClear = function (kind, id, coins) {
+    var list = Meta.data.first[kind];
+    if (!list || list.indexOf(id) >= 0) return 0;
+    list.push(id);
+    return Meta.earn(coins);
+  };
+  Meta.takeNote = function () { var n = Meta.data.note; if (n) { Meta.data.note = null; Meta.save(); } return n; };
+
+  ZZ.Meta = Meta;
+  if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
+})(typeof window !== 'undefined' ? window : globalThis);

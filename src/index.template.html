@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>轉磚對戰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,600;0,700;1,700;1,800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chiron+GoRound+TC:wght@200..900&amp;display=swap" rel="stylesheet">
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section id="menu" class="screen">
+    <div class="menu-in">
+      <header class="hero">
+        <div class="hero-well"><canvas id="demoCv" aria-hidden="true"></canvas></div>
+        <div class="hero-text">
+          <h1 class="logo" aria-label="轉磚"><span class="lt lt-t">轉</span><span class="lt lt-b">磚</span></h1>
+          <p class="lede">兩分鐘對戰。把 T 轉進洞裡，送對手一面水泥牆。</p>
+        </div>
+      </header>
+      <nav class="modes" aria-label="模式">
+        <button class="mode primary" type="button" data-go="battle"><b>對戰</b><span>跟電腦師傅比誰擊倒對方多</span><em id="mBattle"></em></button>
+        <button class="mode" type="button" data-go="dojo"><b>T 轉道場</b><span>有提示、有示範，一關一關練</span><em id="mDojo"></em></button>
+        <button class="mode" type="button" data-go="practice"><b>自由練習</b><span>沒有對手，可以悔棋，雷達幫你找洞</span></button>
+        <button class="mode" type="button" data-go="sprint"><b>40 行競速</b><span>清完 40 行要多久</span><em id="mSprint"></em></button>
+      </nav>
+      <footer class="menu-foot">
+        <button class="link" type="button" data-sheet="settings">設定</button>
+        <button class="link" type="button" data-sheet="help">操作與規則</button>
+      </footer>
+    </div>
+  </section>
+
+  <section id="play" class="screen" hidden>
+    <header id="hud">
+      <div id="hudL" class="hud-side"></div>
+      <div id="hudC"></div>
+      <div id="hudR" class="hud-side"></div>
+    </header>
+    <div id="strip" hidden></div>
+    <main id="stage">
+      <div id="oppWide" hidden><span class="who" id="oppNameW"></span><div class="frame" id="oppFrame"></div></div>
+      <div id="colL" class="col">
+        <button id="holdBox" class="slot" type="button" aria-label="暫存"><span class="slot-label">暫存</span><canvas id="holdCv"></canvas></button>
+        <button id="itemBox" class="slot" type="button" aria-label="用道具" hidden><span class="slot-label">道具</span><canvas id="itemCv"></canvas></button>
+        <div id="oppMini" class="slot" hidden><span class="slot-label" id="oppName">對手</span><canvas id="oppCv"></canvas></div>
+        <div id="chips" class="chips" aria-live="off"></div>
+      </div>
+      <div id="wellWrap">
+        <canvas id="wellCv"></canvas>
+        <div id="pops"></div>
+        <div id="banner"></div>
+        <div id="toast" role="status" hidden></div>
+      </div>
+      <div id="colR" class="col">
+        <div class="slot"><span class="slot-label">下一個</span><canvas id="nextCv"></canvas></div>
+        <div id="tools" class="col"></div>
+        <button id="pauseBtn" class="tool" type="button">暫停</button>
+      </div>
+    </main>
+    <footer id="pad" hidden>
+      <button class="key" type="button" data-k="L" aria-label="左移"><svg viewBox="0 0 32 32"><path d="M20 6 10 16l10 10"/></svg></button>
+      <button class="key" type="button" data-k="R" aria-label="右移"><svg viewBox="0 0 32 32"><path d="m12 6 10 10-10 10"/></svg></button>
+      <div class="mid">
+        <button class="key" type="button" data-k="HOLD" aria-label="暫存">暫存</button>
+        <button class="key" type="button" id="halfKey" data-k="180" aria-label="轉半圈" hidden>半圈</button>
+        <button class="key" type="button" id="itemKey" data-k="ITEM" aria-label="用道具" hidden>道具</button>
+      </div>
+      <button class="key" type="button" data-k="CCW" aria-label="逆時針轉"><svg viewBox="0 0 32 32"><path d="M9 13a9 9 0 1 1 1.5 9.5"/><path d="M8 5v8h8"/></svg>逆轉</button>
+      <button class="key" type="button" data-k="CW" aria-label="順時針轉"><svg viewBox="0 0 32 32"><path d="M23 13a9 9 0 1 0-1.5 9.5"/><path d="M24 5v8h-8"/></svg>順轉</button>
+      <button class="key" type="button" data-k="D" aria-label="軟降"><svg viewBox="0 0 32 32"><path d="m8 12 8 9 8-9"/></svg>軟降</button>
+      <button class="key" type="button" data-k="HD" aria-label="硬降"><svg viewBox="0 0 32 32"><path d="m8 9 8 9 8-9"/><path d="M7 25h18"/></svg>硬降</button>
+    </footer>
+    <div id="rotate" hidden><p>畫面太矮了。把手機轉成直的再玩。</p></div>
+  </section>
+
+  <div id="sheet" hidden><div id="sheetCard" role="dialog" aria-modal="true"></div></div>
+</div>
+
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__BOT__*/
+</script>
+<script>
+/*__DRILLS__*/
+</script>
+<script>
+/*__SFX__*/
+</script>
+<script>
+/*__VIEW__*/
+</script>
+<script>
+/*__UI__*/
+</script>
+</body>
+</html>
