@@ -106,10 +106,19 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   // an iPhone has no such prompt: explain the Share menu instead
   const ios = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: 'zh-TW', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1' });
   const ip = await open(ios);
+  await ip.waitForFunction(() => !document.getElementById('mInstall').hidden, null, { timeout: 5000 }).catch(() => {});
   ok(await ip.evaluate(() => !document.getElementById('mInstall').hidden), 'on an iPhone the link is there');
   await ip.tap('#mInstall'); await sleep(250);
   ok(await ip.evaluate(() => ZZ.peek().sheet === 'install' && /分享/.test(document.getElementById('sheetCard').textContent) && /加入主畫面/.test(document.getElementById('sheetCard').textContent)), 'and explains "Add to Home Screen"');
+  // …but not on a copy of the page that has no service worker beside it (a preview, a saved file): nothing to install there
+  const bare = await open(ios, BASE + '?sw=off'); await sleep(700);
+  ok(await bare.evaluate(() => document.getElementById('mInstall').hidden), 'no link on an iPhone where the page has no service worker');
   await ios.close();
+  // a page shown inside another iPhone app is not Safari, and has no Share menu to add it with
+  const web = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: 'zh-TW', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148' });
+  const wp = await open(web); await sleep(700);
+  ok(await wp.evaluate(() => document.getElementById('mInstall').hidden), 'nor inside another iPhone app');
+  await web.close();
   const line = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: 'zh-TW', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari/604.1 Line/14.3.0' });
   const lp = await open(line);
   ok(await lp.evaluate(() => document.getElementById('mInstall').hidden), 'inside a chat app\'s browser nothing can be installed, so nothing is offered');

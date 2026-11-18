@@ -6,15 +6,17 @@
   var ZZ = window.ZZ, App = ZZ.App, t = ZZ.L.t, btn = App.btn;
   var $ = function (id) { return document.getElementById(id); };
   var nav = window.navigator, ask = null;      // ask: the browser's own install prompt, kept until the player wants it
+  var kept = false;                            // the service worker is in place: this is the game on its own site, not a copy of the page somewhere else
   function param(k) { try { return new URLSearchParams(window.location.search).get(k) || ''; } catch (e) { return ''; } }
   function standalone() {
     try { return nav.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)').matches); } catch (e) { return false; }
   }
   function ios() { return /iphone|ipad|ipod/i.test(nav.userAgent || '') || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1); }
-  function inApp() { return /Line\/|FBAN|FBAV|Instagram|MicroMessenger|; wv\)/i.test(nav.userAgent || ''); }      // chat apps' built-in browsers cannot install anything
+  // chat apps' built-in browsers cannot install anything; neither can a page shown inside another iPhone app (those do not call themselves Safari)
+  function inApp() { var ua = nav.userAgent || ''; return /Line\/|FBAN|FBAV|Instagram|MicroMessenger|; wv\)/i.test(ua) || (ios() && !/Safari/i.test(ua)); }
   function showLink() {
     var e = $('mInstall');
-    if (e) e.hidden = standalone() || !(ask || (ios() && !inApp()));
+    if (e) e.hidden = standalone() || !(ask || (kept && ios() && !inApp()));      // (an iPhone never offers by itself: explain the Share menu, but only where there is something to install)
   }
 
   App.dismiss.install = 1;
@@ -45,7 +47,7 @@
     var ok = false;
     try { ok = 'serviceWorker' in nav && /^https?:$/.test(window.location.protocol) && param('sw') !== 'off'; } catch (e) { ok = false; }
     if (ok) {
-      var reg = function () { try { nav.serviceWorker.register('sw.js').catch(function () { /* the game works without it */ }); } catch (e) { /* same */ } };
+      var reg = function () { try { nav.serviceWorker.register('sw.js').then(function () { kept = true; showLink(); }, function () { /* the game works without it */ }); } catch (e) { /* same */ } };
       if (document.readyState === 'complete') reg(); else window.addEventListener('load', reg);
     }
     // ?go=sprint opens that mode. An invite to a room (?room=) comes first.

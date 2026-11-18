@@ -201,7 +201,7 @@ Vercel 專案連到這個 GitHub 程式庫，推到 `main` 就部署正式站，
 
 **Service worker**（`sw.js`）只做三件事：頁面本身永遠先向網路要，四秒內沒有回應或根本沒網路才用留存的那一份，所以新版不會被舊的快取卡住；音樂和圖示第一次抓到之後留著；`api/` 底下的請求完全不碰。每次 build 版本字串都會變，瀏覽器就會換上新的 worker 並清掉舊的頁面快取。網址加 `?sw=off` 這次不註冊。
 
-**安裝**：Chrome、Edge、Android 會送 `beforeinstallprompt`，這時選單最下面出現「安裝成 App」；iPhone 沒有這個事件，改成說明怎麼用「分享 → 加入主畫面」。通訊軟體內建的瀏覽器裝不了，就不顯示。
+**安裝**：Chrome、Edge、Android 會送 `beforeinstallprompt`，這時選單最下面出現「安裝成 App」；iPhone 沒有這個事件，改成說明怎麼用「分享 → 加入主畫面」，而且要等 service worker 註冊成功才顯示（頁面被放在別的地方、旁邊沒有 `sw.js` 時就沒有東西可以裝）。通訊軟體內建的瀏覽器、其他 App 裡開的網頁裝不了，就不顯示。
 
 **給搜尋引擎的**：`<head>` 裡的標題、說明、canonical、五種語言的 hreflang、Open Graph、Twitter 卡片、JSON-LD（VideoGame）都由 `build.js` 從 `i18n.js` 的 `seo.*` 填進去。頁面裡的文字在 build 時先填好繁體中文，不跑程式的爬蟲也讀得到。`?lang=en` 這類網址會顯示該語言並把自己設為 canonical。文案裡刻意不用別人的商標名稱。
 
