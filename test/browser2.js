@@ -1,7 +1,7 @@
 'use strict';
 const { chromium } = require('/opt/npm-tools/node_modules/playwright');
 const path = require('path');
-const URL = process.env.ZZ_URL || ('file://' + path.join(__dirname, '..', 'index.html'));
+const URL = process.env.ZZ_URL || 'http://127.0.0.1:8765/index.html';
 const OUT = path.join(__dirname, '..', 'shots');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
@@ -11,7 +11,7 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
   const problems = [];
   async function open(name, opts) {
-    const ctx = await browser.newContext(opts);
+    const ctx = await browser.newContext(Object.assign({ locale: 'zh-TW' }, opts));
     const page = await ctx.newPage();
     page.on('pageerror', e => problems.push(name + ' pageerror: ' + e.message + '\n' + (e.stack || '')));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.g|ERR_|Failed to load resource/.test(m.text())) problems.push(name + ' console: ' + m.text()); });

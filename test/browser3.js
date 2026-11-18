@@ -11,7 +11,7 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
   const problems = [];
   async function open(name, opts) {
-    const ctx = await browser.newContext(opts);
+    const ctx = await browser.newContext(Object.assign({ locale: 'zh-TW' }, opts));
     const page = await ctx.newPage();
     page.on('pageerror', e => problems.push(name + ' pageerror: ' + e.message + '\n' + (e.stack || '')));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.g|ERR_|Failed to load resource/.test(m.text())) problems.push(name + ' console: ' + m.text()); });
@@ -153,7 +153,7 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
     await ev(page, 'S.me.inv = [1, 6, 3];');
     await sleep(120);
     await page.screenshot({ path: path.join(OUT, 'n9-phone-items.png') });
-    ok(await page.evaluate(() => /拆/.test(document.getElementById('itemKey').textContent)), 'item key shows the next item');
+    ok(await page.evaluate(() => !!document.querySelector('#itemKey b svg') && /道具/.test(document.getElementById('itemKey').textContent)), 'item key shows the next item');
     await page.tap('#itemKey'); await sleep(80);
     ok(await ev(page, 'return S.me.inv.join("")') === '63', 'tapping the item key uses the first item');
     await page.tap('#itemBox'); await sleep(80);

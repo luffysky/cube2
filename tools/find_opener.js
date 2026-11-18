@@ -161,21 +161,21 @@ const SPECS = {
     }
     return list;
   })(),
-  // two bags without their T: the double-then-triple cannon on the left wall
+  // the first bag whole, then the second bag without its T: the double-then-triple cannon beside the left wall.
+  // The T comes down the two-wide shaft (columns 1-2), turns under the overhang, and kicks into the hole column (3).
   dt: (function () {
     const base = [
-      '..?????...',   // r8
-      '..????????',   // r7
-      '..XX??????',   // r6: overhang
-      '...X??????',   // r5
-      'XX.XXXXXXX',   // r4
-      'X...XXXXXX',   // r3
-      'XX.XXXXXXX',   // r2
-      'X..XXXXXXX',   // r1
-      'XX.XXXXXXX'    // r0
+      '?..???????',   // r8
+      '?..???????',   // r7
+      'X..X??????',   // r6: wall on the left, overhang above the hole column
+      'X...X?????',   // r5: the row the T lies in before it kicks down
+      'XXX.XXXXXX',   // r4
+      'XX...XXXXX',   // r3: first T ends here
+      'XXX.XXXXXX',   // r2
+      'XX..XXXXXX',   // r1: second T's side cell
+      'XXX.XXXXXX'    // r0
     ];
-    const six = ['I', 'O', 'S', 'Z', 'J', 'L'];
-    return [{ name: 'dt left', rows: base, bags: [six, six], goals: [{ spin: 'full', lines: 2 }, { spin: 'full', lines: 3 }], cells: 48 }];
+    return [{ name: 'dt left', rows: base, bags: [['I', 'O', 'T', 'S', 'Z', 'J', 'L'], ['I', 'O', 'S', 'Z', 'J', 'L']], goals: [{ spin: 'full', lines: 2 }, { spin: 'full', lines: 3 }] }];
   })()
 };
 

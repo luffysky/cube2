@@ -1,14 +1,14 @@
 'use strict';
 const { chromium } = require('/opt/npm-tools/node_modules/playwright');
 const path = require('path');
-const URL = process.env.ZZ_URL || ('file://' + path.join(__dirname, '..', 'index.html'));
+const URL = process.env.ZZ_URL || 'http://127.0.0.1:8765/index.html';
 const OUT = path.join(__dirname, '..', 'shots');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
   const sizes = [[360, 640, true], [390, 660, true], [414, 896, true], [320, 568, true], [768, 1024, true], [1024, 768, true], [780, 360, true], [1440, 900, false], [1000, 700, false], [700, 900, false]];
   for (const [w, h, touch] of sizes) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: touch, isMobile: touch });
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: touch, isMobile: touch, locale: 'zh-TW' });
     const page = await ctx.newPage();
     const errs = [];
     page.on('pageerror', e => errs.push(e.message));

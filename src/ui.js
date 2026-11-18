@@ -1,7 +1,8 @@
-/* 轉磚 app: screens, modes, input, items, HUD. */
+/* 轉磚 app core: screens, input, the match loop, the HUD and the built-in sheets.
+   Feature files (shop.js, modes.js) plug in through ZZ.App. Every visible string goes through ZZ.L.t(). */
 (function () {
   'use strict';
-  var ZZ = window.ZZ, Bot = ZZ.Bot, View = ZZ.View, env = View.env, ITEMS = ZZ.ITEMS;
+  var ZZ = window.ZZ, Bot = ZZ.Bot, View = ZZ.View, env = View.env, ITEMS = ZZ.ITEMS, Meta = ZZ.Meta, L = ZZ.L, t = L.t;
   var COLS = ZZ.COLS, ROWS = ZZ.ROWS, VIS = ZZ.VIS, SHAPES = ZZ.SHAPES, DRILLS = ZZ.DRILLS;
   var SKY = 1.25;
   var $ = function (id) { return document.getElementById(id); };
@@ -9,20 +10,32 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // ---------- settings and saved progress ----------
+  var ACTIONS = ['L', 'R', 'D', 'HD', 'CW', 'CCW', '180', 'HOLD', 'ITEM', 'PAUSE', 'RESTART', 'UNDO'];
+  var KEYDEF = {
+    L: ['ArrowLeft', 'KeyA'], R: ['ArrowRight', 'KeyD'], D: ['ArrowDown', 'KeyS'], HD: ['Space'],
+    CW: ['ArrowUp', 'KeyW', 'KeyX', 'KeyK'], CCW: ['KeyZ', 'KeyJ', 'ControlLeft', 'ControlRight'], '180': ['KeyQ', 'KeyL'],
+    HOLD: ['KeyC', 'KeyE', 'ShiftLeft', 'ShiftRight'], ITEM: ['KeyF', 'KeyV', 'Enter'], PAUSE: ['KeyP'], RESTART: ['KeyR'], UNDO: ['KeyU', 'Backspace']
+  };
+  var KEY_MAX = 4;
   var DEF = {
     das: 140, arr: 20, sdf: 80, lock: 500, smooth: !env.reduce, ghost: true, radar: false, hint: true,
-    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1
+    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, lang: ''
   };
   var set = {}, save = { best: 0, dojo: 0, level: 1, minutes: 2, tip: 0, items: 1, itip: 0 };
   var STORE = 'zhuanzhuan.v2';
+  function keyCopy(src) { var o = {}; ACTIONS.forEach(function (a) { o[a] = (src && Array.isArray(src[a]) ? src[a] : KEYDEF[a]).filter(function (c) { return typeof c === 'string'; }).slice(0, KEY_MAX); }); return o; }
   function loadStore() {
     var k;
     for (k in DEF) set[k] = DEF[k];
+    set.keys = keyCopy(null);
     try {
       var raw = window.localStorage.getItem(STORE);
       if (!raw) return;
       var d = JSON.parse(raw);
-      if (d && d.set) for (k in DEF) if (typeof d.set[k] === typeof DEF[k]) set[k] = d.set[k];
+      if (d && d.set) {
+        for (k in DEF) if (typeof d.set[k] === typeof DEF[k]) set[k] = d.set[k];
+        if (d.set.keys && typeof d.set.keys === 'object') set.keys = keyCopy(d.set.keys);
+      }
       if (d && d.save) for (k in save) if (typeof d.save[k] === 'number') save[k] = d.save[k];
     } catch (e) { /* defaults are fine */ }
   }
@@ -44,7 +57,41 @@
     var cs = Math.floor(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = cs % 100;
     return m + ':' + (s < 10 ? '0' : '') + s + '.' + (c < 10 ? '0' : '') + c;
   }
-  function itemsOn() { return !!S && S.kind === 'battle' && !!S.o.items; }
+  function itemsOn() { return !!S && S.kind === 'battle' && (!!S.o.items || !!(S.o.bring && S.o.bring.length)); }
+  function kindOf() { return S ? App.kinds[S.kind] : null; }
+  function rankName(r) { return t('tier' + r.tier) + (r.top ? '' : ' ' + ['III', 'II', 'I'][r.div]); }
+
+  // ---------- plug-in surface ----------
+  // sheets[name]() returns html, opened[name]() runs after it is shown, closed[name]() after it goes away,
+  // acts[name](button) handles data-do, clicks/inputs are tried for anything else, go[name]() handles menu buttons,
+  // kinds[name] adds a play mode, taps see every event of the player's own game.
+  var App = ZZ.App = {
+    sheets: {}, opened: {}, closed: {}, acts: {}, clicks: [], inputs: [], go: {}, kinds: {}, taps: [], again: {}, tools: {},
+    dismiss: { battle: 1, dojo: 1, settings: 1, help: 1, keys: 1 }, capture: null
+  };
+
+  // ---------- keys ----------
+  var KEYS = {};
+  function rebuildKeys() {
+    KEYS = {};
+    ACTIONS.forEach(function (a) { set.keys[a].forEach(function (c) { if (!KEYS[c]) KEYS[c] = a; }); });
+  }
+  var KEYNAME = {
+    ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl',
+    AltLeft: 'L Alt', AltRight: 'R Alt', Enter: 'Enter', Backspace: 'Backspace', Tab: 'Tab', Escape: 'Esc', Comma: ',', Period: '.', Slash: '/', Semicolon: ';',
+    Quote: "'", BracketLeft: '[', BracketRight: ']', Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`'
+  };
+  function keyName(c) {
+    if (!c) return '';
+    if (c === 'Space') return t('kb.space');
+    if (KEYNAME[c]) return KEYNAME[c];
+    if (c.indexOf('Key') === 0) return c.slice(3);
+    if (c.indexOf('Digit') === 0) return c.slice(5);
+    if (c.indexOf('Numpad') === 0) return 'Num ' + c.slice(6);
+    return c;
+  }
+  function key1(a) { return keyName(set.keys[a][0]) || '?'; }
+  function padName(k) { return '「' + t(k) + '」'; }
 
   // ---------- input: delayed auto shift ----------
   var input = {
@@ -82,6 +129,9 @@
     if (k === 'R') return input.side(1, down);
     if (k === 'D') { input.sd = down; return; }
     if (!down) return;
+    if (k === 'PAUSE') return pause();
+    if (k === 'RESTART') return restart();
+    if (k === 'UNDO') return undo();
     if (k === 'ITEM') { useItem('me'); return; }
     if (!input.can()) return;
     var me = S.me;
@@ -92,35 +142,25 @@
     else if (k === 'HOLD' && S.kind !== 'dojo') me.hold();
   }
 
-  // Arrow keys and WASD both move; the turn keys sit under either hand.
-  var KEYS = {
-    ArrowLeft: 'L', ArrowRight: 'R', ArrowDown: 'D', ArrowUp: 'CW', Space: 'HD',
-    KeyA: 'L', KeyD: 'R', KeyS: 'D', KeyW: 'CW',
-    KeyX: 'CW', KeyK: 'CW', KeyZ: 'CCW', KeyJ: 'CCW', ControlLeft: 'CCW', ControlRight: 'CCW',
-    KeyQ: '180', KeyL: '180',
-    KeyC: 'HOLD', KeyE: 'HOLD', ShiftLeft: 'HOLD', ShiftRight: 'HOLD',
-    KeyF: 'ITEM', KeyV: 'ITEM', Enter: 'ITEM'
-  };
-
   function bindInput() {
     window.addEventListener('keydown', function (e) {
       sfx.wake();
+      if (App.capture) { e.preventDefault(); App.capture(e); return; }
       if (sheetName) {
         if (e.code === 'Escape') { e.preventDefault(); sheetDo(sheetName === 'pause' ? 'resume' : 'close'); }
         return;
       }
       if (screen !== 'play') return;
+      if (e.code === 'Escape') { e.preventDefault(); if (!e.repeat) pause(); return; }
+      var tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       var k = KEYS[e.code];
-      if (k) { e.preventDefault(); if (!e.repeat) act(k, true); return; }
-      if (e.repeat) return;
-      if (e.code === 'Escape' || e.code === 'KeyP') pause();
-      else if (e.code === 'KeyR') restart();
-      else if (e.code === 'KeyU' || e.code === 'Backspace') { e.preventDefault(); undo(); }
+      if (k) { e.preventDefault(); if (!e.repeat) act(k, true); }
     });
     window.addEventListener('keyup', function (e) { var k = KEYS[e.code]; if (k) act(k, false); });
     window.addEventListener('blur', function () { input.clear(); });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { input.clear(); pause(); }
+      if (document.hidden) { input.clear(); if (!(S && S.mode === 'net')) pause(); }
       sfx.hush(document.hidden);
     });
 
@@ -171,7 +211,8 @@
       if (!b) return;
       sfx.wake();
       var a = b.dataset.act;
-      if (a === 'undo') undo();
+      if (App.tools[a] && kindOf()) { sfx.play('ui'); App.tools[a](); }
+      else if (a === 'undo') undo();
       else if (a === 'restart') { sfx.play('ui'); restart(); }
       else if (a === 'demo') { sfx.play('ui'); startDemo(); }
       else if (a === 'hint') { sfx.play('ui'); set.hint = !set.hint; saveStore(); setTools(); if (S && S.kind === 'dojo' && S.state === 'play') onSpawn({}); }
@@ -187,10 +228,12 @@
   }
   var toastT = 0;
   function toast(msg, ms) {
-    el.toast.textContent = msg;
-    el.toast.hidden = false;
+    var box = screen === 'play' && !sheetName ? el.toast : el.mtoast;
+    el.toast.hidden = true; el.mtoast.hidden = true;
+    box.textContent = msg;
+    box.hidden = false;
     clearTimeout(toastT);
-    toastT = setTimeout(function () { el.toast.hidden = true; }, ms || 2200);
+    toastT = setTimeout(function () { el.toast.hidden = true; el.mtoast.hidden = true; }, ms || 2200);
   }
   var bannerT = 0;
   function banner(text, cls, ms) {
@@ -211,15 +254,15 @@
     el.pops.appendChild(d);
     setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 980);
   }
-  var LINE_NAME = ['', '單消', '雙消', '三消', '四消'];
-  function spinName(type, spin) { return type === 'T' ? (spin === 'mini' ? '迷你 T 轉' : 'T 轉') : type + ' 轉'; }
+  function spinName(type, spin) { return type === 'T' ? t(spin === 'mini' ? 'p.mini' : 'p.tspin') : t('p.xspin', type); }
+  function clearName(type, spin, lines) { return spinName(type, spin) + (lines ? t('sep') + t('ln' + lines) : ''); }
   function popup(e) {
     var main = '', gold = false, tags = [];
-    if (e.tspin !== 'none') { main = spinName(e.piece, e.tspin) + (e.lines ? LINE_NAME[e.lines] : ''); gold = true; }
-    else if (e.lines >= 2) main = LINE_NAME[e.lines];
-    if (e.b2b) tags.push('連續重擊');
-    if (e.combo > 0) tags.push(e.combo + ' 連擊');
-    if (e.perfect) tags.push('全清');
+    if (e.tspin !== 'none') { main = clearName(e.piece, e.tspin, e.lines); gold = true; }
+    else if (e.lines >= 2) main = t('ln' + e.lines);
+    if (e.b2b) tags.push(t('p.b2b'));
+    if (e.combo > 0) tags.push(t('chip.combo', e.combo));
+    if (e.perfect) tags.push(t('p.perfect'));
     if (!main && !tags.length && !e.attack) return;
     popRaw(main, tags, e.attack, gold);
   }
@@ -228,6 +271,8 @@
     if (e && e._v !== v) { e._v = v; e.textContent = v; }
   }
   function stat(id, label) { return '<div class="stat"><b id="' + id + '">0</b><span>' + label + '</span></div>'; }
+  function coin(n) { return '<span class="coinv"><i class="coin"></i>' + L.num(n) + '</span>'; }
+  function itile(id) { return '<span class="itile" style="--c:' + ITEMS[id].color + '">' + View.itemSvg(id) + '</span>'; }
 
   // ---------- starting a mode ----------
   var TRACK = ['battle1', 'battle1', 'battle2', 'battle2', 'battle3'];
@@ -237,28 +282,48 @@
     input.clear();
     banner('');
     el.pops.innerHTML = '';
-    var seed = (Math.random() * 4294967296) >>> 0;
+    var seed = o.seed != null ? o.seed >>> 0 : (Math.random() * 4294967296) >>> 0, K = App.kinds[kind];
     S = {
       kind: kind, o: o, state: 'count', countT: 0, shown: 9, time: 0, hist: [], target: null, wait: 0, after: null, prev: 'play',
-      flip: false, freeze: { me: 0, opp: 0 }, botItemT: 0, botChk: 0, botHoles: 0
+      flip: false, freeze: { me: 0, opp: 0 }, botItemT: 0, botChk: 0, botHoles: 0, mode: '', used: 0
     };
     if (kind === 'battle') {
-      var lv = Bot.LEVELS[o.level];
-      S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items });
-      S.opp = new ZZ.Game({ seed: seed, manual: true, items: !!o.items });
-      S.me.onAttack = function (n) { S.opp.receive(n); };
-      S.opp.onAttack = function (n) { S.me.receive(n); };
-      S.bot = new Bot.BotPlayer(S.opp, { pps: lv.pps, depth: lv.depth, hold: lv.hold, noise: lv.noise, w: lv.w });
-      S.lv = lv; S.total = o.minutes * 60000; S.left = S.total;
+      var mode = o.mode || 'ai';
+      S.mode = mode;
+      S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [] });
+      S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
+      if (mode === 'net') {
+        S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false });   // a mirror of the other player's wall
+        S.remote = true; S.bot = null;
+        S.oppName = o.oppName || t('foe');
+        S.me.onAttack = function (n) { ZZ.Net.attack(n); };
+      } else if (mode === 'ghost') {
+        S.opp = new ZZ.Game({ seed: seed, manual: true, queue: ZZ.Replay.queueOf(o.rep) });
+        S.bot = new ZZ.Replay.Ghost(S.opp, o.rep, { onItem: foeItem, onTakeOver: function () { toast(t('gh.takeover'), 3800); } });
+        S.oppName = t('gh.name');
+      } else {
+        var cfg = mode === 'rank' ? o.cfg : Bot.LEVELS[o.level];
+        S.opp = new ZZ.Game({ seed: seed, manual: true, items: !!o.items });
+        S.bot = new Bot.BotPlayer(S.opp, { pps: cfg.pps, depth: cfg.depth, hold: cfg.hold, noise: cfg.noise, w: cfg.w });
+        S.oppName = mode === 'rank' ? o.foe : t('lv' + o.level);
+      }
+      if (mode !== 'net') {
+        S.me.onAttack = function (n) { S.opp.receive(n); };
+        S.opp.onAttack = function (n) { S.me.receive(n); };
+      }
+      S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
+      S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
     } else if (kind === 'sprint') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.goal = 40;
     } else if (kind === 'practice') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.state = 'play';
-    } else {
+    } else if (kind === 'dojo') {
       S.drill = clamp(o.drill || 0, 0, DRILLS.length - 1);
+    } else if (K) {
+      K.begin(S, o);
     }
     show('play');
     V.me.fx = []; V.me.parts = []; V.me.koT = 0; V.opp.fx = []; V.opp.parts = []; V.opp.koT = 0;
@@ -266,47 +331,52 @@
     if (kind === 'dojo') loadDrill(S.drill);
     layout();
     if (kind === 'practice') S.me.start();
+    if (K && K.started) K.started();
     sfx.setDuck(1);
-    sfx.music(kind === 'battle' ? TRACK[o.level] : kind === 'sprint' ? 'battle1' : 'calm');
+    sfx.music(kind === 'battle' ? TRACK[S.level] : kind === 'sprint' ? 'battle1' : 'calm');
     if (!env.touch && !save.tip) {
       save.tip = 1; saveStore();
-      toast('← → 或 A D 移動　↑ 或 W 順轉　Z 逆轉　↓ 軟降　空白鍵硬降　C 暫存', 6500);
+      toast(t('tip.keys', key1('L'), key1('R'), key1('CW'), key1('CCW'), key1('D'), key1('HD'), key1('HOLD')), 6500);
     }
   }
 
   function restart() {
     if (!S || S.kind === 'battle') return;
+    var K = kindOf();
+    if (K && K.restart) return K.restart();
     if (S.kind === 'dojo') { loadDrill(S.drill); return; }
     begin(S.kind, S.o);
   }
 
   function setupHud() {
-    var k = S.kind;
-    el.strip.hidden = k !== 'dojo';
+    var k = S.kind, K = kindOf();
+    el.strip.hidden = !(k === 'dojo' || (K && K.strip));
     if (k === 'battle') {
-      var name = '<span class="who">' + esc(S.lv.name) + '</span>';
+      var name = '<span class="who">' + esc(S.oppName) + '</span>', you = '<span class="who">' + t('you') + '</span>';
       if (S.flip) {
-        el.hudL.innerHTML = name + stat('koOpp', '擊倒') + stat('sentOpp', '送出');
-        el.hudR.innerHTML = stat('sentMe', '送出') + stat('koMe', '擊倒') + '<span class="who">你</span>';
+        el.hudL.innerHTML = name + stat('koOpp', t('ko')) + stat('sentOpp', t('sent'));
+        el.hudR.innerHTML = stat('sentMe', t('sent')) + stat('koMe', t('ko')) + you;
       } else {
-        el.hudL.innerHTML = '<span class="who">你</span>' + stat('koMe', '擊倒') + stat('sentMe', '送出');
-        el.hudR.innerHTML = stat('sentOpp', '送出') + stat('koOpp', '擊倒') + name;
+        el.hudL.innerHTML = you + stat('koMe', t('ko')) + stat('sentMe', t('sent'));
+        el.hudR.innerHTML = stat('sentOpp', t('sent')) + stat('koOpp', t('ko')) + name;
       }
-      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div>';
-      el.oppName.textContent = S.lv.name;
-      el.oppNameW.textContent = S.lv.name;
+      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
+      el.oppName.textContent = S.oppName;
+      el.oppNameW.textContent = S.oppName;
     } else if (k === 'sprint') {
-      el.hudL.innerHTML = stat('linesLeft', '剩下幾行');
-      el.hudC.innerHTML = '<div id="clock">0:00.00</div>';
-      el.hudR.innerHTML = '<div class="stat"><b id="bestT">' + (save.best ? fmtTime(save.best) : '—') + '</b><span>最佳</span></div>';
+      el.hudL.innerHTML = stat('linesLeft', t('linesLeft'));
+      el.hudC.innerHTML = '<div id="clock">0:00.00</div><div id="ptsMe" class="pts"></div>';
+      el.hudR.innerHTML = '<div class="stat"><b id="bestT">' + (save.best ? fmtTime(save.best) : '—') + '</b><span>' + t('best') + '</span></div>';
     } else if (k === 'practice') {
-      el.hudL.innerHTML = stat('pAtk', '攻擊') + stat('pSpin', '轉進去');
-      el.hudC.innerHTML = '<div class="hud-title">自由練習</div>';
-      el.hudR.innerHTML = stat('pPps', '每秒塊數');
-    } else {
+      el.hudL.innerHTML = stat('pAtk', t('pAtk')) + stat('pSpin', t('pSpin'));
+      el.hudC.innerHTML = '<div class="hud-title">' + t('m.practice') + '</div><div id="ptsMe" class="pts"></div>';
+      el.hudR.innerHTML = stat('pPps', t('pPps'));
+    } else if (k === 'dojo') {
       el.hudL.innerHTML = '<span class="who" id="dNo"></span>';
       el.hudC.innerHTML = '<div class="hud-title" id="dName"></div>';
-      el.hudR.innerHTML = '<div class="stat"><b id="dDone">0</b><span>已過關</span></div>';
+      el.hudR.innerHTML = '<div class="stat"><b id="dDone">0</b><span>' + t('clearedN') + '</span></div>';
+    } else if (K) {
+      K.hud();
     }
     el.play.classList.toggle('nohold', k === 'dojo');
     el.itemBox.hidden = !itemsOn();
@@ -315,43 +385,48 @@
     sideKey = ''; chipKey = '';
   }
 
+  function tool(a, key, pressed) { return '<button class="tool" type="button" data-act="' + a + '"' + (pressed != null ? ' aria-pressed="' + pressed + '"' : '') + '>' + t(key) + '</button>'; }
   function setTools() {
-    var k = S ? S.kind : '', h = '';
-    if (k === 'practice') h = '<button class="tool" type="button" data-act="undo">悔棋</button><button class="tool" type="button" data-act="restart">清空</button>';
-    else if (k === 'sprint') h = '<button class="tool" type="button" data-act="restart">重來</button>';
-    else if (k === 'dojo') {
-      h = '<button class="tool" type="button" data-act="demo">看示範</button><button class="tool" type="button" data-act="restart">重來</button>' +
-        '<button class="tool" type="button" data-act="hint" aria-pressed="' + (set.hint ? 'true' : 'false') + '">提示</button>';
-    }
+    var k = S ? S.kind : '', h = '', K = kindOf();
+    if (k === 'practice') h = tool('undo', 'tool.undo') + tool('restart', 'tool.clear');
+    else if (k === 'sprint') h = tool('restart', 'restart');
+    else if (k === 'dojo') h = tool('demo', 'tool.demo') + tool('restart', 'restart') + tool('hint', 'tool.hint', set.hint ? 'true' : 'false');
+    else if (K && K.tools) h = K.tools();
     el.tools.innerHTML = h;
   }
 
   // ---------- spin dojo ----------
-  var ACT_NAME = env.touch ? ['往左', '往右', '按「順轉」', '按「逆轉」', '按住「軟降」到底']
-    : ['按 ← 往左', '按 → 往右', '按 ↑ 順時針轉', '按 Z 逆時針轉', '按住 ↓ 軟降到底'];
+  // What to press for each solver move, named after the player's own keys.
+  function actName(a) {
+    if (a === 'hold') return t('act.hold', env.touch ? padName('hold') : key1('HOLD'));
+    if (a === 'hd') return t('act.hd', env.touch ? padName('k.hard') : key1('HD'));
+    var keys = ['act.l', 'act.r', 'act.cw', 'act.ccw', 'act.sd'], who = ['L', 'R', 'CW', 'CCW', 'D'], pads = ['', '', 'k.cw', 'k.ccw', 'k.soft'];
+    return t(keys[a], env.touch ? (pads[a] ? padName(pads[a]) : (a === 0 ? '←' : '→')) : key1(who[a])).trim();
+  }
   function goalPiece(d) { return d.goal.piece || 'T'; }
-  function goalText(d) { return spinName(goalPiece(d), d.goal.spin) + LINE_NAME[d.goal.lines]; }
+  function goalText(d) { return clearName(goalPiece(d), d.goal.spin, d.goal.lines); }
   function loadDrill(i) {
     var d = DRILLS[i], want = goalPiece(d);
     S.drill = i; S.d = d;
     S.me = new ZZ.Game({ board: d.board, queue: d.queue, seed: 1, gravity: 1 / 1500, lockDelay: Math.max(1000, set.lock), garbage: false, sdf: sdfVal() });
     S.steps = Bot.solve(S.me.grid, d.queue, d.goal);
-    S.tLeft = d.queue.filter(function (t) { return t === want; }).length;
-    S.state = 'play'; S.demo = null; S.target = null;
+    S.tLeft = d.queue.filter(function (q) { return q === want; }).length;
+    S.state = 'play'; S.demo = null; S.target = null; S.say = null; S.demoDone = null;
     input.clear();
     banner('');
     V.me.fx = []; V.me.koT = 0;
     S.me.start();
     stripText('');
-    txt('dNo', '第 ' + (i + 1) + ' 關');
-    txt('dName', d.name);
+    txt('dNo', t('drillNo', i + 1));
+    txt('dName', t('d.' + d.id + '.n'));
     txt('dDone', save.dojo + '/' + DRILLS.length);
     sideKey = '';
   }
+  function keysNote() { return env.touch ? '' : '<br><span class="keys-note">' + esc(t('keysNote', key1('CW'), key1('CCW'), key1('D'), key1('HD'))) + '</span>'; }
   function stripText(now) {
     var d = S.d;
-    el.strip.innerHTML = now ? '<b>示範：' + goalText(d) + '</b><br><span class="now">' + esc(now) + '</span>'
-      : '<b>目標：' + goalText(d) + '</b>　' + esc(d.tip) + (env.touch ? '' : '<br><span class="keys-note">順轉 ↑ 或 W　逆轉 Z 或 J　軟降 ↓ 或 S　放下 空白鍵</span>');
+    el.strip.innerHTML = now ? '<b>' + esc(t('demo', goalText(d))) + '</b><br><span class="now">' + esc(now) + '</span>'
+      : '<b>' + esc(t('goal', goalText(d))) + '</b>　' + esc(t('d.' + d.id + '.t')) + keysNote();
   }
   function stepCells(st) {
     var sh = SHAPES[st.type][st.rot], out = [];
@@ -365,18 +440,20 @@
         S.tLeft--;
         if (S.tLeft <= 0) return drillWin();
       } else {
-        return drillFail(e.tspin === 'none' ? '最後一下要用轉的進去，直接放不算。' : '轉進去了，但消掉的行數不對。');
+        return drillFail(t(e.tspin === 'none' ? 'f.noSpin' : 'f.lines'));
       }
     }
     if (!me.cur) return;
     S.steps = Bot.solve(me.grid, [me.cur.type].concat(me.queue), d.goal);
-    if (!S.steps) drillFail('這樣擺，' + want + ' 就轉不進去了。');
+    if (!S.steps) drillFail(t('f.stuck', want));
   }
   function drillWin() {
     sfx.play('win');
     buzz([20, 40, 60]);
-    banner('過關', 'good', 1400);
+    banner(t('b.pass'), 'good', 1400);
     if (S.drill + 1 > save.dojo) { save.dojo = S.drill + 1; saveStore(); }
+    var got = Meta.firstClear('drills', S.drill, 15);
+    if (got) toast(t('firstClear', got), 2600);
     txt('dDone', save.dojo + '/' + DRILLS.length);
     S.state = 'wait'; S.wait = 1500; S.target = null;
     S.after = function () {
@@ -396,7 +473,7 @@
     if (!S.steps) return;
     S.state = 'demo';
     S.demo = { si: 0, ai: 0, t: -300, drop: false };
-    stripText('示範開始');
+    stripText(t('demoStart'));
   }
   function runAct(g, a) {
     if (a === Bot.L) return g.move(-1);
@@ -406,6 +483,7 @@
     return g.sonicDrop();
   }
   // Plays solver steps on a game at a watchable pace. Returns true when the last piece has been placed.
+  // A step may be { hold: true }: press hold and move on.
   function stepDemo(D, g, steps, dt, gap, say) {
     if (D.drop) {
       D.t += dt;
@@ -420,46 +498,71 @@
     D.t = 0;
     var st = steps[D.si];
     if (!st || !g.cur) return true;
+    if (st.hold) {
+      if (say) say(actName('hold'));
+      g.hold();
+      D.si++; D.ai = 0;
+      return D.si >= steps.length;
+    }
     if (D.ai < st.path.length) {
       var a = st.path[D.ai++];
-      if (say) say(ACT_NAME[a] + (D.ai === st.path.length && st.spin !== 'none' ? '，轉進去' : ''));
+      if (say) say(actName(a) + (D.ai === st.path.length && st.spin && st.spin !== 'none' ? t('act.spin') : ''));
       if (a === Bot.SD) D.drop = true; else runAct(g, a);
       return false;
     }
-    if (say) say(env.touch ? '按「硬降」放下' : '按空白鍵放下');
+    if (say) say(actName('hd'));
     g.hardDrop();
     D.si++; D.ai = 0;
     return D.si >= steps.length;
   }
 
   // ---------- items ----------
-  function useItem(k) {
-    if (!itemsOn() || S.state !== 'play') return false;
-    var g = S[k], other = k === 'me' ? 'opp' : 'me', og = S[other], mine = k === 'me', now = performance.now();
-    if (g.over || S.freeze[k] > 0 || !g.inv.length) return false;
-    var id = g.takeItem(), it = ITEMS[id], note = '';
-    if (id === 1) g.chisel(3);
-    else if (id === 2) { og.receive(3); note = og.shield > 0 ? '' : '+3 排水泥'; }
-    else if (id === 3) { g.shield = 8000; g.pending = []; }
-    else if (id === 4) g.queue.unshift('T', 'T');
-    else if (id === 5) g.trowel();
-    else if (id === 6) { if (!og.over) S.freeze[other] = 3000; if (other === 'me') input.clear(); }
-    else if (id === 7) g.boost = 8000;
-    if (!mine) S.bot.plan = null;
-    sideKey = '';
+  function itemFx(id, mine, note) {
+    var now = performance.now();
     if (mine) {
       sfx.play('itemUse');
       buzz(16);
-      popRaw(it.name, [it.tip], 0, id === 4);
+      popRaw(t('i' + id), [t('i' + id + 't')], 0, id === 4);
       if (id === 2 || id === 6) V.opp.addWash(now, id === 6 ? '190,232,255' : '217,67,47', 420);
       if (id === 3) V.me.addWash(now, '88,170,255', 420);
       if (id === 4) V.me.addWash(now, '245,184,46', 420);
     } else {
       var hit = id === 2 || id === 6;
       if (hit) { sfx.play('itemHit'); buzz(30); V.me.addWash(now, id === 6 ? '190,232,255' : '217,67,47', 420); }
-      toast('對手用了「' + it.name + '」' + (id === 2 ? (note ? '：' + note : '，被你的防水布擋掉') : id === 6 ? '：你 3 秒動不了' : ''), 2000);
+      toast(t('foeUsed', t('i' + id)) + (id === 2 ? t(note ? 'foeUsed.grout' : 'foeUsed.tarp') : id === 6 ? t('foeUsed.ice') : ''), 2000);
     }
+  }
+  function useItem(k) {
+    if (!itemsOn() || S.state !== 'play') return false;
+    var g = S[k], other = k === 'me' ? 'opp' : 'me', og = S[other], mine = k === 'me';
+    if (g.over || S.freeze[k] > 0 || !g.inv.length) return false;
+    var id = g.takeItem(), note = true;
+    if (id === 1) g.chisel(3);
+    else if (id === 2) { if (!S.remote) { note = !(og.shield > 0); og.receive(3); } }
+    else if (id === 3) { g.shield = 8000; g.pending = []; }
+    else if (id === 4) g.queue.unshift('T', 'T');
+    else if (id === 5) g.trowel();
+    else if (id === 6) { if (!og.over) S.freeze[other] = 3000; if (other === 'me') input.clear(); }
+    else if (id === 7) g.boost = 8000;
+    if (!mine && S.bot) S.bot.plan = null;
+    sideKey = '';
+    if (mine) {
+      S.used++;
+      if (S.rec) S.rec.item(id);
+      if (S.remote) ZZ.Net.item(id);
+    }
+    itemFx(id, mine, note);
     return true;
+  }
+  // The other side is a remote player or a recording: its item arrives as a bare id and lands on us here.
+  function foeItem(id) {
+    if (!S || S.kind !== 'battle' || S.state !== 'play') return;
+    var note = true;
+    if (id === 2) { note = !(S.me.shield > 0); S.me.receive(3); }
+    else if (id === 6) { if (!S.me.over) { S.freeze.me = 3000; input.clear(); } }
+    else if (id === 3 && !S.remote) { S.opp.shield = 8000; S.opp.pending = []; }
+    else if (id === 7 && !S.remote) S.opp.boost = 8000;
+    itemFx(id, false, note);
   }
   // The computer holds an item until it is useful, then plays it.
   function botItems(dt) {
@@ -468,11 +571,11 @@
     S.botItemT += dt;
     S.botChk -= dt;
     if (S.botChk <= 0) { S.botChk = 300; S.botHoles = Bot.features(Bot.rowsOf(g.grid)).holes; }
-    var id = g.inv[0], t = S.botItemT, wait = 700 + (4 - S.o.level) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false;
-    if (id === 1) go = t > wait && (g.stackHeight() >= 9 || t > late);
-    else if (id === 5) go = t > wait && (S.botHoles >= 3 || t > late);
-    else if (id === 3) go = t > 400 && (g.pendingTotal() >= 2 || t > late);
-    else go = t > wait;
+    var id = g.inv[0], tm = S.botItemT, wait = 700 + (4 - S.level) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false;
+    if (id === 1) go = tm > wait && (g.stackHeight() >= 9 || tm > late);
+    else if (id === 5) go = tm > wait && (S.botHoles >= 3 || tm > late);
+    else if (id === 3) go = tm > 400 && (g.pendingTotal() >= 2 || tm > late);
+    else go = tm > wait;
     if (go) { S.botItemT = 0; useItem('opp'); }
   }
 
@@ -488,6 +591,11 @@
     }
   }
   function handle(g, v, mine, e, now) {
+    var K = kindOf(), i;
+    if (mine) {
+      if (S.rec) S.rec.on(g, e);
+      for (i = 0; i < App.taps.length; i++) App.taps[i](g, e);
+    }
     switch (e.type) {
       case 'spawn':
         v.vis.ox = v.vis.oy = v.vis.ang = 0;
@@ -519,13 +627,14 @@
         if (mine) sfx.play('warn');
         break;
       case 'hold':
-        if (mine) sfx.play('hold');
+        if (mine) { sfx.play('hold'); if (K && K.hold) K.hold(); }
         break;
       case 'topout':
         onTopOut(g, v, mine, now);
         break;
       case 'empty':
-        if (mine && S.kind === 'dojo' && S.state === 'play') drillFail('方塊用完了，再試一次。');
+        if (mine && S.kind === 'dojo' && S.state === 'play') drillFail(t('f.empty'));
+        else if (mine && K && K.empty) K.empty();
         break;
       case 'itemtile':
         if (mine) sfx.play('itemTile');
@@ -535,18 +644,18 @@
         if (mine) {
           sfx.play('itemGet');
           buzz(14);
-          popRaw('拿到「' + ITEMS[e.id].ch + '」', [ITEMS[e.id].tip], 0, false);
+          popRaw(t('p.got', t('i' + e.id)), [t('i' + e.id + 't')], 0, false);
           if (!save.itip) {
             save.itip = 1; saveStore();
-            toast(env.touch ? '按下面中間的「道具」鍵就能用。' : '按 F 用道具。', 4200);
+            toast(env.touch ? t('tip.itemTouch') : t('tip.itemKey', key1('ITEM')), 4200);
           }
         }
         break;
       case 'itemfull':
-        if (mine) toast('道具滿了，這顆沒拿到。');
+        if (mine) toast(t('itemFull'));
         break;
       case 'blocked':
-        if (mine) popRaw('擋下 ' + e.n + ' 排', [], 0, false);
+        if (mine) popRaw(t('p.blocked', e.n), [], 0, false);
         break;
       case 'chisel':
         v.addCrumble(e.rows, now);
@@ -559,15 +668,16 @@
   }
   function radarOn() { return S.kind === 'practice' || ((S.kind === 'battle' || S.kind === 'sprint') && set.radar); }
   function radarTarget() {
-    var me = S.me, t = me.cur.type, sp = t === 'O' ? null : Bot.findSpins(me, t, false)[0], strong = !!sp;
-    if (!sp && t !== 'T') { sp = Bot.findSpins(me, 'T', false)[0]; strong = !!sp && me.holdType === 'T'; }
+    var me = S.me, ty = me.cur.type, sp = ty === 'O' ? null : Bot.findSpins(me, ty, false)[0], strong = !!sp;
+    if (!sp && ty !== 'T') { sp = Bot.findSpins(me, 'T', false)[0]; strong = !!sp && me.holdType === 'T'; }
     if (!sp) return null;
-    return { cells: stepCells(sp), strong: strong, label: spinName(sp.type, sp.spin) + LINE_NAME[sp.lines] };
+    return { cells: stepCells(sp), strong: strong, label: clearName(sp.type, sp.spin, sp.lines) };
   }
   function onSpawn(e) {
-    var me = S.me;
+    var me = S.me, K = kindOf();
     S.target = null;
     if (!me.cur) return;
+    if (K && K.spawn) return K.spawn(e);
     if (S.kind === 'practice' && !e.hold) {
       S.hist.push(me.snapshot());
       if (S.hist.length > 80) S.hist.shift();
@@ -580,7 +690,7 @@
     }
   }
   function onLock(g, v, mine, e, now) {
-    var spun = e.tspin !== 'none';
+    var spun = e.tspin !== 'none', K = kindOf();
     if (e.lines) {
       v.addClear(e.rows, e.rowColors, now, spun || e.lines === 4);
       if (spun) { v.addShine(now); v.addDust(e.cells[0][0] + 0.5, e.cells[0][1], now); }
@@ -601,38 +711,43 @@
     }
     popup(e);
     if (S.demo) return;
-    if (S.kind === 'dojo') drillLock(e);
+    if (K && K.lock) K.lock(e);
+    else if (S.kind === 'dojo') drillLock(e);
     else if (S.kind === 'sprint' && S.me.stats.lines >= S.goal) endSprint();
   }
   function onTopOut(g, v, mine, now) {
+    var K = kindOf();
     if (S.kind === 'battle') {
       var k = mine ? 'me' : 'opp', other = mine ? 'opp' : 'me';
       S.ko[other]++;
+      S[other].stats.score += 1500;
       S.down[k] = 1150;
       S.freeze[k] = 0;
       v.knock(now);
       sfx.play('ko');
       buzz(mine ? [60, 40, 80] : 40);
-      if (mine) { input.clear(); banner('被擊倒', 'bad', 1000); }
-      else popRaw('擊倒對手', [], 0, true);
+      if (mine) { input.clear(); banner(t('b.koed'), 'bad', 1000); }
+      else popRaw(t('b.koFoe'), [], 0, true);
     } else if (S.kind === 'sprint') {
       S.state = 'over';
       sfx.play('lose');
       sfx.setDuck(0.4);
       openSheet('sprintFail');
     } else if (S.kind === 'practice') {
-      toast('牆滿了，清空重來。');
+      toast(t('wallFull'));
       S.me.seed = (Math.random() * 4294967296) >>> 0;
       S.me.reset();
       S.me.start();
       S.hist = [];
     } else if (S.kind === 'dojo' && S.state === 'play') {
-      drillFail('牆滿了，再試一次。');
+      drillFail(t('f.full'));
+    } else if (K && K.topout) {
+      K.topout();
     }
   }
   function undo() {
     if (!S || S.kind !== 'practice' || S.state !== 'play') return;
-    if (S.hist.length < 2) { toast('已經是第一步了。'); return; }
+    if (S.hist.length < 2) { toast(t('undoFirst')); return; }
     S.hist.pop();
     S.me.restore(S.hist[S.hist.length - 1]);
     V.me.fx = [];
@@ -641,27 +756,45 @@
 
   // ---------- finishing ----------
   function rate(n, ms) { return ms > 0 ? n / (ms / 60000) : 0; }
-  function endBattle() {
+  // why: '' time ran out, 'left' the other player went away, 'quit' we walked out of an online match
+  function endBattle(why) {
+    if (!S || S.state === 'over') return;
     S.state = 'over';
     input.clear();
-    var a = S.ko.me, b = S.ko.opp, r = a !== b ? (a > b ? 1 : -1) : S.me.stats.sent !== S.opp.stats.sent ? (S.me.stats.sent > S.opp.stats.sent ? 1 : -1) : 0;
-    S.result = r;
-    sfx.setDuck(0.4);
-    sfx.play(r >= 0 ? 'win' : 'lose');
-    banner('時間到', '', 900);
-    setTimeout(function () { if (S && S.state === 'over' && S.kind === 'battle') openSheet('battleEnd'); }, 900);
+    var st = S;
+    var settle = function () {
+      if (S !== st) return;
+      var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
+      var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
+      S.result = r; S.why = why || '';
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used });
+      S.saved = false;
+      if (S.rec && ZZ.Replay && played > 20000) {
+        S.saved = ZZ.Replay.save(S.rec.done({
+          result: r, score: ms.score, sent: ms.sent, ko: a, pieces: ms.pieces, ms: played,
+          pps: Math.round(ms.pieces / (played / 1000) * 100) / 100, apm: Math.round(rate(ms.attack, played) * 10) / 10, name: Meta.data.name
+        }), Meta.isSub() ? 30 : 5);
+      }
+      sfx.setDuck(0.4);
+      sfx.play(r >= 0 ? 'win' : 'lose');
+      if (!why) banner(t('b.time'), '', 900);
+      setTimeout(function () { if (S === st && S.state === 'over') openSheet('battleEnd'); }, why ? 300 : 900);
+    };
+    if (S.remote && !why) ZZ.Net.finish(settle); else settle();
   }
   function endSprint() {
     S.state = 'over';
     input.clear();
     S.newBest = !save.best || S.time < save.best;
     if (S.newBest) { save.best = Math.round(S.time); saveStore(); }
+    S.reward = Meta.finish({ mode: 'sprint', result: 1, time: S.time, newBest: S.newBest, stats: S.me.stats });
     sfx.setDuck(0.4);
     sfx.play('win');
     openSheet('sprintEnd');
   }
   function pause() {
     if (!S || screen !== 'play' || sheetName) return;
+    if (S.mode === 'net') { if (S.state === 'play' || S.state === 'count') openSheet('netLeave'); return; }
     if (S.state !== 'play' && S.state !== 'count' && S.state !== 'demo' && S.state !== 'wait') return;
     S.prev = S.state;
     S.state = 'pause';
@@ -674,6 +807,7 @@
     last = performance.now();
   }
   function toMenu() {
+    if (S && S.mode === 'net' && ZZ.Net) ZZ.Net.leave();
     S = null;
     closeSheet(true);
     input.clear();
@@ -681,95 +815,138 @@
   }
 
   // ---------- sheets ----------
-  var LV_NOTE = ['剛學會擺，常常放歪', '疊得穩，不太會攻擊', '會留一排等長條四消', '四消一個接一個', 'T 轉連發，手下不留情'];
   var pick = { level: 1, minutes: 2, items: true };
-  function itile(id) { return '<span class="itile" style="--c:' + ITEMS[id].color + '">' + ITEMS[id].ch + '</span>'; }
+  function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
+  function rewardHtml(rw) {
+    if (!rw) return '';
+    var h = '', i;
+    if (rw.rank) {
+      var rk = rw.rank, to = rk.to, pct = to.top ? 100 : Math.round(to.into / to.need * 100);
+      h += '<div class="rankbox' + (rk.up ? ' up' : '') + '"><b>' + esc(rankName(to)) + '</b><span>' + t('rateLine', (rk.delta >= 0 ? '+' : '') + rk.delta) + '</span>' +
+        '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    }
+    if (rw.coins) {
+      h += '<div class="earn"><div class="earn-top"><span>' + t('earned') + '</span>' + coin(rw.coins) + '</div><ul>';
+      for (i = 0; i < rw.parts.length; i++) h += '<li><span>' + esc(t('w.' + rw.parts[i].key, rw.parts[i].arg ? rankName(rw.parts[i].arg) : '')) + '</span><b>+' + rw.parts[i].n + '</b></li>';
+      h += '</ul></div>';
+    }
+    for (i = 0; i < rw.jobs.length; i++) h += '<p class="note">' + esc(t('jobDone', t('j.' + rw.jobs[i]))) + '</p>';
+    return h;
+  }
+  function keyRows() {
+    var h = '<dl class="keys">', i;
+    for (i = 0; i < ACTIONS.length; i++) {
+      var a = ACTIONS[i], ks = set.keys[a].map(function (c) { return '<kbd>' + esc(keyName(c)) + '</kbd>'; });
+      if (a === 'PAUSE') ks.unshift('<kbd>Esc</kbd>');
+      h += '<dt>' + ks.join(' ') + '</dt><dd>' + t('a.' + a) + '</dd>';
+    }
+    return h + '</dl>';
+  }
   function sheetHtml(name) {
     var h = '', i;
+    if (App.sheets[name]) return App.sheets[name]();
     if (name === 'battle') {
-      h = '<h2>選對手</h2><div class="levels" role="radiogroup" aria-label="對手">';
+      h = '<h2>' + t('pickFoe') + '</h2><div class="levels" role="radiogroup" aria-label="' + t('pickFoe') + '">';
       for (i = 0; i < Bot.LEVELS.length; i++) {
-        h += '<button class="lvl" type="button" role="radio" aria-checked="' + (pick.level === i) + '" data-level="' + i + '"><b>' + Bot.LEVELS[i].name +
-          '</b><span>' + LV_NOTE[i] + '</span><i>每秒 ' + Bot.LEVELS[i].pps + ' 塊</i></button>';
+        h += '<button class="lvl" type="button" role="radio" aria-checked="' + (pick.level === i) + '" data-level="' + i + '"><b>' + t('lv' + i) +
+          '</b><span>' + t('lvn' + i) + '</span><i>' + t('pps', Bot.LEVELS[i].pps) + '</i></button>';
       }
-      h += '</div><h3>對戰時間</h3><div class="seg" role="radiogroup" aria-label="對戰時間">';
-      for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + i + ' 分鐘</button>';
-      h += '</div><label class="toggle" for="bItems">道具戰：牆上會冒出道具磚，消掉那排就拿到<input type="checkbox" id="bItems"></label>' +
-        '<div class="row"><button class="btn" type="button" data-do="close">取消</button><button class="btn main" type="button" data-do="fight">開始對戰</button></div>';
+      h += '</div><h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
+      for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
+      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' + bringHtml() +
+        '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
     } else if (name === 'pause') {
-      h = '<h2>暫停</h2><div class="row"><button class="btn main" type="button" data-do="resume">繼續</button></div><div class="row">' +
-        (S && S.kind !== 'battle' ? '<button class="btn" type="button" data-do="again">重來</button>' : '<button class="btn" type="button" data-do="again">重新對戰</button>') +
-        '<button class="btn" type="button" data-do="settings">設定</button><button class="btn" type="button" data-do="help">操作與規則</button><button class="btn" type="button" data-do="menu">回主選單</button></div>';
+      h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
+        btn('again', S && S.kind === 'battle' ? 'rematch' : 'restart') + btn('settings', 'm.settings') + btn('help', 'm.help') + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'battleEnd') {
-      var me = S.me.stats, op = S.opp.stats, t = S.total;
+      var me = S.me.stats, op = S.opp.stats, tt = Math.max(1, S.total - S.left), foe = esc(S.oppName);
       var rows = [
-        ['送出行數', me.sent, op.sent],
-        ['每分鐘攻擊', rate(me.attack, t).toFixed(1), rate(op.attack, t).toFixed(1)],
-        ['每秒塊數', (me.pieces / (t / 1000)).toFixed(2), (op.pieces / (t / 1000)).toFixed(2)],
-        ['T 轉', me.spins + me.minis, op.spins + op.minis],
-        ['其他方塊的轉', me.xspins, op.xspins],
-        ['四消', me.quads, op.quads],
-        ['最長連擊', me.maxCombo, op.maxCombo]
+        [t('score'), L.num(me.score), L.num(op.score)],
+        [t('st.sent'), me.sent, op.sent],
+        [t('st.apm'), rate(me.attack, tt).toFixed(1), S.remote ? '—' : rate(op.attack, tt).toFixed(1)],
+        [t('st.pps'), (me.pieces / (tt / 1000)).toFixed(2), (op.pieces / (tt / 1000)).toFixed(2)],
+        [t('st.tspin'), me.spins + me.minis, S.remote ? '—' : op.spins + op.minis],
+        [t('st.quad'), me.quads, S.remote ? '—' : op.quads],
+        [t('st.combo'), me.maxCombo, S.remote ? '—' : op.maxCombo]
       ];
-      if (S.o.items) rows.push(['拿到的道具', me.items, op.items]);
-      h = '<h2>' + (S.result > 0 ? '你贏了' : S.result < 0 ? '這場輸了' : '平手') + '</h2>' +
-        '<div class="score"><div><b>' + S.ko.me + '</b><span>你的擊倒</span></div><i>比</i><div><b>' + S.ko.opp + '</b><span>' + esc(S.lv.name) + '的擊倒</span></div></div>' +
-        (S.ko.me === S.ko.opp && S.result !== 0 ? '<p>擊倒數一樣，改比送出的行數。</p>' : '') +
-        '<table class="cmp"><thead><tr><th></th><th>你</th><th>' + esc(S.lv.name) + '</th></tr></thead><tbody>';
+      h = '<h2>' + t(S.result > 0 ? 'r.win' : S.result < 0 ? 'r.lose' : 'r.draw') + '</h2>' +
+        (S.why === 'left' ? '<p>' + t('net.foeLeft') + '</p>' : '') +
+        '<div class="score"><div><b>' + S.ko.me + '</b><span>' + t('r.yourKo') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + S.ko.opp + '</b><span>' + t('r.foeKo', foe) + '</span></div></div>' +
+        (S.ko.me === S.ko.opp && S.result !== 0 && !S.why ? '<p>' + t('r.tie') + '</p>' : '') + rewardHtml(S.reward) +
+        '<table class="cmp"><thead><tr><th></th><th>' + t('you') + '</th><th>' + foe + '</th></tr></thead><tbody>';
       for (i = 0; i < rows.length; i++) h += '<tr><td>' + rows[i][0] + '</td><td>' + rows[i][1] + '</td><td>' + rows[i][2] + '</td></tr>';
-      h += '</tbody></table><div class="row"><button class="btn main" type="button" data-do="again">再來一場</button><button class="btn" type="button" data-do="battle">換對手</button><button class="btn" type="button" data-do="menu">回主選單</button></div>';
+      h += '</tbody></table>' + (S.saved ? '<p class="note">' + t('recSaved') + '</p>' : '') + (App.endExtra ? App.endExtra() : '') + '<div class="row">' +
+        (S.why === 'left' ? '' : btn('again', 'again', true)) + (S.mode === 'ai' ? btn('battle', 'changeFoe') : '') + btn('menu', 'toMenu', S.why === 'left') + '</div>';
     } else if (name === 'sprintEnd') {
       var s = S.me.stats;
-      h = '<h2>' + (S.newBest ? '新紀錄' : '40 行清完') + '</h2><div class="score"><div><b>' + fmtTime(S.time) + '</b><span>這次</span></div><i></i><div><b>' + fmtTime(save.best) + '</b><span>最佳</span></div></div>' +
-        '<table class="cmp"><tbody><tr><td>每秒塊數</td><td>' + (s.pieces / (S.time / 1000)).toFixed(2) + '</td></tr><tr><td>用了幾塊</td><td>' + s.pieces + '</td></tr><tr><td>各種轉</td><td>' + (s.spins + s.minis + s.xspins) + '</td></tr><tr><td>四消</td><td>' + s.quads + '</td></tr></tbody></table>' +
-        '<div class="row"><button class="btn main" type="button" data-do="again">再跑一次</button><button class="btn" type="button" data-do="menu">回主選單</button></div>';
+      h = '<h2>' + t(S.newBest ? 'sp.new' : 'sp.done') + '</h2><div class="score"><div><b>' + fmtTime(S.time) + '</b><span>' + t('sp.this') + '</span></div><i></i><div><b>' + fmtTime(save.best) + '</b><span>' + t('best') + '</span></div></div>' +
+        rewardHtml(S.reward) + '<table class="cmp"><tbody><tr><td>' + t('score') + '</td><td>' + L.num(s.score) + '</td></tr><tr><td>' + t('st.pps') + '</td><td>' + (s.pieces / (S.time / 1000)).toFixed(2) +
+        '</td></tr><tr><td>' + t('sp.used') + '</td><td>' + s.pieces + '</td></tr><tr><td>' + t('sp.spins') + '</td><td>' + (s.spins + s.minis + s.xspins) + '</td></tr><tr><td>' + t('st.quad') + '</td><td>' + s.quads + '</td></tr></tbody></table>' +
+        '<div class="row">' + btn('again', 'sp.again', true) + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'sprintFail') {
-      h = '<h2>牆滿了</h2><p>還差 ' + Math.max(0, S.goal - S.me.stats.lines) + ' 行。</p><div class="row"><button class="btn main" type="button" data-do="again">再跑一次</button><button class="btn" type="button" data-do="menu">回主選單</button></div>';
+      h = '<h2>' + t('sp.fail') + '</h2><p>' + t('sp.left', Math.max(0, S.goal - S.me.stats.lines)) + '</p><div class="row">' + btn('again', 'sp.again', true) + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'dojoDone') {
-      h = '<h2>全部過關</h2><p>T 轉的雙消、三消、蓋屋簷，還有 Z、S、L、J 的轉法都會了。接下來去自由練習自己搭洞，雷達會告訴你哪裡轉得進去。</p>' +
-        '<div class="row"><button class="btn main" type="button" data-do="practice">去自由練習</button><button class="btn" type="button" data-do="dojoFirst">從第一關再練</button><button class="btn" type="button" data-do="menu">回主選單</button></div>';
+      h = '<h2>' + t('dojo.all') + '</h2><p>' + t('dojo.allP') + '</p><div class="row">' + btn('practice', 'dojo.toPractice', true) + btn('dojoFirst', 'dojo.first') + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'dojo') {
-      h = '<h2>旋轉道場</h2>';
+      h = '<h2>' + t('m.dojo') + '</h2>';
       var open = false;
       for (i = 0; i < DRILLS.length; i++) {
         var other = goalPiece(DRILLS[i]) !== 'T';
         if (i === 0 || (other && goalPiece(DRILLS[i - 1]) === 'T')) {
           if (open) h += '</div>';
-          h += '<h3>' + (other ? '其他方塊也能轉' : 'T 轉') + '</h3><div class="levels">';
+          h += '<h3>' + t(other ? 'dojo.g2' : 'dojo.g1') + '</h3><div class="levels">';
           open = true;
         }
-        h += '<button class="lvl" type="button" data-drill="' + i + '"><b>第 ' + (i + 1) + ' 關</b><span>' + esc(DRILLS[i].name) + '</span><i>' + (i < save.dojo ? '過關' : '') + '</i></button>';
+        h += '<button class="lvl" type="button" data-drill="' + i + '"><b>' + t('drillNo', i + 1) + '</b><span>' + esc(t('d.' + DRILLS[i].id + '.n')) + '</span><i>' + (i < save.dojo ? t('doneMark') : '') + '</i></button>';
       }
-      h += '</div><div class="row"><button class="btn" type="button" data-do="close">取消</button></div>';
+      h += '</div><div class="row">' + btn('close', 'cancel') + '</div>';
     } else if (name === 'settings') {
-      h = '<h2>設定</h2><h3>操控手感</h3>' +
-        field('sDas', '按住多久開始連續移動', 60, 300, 5, '數字越小，方塊越快滑出去。') +
-        field('sArr', '連續移動的間隔', 0, 80, 5, '0 會直接貼到牆邊。') +
-        field('sSdf', '軟降速度', 10, 125, 5, '拉到最右邊是瞬間到底。') +
-        field('sLock', '落地後多久鎖定', 200, 1000, 50, '想多一點時間轉進洞裡，就調長。') +
-        '<h3>畫面</h3>' + toggle('sSmooth', '移動和旋轉的滑順動畫') + toggle('sGhost', '顯示落點') + toggle('sRadar', '對戰和競速也開旋轉雷達') +
-        '<h3>觸控按鍵</h3><div class="seg" role="radiogroup" aria-label="按鍵高度">' +
-        ['矮', '中', '高'].map(function (n, j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + n + '</button>'; }).join('') + '</div>' +
-        toggle('sSwap', '移動鍵放右手邊') + toggle('sHalf', '多一顆「半圈」鍵（轉 180 度）') + toggle('sHaptic', '震動回饋') +
-        '<h3>聲音</h3>' + field('sMvol', '音樂音量', 0, 100, 5, '') + field('sVol', '音效音量', 0, 100, 5, '') + toggle('sReal', '用實錄音效（關掉改用合成音）') +
-        '<div class="row"><button class="btn" type="button" data-do="defaults">恢復預設</button><button class="btn main" type="button" data-do="close">完成</button></div>';
+      var langs = '<option value="">' + t('s.auto') + '</option>';
+      for (i = 0; i < L.LANGS.length; i++) langs += '<option value="' + L.LANGS[i][0] + '">' + L.LANGS[i][1] + '</option>';
+      h = '<h2>' + t('m.settings') + '</h2><div class="field line"><label for="sLang">' + t('s.lang') + '</label><select id="sLang">' + langs + '</select></div>' +
+        '<h3>' + t('s.feel') + '</h3>' +
+        field('sDas', t('s.das'), 60, 300, 5, t('s.dasN')) + field('sArr', t('s.arr'), 0, 80, 5, t('s.arrN')) +
+        field('sSdf', t('s.sdf'), 10, 125, 5, t('s.sdfN')) + field('sLock', t('s.lock'), 200, 1000, 50, t('s.lockN')) +
+        '<h3>' + t('s.screen') + '</h3>' + toggle('sSmooth', t('s.smooth')) + toggle('sGhost', t('s.ghost')) + toggle('sRadar', t('s.radar')) +
+        (env.touch ? '' : '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>') +
+        '<h3>' + t('s.touch') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('s.padH') + '">' +
+        [0, 1, 2].map(function (j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + t('s.pad' + j) + '</button>'; }).join('') + '</div>' +
+        toggle('sSwap', t('s.swap')) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
+        (env.touch ? '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>' : '') +
+        '<h3>' + t('s.sound') + '</h3>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
+        '<div class="row">' + btn('defaults', 's.defaults') + btn('close', 'done', true) + '</div>';
+    } else if (name === 'keys') {
+      h = '<h2>' + t('kb.title') + '</h2><p>' + t('kb.hint') + '</p><div class="binds">';
+      for (i = 0; i < ACTIONS.length; i++) {
+        var a = ACTIONS[i], ks = set.keys[a];
+        h += '<div class="bind"><span>' + t('a.' + a) + '</span><div class="bind-keys">' + (a === 'PAUSE' ? '<kbd>Esc</kbd>' : '') +
+          ks.map(function (c) { return '<button type="button" class="kbtn" data-unbind="' + a + '|' + c + '">' + esc(keyName(c)) + '</button>'; }).join('') +
+          (capAct === a ? '<span class="kwait">' + t('kb.press') + '</span>' : '<button type="button" class="kbtn add" data-bind="' + a + '" aria-label="+">＋</button>') + '</div></div>';
+      }
+      h += '</div><div class="row">' + btn('keyDefaults', 's.defaults') + btn('close', 'done', true) + '</div>';
     } else if (name === 'help') {
-      h = '<h2>操作與規則</h2><h3>鍵盤</h3><dl class="keys">' +
-        '<dt><kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd></dt><dd>左右移動，按住會連續移動</dd>' +
-        '<dt><kbd>↓</kbd> <kbd>S</kbd></dt><dd>軟降</dd><dt><kbd>空白鍵</kbd></dt><dd>硬降，直接放到底</dd>' +
-        '<dt><kbd>↑</kbd> <kbd>W</kbd> <kbd>X</kbd> <kbd>K</kbd></dt><dd>順時針轉</dd><dt><kbd>Z</kbd> <kbd>J</kbd> <kbd>Ctrl</kbd></dt><dd>逆時針轉</dd><dt><kbd>Q</kbd> <kbd>L</kbd></dt><dd>轉半圈</dd>' +
-        '<dt><kbd>C</kbd> <kbd>E</kbd> <kbd>Shift</kbd></dt><dd>暫存</dd><dt><kbd>F</kbd> <kbd>V</kbd> <kbd>Enter</kbd></dt><dd>用道具</dd>' +
-        '<dt><kbd>Esc</kbd> <kbd>P</kbd></dt><dd>暫停</dd><dt><kbd>R</kbd></dt><dd>重來（對戰以外）</dd><dt><kbd>U</kbd></dt><dd>悔棋（自由練習）</dd></dl>' +
-        '<h3>觸控</h3><p>拇指可以在左、右兩顆鍵之間直接滑過去，不用抬手。點一下「暫存」格或「道具」格也有用。</p>' +
-        '<h3>轉進去怎麼算</h3><ul class="rules"><li>T 的最後一個動作是旋轉，而且四個斜角有三個被擋住，就是 T 轉。</li><li>Z、S、L、J、I 也能轉：最後一個動作是旋轉，轉完左右上下都動不了，就算。</li><li>轉成功的那一下，磚會閃一圈金光。</li><li>落地後有一小段時間可以調整，每次移動或旋轉會重新計時，最多 15 次。時間長短可以在設定裡調。</li></ul>' +
-        '<h3>送多少行</h3><ul class="rules"><li>雙消 1、三消 2、四消 4。</li><li>T 轉單消 2、雙消 4、三消 6；迷你 T 轉單消 1、雙消 2。</li><li>其他方塊的轉：照消掉的行數算，再多送 1 行。</li><li>連續重擊：四消或任何一種轉接著打，每次多送 1 行。</li><li>連擊：連續幾塊都有消行，越後面加越多。</li><li>全清再加 6 行。</li></ul>' +
-        '<h3>對戰</h3><ul class="rules"><li>你送出的行會先抵銷紅條裡排隊的水泥行，剩下的才送給對手。</li><li>放下一塊卻沒有消行，排隊的水泥行就會從底下頂上來。</li><li>牆頂到天花板算被擊倒一次，水泥行會掉光，然後繼續打。</li><li>時間到比擊倒次數，一樣多就比送出的行數。</li></ul>' +
-        '<h3>道具</h3><p>道具戰裡，每放幾塊，牆上就有一格變成白色的道具磚。把那一排消掉就能拿到，最多帶 3 個，先拿到的先用。</p><dl class="keys">';
-      for (i = 1; i < ITEMS.length; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + ITEMS[i].name + '</b>　' + ITEMS[i].tip + '</dd>';
-      h += '</dl><h3>素材出處</h3><p>音樂：Juhani Junkala《5 Chiptunes (Action)》。音效：Kenney《Interface Sounds》《UI Audio》。全部是 CC0 授權，可以商用，不強制標示出處。</p>' +
-        '<div class="row"><button class="btn main" type="button" data-do="close">知道了</button></div>';
+      h = '<h2>' + t('m.help') + '</h2><h3>' + t('s.kb') + '</h3>' + keyRows() +
+        '<h3>' + t('h.touch') + '</h3><p>' + t('h.touchP') + '</p>' +
+        '<h3>' + t('h.spin') + '</h3>' + ul(['h.spin1', 'h.spin2', 'h.spin3', 'h.spin4']) +
+        '<h3>' + t('h.atk') + '</h3>' + ul(['h.atk1', 'h.atk2', 'h.atk3', 'h.atk4', 'h.atk5', 'h.atk6']) +
+        '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
+        '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
+        '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
+      for (i = 1; i < ITEMS.length; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
+      h += '</dl><h3>' + t('h.credits') + '</h3><p>' + t('h.creditsP') + '</p><div class="row">' + btn('close', 'ok', true) + '</div>';
     }
     return h;
+  }
+  function ul(keys) { return '<ul class="rules">' + keys.map(function (k) { return '<li>' + t(k) + '</li>'; }).join('') + '</ul>'; }
+  function bringHtml() {
+    var d = Meta.data, h = '<h3>' + t('bring', Meta.BRING_MAX) + '</h3>', any = false, i;
+    var cells = '';
+    for (i = 1; i < ITEMS.length; i++) {
+      if (!(d.items[i] > 0)) continue;
+      any = true;
+      cells += '<button type="button" class="bringb" data-bring="' + i + '" aria-pressed="' + (d.bring.indexOf(i) >= 0) + '" title="' + esc(t('i' + i)) + '">' + itile(i) + '<span>×' + d.items[i] + '</span></button>';
+    }
+    return h + (any ? '<div class="bringrow">' + cells + '</div>' : '<p>' + t('bringNone') + '</p>');
   }
   function field(id, label, min, max, step, note) {
     return '<div class="field"><label for="' + id + '">' + label + '</label><output id="' + id + 'O" for="' + id + '"></output>' +
@@ -780,14 +957,15 @@
   var FIELDS = { sDas: 'das', sArr: 'arr', sSdf: 'sdf', sLock: 'lock', sVol: 'vol', sMvol: 'mvol' };
   var TOGGLES = { sSmooth: 'smooth', sGhost: 'ghost', sRadar: 'radar', sSwap: 'swap', sHalf: 'half', sHaptic: 'haptic', sReal: 'real' };
   function fieldText(k) {
-    if (k === 'sdf') return set.sdf >= 125 ? '瞬間' : '每秒 ' + set.sdf + ' 格';
-    if (k === 'vol' || k === 'mvol') return set[k] ? String(set[k]) : '關';
-    return set[k] + ' 毫秒';
+    if (k === 'sdf') return set.sdf >= 125 ? t('u.instant') : t('u.cps', set.sdf);
+    if (k === 'vol' || k === 'mvol') return set[k] ? String(set[k]) : t('u.off');
+    return t('u.ms', set[k]);
   }
   function syncSettings() {
     var id;
     for (id in FIELDS) { $(id).value = set[FIELDS[id]]; $(id + 'O').textContent = fieldText(FIELDS[id]); }
     for (id in TOGGLES) $(id).checked = !!set[TOGGLES[id]];
+    $('sLang').value = set.lang;
   }
   function applySettings() {
     el.pad.classList.toggle('swap', set.swap);
@@ -795,90 +973,190 @@
     sfx.vol();
     if (S && S.me) {
       S.me.sdf = sdfVal();
-      S.me.lockDelay = S.kind === 'dojo' ? Math.max(1000, set.lock) : set.lock;
+      S.me.lockDelay = S.kind === 'dojo' || kindOf() ? Math.max(1000, set.lock) : set.lock;
     }
     if (screen === 'play') layout();
   }
 
+  // ---------- language ----------
+  var FONT = { 'zh-Hans': 'Noto+Sans+SC:wght@400..900', ja: 'Zen+Maru+Gothic:wght@500;700;900', ko: 'Noto+Sans+KR:wght@400..900' }, fontDone = {};
+  function applyLang() {
+    L.set(set.lang || '');
+    var root = document.documentElement, list, i;
+    root.lang = L.lang;
+    document.title = t('title');
+    var f = FONT[L.lang];
+    if (f && !fontDone[L.lang]) {
+      fontDone[L.lang] = 1;
+      var ln = document.createElement('link');
+      ln.rel = 'stylesheet';
+      ln.href = 'https://fonts.googleapis.com/css2?family=' + f + '&display=swap';
+      document.head.appendChild(ln);
+    }
+    list = document.querySelectorAll('[data-t]');
+    for (i = 0; i < list.length; i++) list[i].textContent = t(list[i].getAttribute('data-t'));
+    list = document.querySelectorAll('[data-ta]');
+    for (i = 0; i < list.length; i++) list[i].setAttribute('aria-label', t(list[i].getAttribute('data-ta')));
+    $('logoA').textContent = L.lang === 'zh-Hans' ? '转' : '轉';
+    $('logoB').textContent = L.lang === 'zh-Hans' ? '砖' : '磚';
+    env.font = '';
+    if (S) { setupHud(); if (S.kind === 'dojo' && S.d) loadDrill(S.drill); layout(); }
+    updateMenu();
+  }
+
+  // ---------- key binding sheet ----------
+  var capAct = '';
+  function stopCapture() { capAct = ''; App.capture = null; }
+  function startCapture(a) {
+    if (set.keys[a].length >= KEY_MAX) { toast(t('kb.max')); return; }
+    capAct = a;
+    App.capture = function (e) {
+      if (e.repeat) return;
+      var code = e.code;
+      if (!code || code === 'Escape') { stopCapture(); openSheet('keys'); return; }
+      var was = KEYS[code];
+      ACTIONS.forEach(function (x) { set.keys[x] = set.keys[x].filter(function (c) { return c !== code; }); });
+      set.keys[a].push(code);
+      if (was && was !== a) toast(t('kb.moved', keyName(code), t('a.' + was)), 2600);
+      rebuildKeys();
+      saveStore();
+      stopCapture();
+      openSheet('keys');
+    };
+    openSheet('keys');
+  }
+
   function openSheet(name) {
-    if ((name === 'settings' || name === 'help') && sheetName !== name) sheetBack = sheetName === 'pause' ? 'pause' : '';
+    if ((name === 'settings' || name === 'help') && sheetName !== name && sheetName !== 'keys') sheetBack = sheetName === 'pause' ? 'pause' : '';
+    var keep = sheetName === name ? el.sheetCard.scrollTop : 0;
     sheetName = name;
     el.sheetCard.innerHTML = sheetHtml(name);
     el.sheet.hidden = false;
-    el.sheetCard.scrollTop = 0;
+    el.sheetCard.scrollTop = keep;
     if (name === 'settings') syncSettings();
     if (name === 'battle') $('bItems').checked = pick.items;
+    if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
-    if (b && !env.touch) b.focus();
+    if (b && !env.touch && !keep) b.focus();
   }
   function closeSheet(quiet) {
+    var was = sheetName;
     sheetName = '';
     el.sheet.hidden = true;
     el.sheetCard.innerHTML = '';
+    stopCapture();
+    if (was && App.closed[was]) App.closed[was]();
     if (!quiet && sheetBack) { var b = sheetBack; sheetBack = ''; openSheet(b); }
+    if (screen === 'menu') updateMenu();
   }
   function openBattle() { pick.level = save.level; pick.minutes = save.minutes; pick.items = !!save.items; openSheet('battle'); }
-  function sheetDo(a) {
-    if (a === 'close') { closeSheet(); if (!sheetName && S && S.state === 'pause') resume(); }
+  function againBattle() {
+    var o = {}, k;
+    for (k in S.o) o[k] = S.o[k];
+    if (App.again[S.mode]) return App.again[S.mode](o);
+    o.bring = Meta.takeBring();
+    o.seed = null;
+    begin('battle', o);
+  }
+  function sheetDo(a, target) {
+    if (App.acts[a]) return App.acts[a](target);
+    if (a === 'close') {
+      if (sheetName === 'keys') { stopCapture(); return openSheet('settings'); }
+      closeSheet();
+      if (!sheetName && S && S.state === 'pause') resume();
+    }
     else if (a === 'resume') { sheetBack = ''; closeSheet(true); resume(); }
     else if (a === 'fight') {
       save.level = pick.level; save.minutes = pick.minutes; save.items = pick.items ? 1 : 0; saveStore();
-      begin('battle', { level: pick.level, minutes: pick.minutes, items: pick.items });
+      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, bring: Meta.takeBring() });
     }
-    else if (a === 'again') { sheetBack = ''; if (S.kind === 'dojo') { closeSheet(true); sfx.setDuck(1); loadDrill(S.drill); } else begin(S.kind, S.o); }
+    else if (a === 'again') {
+      sheetBack = '';
+      var K = kindOf();
+      if (S.kind === 'battle') againBattle();
+      else if (K && K.restart) { closeSheet(true); sfx.setDuck(1); K.restart(); }
+      else if (S.kind === 'dojo') { closeSheet(true); sfx.setDuck(1); loadDrill(S.drill); }
+      else begin(S.kind, S.o);
+    }
     else if (a === 'battle') { sheetBack = ''; openBattle(); }
     else if (a === 'menu') { sheetBack = ''; toMenu(); }
-    else if (a === 'settings' || a === 'help') openSheet(a);
+    else if (a === 'settings' || a === 'help' || a === 'keys') openSheet(a);
     else if (a === 'practice') begin('practice');
     else if (a === 'dojoFirst') begin('dojo', { drill: 0 });
-    else if (a === 'defaults') { for (var k in DEF) set[k] = DEF[k]; saveStore(); openSheet('settings'); applySettings(); }
+    else if (a === 'defaults') {
+      var lang = set.lang, keys = set.keys;
+      for (var k in DEF) set[k] = DEF[k];
+      set.lang = lang; set.keys = keys;
+      saveStore(); openSheet('settings'); applySettings();
+    }
+    else if (a === 'keyDefaults') { set.keys = keyCopy(null); rebuildKeys(); saveStore(); stopCapture(); openSheet('keys'); }
   }
   function bindSheets() {
     el.sheetCard.addEventListener('click', function (e) {
-      var t = e.target.closest ? e.target.closest('button') : null;
-      if (!t) return;
+      var tg = e.target.closest ? e.target.closest('button') : null;
+      if (!tg) return;
       sfx.wake();
       sfx.play('ui');
-      var d = t.dataset;
-      if (d.do) return sheetDo(d.do);
+      var d = tg.dataset, i;
+      if (d.do) return sheetDo(d.do, tg);
       if (d.level) { pick.level = +d.level; openSheet('battle'); }
       else if (d.min) { pick.minutes = +d.min; openSheet('battle'); }
+      else if (d.bring) { Meta.toggleBring(+d.bring); openSheet('battle'); }
       else if (d.drill) begin('dojo', { drill: +d.drill });
-      else if (d.pad) { set.pad = +d.pad; saveStore(); var keep = el.sheetCard.scrollTop; el.sheetCard.innerHTML = sheetHtml('settings'); syncSettings(); el.sheetCard.scrollTop = keep; applySettings(); }
+      else if (d.pad) { set.pad = +d.pad; saveStore(); openSheet('settings'); applySettings(); }
+      else if (d.bind) startCapture(d.bind);
+      else if (d.unbind) {
+        var p = d.unbind.split('|');
+        set.keys[p[0]] = set.keys[p[0]].filter(function (c) { return c !== p[1]; });
+        rebuildKeys(); saveStore(); openSheet('keys');
+      }
+      else for (i = 0; i < App.clicks.length; i++) if (App.clicks[i](d, tg)) return;
     });
-    el.sheetCard.addEventListener('input', function (e) {
-      var id = e.target.id;
+    var onInput = function (e) {
+      var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
+      if (id === 'sLang') { if (e.type !== 'change') return; set.lang = e.target.value; saveStore(); applyLang(); openSheet('settings'); return; }
       if (FIELDS[id]) {
         set[FIELDS[id]] = +e.target.value;
         $(id + 'O').textContent = fieldText(FIELDS[id]);
         if (id === 'sVol' || id === 'sMvol') { sfx.wake(); sfx.vol(); if (id === 'sVol') sfx.play('tick'); }
       }
       else if (TOGGLES[id]) set[TOGGLES[id]] = e.target.checked;
-      else return;
+      else { for (i = 0; i < App.inputs.length; i++) if (App.inputs[i](e.target, e)) return; return; }
       saveStore();
       applySettings();
-    });
+    };
+    el.sheetCard.addEventListener('input', onInput);
+    el.sheetCard.addEventListener('change', onInput);
     el.sheet.addEventListener('click', function (e) {
       if (e.target !== el.sheet) return;
-      if (sheetName === 'battle' || sheetName === 'dojo' || sheetName === 'settings' || sheetName === 'help') sheetDo('close');
+      if (App.dismiss[sheetName]) sheetDo('close');
     });
     el.menu.addEventListener('click', function (e) {
-      var t = e.target.closest ? e.target.closest('button') : null;
-      if (!t) return;
+      var tg = e.target.closest ? e.target.closest('button') : null;
+      if (!tg) return;
       sfx.wake();
       sfx.play('ui');
-      if (t.dataset.sheet) return openSheet(t.dataset.sheet);
-      var go = t.dataset.go;
-      if (go === 'battle') openBattle();
+      if (tg.dataset.sheet) return openSheet(tg.dataset.sheet);
+      var go = tg.dataset.go;
+      if (App.go[go]) App.go[go]();
+      else if (go === 'battle') openBattle();
       else if (go === 'dojo') { if (save.dojo > 0) openSheet('dojo'); else begin('dojo', { drill: 0 }); }
       else if (go) begin(go);
     });
   }
   function updateMenu() {
-    $('mBattle').textContent = '';
-    $('mDojo').textContent = save.dojo ? save.dojo + '/' + DRILLS.length : '';
-    $('mSprint').textContent = save.best ? fmtTime(save.best) : '';
+    var d = Meta.data, r = Meta.rankOf(d.rp);
+    txt('mName', d.name || t('player'));
+    txt('mRank', rankName(r));
+    txt('mCoins', L.num(d.coins));
+    txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
+    txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
+    txt('mSprint', save.best ? fmtTime(save.best) : '');
+    var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
+    txt('mGhost', n ? String(n) : '');
+    txt('mOpen', d.first.openers.length ? d.first.openers.length + '/' + o.length : '');
+    $('mJobsDot').hidden = !(Meta.loginDue() || Meta.jobsReady() > 0);
   }
 
   // ---------- layout ----------
@@ -935,10 +1213,11 @@
     }
     var short = env.touch && H < 470 && W > H;
     el.rotate.hidden = !short;
-    if (short && (S.state === 'play' || S.state === 'count')) { S.prev = S.state; S.state = 'pause'; input.clear(); openSheet('pause'); }
+    if (short && S.mode !== 'net' && (S.state === 'play' || S.state === 'count')) { S.prev = S.state; S.state = 'pause'; input.clear(); openSheet('pause'); }
   }
+  var lookKey = '';
   function drawSide() {
-    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + nextN + '|' + me.inv.join('');
+    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
     if (key === sideKey) return;
     sideKey = key;
     var dpr = env.dpr, w = side - 8, x = el.holdCv.getContext('2d'), i;
@@ -958,38 +1237,43 @@
       if (inv[0]) View.drawItem(x, inv[0], 0, 0, big);
       if (inv[1]) View.drawItem(x, inv[1], big + 4, 0, sm);
       if (inv[2]) View.drawItem(x, inv[2], big + 4, sm + 2, sm);
-      el.itemKey.innerHTML = inv[0] ? '<b>' + ITEMS[inv[0]].ch + '</b>道具' : '道具';
+      el.itemKey.innerHTML = (inv[0] ? '<b style="color:' + ITEMS[inv[0]].color + '">' + View.itemSvg(inv[0]) + '</b>' : '') + esc(t('item'));
       el.itemKey.classList.toggle('empty', !inv[0]);
       el.itemBox.classList.toggle('empty', !inv[0]);
     }
   }
   function secs(ms) { return Math.ceil(ms / 1000); }
   function drawChips() {
-    var me = S.me, fz = S.freeze.me, key = me.b2b + '|' + me.combo + '|' + secs(Math.max(0, me.shield)) + '|' + secs(Math.max(0, me.boost)) + '|' + secs(fz);
+    var me = S.me, fz = S.freeze.me, key = me.b2b + '|' + me.combo + '|' + secs(Math.max(0, me.shield)) + '|' + secs(Math.max(0, me.boost)) + '|' + secs(fz) + L.lang;
     if (key === chipKey) return;
     chipKey = key;
     var h = '';
-    if (fz > 0) h += '<span class="chip ice">結冰 ' + secs(fz) + '</span>';
-    if (me.shield > 0) h += '<span class="chip blue">防水布 ' + secs(me.shield) + '</span>';
-    if (me.boost > 0) h += '<span class="chip gold">兩倍 ' + secs(me.boost) + '</span>';
-    if (me.b2b >= 1) h += '<span class="chip gold">連續重擊 ×' + me.b2b + '</span>';
-    if (me.combo >= 1) h += '<span class="chip">' + me.combo + ' 連擊</span>';
+    if (fz > 0) h += '<span class="chip ice">' + t('chip.ice', secs(fz)) + '</span>';
+    if (me.shield > 0) h += '<span class="chip blue">' + t('chip.tarp', secs(me.shield)) + '</span>';
+    if (me.boost > 0) h += '<span class="chip gold">' + t('chip.x2', secs(me.boost)) + '</span>';
+    if (me.b2b >= 1) h += '<span class="chip gold">' + t('chip.b2b', me.b2b) + '</span>';
+    if (me.combo >= 1) h += '<span class="chip">' + t('chip.combo', me.combo) + '</span>';
     el.chips.innerHTML = h;
   }
   function updateHud() {
-    var me = S.me, st = me.stats;
+    var me = S.me, st = me.stats, K = kindOf();
     if (S.kind === 'battle') {
       txt('koMe', String(S.ko.me)); txt('koOpp', String(S.ko.opp));
       txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent));
+      txt('ptsMe', t('pts', L.num(st.score)));
       var c = $('clock');
       txt('clock', fmtClock(S.left));
       if (c) { var late = S.left <= 10000; if (c._late !== late) { c._late = late; c.className = late ? 'late' : ''; } }
     } else if (S.kind === 'sprint') {
       txt('linesLeft', String(Math.max(0, S.goal - st.lines)));
       txt('clock', fmtTime(S.time));
+      txt('ptsMe', t('pts', L.num(st.score)));
     } else if (S.kind === 'practice') {
       txt('pAtk', String(st.attack)); txt('pSpin', String(st.spins + st.minis + st.xspins));
       txt('pPps', S.time > 800 ? (st.pieces / (S.time / 1000)).toFixed(2) : '0.00');
+      txt('ptsMe', t('pts', L.num(st.score)));
+    } else if (K && K.update) {
+      K.update();
     }
   }
 
@@ -1006,7 +1290,7 @@
     V.hero.vis.ox = V.hero.vis.oy = V.hero.vis.ang = 0;
   }
   function heroLayout() {
-    var w = el.menu.clientWidth || 360, cell = clamp(Math.floor(Math.min(w, 560) * 0.4 / COLS), 10, 18);
+    var w = el.menu.clientWidth || 360, cell = clamp(Math.floor(Math.min(w, 560) * 0.34 / COLS), 9, 16);
     V.hero.resize(cell);
     if (!hero.g) heroLoad();
   }
@@ -1043,34 +1327,43 @@
     S.shown = n;
     if (n > 0) { banner(String(n), 'num'); sfx.play('count'); }
     else {
-      banner('開始', '', 520);
+      banner(t('b.go'), '', 520);
       sfx.play('go');
       S.state = 'play';
       S.me.start();
-      if (S.opp) S.opp.start();
+      if (S.opp && !S.remote) S.opp.start();
     }
   }
   function playTick(dt) {
-    var fz = S.freeze;
+    var fz = S.freeze, K = kindOf();
     if (S.kind === 'battle') {
       S.left -= dt;
-      if (S.left <= 0) { S.left = 0; endBattle(); return; }
+      if (S.left <= 0) { S.left = 0; endBattle(''); return; }
+      if (S.rec) S.rec.tick(dt);
       var sides = ['me', 'opp'];
       for (var i = 0; i < 2; i++) {
         var k = sides[i];
         if (S.down[k] > 0) {
           S.down[k] -= dt;
-          if (S.down[k] <= 0) { S.down[k] = 0; V[k].koT = 0; S[k].revive(); }
+          if (S.down[k] <= 0) {
+            S.down[k] = 0; V[k].koT = 0;
+            if (!(k === 'opp' && S.remote)) {
+              S[k].revive();
+              if (k === 'opp' && S.bot && S.bot.onRevive) S.bot.onRevive();
+            }
+          }
         }
         if (fz[k] > 0) fz[k] = Math.max(0, fz[k] - dt);
       }
-      if (fz.opp <= 0) {
+      if (S.remote) ZZ.Net.tick(dt);
+      else if (fz.opp <= 0) {
         if (!S.opp.over) S.bot.update(dt);
         S.opp.update(dt);
-        if (S.o.items) botItems(dt);
+        if (S.o.items && S.mode !== 'ghost') botItems(dt);
       }
     } else {
       S.time += dt;
+      if (K && K.tick) K.tick(dt);
     }
     if (fz.me > 0) return;
     input.update(dt);
@@ -1085,9 +1378,9 @@
     if (S.state === 'count') countTick(dt);
     else if (S.state === 'play') playTick(dt);
     else if (S.state === 'demo') {
-      if (stepDemo(S.demo, S.me, S.steps, dt, 560, stripText)) {
+      if (stepDemo(S.demo, S.me, S.steps, dt, 560, S.say || stripText)) {
         S.state = 'wait'; S.wait = 1500;
-        S.after = function () { loadDrill(S.drill); toast('換你試試看。'); };
+        S.after = S.demoDone || function () { loadDrill(S.drill); toast(t('yourTurn')); };
       }
     } else if (S.state === 'wait') {
       S.wait -= dt;
@@ -1111,20 +1404,38 @@
     updateHud();
   }
 
+  // ---------- looks ----------
+  // Puts the equipped tile style, wall, effect and colour theme on screen. Called at start and whenever the shop changes something.
+  function applyLook() {
+    var e = Meta.data.equip, root = document.documentElement;
+    if (e.theme && e.theme !== 'auto') root.setAttribute('data-skin', e.theme); else root.removeAttribute('data-skin');
+    View.readTheme();
+    View.terrazzo();
+    View.setLook({ tile: e.tile, bg: e.bg, fx: e.fx, dim: Meta.data.custom.dim });
+    lookKey = e.tile + e.bg + e.theme + Date.now();
+    sideKey = '';
+    if (V.me) V.me.bg = V.opp.bg = V.hero.bg = null;
+  }
+
   // ---------- boot ----------
   function start(data) {
     ['app', 'menu', 'play', 'hud', 'hudL', 'hudC', 'hudR', 'strip', 'stage', 'colL', 'colR', 'holdBox', 'holdCv', 'itemBox', 'itemCv', 'oppMini', 'oppName', 'oppCv',
-      'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'itemKey', 'halfKey', 'toast', 'rotate',
+      'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'itemKey', 'halfKey', 'toast', 'mtoast', 'rotate',
       'sheet', 'sheetCard', 'demoCv'].forEach(function (id) { el[id] = $(id); });
     loadStore();
+    rebuildKeys();
+    Meta.load();
+    L.set(set.lang || '');
     View.readTheme();
-    View.terrazzo();
     V.me = new View.BoardView(el.wellCv, { meter: true });
     V.opp = new View.BoardView(el.oppCv, { plain: true, sky: 0 });
     V.hero = new View.BoardView(el.demoCv, { rows: 8, sky: 0 });
+    applyLook();
     bindInput();
     bindSheets();
     applySettings();
+    applyLang();
+    Meta.onChange = function () { if (screen === 'menu') updateMenu(); };
     show('menu');
     var retheme = function () {
       View.readTheme();
@@ -1138,21 +1449,35 @@
     if (window.MutationObserver) new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     window.addEventListener('resize', function () { if (screen === 'play') layout(); else heroLayout(); });
     document.addEventListener('pointerdown', function () { sfx.wake(); }, { passive: true });
-    // Item tiles are drawn with the page font; redraw them once the web font has arrived.
+    // Item marks and labels are drawn with the page fonts; redraw them once the web fonts have arrived.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () { env.font = ''; View.clearItemSprites(); V.me.itiles = null; if (S) layout(); }).catch(function () { /* fallback font stays */ });
     }
+    for (var i = 0; i < App.boot.length; i++) App.boot[i](data);
     if (data && data.dojo && data.screen === 'dojo') begin('dojo', { drill: data.drill || 0 });
     last = performance.now();
     window.requestAnimationFrame(frame);
   }
 
-  ZZ.peek = function () { return { S: S, V: V, set: set, save: save, screen: screen, sheet: sheetName, sfx: sfx, useItem: useItem }; };
+  App.boot = [];
+  App.set = set; App.save = save; App.el = el; App.V = V; App.sfx = sfx; App.env = env; App.input = input;
+  App.S = function () { return S; };
+  App.screen = function () { return screen; };
+  App.sheet = function () { return sheetName; };
+  App.begin = begin; App.openSheet = openSheet; App.closeSheet = closeSheet; App.sheetDo = sheetDo; App.toast = toast; App.banner = banner; App.popRaw = popRaw;
+  App.txt = txt; App.stat = stat; App.esc = esc; App.btn = btn; App.coin = coin; App.itile = itile; App.ul = ul; App.field = field; App.toggle = toggle;
+  App.fmtClock = fmtClock; App.fmtTime = fmtTime; App.saveStore = saveStore; App.applySettings = applySettings; App.applyLook = applyLook; App.applyLang = applyLang;
+  App.toMenu = toMenu; App.layout = layout; App.updateMenu = updateMenu; App.rankName = rankName; App.stepCells = stepCells; App.stepDemo = stepDemo;
+  App.actName = actName; App.clearName = clearName; App.key1 = key1; App.sdfVal = sdfVal; App.foeItem = foeItem; App.endBattle = endBattle; App.setTools = setTools;
+  App.tool = tool; App.buzz = buzz; App.resume = resume; App.openBattle = openBattle; App.rewardHtml = rewardHtml;
+
+  ZZ.peek = function () { return { S: S, V: V, set: set, save: save, screen: screen, sheet: sheetName, sfx: sfx, useItem: useItem, meta: Meta.data, lang: L.lang }; };
 
   var hot = window.claude && window.claude.hot;
   if (hot && hot.snapshot) {
     try { hot.snapshot(function () { return { screen: S ? S.kind : 'menu', dojo: !!(S && S.kind === 'dojo'), drill: S && S.kind === 'dojo' ? S.drill : 0 }; }); } catch (e) { /* viewer feature only */ }
   }
   function boot(data) { try { start(data || {}); } catch (e) { if (window.console) console.error(e); } }
-  if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {});
+  // Feature files load after this one; start once they have all registered.
+  ZZ.start = function () { if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {}); };
 })();

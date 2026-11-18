@@ -6,16 +6,16 @@
   var COLS = 10, ROWS = 40, VIS = 20, TOP = ROWS - VIS;
   var TYPES = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
   var TID = { I: 1, O: 2, T: 3, S: 4, Z: 5, J: 6, L: 7 };
-  var GARBAGE = 8;
-  // A cell holds its glaze in the low four bits and, for an item tile, the item id above them.
+  var GARBAGE = 8;   // a cell holds its glaze in the low four bits and, for an item tile, the item id above them
+  // Items. Names and descriptions live in the language file (keys i1..i7); the tile shows a wordless mark.
   var ITEMS = [null,
-    { id: 1, ch: '拆', name: '拆牆', tip: '敲掉自己最下面 3 排', color: '#D9432F' },
-    { id: 2, ch: '泥', name: '灌漿', tip: '直接灌給對手 3 排水泥', color: '#59636F' },
-    { id: 3, ch: '盾', name: '防水布', tip: '8 秒內擋掉所有水泥', color: '#2F7FD9' },
-    { id: 4, ch: '金', name: '金磚', tip: '接下來 2 塊都是 T', color: '#A8700A' },
-    { id: 5, ch: '平', name: '抹平', tip: '牆裡的洞全部補平', color: '#168A63' },
-    { id: 6, ch: '冰', name: '結冰', tip: '對手 3 秒動不了', color: '#1C8DBF' },
-    { id: 7, ch: '倍', name: '加倍', tip: '8 秒內送出的行數變兩倍', color: '#7C4BD0' }
+    { id: 1, color: '#D9432F' },   // knock down: removes your bottom 3 rows
+    { id: 2, color: '#59636F' },   // grout: 3 cement rows to the rival
+    { id: 3, color: '#2F7FD9' },   // tarp: blocks cement for 8 s
+    { id: 4, color: '#A8700A' },   // gold tiles: the next 2 pieces are T
+    { id: 5, color: '#168A63' },   // level: fills the holes in your wall
+    { id: 6, color: '#1C8DBF' },   // freeze: the rival cannot move for 3 s
+    { id: 7, color: '#7C4BD0' }    // double: lines sent count twice for 8 s
   ];
 
   // Spawn-state cells inside an n*n box; the other three states come from rotating the box clockwise.
@@ -280,7 +280,7 @@
     c.x += dx;
     this.lastMove = 'move';
     this.manip();
-    this.emit('move', { dx: dx });
+    this.emit('move', { dx: dx, x: c.x, y: c.y, rot: c.rot });
     return true;
   };
 
@@ -298,7 +298,7 @@
         this.lastKick = dir === 2 ? -1 : i;
         this.newLow();
         this.manip();
-        this.emit('rotate', { dir: dir, kick: i, dx: dx, dy: dy, spin: this.spinState() });
+        this.emit('rotate', { dir: dir, kick: i, dx: dx, dy: dy, spin: this.spinState(), x: c.x, y: c.y, rot: c.rot });
         return true;
       }
     }
@@ -331,7 +331,7 @@
   Game.prototype.sonicDrop = function () {
     var n = 0;
     while (this.stepDown()) n++;
-    if (n) { this.stats.score += n; this.emit('fall', { n: n, soft: true }); }
+    if (n) { this.stats.score += n; this.emit('fall', { n: n, soft: true, x: this.cur.x, y: this.cur.y, rot: this.cur.rot }); }
     return n;
   };
 
@@ -373,7 +373,7 @@
         this.lastMove = 'fall';
         this.newLow();
         if (this.soft) this.stats.score += n;
-        this.emit('fall', { n: n, soft: this.soft });
+        this.emit('fall', { n: n, soft: this.soft, x: c.x, y: c.y, rot: c.rot });
       }
     }
     if (this.grounded()) {
@@ -587,7 +587,7 @@
       this.grid.unshift(emptyRow());
     }
     this.refit();
-    this.emit('chisel', { rows: gone });
+    this.emit('chisel', { rows: gone, n: n });
     return gone.length;
   };
 

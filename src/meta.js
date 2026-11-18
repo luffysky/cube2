@@ -99,18 +99,18 @@
 
   // ---------- daily jobs ----------
   var JOBS = [
-    { id: 'win', text: '贏 2 場對戰', need: 2, coin: 60, on: function (m) { return m.battle && m.result > 0 ? 1 : 0; } },
-    { id: 'play', text: '打完 3 場對戰', need: 3, coin: 40, on: function (m) { return m.battle ? 1 : 0; } },
-    { id: 'tspin', text: '做出 5 次 T 轉', need: 5, coin: 60, on: function (m) { return m.stats.spins + m.stats.minis; } },
-    { id: 'send', text: '送出 40 行', need: 40, coin: 50, on: function (m) { return m.battle ? m.stats.sent : 0; } },
-    { id: 'quad', text: '四消 3 次', need: 3, coin: 40, on: function (m) { return m.stats.quads; } },
-    { id: 'ko', text: '擊倒對手 4 次', need: 4, coin: 50, on: function (m) { return m.battle ? m.ko : 0; } },
-    { id: 'rank', text: '打 2 場排位賽', need: 2, coin: 60, on: function (m) { return m.mode === 'rank' ? 1 : 0; } },
-    { id: 'combo', text: '打出 5 連擊', need: 1, coin: 40, on: function (m) { return m.stats.maxCombo >= 5 ? 1 : 0; } },
-    { id: 'xspin', text: '用 T 以外的方塊轉進去 2 次', need: 2, coin: 50, on: function (m) { return m.stats.xspins; } },
-    { id: 'sprint', text: '跑完一次 40 行競速', need: 1, coin: 40, on: function (m) { return m.mode === 'sprint' && m.result > 0 ? 1 : 0; } },
-    { id: 'score', text: '單場拿到 20000 分', need: 1, coin: 60, on: function (m) { return m.stats.score >= 20000 ? 1 : 0; } },
-    { id: 'item', text: '用掉 3 個道具', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } }
+    { id: 'win', need: 2, coin: 60, on: function (m) { return m.battle && m.result > 0 ? 1 : 0; } },
+    { id: 'play', need: 3, coin: 40, on: function (m) { return m.battle ? 1 : 0; } },
+    { id: 'tspin', need: 5, coin: 60, on: function (m) { return m.stats.spins + m.stats.minis; } },
+    { id: 'send', need: 40, coin: 50, on: function (m) { return m.battle ? m.stats.sent : 0; } },
+    { id: 'quad', need: 3, coin: 40, on: function (m) { return m.stats.quads; } },
+    { id: 'ko', need: 4, coin: 50, on: function (m) { return m.battle ? m.ko : 0; } },
+    { id: 'rank', need: 2, coin: 60, on: function (m) { return m.mode === 'rank' ? 1 : 0; } },
+    { id: 'combo', need: 1, coin: 40, on: function (m) { return m.stats.maxCombo >= 5 ? 1 : 0; } },
+    { id: 'xspin', need: 2, coin: 50, on: function (m) { return m.stats.xspins; } },
+    { id: 'sprint', need: 1, coin: 40, on: function (m) { return m.mode === 'sprint' && m.result > 0 ? 1 : 0; } },
+    { id: 'score', need: 1, coin: 60, on: function (m) { return m.stats.score >= 20000 ? 1 : 0; } },
+    { id: 'item', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } }
   ];
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
@@ -177,7 +177,7 @@
     if (d.season && d.rgames > 0) {
       var r = rankOf(d.peak), coins = 60 + r.tier * 90;
       d.coins += coins;
-      d.note = { kind: 'season', coins: coins, name: r.name };
+      d.note = { kind: 'season', coins: coins, tier: r.tier, div: r.div, top: r.top };
       d.rp = Math.round(d.rp * 0.7 / 10) * 10;
     }
     d.season = s; d.peak = d.rp; d.rgames = 0;
@@ -204,8 +204,8 @@
   Meta.jobs = function () {
     Meta.rollDay();
     return Meta.data.daily.jobs.map(function (j, i) {
-      var def = job(j.id) || { text: '', need: 1, coin: 0 };
-      return { i: i, id: j.id, text: def.text, need: def.need, coin: def.coin, n: Math.min(j.n, def.need), done: j.n >= def.need, paid: j.paid };
+      var def = job(j.id) || { need: 1, coin: 0 };
+      return { i: i, id: j.id, need: def.need, coin: def.coin, n: Math.min(j.n, def.need), done: j.n >= def.need, paid: j.paid };
     });
   };
   Meta.jobsReady = function () { return Meta.jobs().filter(function (j) { return j.done && !j.paid; }).length; };
@@ -243,9 +243,9 @@
   Meta.canUse = function (kind, id) { return Meta.state(kind, id) === 'ok'; };
   Meta.buy = function (kind, id) {
     var it = find(kind, id);
-    if (!it || it.sub || it.rank != null || !it.price) return { ok: false, why: '這個不能用金幣買。' };
-    if (Meta.owns(kind, id)) return { ok: false, why: '已經有了。' };
-    if (!Meta.spend(it.price)) return { ok: false, why: '金幣不夠，還差 ' + (it.price - Meta.data.coins) + '。' };
+    if (!it || it.sub || it.rank != null || !it.price) return { ok: false, why: 'no' };
+    if (Meta.owns(kind, id)) return { ok: false, why: 'have' };
+    if (!Meta.spend(it.price)) return { ok: false, why: 'poor', n: it.price - Meta.data.coins };
     Meta.data.owned[kind].push(id);
     Meta.save();
     return { ok: true };
@@ -263,8 +263,8 @@
   };
   Meta.buySet = function (id) {
     var st = find('set', id), p = Meta.setPrice(id);
-    if (!st || !p.miss) return { ok: false, why: '這套你都有了。' };
-    if (!Meta.spend(p.price)) return { ok: false, why: '金幣不夠，還差 ' + (p.price - Meta.data.coins) + '。' };
+    if (!st || !p.miss) return { ok: false, why: 'setHave' };
+    if (!Meta.spend(p.price)) return { ok: false, why: 'poor', n: p.price - Meta.data.coins };
     KINDS.forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
     Meta.save();
     return { ok: true };
@@ -296,9 +296,9 @@
   // ---------- items carried into a match ----------
   Meta.buyItem = function (id) {
     var p = ITEM_PRICE[id];
-    if (!p) return { ok: false, why: '沒有這個道具。' };
-    if (Meta.data.items[id] >= 99) return { ok: false, why: '最多放 99 個。' };
-    if (!Meta.spend(p)) return { ok: false, why: '金幣不夠，還差 ' + (p - Meta.data.coins) + '。' };
+    if (!p) return { ok: false, why: 'no' };
+    if (Meta.data.items[id] >= 99) return { ok: false, why: 'max' };
+    if (!Meta.spend(p)) return { ok: false, why: 'poor', n: p - Meta.data.coins };
     Meta.data.items[id]++;
     Meta.save();
     return { ok: true };
@@ -327,27 +327,27 @@
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
     m.battle = m.mode !== 'sprint';
     var st = m.stats || {}, sc = st.score || 0;
-    function add(label, n) { n = Math.round(n); if (n > 0) parts.push({ label: label, n: n }); }
+    function add(key, n) { n = Math.round(n); if (n > 0) parts.push({ key: key, n: n }); }
     if (m.battle) {
-      add('分數', Math.min(80, Math.floor(sc / 400)));
-      if (m.result > 0) add('贏了', m.mode === 'rank' ? 30 : m.mode === 'net' ? 25 : m.mode === 'ghost' ? 20 : WIN_AI[m.level] || 10);
-      else add(m.result === 0 ? '平手' : '打完一場', m.result === 0 ? 10 : 5);
-      add('擊倒', Math.min(5, m.ko || 0) * 4);
-      if (m.result > 0 && d.daily.win !== Meta.dayNo()) { d.daily.win = Meta.dayNo(); add('今天第一勝', 50); }
+      add('score', Math.min(80, Math.floor(sc / 400)));
+      if (m.result > 0) add('win', m.mode === 'rank' ? 30 : m.mode === 'net' ? 25 : m.mode === 'ghost' ? 20 : WIN_AI[m.level] || 10);
+      else add(m.result === 0 ? 'draw' : 'played', m.result === 0 ? 10 : 5);
+      add('ko', Math.min(5, m.ko || 0) * 4);
+      if (m.result > 0 && d.daily.win !== Meta.dayNo()) { d.daily.win = Meta.dayNo(); add('first', 50); }
       d.tot.games++; if (m.result > 0) d.tot.wins++;
       d.tot.tspins += (st.spins || 0) + (st.minis || 0); d.tot.sent += st.sent || 0; d.tot.kos += m.ko || 0;
       if (m.mode === 'net') d.tot.online++;
       if (sc > d.tot.best) { d.tot.best = sc; out.best = true; }
     } else {
       if (m.result > 0) {
-        add('跑完 40 行', 15);
-        add('速度', m.time < 60000 ? 40 : m.time < 90000 ? 20 : m.time < 120000 ? 10 : 0);
-        if (m.newBest) add('新紀錄', 20);
+        add('sprint', 15);
+        add('speed', m.time < 60000 ? 40 : m.time < 90000 ? 20 : m.time < 120000 ? 10 : 0);
+        if (m.newBest) add('best', 20);
       }
     }
     var sum = 0;
     parts.forEach(function (p) { sum += p.n; });
-    if (Meta.isSub() && sum) { var extra = Math.round(sum * (SUB_BOOST - 1)); parts.push({ label: '會員加成', n: extra }); sum += extra; }
+    if (Meta.isSub() && sum) { var extra = Math.round(sum * (SUB_BOOST - 1)); parts.push({ key: 'member', n: extra }); sum += extra; }
     out.coins = sum;
 
     if (m.mode === 'rank') {
@@ -359,7 +359,7 @@
       out.rank = { before: before, after: d.rp, delta: d.rp - before, from: rb, to: ra, up: up, bonus: 0 };
       if (d.rp > d.peak) {
         // first time at a new division this season
-        if (up) { out.rank.bonus = 40 + ra.tier * 20; parts.push({ label: '升上 ' + ra.name, n: out.rank.bonus }); out.coins += out.rank.bonus; }
+        if (up) { out.rank.bonus = 40 + ra.tier * 20; parts.push({ key: 'promo', n: out.rank.bonus, arg: ra }); out.coins += out.rank.bonus; }
         d.peak = d.rp;
       }
     }
@@ -369,7 +369,7 @@
       var def = job(j.id);
       if (!def || j.paid || j.n >= def.need) return;
       j.n += def.on(m) || 0;
-      if (j.n >= def.need) out.jobs.push(def.text);
+      if (j.n >= def.need) out.jobs.push(def.id);
     });
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();

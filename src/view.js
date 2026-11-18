@@ -448,7 +448,43 @@
     petal: { g: 300, vx: 240, vy0: -60, vy: -200, tint: ['#FFC1D6', 0.55] }
   };
 
-  // Item tile: a white glazed tile with one character fired onto it.
+  // Item marks need no words: a short sign or a small drawing, the same in every language.
+  var ITEM_MARK = [null,
+    { txt: '\u22123' }, { txt: '+3' },
+    { d: 'M12 2.5 20 5.5v6c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10v-6z' },
+    { d: 'M3 5h18v6h-6v8H9v-8H3z' },
+    { d: 'M3 17h18v4H3zM10.5 3h3v6h3.5L12 14 7 9h3.5z' },
+    { d: 'M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9', stroke: true },
+    { txt: '\u00D72' }
+  ];
+  var NUMFONT = '"Barlow Semi Condensed", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
+  function itemMark(x, id, cx, cy, size, color) {
+    var m = ITEM_MARK[id];
+    if (!m) return;
+    x.save();
+    if (m.txt) {
+      x.fillStyle = color;
+      x.font = 'italic 800 ' + Math.round(size * 0.74) + 'px ' + NUMFONT;
+      x.textAlign = 'center';
+      x.textBaseline = 'middle';
+      x.fillText(m.txt, cx - size * 0.02, cy + size * 0.05);
+    } else if (typeof Path2D !== 'undefined') {
+      x.translate(cx - size / 2, cy - size / 2);
+      x.scale(size / 24, size / 24);
+      var p = new Path2D(m.d);
+      if (m.stroke) { x.strokeStyle = color; x.lineWidth = 2.6; x.lineCap = 'round'; x.stroke(p); }
+      else { x.fillStyle = color; x.fill(p); }
+    }
+    x.restore();
+  }
+  function itemSvg(id) {
+    var m = ITEM_MARK[id];
+    if (!m) return '';
+    if (m.txt) return '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="16" font-weight="800" font-style="italic" fill="currentColor" style="font-family:var(--num)">' + m.txt + '</text></svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + m.d + '" ' + (m.stroke ? 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"' : 'fill="currentColor"') + '/></svg>';
+  }
+
+  // Item tile: a white glazed tile with its mark fired onto it.
   function makeItemTile(px, id) {
     var c = document.createElement('canvas');
     c.width = c.height = px;
@@ -469,11 +505,7 @@
     x.strokeStyle = it.color;
     rr(x, g + x.lineWidth / 2, g + x.lineWidth / 2, w - x.lineWidth, w - x.lineWidth, r * 0.8);
     x.stroke();
-    x.fillStyle = it.color;
-    x.font = '900 ' + Math.round(px * 0.6) + 'px ' + fontFamily();
-    x.textAlign = 'center';
-    x.textBaseline = 'middle';
-    x.fillText(it.ch, px / 2, px / 2 + px * 0.04);
+    itemMark(x, id, px / 2, px / 2, px * 0.62, it.color);
     return c;
   }
   function fontFamily() { return env.font || (env.font = getComputedStyle(document.body).fontFamily || 'sans-serif'); }
@@ -1127,30 +1159,33 @@
     try { LIB[name](this, a, b); } catch (e) { /* audio is optional */ }
   };
 
-  // A small still of one look for the shop: a few tiles on a patch of wall.
+  // A small still of one look for the shop: a few tiles on a patch of wall. look: { tile, bg, fx } (missing parts use the current look).
   var SAMPLE = ['..3...', '.333.6', '55.166', '.55116'];
-  function preview(cv, kind, id, w, h) {
+  function preview(cv, look, w, h) {
     var x = sizeCanvas(cv, w, h), cell = Math.floor(Math.min(w / 6.3, h / 4.3)), i, j;
-    var tiles = sprites(Math.max(2, Math.round(cell * env.dpr)), kind === 'tile' ? id : LOOK.tile), ox = Math.round((w - cell * 6) / 2), oy = h - cell * 4 - 3;
+    var tiles = sprites(Math.max(2, Math.round(cell * env.dpr)), look.tile || LOOK.tile), ox = Math.round((w - cell * 6) / 2), oy = h - cell * 4 - 3;
     x.fillStyle = theme.wall;
     x.fillRect(0, 0, w, h);
-    x.save();
-    x.translate(ox - cell * 2, 0);
-    paintWall(x, kind === 'bg' ? id : (kind === 'tile' || kind === 'fx' ? LOOK.bg : 'wall'), { bx: 0, by: oy - cell * 16, W: cell * COLS, H: cell * 20, cell: cell, rows: 20, plain: false });
-    x.restore();
+    // the wall is painted in ten-column patches until the picture is covered
+    for (var px = ox - Math.ceil(ox / (cell * COLS)) * cell * COLS; px < w; px += cell * COLS) {
+      x.save();
+      x.translate(px, 0);
+      paintWall(x, look.bg || LOOK.bg, { bx: 0, by: oy - cell * 16, W: cell * COLS, H: cell * 20, cell: cell, rows: 20, plain: false });
+      x.restore();
+    }
     for (j = 0; j < 4; j++) for (i = 0; i < 6; i++) {
       var v = +SAMPLE[j].charAt(i);
       if (v) x.drawImage(tiles[v], ox + i * cell, oy + j * cell, cell, cell);
     }
-    if (kind === 'fx') {
-      var rnd = new ZZ.RNG(9), P = PART[id] || PART.shard, cols = [TILE[3], TILE[5], TILE[6], TILE[1], TILE[4]];
-      for (i = 0; i < 14; i++) {
+    if (look.fx) {
+      var rnd = new ZZ.RNG(9), P = PART[look.fx] || PART.shard, cols = [TILE[3], TILE[5], TILE[6], TILE[1], TILE[4]];
+      for (i = 0; i < 12; i++) {
         var c = cols[i % cols.length];
         if (P.tint) c = mix(c, P.tint[0], P.tint[1]);
         x.save();
-        x.translate(w * (0.08 + rnd.next() * 0.84), h * (0.08 + rnd.next() * 0.6));
-        x.rotate(id === 'bubble' ? 0 : rnd.next() * 6);
-        drawPart(x, id, cell * (0.3 + rnd.next() * 0.3), c);
+        x.translate(w * (0.08 + rnd.next() * 0.84), h * (0.08 + rnd.next() * 0.5));
+        x.rotate(look.fx === 'bubble' ? 0 : rnd.next() * 6);
+        drawPart(x, look.fx, cell * (0.3 + rnd.next() * 0.3), c);
         x.restore();
       }
     }
@@ -1159,6 +1194,6 @@
   ZZ.View = {
     env: env, TILE: TILE, theme: theme, readTheme: readTheme, terrazzo: terrazzo, sprites: sprites, sizeCanvas: sizeCanvas,
     drawPiece: drawPiece, drawItem: drawItem, clearItemSprites: clearItemSprites, BoardView: BoardView, Sound: Sound, mix: mix, rgba: rgba,
-    LOOK: LOOK, setLook: setLook, preview: preview
+    LOOK: LOOK, setLook: setLook, preview: preview, itemSvg: itemSvg
   };
 })();
