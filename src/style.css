@@ -352,3 +352,7 @@ html[lang="ko"] { --display: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Goth
 #sheetCard > * { flex-shrink: 0; }
 .field.line { grid-template-columns: auto minmax(0, 1fr); }
 .field.line select, .field.line input[type="text"] { justify-self: end; width: 100%; max-width: 16em; }
+
+/* 捲軸藏起來。內容照樣可以用滾輪、觸控和鍵盤捲動。 */
+html, body, #menu, #sheetCard { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #sheetCard::-webkit-scrollbar { display: none; width: 0; height: 0; }
