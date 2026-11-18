@@ -68,6 +68,7 @@
     'net.shareText': ['來轉磚跟我打一場，房間代碼 {0}', 'Play me at Zhuan Zhuan. Room code {0}', 'Zhuan Zhuan で対戦しよう。部屋コード {0}', 'Zhuan Zhuan에서 한 판 하자. 방 코드 {0}'],
     'net.waitFriend': ['等朋友進來…', 'Waiting for your friend…', '友だちを待っています…', '친구를 기다리는 중…'],
     'net.joining': ['正在連線…', 'Connecting…', '接続中…', '연결 중…'],
+    'net.seated': ['進房了，等房主那邊回應…房主要把遊戲留在畫面上才收得到。', 'You are in the room. Waiting for the host to answer… The host has to keep the game on screen.', '部屋に入りました。ホストの応答を待っています…ホストはゲームを画面に表示しておく必要があります。', '방에 들어왔습니다. 방장의 응답을 기다리는 중… 방장이 게임을 화면에 띄워 두어야 합니다.'],
     'net.connected': ['已連上：{0}', 'Connected: {0}', '接続完了：{0}', '연결됨: {0}'],
     'net.waitHost': ['規則由房主決定。等房主按開始…', 'The host sets the rules. Waiting for the host to start…', 'ルールはホストが決めます。開始を待っています…', '규칙은 방장이 정합니다. 시작을 기다리는 중…'],
     'net.start': ['開始', 'Start', '開始', '시작'],
@@ -76,9 +77,13 @@
     'net.rules': ['{0}　{1}', '{0} · {1}', '{0}　{1}', '{0} · {1}'],
     'net.itemsOn': ['有道具', 'items on', 'アイテムあり', '아이템 있음'],
     'net.itemsOff': ['沒有道具', 'no items', 'アイテムなし', '아이템 없음'],
-    'net.e.lib': ['連線元件載不進來。如果這頁是在 Claude 的預覽裡開的，連線對戰請改用 GitHub 上的版本。', 'The networking component failed to load. Inside the Claude preview, online play is not available; use the GitHub version instead.', '通信コンポーネントを読み込めません。Claudeのプレビュー内ではオンライン対戦は使えません。GitHub版をご利用ください。', '통신 구성 요소를 불러오지 못했습니다. Claude 미리보기에서는 온라인 대전을 쓸 수 없습니다. GitHub 버전을 이용하세요.'],
-    'net.e.server': ['連不上配對伺服器。如果這頁是在 Claude 的預覽裡開的，連線會被擋住，請改用 GitHub 上的版本。', 'Cannot reach the matchmaking server. Inside the Claude preview the connection is blocked; use the GitHub version instead.', 'マッチングサーバーに接続できません。Claudeのプレビュー内では接続がブロックされます。GitHub版をご利用ください。', '매칭 서버에 연결할 수 없습니다. Claude 미리보기에서는 연결이 차단됩니다. GitHub 버전을 이용하세요.'],
+    'net.e.lib': ['連線元件載不進來。如果這頁是在預覽裡開的，連線對戰請到正式站玩。', 'The networking component failed to load. Online play does not work inside a preview; use the live site.', '通信コンポーネントを読み込めません。プレビュー内ではオンライン対戦は使えません。公開サイトをご利用ください。', '통신 구성 요소를 불러오지 못했습니다. 미리보기에서는 온라인 대전을 쓸 수 없습니다. 정식 사이트를 이용하세요.'],
+    'net.e.server': ['連不上配對伺服器。確認網路之後再試一次。', 'Cannot reach the matchmaking server. Check your connection and try again.', 'マッチングサーバーに接続できません。通信環境を確認してもう一度お試しください。', '매칭 서버에 연결할 수 없습니다. 네트워크를 확인하고 다시 시도하세요.'],
+    'net.e.slow': ['試太多次了，等幾分鐘再試。', 'Too many tries. Wait a few minutes and try again.', '試行回数が多すぎます。数分待ってからお試しください。', '시도 횟수가 너무 많습니다. 몇 분 후 다시 시도하세요.'],
+    'net.noteRelay': ['對戰資料經由本站的伺服器轉送，行動網路和 Wi-Fi 都連得上。', "Match data is relayed through this site's server, so it works on mobile data and Wi-Fi alike.", '対戦データはこのサイトのサーバーを経由するので、モバイル回線でもWi-Fiでもつながります。', '대전 데이터는 이 사이트의 서버를 거쳐 전달되므로 모바일 데이터와 Wi-Fi 모두에서 연결됩니다.'],
+    'net.keepOpen': ['等朋友的時候，請把遊戲留在畫面上；切到別的 App 太久，房間會斷。', 'Keep the game on screen while you wait. If you stay in another app too long, the room drops.', '待っている間はゲームを画面に表示したままにしてください。別のアプリに長くいると部屋が切れます。', '기다리는 동안 게임을 화면에 띄워 두세요. 다른 앱에 오래 있으면 방이 끊깁니다.'],
     'net.e.room': ['找不到這個房間。確認代碼，或請朋友重開。', 'Room not found. Check the code or ask your friend to reopen it.', '部屋が見つかりません。コードを確認するか、作り直してもらってください。', '방을 찾을 수 없습니다. 코드를 확인하거나 다시 만들어 달라고 하세요.'],
+    'net.e.host': ['房主一直沒有回應。請他回到遊戲重開一個房間，再把新的代碼傳給你。', 'The host did not answer. Ask them to go back to the game, open a new room and send you the new code.', 'ホストから応答がありません。ゲームに戻って部屋を作り直し、新しいコードを送ってもらってください。', '방장이 응답하지 않습니다. 게임으로 돌아가 방을 새로 만들고 새 코드를 보내 달라고 하세요.'],
     'net.e.full': ['房間已經有人了。', 'That room is already full.', 'その部屋は満員です。', '방이 이미 찼습니다.'],
     'net.e.lost': ['連線斷了。', 'The connection was lost.', '接続が切れました。', '연결이 끊겼습니다.'],
     'net.foeLeft': ['對手離線，這場算你贏。', 'Your rival left. The match is yours.', '相手が切断しました。あなたの勝ちです。', '상대가 나갔습니다. 당신의 승리입니다.'],
@@ -107,7 +112,7 @@
       '<div class="bar"><i style="width:' + pct + '%"></i></div></div><div class="ladder">';
     for (i = 0; i < 7; i++) h += '<span' + (i === r.tier ? ' class="on"' : i < r.tier ? ' class="past"' : '') + '>' + t('tier' + i) + '</span>';
     h += '</div><p>' + t('rk.season', Meta.seasonId()) + '　' + t('rk.record', d.rgames) + '</p>' + App.ul(['rk.r1', 'rk.r2', 'rk.r3', 'rk.r4']) +
-      '<p class="note">' + esc(t('rk.next', foeName(f), t('pps', f.cfg.pps))) + '</p><div class="row">' + btn('close', 'cancel') + btn('rankGo', 'rk.start', true) + '</div>';
+      '<p class="note">' + esc(t('rk.next', foeName(f), t('pps', f.cfg.pps))) + '</p><div class="row">' + btn('close', 'cancel') + (ZZ.Cloud && ZZ.Cloud.on ? btn('board', 'lb.open') : '') + btn('rankGo', 'rk.start', true) + '</div>';
     return h;
   };
   function startRank() {
@@ -238,7 +243,7 @@
       say('');
     },
     win: function () {
-      var S = App.S(), got = Meta.firstClear('openers', S.les.id, S.les.coin);
+      var S = App.S(), got = Meta.firstClear('openers', S.les.id);
       App.sfx.play('win');
       App.buzz([20, 40, 60]);
       App.banner(t('b.pass'), 'good', 1400);
@@ -282,11 +287,12 @@
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
-    else if (st === 'joining') h += '<p>' + t('net.joining') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
+    else if (st === 'joining') h += '<p>' + t(Net.seated ? 'net.seated' : 'net.joining') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
-        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('net.keepOpen') + '</p>' : '') +
+        '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.host) {
@@ -298,9 +304,10 @@
       }
     } else {
       if (st === 'error') h += '<p class="warn">' + t('net.e.' + Net.err) + '</p>';
-      h += '<div class="row">' + btn('netOpen', 'net.open', true) + '</div><h3>' + t('net.or') + '</h3>' +
+      // arriving through a friend's invite link, joining is the main thing to do
+      h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
-        btn('netJoin', 'net.join') + '</div><p class="note">' + t('net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+        btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
     }
     return h;
   };

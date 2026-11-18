@@ -123,7 +123,7 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
     await page.click('[data-go="sprint"]'); await sleep(2300);
     await ev(page, "S.me.setBoard(['XXXXXXXXX.','XXXXXXXXX.','XXXXXXXXX.','XXXXXXXXX.']); S.me.stats.lines = 36; S.me.cur = {type:'I', rot:1, x:7, y:21};");
     await page.keyboard.press('Space'); await sleep(250);
-    ok(await ev(page, 'return p.sheet') === 'sprintEnd' && await ev(page, 'return p.save.best') > 0, 'sprint finishes at 40 lines');
+    ok(await ev(page, 'return p.sheet') === 'sprintEnd' && await ev(page, 'return p.meta.tot.sprint') > 0, 'sprint finishes at 40 lines');
     await page.screenshot({ path: path.join(OUT, 'k4-sprint-end.png') });
     await page.click('[data-do="menu"]');
     ok(await page.evaluate(() => document.getElementById('mSprint').textContent.length > 0), 'menu shows the best sprint time');

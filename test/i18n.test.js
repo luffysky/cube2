@@ -8,7 +8,7 @@ const ZZ = require('../src/engine.js');
 require('../src/hans-map.js'); require('../src/i18n.js'); require('../src/bot.js'); require('../src/drills.js'); require('../src/openers.js'); require('../src/meta.js');
 const L = ZZ.L;
 // pull the dictionaries out of the browser-only files without running their UI code
-for (const f of ['modes.js', 'shop.js']) {
+for (const f of ['modes.js', 'shop.js', 'cloud.js']) {
   const s = src(f), a = s.indexOf('L.add({'), b = s.indexOf('});', a);
   new Function('L', s.slice(a, b + 3))(L);
 }
@@ -17,7 +17,7 @@ function ok(c, name) { if (c) pass++; else { fail++; console.log('FAIL', name); 
 const dict = {};
 const origAdd = L.add;
 // re-read all dictionaries to inspect raw entries
-for (const f of ['i18n.js', 'modes.js', 'shop.js']) {
+for (const f of ['i18n.js', 'modes.js', 'shop.js', 'cloud.js']) {
   const s = src(f), a = s.indexOf('L.add({'), b = s.indexOf('});', a);
   new Function('L', s.slice(a, b + 3))({ add: o => Object.assign(dict, o) });
 }
@@ -33,7 +33,7 @@ for (const k of keys) {
 }
 // keys used in code
 const used = new Set();
-for (const f of ['ui.js', 'modes.js', 'shop.js', 'net.js']) {
+for (const f of ['ui.js', 'modes.js', 'shop.js', 'net.js', 'cloud.js']) {
   const s = src(f);
   for (const m of s.matchAll(/\bt\('([A-Za-z0-9_.\-]+)'(?!\s*\+)/g)) used.add(m[1]);   // a quote followed by + is a prefix, checked below
   for (const m of s.matchAll(/btn\('[A-Za-z]+', '([A-Za-z0-9_.\-]+)'/g)) used.add(m[1]);
@@ -57,7 +57,10 @@ for (const kind of ['tile', 'bg', 'theme', 'fx', 'set']) for (const it of ZZ.Met
 for (const k of ['set', 'tile', 'bg', 'theme', 'fx', 'items', 'member']) built.push('k.' + k);
 for (const w of ['score', 'win', 'draw', 'played', 'ko', 'first', 'member', 'promo', 'sprint', 'speed', 'best']) built.push('w.' + w);
 for (const e of ['poor', 'have', 'no', 'max', 'setHave']) built.push('e.' + e);
-for (const e of ['lib', 'server', 'room', 'full', 'lost']) built.push('net.e.' + e);
+for (const e of ['lib', 'server', 'room', 'full', 'lost', 'slow']) built.push('net.e.' + e);
+for (const s of ['none', 'new', 'ok', 'busy', 'wait', 'gone']) built.push('cl.' + s);
+for (const b of ['rp', 'score', 'sprint']) built.push('lb.' + b, 'lb.none.' + b);
+for (const s of ['season', 'all']) built.push('lb.' + s);
 for (const k of built) ok(L.has(k), 'run-time key not defined: ' + k);
 // Simplified Chinese comes out converted
 L.set('zh-Hans');

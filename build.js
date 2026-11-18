@@ -3,7 +3,7 @@ const fs = require('fs'), path = require('path');
 const src = f => fs.readFileSync(path.join(__dirname, 'src', f), 'utf8');
 let html = src('index.template.html');
 const parts = { CSS: 'style.css', ENGINE: 'engine.js', HANS: 'hans-map.js', I18N: 'i18n.js', BOT: 'bot.js', DRILLS: 'drills.js', OPENERS: 'openers.js', META: 'meta.js',
-  SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', SHOP: 'shop.js' };
+  SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', SHOP: 'shop.js', CLOUD: 'cloud.js' };
 for (const [k, f] of Object.entries(parts)) {
   const body = src(f);
   if (body.includes('</script')) throw new Error(f + ' contains a closing script tag');

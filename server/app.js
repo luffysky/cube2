@@ -1,0 +1,154 @@
+'use strict';
+/* The HTTP side: three small endpoints, written against plain Node request and response objects so the same code
+   runs as Vercel Functions, behind the local dev server and inside the tests.
+
+     GET  /api/health                     is the API here, and is a database linked
+     POST /api/rpc    { a: action, … }    hello · sync · code · redeem · delete
+     GET  /api/board?b=rp|score|sprint    a leaderboard (&s=all for all-time, &me=<tag> for one player's place)
+     POST /api/room   { a: action, … }    open · join · x (exchange messages) · close: rooms for online matches
+
+   Only the page served from the same address may call it: no CORS headers are sent, and a request that names a
+   different origin is turned away. A player is known by the bearer token the page keeps, never by a cookie. */
+
+const crypto = require('crypto');
+const db = require('./db.js');
+const core = require('./core.js');
+const rules = require('./rules.js');
+
+const MAX_BODY = 24 * 1024;
+let clock = () => Date.now();
+function setClock(fn) { clock = fn || (() => Date.now()); }
+
+function send(res, status, body, extra) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  if (extra) for (const k in extra) res.setHeader(k, extra[k]);
+  res.end(JSON.stringify(body));
+}
+function header(req, name) { const v = req.headers && req.headers[name]; return Array.isArray(v) ? v[0] : v; }
+// A browser names the page a request came from. If it does, that page has to be this site.
+function foreign(req) {
+  const origin = header(req, 'origin');
+  if (!origin) return false;
+  try { return new URL(origin).host !== header(req, 'host'); } catch (e) { return true; }
+}
+// Addresses are only ever used to slow down abuse, and only as a keyed hash that cannot be turned back into one.
+let ipKey = null;
+function ipTag(req) {
+  if (!ipKey) ipKey = crypto.createHash('sha256').update('zz-rate|' + (process.env.DATABASE_URL || process.env.DATABASE_POSTGRES_URL || 'local')).digest();
+  const raw = String(header(req, 'x-real-ip') || header(req, 'x-forwarded-for') || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim().slice(0, 64);
+  return crypto.createHmac('sha256', ipKey).update(raw).digest('base64url').slice(0, 22);
+}
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const bad = (status, why) => { const e = new Error(why); e.status = status; e.why = why; reject(e); };
+    if (!/^application\/json\b/i.test(header(req, 'content-type') || '')) return bad(415, 'type');
+    if (+header(req, 'content-length') > MAX_BODY) return bad(413, 'big');
+    const parse = text => { let v; try { v = JSON.parse(text); } catch (e) { return bad(400, 'json'); } if (!v || typeof v !== 'object' || Array.isArray(v)) return bad(400, 'json'); resolve(v); };
+    // Vercel has usually read and parsed the body already
+    let ready;
+    try { ready = req.body; } catch (e) { return bad(400, 'json'); }
+    if (ready !== undefined && ready !== null) {
+      if (Buffer.isBuffer(ready)) return ready.length > MAX_BODY ? bad(413, 'big') : parse(ready.toString('utf8'));
+      if (typeof ready === 'string') return ready.length > MAX_BODY ? bad(413, 'big') : parse(ready);
+      if (typeof ready === 'object' && !Array.isArray(ready)) return JSON.stringify(ready).length > MAX_BODY ? bad(413, 'big') : resolve(ready);
+      return bad(400, 'json');
+    }
+    const parts = []; let size = 0;
+    req.on('data', c => { size += c.length; if (size > MAX_BODY) { bad(413, 'big'); req.destroy(); } else parts.push(c); });
+    req.on('end', () => parse(Buffer.concat(parts).toString('utf8')));
+    req.on('error', () => bad(400, 'json'));
+  });
+}
+
+const routes = {
+  async health(req, res, url) {
+    if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), region: process.env.VERCEL_REGION || '', now: clock() };
+    if (url.searchParams.get('deep') && out.db) {
+      // a look at the database itself: is it reachable, how long does one round trip take
+      const t0 = Date.now();
+      try { await db.run(d => d.query('SELECT count(*)::int AS n FROM zz.players')); out.ready = true; } catch (e) { out.ready = false; log('health', e); }
+      out.ms = Date.now() - t0;
+      return send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=15' });
+    }
+    send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=60' });
+  },
+  async board(req, res, url) {
+    if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
+    const q = url.searchParams, now = clock();
+    const out = await db.run(d => core.board(d, q.get('b') || '', q.get('s') || '', q.get('me') || '', now));
+    // the same board for everyone asking within half a minute: one database query, not one per visitor
+    send(res, out.status, out.body, out.status === 200 ? { 'Cache-Control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=120' } : null);
+  },
+  async room(req, res) {
+    if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
+    if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
+    const body = await readBody(req), now = clock();
+    let out;
+    switch (body.a) {
+      case 'x': out = await db.run(d => core.roomExchange(d, body, now)); break;
+      case 'open': out = await db.run(d => core.roomOpen(d, body, ipTag(req), now)); break;
+      case 'join': out = await db.run(d => core.roomJoin(d, body, ipTag(req), now)); break;
+      case 'close': out = await db.run(d => core.roomClose(d, body)); break;
+      default: return send(res, 400, { ok: false, why: 'action' });
+    }
+    send(res, out.status, out.body);
+  },
+  async rpc(req, res) {
+    if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
+    if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
+    const body = await readBody(req), now = clock(), cred = core.readCred(header(req, 'authorization'));
+    let out;
+    switch (body.a) {
+      case 'hello':
+        out = await db.run(d => core.hello(d, body, ipTag(req), now));
+        break;
+      case 'sync': {
+        const ops = rules.cleanOps(body.ops);
+        if (!ops) return send(res, 400, { ok: false, why: 'ops' });
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.sync(d, cred, ops, now));
+        break;
+      }
+      case 'code':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.makeCode(d, cred, now));
+        break;
+      case 'redeem':
+        out = await db.run(d => core.redeem(d, body, cred, ipTag(req), now));
+        break;
+      case 'delete':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.wipe(d, cred));
+        break;
+      default:
+        return send(res, 400, { ok: false, why: 'action' });
+    }
+    send(res, out.status, out.body);
+  }
+};
+
+// Log lines say what went wrong and nothing about who asked or how the database is reached.
+function log(where, e) {
+  const msg = String((e && e.message) || e).replace(/postgres(ql)?:\/\/\S+/gi, '[connection string]').slice(0, 240);
+  console.error('[zz] ' + where + ' ' + ((e && e.code) || (e && e.name) || '') + ' ' + msg);
+}
+async function handle(name, req, res) {
+  try {
+    const url = new URL(req.url || '/', 'http://x');
+    await routes[name](req, res, url);
+  } catch (e) {
+    if (e && e.status && e.why) return send(res, e.status, { ok: false, why: e.why });
+    // The database did not answer (too slow, waking up, or the network between here and there): ask the page to try again.
+    // The driver wraps such failures and keeps the original in sourceError.
+    if (e && (e.name === 'TimeoutError' || e.name === 'AbortError' || e.sourceError)) { log(name, e); return send(res, 503, { ok: false, why: 'busy' }, { 'Retry-After': '5' }); }
+    log(name, e);
+    send(res, 500, { ok: false, why: 'server' });
+  }
+}
+
+module.exports = { handle, setClock, routes: Object.keys(routes) };

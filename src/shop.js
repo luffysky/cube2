@@ -56,7 +56,7 @@
     'jb.claim': ['領取', 'Claim', '受け取る', '받기'],
     'jb.claimed': ['已領', 'Claimed', '受取済み', '수령 완료'],
     'jb.today': ['今天的任務', "Today's jobs", '今日の任務', '오늘의 임무'],
-    'jb.resets': ['每天午夜換新。', 'New jobs at midnight.', '毎日0時に更新。', '매일 자정에 갱신.'],
+    'jb.resets': ['每天午夜換新（台灣時間）。', 'New jobs every day at 00:00 Taiwan time (UTC+8).', '毎日0時（台湾時間・UTC+8）に更新。', '매일 자정(대만 시간, UTC+8)에 갱신.'],
     'jb.got': ['+{0} 金幣', '+{0} coins', '+{0}コイン', '+{0}코인'],
     'j.win': ['贏 2 場對戰', 'Win 2 matches', '対戦で2勝', '대전 2승'],
     'j.play': ['打完 3 場對戰', 'Play 3 matches', '対戦を3回', '대전 3판'],
@@ -77,6 +77,7 @@
     'pf.games': ['對戰場數', 'Matches', '対戦数', '대전 수'],
     'pf.wins': ['勝場', 'Wins', '勝利', '승리'],
     'pf.best': ['最高分', 'Best score', '最高スコア', '최고 점수'],
+    'pf.sprint': ['40 行最快', 'Fastest 40 lines', '40ライン最速', '40줄 최고 기록'],
     'pf.tspins': ['T 轉總數', 'T-spins', 'Tスピン合計', 'T스핀 합계'],
     'pf.sent': ['送出總行數', 'Lines sent', '送ったライン合計', '보낸 줄 합계'],
     'pf.kos': ['擊倒總數', 'KOs', 'KO合計', 'KO 합계'],
@@ -201,7 +202,7 @@
   function dropPic(key) {
     Pics.del(key);
     Meta.data.custom[key] = false;
-    if (Meta.data.equip[key] === 'custom') Meta.data.equip[key] = key === 'tile' ? 'glaze' : 'wall';
+    if (Meta.data.equip[key] === 'custom') Meta.equip(key, key === 'tile' ? 'glaze' : 'wall');
     Meta.save();
     var o = {}; o[key] = null;
     View.setLook({ img: o });
@@ -299,7 +300,7 @@
       View.setLook({ dim: +el.value });
       return true;
     }
-    if (el.id === 'pName') { Meta.data.name = el.value.replace(/[<>&"]/g, '').slice(0, 12); Meta.save(); return true; }
+    if (el.id === 'pName') { Meta.setName(el.value); return true; }
     return false;
   });
   App.clicks.push(function (d) {
@@ -353,11 +354,11 @@
   // ---------- profile ----------
   App.sheets.profile = function () {
     var d = Meta.data, r = Meta.rankOf(d.rp), pct = r.top ? 100 : Math.round(r.into / r.need * 100), tt = d.tot;
-    var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
+    var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
     var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
       '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div><table class="cmp"><tbody>';
     rows.forEach(function (x) { h += '<tr><td>' + t(x[0]) + '</td><td>' + x[1] + '</td></tr>'; });
-    return h + '</tbody></table><div class="row">' + btn('close', 'done', true) + '</div>';
+    return h + '</tbody></table>' + (App.profileExtra ? App.profileExtra() : '') + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
 
   // Bring the saved pictures back when the page opens.
@@ -366,7 +367,7 @@
       if (!Meta.data.custom[key]) return;
       Pics.get(key, function (url) {
         if (url) useUrl(key, url);
-        else { Meta.data.custom[key] = false; if (Meta.data.equip[key] === 'custom') Meta.data.equip[key] = key === 'tile' ? 'glaze' : 'wall'; Meta.save(); App.applyLook(); }
+        else { Meta.data.custom[key] = false; if (Meta.data.equip[key] === 'custom') Meta.equip(key, key === 'tile' ? 'glaze' : 'wall'); Meta.save(); App.applyLook(); }
       });
     });
   });
