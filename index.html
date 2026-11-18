@@ -5476,6 +5476,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   var Net = {
     state: 'idle',            // idle, opening, waiting, joining, ready, playing, error
     code: '', host: false, me: '', foe: '', err: '', cfg: { minutes: 2, items: false },
+    seated: false,            // joining through the relay: in the room, the host has not answered yet
     wantAgain: false, foeAgain: false, onChange: null
   };
   var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0, epoch = 0, relayed = false;
@@ -5483,7 +5484,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 
   function changed() { if (Net.onChange) Net.onChange(); }
   function setState(s) { Net.state = s; changed(); }
-  function fail(kind) { Net.err = kind; shut(); setState('error'); }
+  function fail(kind) { Net.err = kind; Net.seated = false; shut(); setState('error'); }
   function int(v, lo, hi) { v = Math.round(+v); return v >= lo && v <= hi ? v : lo; }
   function shut() {
     clearTimeout(joinT);
@@ -5557,21 +5558,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function Relay(code, key, role) {
     this.code = code; this.key = key; this.role = role;
     this.h = {}; this.out = []; this.nOut = 0; this.ack = 0;
-    this.open = false; this.dead = false; this.closing = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
+    this.open = false; this.dead = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
     this.heard = Date.now(); this.said = Date.now(); this.born = Date.now();
     this.pump(0);
   }
+  // Until the other side has said anything at all it may simply not be looking: a host who is still in the chat app
+  // where the code was sent. That gets more patience than silence from someone who was talking a moment ago.
+  var QUIET = Net.QUIET = { play: 15000, lobby: 70000, first: 150000 };
   Relay.prototype.on = function (ev, fn) { this.h[ev] = fn; };
   Relay.prototype.fire = function (ev, d) { if (this.h[ev]) this.h[ev](d); };
   // how long to wait between rounds: quick while a match is on, relaxed in the lobby, slow while waiting alone
   Relay.prototype.pace = function () {
     if (Net.state === 'playing') return 110;
-    if (this.open) return 500;
+    if (this.open) return this.ack || Date.now() - this.heard < 10000 ? 500 : 1500;
     var waited = Date.now() - this.born;      // nobody has joined yet: look less often the longer the room sits open
     return waited < 120000 ? 1300 : waited < 600000 ? 2500 : 5000;
   };
   Relay.prototype.send = function (m) {
-    if (this.dead || this.closing) return;
+    if (this.dead) return;
     var last = this.out[this.out.length - 1];
     // only the newest picture of the wall is worth sending
     if (m && m.t === 's' && last && !last.s && last.m.t === 's') last.m = m;
@@ -5581,7 +5585,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
   Relay.prototype.pump = function (ms) {
     var self = this, at = Date.now() + ms;
-    if (this.dead || this.closing || this.busy) return;
+    if (this.dead || this.busy) return;
     if (this.t && this.due <= at) return;      // an earlier round is already booked
     clearTimeout(this.t);
     this.due = at;
@@ -5589,9 +5593,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
   Relay.prototype.round = function (last) {
     var self = this, batch = [], size = 0, i;
-    if (this.dead || this.closing || this.busy) return;
-    // silence from the other side for too long means they are gone (a phone that went to sleep, a closed tab)
-    if (this.open && Date.now() - this.heard > (Net.state === 'playing' ? 15000 : 70000)) { this.dead = true; return this.fire('close'); }
+    if (this.dead || this.busy) return;
+    // silence from the other side for too long means they are gone (a phone that went to sleep, a closed tab).
+    // Say so on the way out: if they do come back they should not find a room that looks alive.
+    if (this.open && Date.now() - this.heard > (Net.state === 'playing' ? QUIET.play : this.ack ? QUIET.lobby : QUIET.first)) {
+      this.out.push({ n: ++this.nOut, m: { t: 'bye' } });
+      this.finish();
+      return this.fire('close');
+    }
     if (this.open && Net.state !== 'playing' && Date.now() - this.said > 5000) { this.out.push({ n: ++this.nOut, m: { t: 'p' } }); this.said = Date.now(); }
     for (i = 0; i < this.out.length && batch.length < 60; i++) {
       var len = JSON.stringify(this.out[i].m).length;
@@ -5602,7 +5611,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var top = batch.length ? batch[batch.length - 1].n : 0, retry = function () {
       self.busy = false;
       if (self.dead) return;
-      if (self.closing) return self.finish();
       for (var k = 0; k < self.out.length; k++) delete self.out[k].s;
       if (++self.fails > 14) { self.dead = true; return self.fire('close'); }
       self.pump(Math.min(3000, 250 * self.fails));
@@ -5615,40 +5623,44 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (r.status !== 200 || !b || !b.ok) return retry();
       self.busy = false; self.fails = 0;
       self.out = self.out.filter(function (o) { return o.n > top; });
-      if (self.closing) return self.finish();
       if (b.paired && !self.open) { self.open = true; self.heard = Date.now(); self.fire('open'); }
       var got = Array.isArray(b.in) ? b.in : [], any = false;
-      for (var k = 0; k < got.length && !self.dead && !self.closing; k++) {
+      for (var k = 0; k < got.length && !self.dead; k++) {
         var it = got[k];
         if (!it || typeof it.n !== 'number' || it.n <= self.ack) continue;
         self.ack = it.n; self.heard = Date.now(); any = true;
         self.fire('data', it.m);
       }
       if (self.dead) return;
-      if (self.closing) return self.finish();
       self.pump(self.out.length || any ? Math.min(110, self.pace()) : self.pace());
     }, retry);
   };
-  Relay.prototype.close = function () {
-    if (this.dead || this.closing) return;
-    this.closing = true;
-    clearTimeout(this.t); this.t = 0;
-    if (!this.busy) this.finish();      // otherwise the round in flight calls finish() when it lands
-  };
-  // The last word: hand over what is still waiting (the goodbye), then stop. The host also takes the room down.
+  Relay.prototype.close = function () { this.finish(); };
+  // The last word: hand over what is still waiting (the goodbye), then stop. When it is the host who leaves, the same
+  // request takes the room down. It is a single request so that it still gets out while the page is closing.
   Relay.prototype.finish = function () {
-    var self = this, rest = this.out.slice(0, 60).map(function (o) { return { n: o.n, m: o.m }; });
+    var rest = [], size = 0, i, len;
     if (this.dead) return;
+    for (i = this.out.length - 1; i >= 0 && rest.length < 60; i--) {      // the newest first: the goodbye is the one that must arrive
+      len = JSON.stringify(this.out[i].m).length;
+      if (rest.length && size + len > 16000) break;
+      size += len;
+      rest.unshift({ n: this.out[i].n, m: this.out[i].m });
+    }
     this.dead = true; this.out = [];
-    var end = function () { if (self.role === 0) rpc({ a: 'close', code: self.code, key: self.key }, true).then(null, function () { /* it runs out by itself */ }); };
-    if (!rest.length) return end();
-    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest }, true).then(end, end);
+    clearTimeout(this.t); this.t = 0;
+    if (!rest.length && this.role !== 0) return;
+    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest, end: true }, true).then(null, function () { /* the room runs out by itself */ });
   };
   function transport(cb) {
     var mode = qs.get('net'), C = ZZ.Cloud;
     if (mode === 'bc') return cb('bc');
     if (mode === 'peer' || qs.get('peer') || !C || !C.whenKnown) return cb('peer');
-    C.whenKnown(function (on) { cb(on ? 'relay' : 'peer'); });
+    var go = function (hosted) { cb(hosted ? 'relay' : 'peer'); };
+    // written off because nothing answered when the page loaded? Look once more before settling for the public broker:
+    // two friends must not end up on different sides
+    if (C.dead && C.unsure && C.recheck) return C.recheck().then(go, function () { go(false); });
+    C.whenKnown(go);
   }
 
   function wire(c) {
@@ -5657,6 +5669,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       clearTimeout(joinT);
       send({ t: 'hello', v: 1, name: Net.me });
       if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items });
+      else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
     c.on('data', onMsg);
     c.on('close', dropped);
@@ -5669,7 +5682,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   }
   function reset(name, host) {
     shut();
-    Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = '';
+    Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     epoch++;
   }
@@ -5753,7 +5766,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     send({ t: 'bye' });
     var st = link;
     setTimeout(function () { if (link === st) shut(); }, 150);
-    Net.state = 'idle'; Net.err = '';
+    Net.state = 'idle'; Net.err = ''; Net.seated = false;
     changed();
   };
   Net.setCfg = function (c) {
@@ -5868,6 +5881,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         // answer once, in case our own greeting went out before the other side was listening
         if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items }); }
         Net.foe = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
         break;
       case 'full': fail('full'); break;
@@ -5908,7 +5922,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     shut();
     if (mid) { Net.state = 'idle'; App.endBattle('left'); return; }
     if (endWait) { var f = endWait; endWait = null; settle(f); }
-    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining') { Net.err = 'lost'; setState('error'); }
+    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining') {
+      Net.err = Net.state === 'joining' && Net.seated ? 'host' : 'lost';      // in the room, but the host never answered
+      Net.seated = false;
+      setState('error');
+    }
   }
 
   // every event of our own game: mark the wall as changed and pass on what the other screen needs for its effects
@@ -5944,6 +5962,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Net.relayed = function () { return relayed; };
   // back from the background: catch up at once instead of waiting for the next round
   document.addEventListener('visibilitychange', function () { if (!document.hidden && link && link.pump && !link.dead) link.pump(0); });
+  // The page is being closed or left: say goodbye now. The other side is told at once and, for a host, the room code
+  // stops working, instead of a room that looks open with nobody in it.
+  window.addEventListener('pagehide', function () {
+    if (!link) return;
+    send({ t: 'bye' });
+    shut();
+    Net.state = 'idle'; Net.err = ''; Net.seated = false;
+  });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) changed(); });      // brought back by the back button: show where things stand
 
   ZZ.Net = Net;
 })();
@@ -6019,6 +6046,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'net.shareText': ['來轉磚跟我打一場，房間代碼 {0}', 'Play me at Zhuan Zhuan. Room code {0}', 'Zhuan Zhuan で対戦しよう。部屋コード {0}', 'Zhuan Zhuan에서 한 판 하자. 방 코드 {0}'],
     'net.waitFriend': ['等朋友進來…', 'Waiting for your friend…', '友だちを待っています…', '친구를 기다리는 중…'],
     'net.joining': ['正在連線…', 'Connecting…', '接続中…', '연결 중…'],
+    'net.seated': ['進房了，等房主那邊回應…房主要把遊戲留在畫面上才收得到。', 'You are in the room. Waiting for the host to answer… The host has to keep the game on screen.', '部屋に入りました。ホストの応答を待っています…ホストはゲームを画面に表示しておく必要があります。', '방에 들어왔습니다. 방장의 응답을 기다리는 중… 방장이 게임을 화면에 띄워 두어야 합니다.'],
     'net.connected': ['已連上：{0}', 'Connected: {0}', '接続完了：{0}', '연결됨: {0}'],
     'net.waitHost': ['規則由房主決定。等房主按開始…', 'The host sets the rules. Waiting for the host to start…', 'ルールはホストが決めます。開始を待っています…', '규칙은 방장이 정합니다. 시작을 기다리는 중…'],
     'net.start': ['開始', 'Start', '開始', '시작'],
@@ -6033,6 +6061,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'net.noteRelay': ['對戰資料經由本站的伺服器轉送，行動網路和 Wi-Fi 都連得上。', "Match data is relayed through this site's server, so it works on mobile data and Wi-Fi alike.", '対戦データはこのサイトのサーバーを経由するので、モバイル回線でもWi-Fiでもつながります。', '대전 데이터는 이 사이트의 서버를 거쳐 전달되므로 모바일 데이터와 Wi-Fi 모두에서 연결됩니다.'],
     'net.keepOpen': ['等朋友的時候，請把遊戲留在畫面上；切到別的 App 太久，房間會斷。', 'Keep the game on screen while you wait. If you stay in another app too long, the room drops.', '待っている間はゲームを画面に表示したままにしてください。別のアプリに長くいると部屋が切れます。', '기다리는 동안 게임을 화면에 띄워 두세요. 다른 앱에 오래 있으면 방이 끊깁니다.'],
     'net.e.room': ['找不到這個房間。確認代碼，或請朋友重開。', 'Room not found. Check the code or ask your friend to reopen it.', '部屋が見つかりません。コードを確認するか、作り直してもらってください。', '방을 찾을 수 없습니다. 코드를 확인하거나 다시 만들어 달라고 하세요.'],
+    'net.e.host': ['房主一直沒有回應。請他回到遊戲重開一個房間，再把新的代碼傳給你。', 'The host did not answer. Ask them to go back to the game, open a new room and send you the new code.', 'ホストから応答がありません。ゲームに戻って部屋を作り直し、新しいコードを送ってもらってください。', '방장이 응답하지 않습니다. 게임으로 돌아가 방을 새로 만들고 새 코드를 보내 달라고 하세요.'],
     'net.e.full': ['房間已經有人了。', 'That room is already full.', 'その部屋は満員です。', '방이 이미 찼습니다.'],
     'net.e.lost': ['連線斷了。', 'The connection was lost.', '接続が切れました。', '연결이 끊겼습니다.'],
     'net.foeLeft': ['對手離線，這場算你贏。', 'Your rival left. The match is yours.', '相手が切断しました。あなたの勝ちです。', '상대가 나갔습니다. 당신의 승리입니다.'],
@@ -6236,7 +6265,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
-    else if (st === 'joining') h += '<p>' + t('net.joining') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
+    else if (st === 'joining') h += '<p>' + t(Net.seated ? 'net.seated' : 'net.joining') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
@@ -6256,7 +6285,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       // arriving through a friend's invite link, joining is the main thing to do
       h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
-        btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.on ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+        btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
     }
     return h;
   };
@@ -6716,7 +6745,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     api: 'api/',      // relative, so the game also works from a sub-folder
     on: false,        // the API answered and has a database behind it
     dead: false,      // this host has no API: stay local, do not keep asking
+    unsure: false,    // …or so it seemed: nothing answered, which a dead network also looks like
     seen: false,      // the API has answered from this address before
+    nodb: false,      // the API is here but has no database linked
     gone: false,      // this device was unlinked on purpose; do not make a new account by itself
     cred: null,       // { id, key }
     pub: '',          // the short public tag shown on leaderboards
@@ -6728,12 +6759,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     onChange: null, onAdopt: null, onNote: null
   };
   var probeFails = 0, timer = 0, pullNext = false, known = false, waiters = [];
-  // Other parts of the game (online rooms) ask whether the API is here; they get their answer once the first look is done.
-  Cloud.whenKnown = function (cb) { if (known || Cloud.dead) cb(Cloud.on); else waiters.push(cb); };
+  // Other parts of the game (online rooms) ask whether this host has the API; they get their answer once the first
+  // look is done. The answer is "no" only when that is certain: a look that merely failed (a bad moment on the
+  // network) must not send one player to the public broker while their friend's room is on our own server.
+  Cloud.hosted = function () { return known && !Cloud.dead && !Cloud.nodb; };
+  Cloud.whenKnown = function (cb) { if (known || Cloud.dead) cb(Cloud.hosted()); else waiters.push(cb); };
   function nowKnown() {
     known = true;
     var w = waiters; waiters = [];
-    for (var i = 0; i < w.length; i++) w[i](Cloud.on);
+    for (var i = 0; i < w.length; i++) w[i](Cloud.hosted());
   }
 
   // ---------- what is kept on the device ----------
@@ -6748,6 +6782,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     } catch (e) { return null; }
   }
   function persist() {
+    if (!Cloud.cred && !Cloud.gone) theirs();   // never write over an account another tab has just made
     var st = storage(), c = Cloud.cred;
     var v = { id: c ? c.id : '', key: c ? c.key : '', pub: Cloud.pub, gone: Cloud.gone, seen: Cloud.seen, base: c ? null : Cloud.base,
       q: Cloud.q.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) };
@@ -6776,7 +6811,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (!f) return Promise.reject(new Error('no fetch'));
     var o = { method: method, headers: {}, credentials: 'same-origin', cache: 'no-store' }, ctl = null, t = 0;
     if (body) { o.body = JSON.stringify(body); o.headers['Content-Type'] = 'application/json'; o.keepalive = o.body.length < 60000; }
-    if (auth && Cloud.cred) o.headers.Authorization = 'Bearer ' + Cloud.cred.id + '.' + Cloud.cred.key;
+    var who = auth === true ? Cloud.cred : auth;
+    if (who) o.headers.Authorization = 'Bearer ' + who.id + '.' + who.key;
     if (typeof AbortController === 'function') { ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 15000); }
     var done = function () { if (t) clearTimeout(t); };
     return f(Cloud.api + path, o).then(function (res) {
@@ -6799,6 +6835,46 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (timer) clearTimeout(timer);
     timer = later(function () { timer = 0; Cloud.flush(); }, ms);
   }
+
+  // ---------- several tabs of one browser ----------
+  // They share the store, so they must end up on one account, and none of them may lose what it still has to send.
+  //
+  // The account another tab has put in the store, if there is one: this tab joins it and keeps its own queue (the
+  // server knows each change by its id, so one that both tabs send is still done once).
+  // spare: an account this tab has just made itself. If another tab was quicker, that one is one too many.
+  function theirs(spare) {
+    var v = readStore();
+    if (!v || !v.id || !v.key || v.gone || (spare && v.id === spare.id)) return false;
+    if (spare) call('POST', 'rpc', { a: 'delete' }, { id: spare.id, key: spare.key }).then(null, function () {});
+    Cloud.cred = { id: v.id, key: v.key };
+    Cloud.pub = typeof v.pub === 'string' ? v.pub : '';
+    Cloud.base = null; Cloud.want = false; Cloud.gone = false;
+    return true;
+  }
+  // One tab at a time. Where the browser cannot do that (it is rare), fn simply runs.
+  function alone(fn) {
+    var nav = root.navigator, locks = Cloud.locks === undefined ? nav && nav.locks : Cloud.locks, ran = false;
+    var go = function () { ran = true; return fn(); };
+    if (!locks || typeof locks.request !== 'function') return Promise.resolve().then(go);
+    try {
+      return Promise.resolve(locks.request(KEY, go)).then(null, function (e) { if (ran) throw e; return go(); });
+    } catch (e) { return Promise.resolve().then(go); }
+  }
+  // Another tab changed which account this browser uses: it made one, switched to another save, or unlinked.
+  Cloud.follow = function () {
+    var v = readStore() || {}, id = v.id && v.key ? v.id : '', mine = Cloud.cred ? Cloud.cred.id : '', gone = !id && !!v.gone;
+    if (id === mine && gone === Cloud.gone) return false;
+    if (!id && !gone && mine) { persist(); return false; }   // a tab that had not heard of the account wrote over it: put it back
+    var join = !!id && !mine;                                  // it made the account this tab was about to make
+    Cloud.cred = id ? { id: v.id, key: v.key } : null;
+    Cloud.pub = id && typeof v.pub === 'string' ? v.pub : '';
+    Cloud.gone = gone; Cloud.want = false;
+    if (!join) Cloud.q = [];                                   // a different save, or none: what waited here was meant for the old one
+    Cloud.base = Cloud.cred || gone ? null : snapshot();
+    if (Cloud.cred && Cloud.on) Cloud.flush(true);
+    changed();
+    return true;
+  };
 
   // ---------- the queue ----------
   function push(k, a) {
@@ -6846,14 +6922,18 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   // One request. Answers 'more' (go on), 'done' or 'wait' (try again later).
   function step() {
     if (!Cloud.cred) {
-      // another tab may have made the account a moment ago
-      var other = readStore();
-      if (other && other.id && other.key) { Cloud.cred = { id: other.id, key: other.key }; Cloud.pub = other.pub || ''; Cloud.base = null; return Promise.resolve('more'); }
-      return call('POST', 'rpc', { a: 'hello', st: Cloud.base || snapshot() }).then(function (r) {
-        var b = r.body;
-        if (r.status === 200 && b && b.ok && b.id && b.key) { take(b); adopt(b.st); return 'more'; }
-        if (r.status === 429) Cloud.fails = Math.max(Cloud.fails, 6);
-        return 'wait';
+      return alone(function () {
+        if (Cloud.cred || theirs()) return 'more';   // another tab made the account while this one waited its turn
+        return call('POST', 'rpc', { a: 'hello', st: Cloud.base || snapshot() }).then(function (r) {
+          var b = r.body;
+          if (r.status === 200 && b && b.ok && b.id && b.key) {
+            if (theirs(b)) return 'more';            // (a browser that cannot take turns) another tab got there first
+            take(b); adopt(b.st);
+            return 'more';
+          }
+          if (r.status === 429) Cloud.fails = Math.max(Cloud.fails, 6);
+          return 'wait';
+        });
       });
     }
     var batch = Cloud.q.slice(0, BATCH), ids = {};
@@ -6902,8 +6982,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
 
   // ---------- is there an API here at all ----------
-  function none() {
-    Cloud.dead = true; Cloud.on = false;
+  // unsure: nothing answered at all (as opposed to a host that plainly said "no such thing here")
+  function none(unsure) {
+    Cloud.dead = true; Cloud.on = false; Cloud.unsure = !!unsure;
     if (!Cloud.cred) { Cloud.q = []; Cloud.base = null; persist(); }
     nowKnown();
     changed();
@@ -6912,9 +6993,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (Cloud.dead) return Promise.resolve(false);
     var again = function () {
       probeFails++;
-      if (!Cloud.seen && !Cloud.cred && probeFails >= 3) { none(); return false; }
-      if (Cloud.auto) later(probe, Math.min(300000, 4000 * Math.pow(2, Math.min(7, probeFails))));
-      nowKnown();
+      var fresh = !Cloud.seen && !Cloud.cred;      // nothing has ever answered from this address
+      if (fresh && probeFails >= 3) { none(true); return false; }
+      if (Cloud.auto) later(probe, fresh ? 1200 * probeFails : Math.min(300000, 4000 * Math.pow(2, Math.min(7, probeFails))));
+      if (!fresh) nowKnown();                      // the API has been here before: a bad moment, not a missing server
       changed();
       return false;
     };
@@ -6922,8 +7004,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       var b = r.body;
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
-        if (!b.db) { Cloud.on = false; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true;
+        if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
+        Cloud.on = true; Cloud.nodb = false;
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
@@ -6935,6 +7017,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     }, again);
   }
   Cloud.probe = probe;
+  // Asked when it matters (an online room is about to be opened, the network is back): if the API was written off
+  // only because nothing answered, look once more.
+  Cloud.recheck = function () {
+    if (!Cloud.dead || !Cloud.unsure) return Promise.resolve(Cloud.hosted());
+    Cloud.dead = false; Cloud.unsure = false; probeFails = 2;
+    if (!Cloud.cred && !Cloud.base) Cloud.base = snapshot();
+    return probe().then(function () { return Cloud.hosted(); });
+  };
 
   // ---------- start ----------
   Cloud.init = function (o) {
@@ -6943,7 +7033,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (o.store) Cloud.store = o.store;
     if (o.now) Cloud.now = o.now;
     if (o.auto != null) Cloud.auto = o.auto;
-    Cloud.dead = false; Cloud.on = false; Cloud.busy = null; Cloud.fails = 0; Cloud.skew = 0; probeFails = 0; pullNext = false; known = false;
+    if ('locks' in o) Cloud.locks = o.locks;
+    Cloud.dead = false; Cloud.unsure = false; Cloud.on = false; Cloud.nodb = false; Cloud.busy = null; Cloud.fails = 0; Cloud.skew = 0; probeFails = 0; pullNext = false; known = false;
     load();
     if (!Cloud.cred && !Cloud.base) Cloud.base = snapshot();
     Meta.now = function () { return Cloud.now() + Cloud.skew; };
@@ -7256,8 +7347,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     showLink();
     refresh();
     // the online lobby words its note by whether the relay is there; redraw it once that is known
-    if (wasOn !== Cloud.on) {
-      wasOn = Cloud.on;
+    if (wasOn !== Cloud.hosted()) {
+      wasOn = Cloud.hosted();
       var net = ZZ.Net, active = document.activeElement;
       if (App.sheet() === 'online' && net && (net.state === 'idle' || net.state === 'error') && !(active && active.id === 'nCode')) App.openSheet('online');
     }
@@ -7281,21 +7372,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     try { local = !/^https?:$/.test(window.location.protocol) || /[?&]cloud=off\b/.test(window.location.search); } catch (e) { local = true; }
     Cloud.init({ local: local });
     showLink();
-    window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); });
+    window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); else Cloud.recheck(); });
     window.addEventListener('pagehide', function () { Cloud.flush(); });
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden && Cloud.on && Cloud.cred && Date.now() - Cloud.last > 60000) Cloud.flush(true);
     });
-    window.addEventListener('storage', function (e) {
-      if (e.key !== KEY) return;
-      // another tab linked, unlinked or switched the save: follow it
-      var v = readStore() || {}, id = Cloud.cred ? Cloud.cred.id : '';
-      if ((v.id || '') === id && !!v.gone === Cloud.gone) return;
-      Cloud.cred = v.id && v.key ? { id: v.id, key: v.key } : null;
-      Cloud.pub = v.pub || ''; Cloud.gone = !!v.gone; Cloud.q = []; Cloud.base = null;
-      if (Cloud.cred && Cloud.on) Cloud.flush(true);
-      Cloud.onChange();
-    });
+    window.addEventListener('storage', function (e) { if (e.key === KEY) Cloud.follow(); });
   });
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>

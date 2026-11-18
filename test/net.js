@@ -84,6 +84,17 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   const rA = await ev(A, 'return {sheet:p.sheet, r:S.result, ko:S.ko}'), rB = await ev(B, 'return {sheet:p.sheet, r:S.result, ko:S.ko}');
   ok(rA.sheet === 'battleEnd' && rB.sheet === 'battleEnd', 'both see the result', [rA, rB]);
   ok(rA.r === 1 && rB.r === -1 && rA.ko.me === rB.ko.opp, 'results agree: host won', [rA, rB]);
+  if (RELAY) {
+    // Both pages are tabs of one browser here, so they share one save. Both finished at the same moment and both
+    // wanted to make the cloud account: there must be one account, and both results must be on it.
+    await until(async () => (await ev(A, 'return !ZZ.Cloud.busy && !ZZ.Cloud.q.length && !!ZZ.Cloud.cred')) && (await ev(B, 'return !ZZ.Cloud.busy && !ZZ.Cloud.q.length && !!ZZ.Cloud.cred')), 8000);
+    const db = await (await fetch('http://127.0.0.1:' + PORT + '/_dev/state')).json();
+    const ids = [await ev(A, 'return ZZ.Cloud.cred && ZZ.Cloud.cred.id'), await ev(B, 'return ZZ.Cloud.cred && ZZ.Cloud.cred.id')];
+    ok(db.players.length === 1 && ids[0] === db.players[0].id && ids[1] === db.players[0].id, 'two tabs of one browser end up on one cloud account', [db.players, ids]);
+    ok(db.players[0] && db.players[0].games === 2, 'and neither tab lost its result', db.players);
+    await ev(A, 'ZZ.Cloud.flush(true); return 1'); await ev(B, 'ZZ.Cloud.flush(true); return 1');
+    ok(await until(async () => (await ev(A, 'return ZZ.Meta.data.tot.games')) === 2 && (await ev(B, 'return ZZ.Meta.data.tot.games')) === 2, 5000), 'both tabs show both matches', [await ev(A, 'return ZZ.Meta.data.tot'), await ev(B, 'return ZZ.Meta.data.tot')]);
+  }
   // rematch needs both
   await A.click('[data-do="again"]'); await sleep(400);
   ok((await ev(A, 'return p.sheet === "battleEnd" && N.wantAgain')), 'host waits for the other side');
@@ -98,6 +109,57 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   const left = await ev(A, 'return {sheet:p.sheet, why:S.why, r:S.result}');
   ok(left.sheet === 'battleEnd' && left.why === 'left' && left.r === 1, 'the one who stayed wins', left);
   if (RELAY) {
+    const api = (body) => fetch('http://127.0.0.1:' + PORT + '/api/room', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async r => ({ status: r.status, json: await r.json().catch(() => null) }));
+    const state = async () => (await fetch('http://127.0.0.1:' + PORT + '/_dev/state')).json();
+    await A.bringToFront(); await A.click('[data-do="menu"]'); await sleep(300);
+    await B.bringToFront(); await sleep(300);
+
+    // ---------- a room whose host is not looking (still in the chat app where the code was sent) ----------
+    const hostKey = 'testhostkey0123456789testhostkey';
+    const made = await api({ a: 'open', key: hostKey });
+    ok(made.status === 200 && /^[A-Z0-9]{5}$/.test(made.json.code), 'a room with nobody watching it', made);
+    await B.click('[data-go="online"]'); await sleep(200);
+    await B.fill('#nCode', made.json.code);
+    await B.click('[data-do="netJoin"]');
+    ok(await until(() => ev(B, 'return N.state === "joining" && N.seated'), 6000), 'the guest gets into the room', await ev(B, 'return [N.state, N.seated, N.err]'));
+    ok(await B.evaluate(() => /進房了/.test(document.getElementById('sheetCard').textContent) && !!document.querySelector('[data-do="netQuit"]')), 'and is told it is waiting for the host, with a way out');
+    await B.screenshot({ path: path.join(OUT, 'n_seated.png') });
+    await nap(2500);
+    ok((await ev(B, 'return N.state')) === 'joining', 'it keeps waiting: the host may be back any moment');
+    // the host comes back and answers: the guest connects after all
+    let got = await api({ a: 'x', code: made.json.code, key: hostKey, role: 0, ack: 0, out: [{ n: 1, m: { t: 'hello', v: 1, name: '遲到的房主' } }, { n: 2, m: { t: 'cfg', minutes: 3, items: false } }] });
+    ok(got.json.paired && got.json.in.some(l => l.m.t === 'hello' && typeof l.m.name === 'string'), 'the host finds the guest waiting', got.json);
+    ok(await until(() => ev(B, 'return N.state === "ready" && N.foe === "遲到的房主" && !N.seated && N.cfg.minutes === 3'), 6000), 'and the guest is connected as soon as the host answers', await ev(B, 'return [N.state, N.foe, N.seated]'));
+    await B.click('[data-do="netQuit"]'); await sleep(500);
+    got = await api({ a: 'x', code: made.json.code, key: hostKey, role: 0, ack: 0, out: [] });
+    ok(got.json.in.some(l => l.m.t === 'bye'), 'leaving says goodbye to the host', got.json.in.map(l => l.m.t));
+
+    // ---------- a host who never comes back ----------
+    const made2 = await api({ a: 'open', key: hostKey });
+    await ev(B, 'N.QUIET.first = 2500; return 1');
+    await B.fill('#nCode', made2.json.code);
+    await B.click('[data-do="netJoin"]');
+    ok(await until(() => ev(B, 'return N.state === "error"'), 12000) && (await ev(B, 'return N.err')) === 'host', 'the guest gives up after a while and says why', await ev(B, 'return [N.state, N.err]'));
+    ok(await B.evaluate(() => /房主一直沒有回應/.test(document.getElementById('sheetCard').textContent)), 'in words that say what to do next');
+    await B.screenshot({ path: path.join(OUT, 'n_nohost.png') });
+    await nap(400);
+    got = await api({ a: 'x', code: made2.json.code, key: hostKey, role: 0, ack: 0, out: [] });
+    ok(got.status === 200 && got.json.in[got.json.in.length - 1].m.t === 'bye', 'and leaves a goodbye, so a host who does come back is not shown a live room', got.json && got.json.in.map(l => l.m.t));
+    await ev(B, 'N.QUIET.first = 150000; return 1');
+    await B.click('[data-do="close"]'); await sleep(200);
+
+    // ---------- the host closes the page while waiting: the code stops working ----------
+    const C = await open('host2');
+    await C.click('[data-go="online"]'); await sleep(200);
+    await C.click('[data-do="netOpen"]');
+    await until(() => ev(C, 'return N.state === "waiting"'), 8000);
+    const code3 = await ev(C, 'return N.code');
+    ok((await state()).rooms.some(r => r.code === code3), 'a third tab opens a room', code3);
+    await C.goto('about:blank'); await nap(700);
+    ok(!(await state()).rooms.some(r => r.code === code3), 'closing the page takes the room down');
+    ok((await api({ a: 'join', code: code3, key: 'testguestkey0123456789testguest' })).status === 404, 'so a friend who tries the code is told at once that the room is gone');
+    await C.close();
+
     // what the relay asked of the server during all that
     const rooms = reqs.filter(u => /\/api\/room$/.test(u)).length;
     ok(rooms > 20 && reqs.every(u => /^http:\/\/127\.0\.0\.1:/.test(u) || /fonts\.(googleapis|gstatic)\.com/.test(u)), 'everything went through this site, nothing through a public broker', [rooms, reqs.filter(u => !/^http:\/\/127\.0\.0\.1:/.test(u) && !/fonts\./.test(u)).slice(0, 5)]);

@@ -16,6 +16,7 @@
   var Net = {
     state: 'idle',            // idle, opening, waiting, joining, ready, playing, error
     code: '', host: false, me: '', foe: '', err: '', cfg: { minutes: 2, items: false },
+    seated: false,            // joining through the relay: in the room, the host has not answered yet
     wantAgain: false, foeAgain: false, onChange: null
   };
   var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0, epoch = 0, relayed = false;
@@ -23,7 +24,7 @@
 
   function changed() { if (Net.onChange) Net.onChange(); }
   function setState(s) { Net.state = s; changed(); }
-  function fail(kind) { Net.err = kind; shut(); setState('error'); }
+  function fail(kind) { Net.err = kind; Net.seated = false; shut(); setState('error'); }
   function int(v, lo, hi) { v = Math.round(+v); return v >= lo && v <= hi ? v : lo; }
   function shut() {
     clearTimeout(joinT);
@@ -97,21 +98,24 @@
   function Relay(code, key, role) {
     this.code = code; this.key = key; this.role = role;
     this.h = {}; this.out = []; this.nOut = 0; this.ack = 0;
-    this.open = false; this.dead = false; this.closing = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
+    this.open = false; this.dead = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
     this.heard = Date.now(); this.said = Date.now(); this.born = Date.now();
     this.pump(0);
   }
+  // Until the other side has said anything at all it may simply not be looking: a host who is still in the chat app
+  // where the code was sent. That gets more patience than silence from someone who was talking a moment ago.
+  var QUIET = Net.QUIET = { play: 15000, lobby: 70000, first: 150000 };
   Relay.prototype.on = function (ev, fn) { this.h[ev] = fn; };
   Relay.prototype.fire = function (ev, d) { if (this.h[ev]) this.h[ev](d); };
   // how long to wait between rounds: quick while a match is on, relaxed in the lobby, slow while waiting alone
   Relay.prototype.pace = function () {
     if (Net.state === 'playing') return 110;
-    if (this.open) return 500;
+    if (this.open) return this.ack || Date.now() - this.heard < 10000 ? 500 : 1500;
     var waited = Date.now() - this.born;      // nobody has joined yet: look less often the longer the room sits open
     return waited < 120000 ? 1300 : waited < 600000 ? 2500 : 5000;
   };
   Relay.prototype.send = function (m) {
-    if (this.dead || this.closing) return;
+    if (this.dead) return;
     var last = this.out[this.out.length - 1];
     // only the newest picture of the wall is worth sending
     if (m && m.t === 's' && last && !last.s && last.m.t === 's') last.m = m;
@@ -121,7 +125,7 @@
   };
   Relay.prototype.pump = function (ms) {
     var self = this, at = Date.now() + ms;
-    if (this.dead || this.closing || this.busy) return;
+    if (this.dead || this.busy) return;
     if (this.t && this.due <= at) return;      // an earlier round is already booked
     clearTimeout(this.t);
     this.due = at;
@@ -129,9 +133,14 @@
   };
   Relay.prototype.round = function (last) {
     var self = this, batch = [], size = 0, i;
-    if (this.dead || this.closing || this.busy) return;
-    // silence from the other side for too long means they are gone (a phone that went to sleep, a closed tab)
-    if (this.open && Date.now() - this.heard > (Net.state === 'playing' ? 15000 : 70000)) { this.dead = true; return this.fire('close'); }
+    if (this.dead || this.busy) return;
+    // silence from the other side for too long means they are gone (a phone that went to sleep, a closed tab).
+    // Say so on the way out: if they do come back they should not find a room that looks alive.
+    if (this.open && Date.now() - this.heard > (Net.state === 'playing' ? QUIET.play : this.ack ? QUIET.lobby : QUIET.first)) {
+      this.out.push({ n: ++this.nOut, m: { t: 'bye' } });
+      this.finish();
+      return this.fire('close');
+    }
     if (this.open && Net.state !== 'playing' && Date.now() - this.said > 5000) { this.out.push({ n: ++this.nOut, m: { t: 'p' } }); this.said = Date.now(); }
     for (i = 0; i < this.out.length && batch.length < 60; i++) {
       var len = JSON.stringify(this.out[i].m).length;
@@ -142,7 +151,6 @@
     var top = batch.length ? batch[batch.length - 1].n : 0, retry = function () {
       self.busy = false;
       if (self.dead) return;
-      if (self.closing) return self.finish();
       for (var k = 0; k < self.out.length; k++) delete self.out[k].s;
       if (++self.fails > 14) { self.dead = true; return self.fire('close'); }
       self.pump(Math.min(3000, 250 * self.fails));
@@ -155,40 +163,44 @@
       if (r.status !== 200 || !b || !b.ok) return retry();
       self.busy = false; self.fails = 0;
       self.out = self.out.filter(function (o) { return o.n > top; });
-      if (self.closing) return self.finish();
       if (b.paired && !self.open) { self.open = true; self.heard = Date.now(); self.fire('open'); }
       var got = Array.isArray(b.in) ? b.in : [], any = false;
-      for (var k = 0; k < got.length && !self.dead && !self.closing; k++) {
+      for (var k = 0; k < got.length && !self.dead; k++) {
         var it = got[k];
         if (!it || typeof it.n !== 'number' || it.n <= self.ack) continue;
         self.ack = it.n; self.heard = Date.now(); any = true;
         self.fire('data', it.m);
       }
       if (self.dead) return;
-      if (self.closing) return self.finish();
       self.pump(self.out.length || any ? Math.min(110, self.pace()) : self.pace());
     }, retry);
   };
-  Relay.prototype.close = function () {
-    if (this.dead || this.closing) return;
-    this.closing = true;
-    clearTimeout(this.t); this.t = 0;
-    if (!this.busy) this.finish();      // otherwise the round in flight calls finish() when it lands
-  };
-  // The last word: hand over what is still waiting (the goodbye), then stop. The host also takes the room down.
+  Relay.prototype.close = function () { this.finish(); };
+  // The last word: hand over what is still waiting (the goodbye), then stop. When it is the host who leaves, the same
+  // request takes the room down. It is a single request so that it still gets out while the page is closing.
   Relay.prototype.finish = function () {
-    var self = this, rest = this.out.slice(0, 60).map(function (o) { return { n: o.n, m: o.m }; });
+    var rest = [], size = 0, i, len;
     if (this.dead) return;
+    for (i = this.out.length - 1; i >= 0 && rest.length < 60; i--) {      // the newest first: the goodbye is the one that must arrive
+      len = JSON.stringify(this.out[i].m).length;
+      if (rest.length && size + len > 16000) break;
+      size += len;
+      rest.unshift({ n: this.out[i].n, m: this.out[i].m });
+    }
     this.dead = true; this.out = [];
-    var end = function () { if (self.role === 0) rpc({ a: 'close', code: self.code, key: self.key }, true).then(null, function () { /* it runs out by itself */ }); };
-    if (!rest.length) return end();
-    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest }, true).then(end, end);
+    clearTimeout(this.t); this.t = 0;
+    if (!rest.length && this.role !== 0) return;
+    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest, end: true }, true).then(null, function () { /* the room runs out by itself */ });
   };
   function transport(cb) {
     var mode = qs.get('net'), C = ZZ.Cloud;
     if (mode === 'bc') return cb('bc');
     if (mode === 'peer' || qs.get('peer') || !C || !C.whenKnown) return cb('peer');
-    C.whenKnown(function (on) { cb(on ? 'relay' : 'peer'); });
+    var go = function (hosted) { cb(hosted ? 'relay' : 'peer'); };
+    // written off because nothing answered when the page loaded? Look once more before settling for the public broker:
+    // two friends must not end up on different sides
+    if (C.dead && C.unsure && C.recheck) return C.recheck().then(go, function () { go(false); });
+    C.whenKnown(go);
   }
 
   function wire(c) {
@@ -197,6 +209,7 @@
       clearTimeout(joinT);
       send({ t: 'hello', v: 1, name: Net.me });
       if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items });
+      else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
     c.on('data', onMsg);
     c.on('close', dropped);
@@ -209,7 +222,7 @@
   }
   function reset(name, host) {
     shut();
-    Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = '';
+    Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     epoch++;
   }
@@ -293,7 +306,7 @@
     send({ t: 'bye' });
     var st = link;
     setTimeout(function () { if (link === st) shut(); }, 150);
-    Net.state = 'idle'; Net.err = '';
+    Net.state = 'idle'; Net.err = ''; Net.seated = false;
     changed();
   };
   Net.setCfg = function (c) {
@@ -408,6 +421,7 @@
         // answer once, in case our own greeting went out before the other side was listening
         if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items }); }
         Net.foe = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
         break;
       case 'full': fail('full'); break;
@@ -448,7 +462,11 @@
     shut();
     if (mid) { Net.state = 'idle'; App.endBattle('left'); return; }
     if (endWait) { var f = endWait; endWait = null; settle(f); }
-    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining') { Net.err = 'lost'; setState('error'); }
+    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining') {
+      Net.err = Net.state === 'joining' && Net.seated ? 'host' : 'lost';      // in the room, but the host never answered
+      Net.seated = false;
+      setState('error');
+    }
   }
 
   // every event of our own game: mark the wall as changed and pass on what the other screen needs for its effects
@@ -484,6 +502,15 @@
   Net.relayed = function () { return relayed; };
   // back from the background: catch up at once instead of waiting for the next round
   document.addEventListener('visibilitychange', function () { if (!document.hidden && link && link.pump && !link.dead) link.pump(0); });
+  // The page is being closed or left: say goodbye now. The other side is told at once and, for a host, the room code
+  // stops working, instead of a room that looks open with nobody in it.
+  window.addEventListener('pagehide', function () {
+    if (!link) return;
+    send({ t: 'bye' });
+    shut();
+    Net.state = 'idle'; Net.err = ''; Net.seated = false;
+  });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) changed(); });      // brought back by the back button: show where things stand
 
   ZZ.Net = Net;
 })();

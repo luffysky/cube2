@@ -16,6 +16,15 @@ const server = http.createServer((req, res) => {
     if (app.routes.indexOf(m[1]) < 0) { res.statusCode = 404; return res.end('not found'); }
     return app.handle(m[1], req, res);
   }
+  // for the browser tests: what the database holds right now (this server only ever runs on a developer's machine)
+  if (url.pathname === '/_dev/state') {
+    const rows = sql => db.get().query(sql).then(r => r, () => []);
+    return Promise.all([
+      rows("SELECT id, name, ver, (state->>'coins')::int AS coins, (state->'tot'->>'games')::int AS games FROM zz.players ORDER BY made, id"),
+      rows('SELECT code, jk IS NOT NULL AS paired, exp FROM zz.rooms ORDER BY code'),
+      rows('SELECT room, dst, n, body FROM zz.mail ORDER BY room, dst, n')
+    ]).then(([players, rooms, mail]) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ players, rooms, mail })); });
+  }
   let rel = decodeURIComponent(url.pathname);
   if (rel.endsWith('/')) rel += 'index.html';
   const file = path.normalize(path.join(ROOT, rel));

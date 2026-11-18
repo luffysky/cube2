@@ -20,7 +20,9 @@
     api: 'api/',      // relative, so the game also works from a sub-folder
     on: false,        // the API answered and has a database behind it
     dead: false,      // this host has no API: stay local, do not keep asking
+    unsure: false,    // …or so it seemed: nothing answered, which a dead network also looks like
     seen: false,      // the API has answered from this address before
+    nodb: false,      // the API is here but has no database linked
     gone: false,      // this device was unlinked on purpose; do not make a new account by itself
     cred: null,       // { id, key }
     pub: '',          // the short public tag shown on leaderboards
@@ -32,12 +34,15 @@
     onChange: null, onAdopt: null, onNote: null
   };
   var probeFails = 0, timer = 0, pullNext = false, known = false, waiters = [];
-  // Other parts of the game (online rooms) ask whether the API is here; they get their answer once the first look is done.
-  Cloud.whenKnown = function (cb) { if (known || Cloud.dead) cb(Cloud.on); else waiters.push(cb); };
+  // Other parts of the game (online rooms) ask whether this host has the API; they get their answer once the first
+  // look is done. The answer is "no" only when that is certain: a look that merely failed (a bad moment on the
+  // network) must not send one player to the public broker while their friend's room is on our own server.
+  Cloud.hosted = function () { return known && !Cloud.dead && !Cloud.nodb; };
+  Cloud.whenKnown = function (cb) { if (known || Cloud.dead) cb(Cloud.hosted()); else waiters.push(cb); };
   function nowKnown() {
     known = true;
     var w = waiters; waiters = [];
-    for (var i = 0; i < w.length; i++) w[i](Cloud.on);
+    for (var i = 0; i < w.length; i++) w[i](Cloud.hosted());
   }
 
   // ---------- what is kept on the device ----------
@@ -52,6 +57,7 @@
     } catch (e) { return null; }
   }
   function persist() {
+    if (!Cloud.cred && !Cloud.gone) theirs();   // never write over an account another tab has just made
     var st = storage(), c = Cloud.cred;
     var v = { id: c ? c.id : '', key: c ? c.key : '', pub: Cloud.pub, gone: Cloud.gone, seen: Cloud.seen, base: c ? null : Cloud.base,
       q: Cloud.q.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) };
@@ -80,7 +86,8 @@
     if (!f) return Promise.reject(new Error('no fetch'));
     var o = { method: method, headers: {}, credentials: 'same-origin', cache: 'no-store' }, ctl = null, t = 0;
     if (body) { o.body = JSON.stringify(body); o.headers['Content-Type'] = 'application/json'; o.keepalive = o.body.length < 60000; }
-    if (auth && Cloud.cred) o.headers.Authorization = 'Bearer ' + Cloud.cred.id + '.' + Cloud.cred.key;
+    var who = auth === true ? Cloud.cred : auth;
+    if (who) o.headers.Authorization = 'Bearer ' + who.id + '.' + who.key;
     if (typeof AbortController === 'function') { ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 15000); }
     var done = function () { if (t) clearTimeout(t); };
     return f(Cloud.api + path, o).then(function (res) {
@@ -103,6 +110,46 @@
     if (timer) clearTimeout(timer);
     timer = later(function () { timer = 0; Cloud.flush(); }, ms);
   }
+
+  // ---------- several tabs of one browser ----------
+  // They share the store, so they must end up on one account, and none of them may lose what it still has to send.
+  //
+  // The account another tab has put in the store, if there is one: this tab joins it and keeps its own queue (the
+  // server knows each change by its id, so one that both tabs send is still done once).
+  // spare: an account this tab has just made itself. If another tab was quicker, that one is one too many.
+  function theirs(spare) {
+    var v = readStore();
+    if (!v || !v.id || !v.key || v.gone || (spare && v.id === spare.id)) return false;
+    if (spare) call('POST', 'rpc', { a: 'delete' }, { id: spare.id, key: spare.key }).then(null, function () {});
+    Cloud.cred = { id: v.id, key: v.key };
+    Cloud.pub = typeof v.pub === 'string' ? v.pub : '';
+    Cloud.base = null; Cloud.want = false; Cloud.gone = false;
+    return true;
+  }
+  // One tab at a time. Where the browser cannot do that (it is rare), fn simply runs.
+  function alone(fn) {
+    var nav = root.navigator, locks = Cloud.locks === undefined ? nav && nav.locks : Cloud.locks, ran = false;
+    var go = function () { ran = true; return fn(); };
+    if (!locks || typeof locks.request !== 'function') return Promise.resolve().then(go);
+    try {
+      return Promise.resolve(locks.request(KEY, go)).then(null, function (e) { if (ran) throw e; return go(); });
+    } catch (e) { return Promise.resolve().then(go); }
+  }
+  // Another tab changed which account this browser uses: it made one, switched to another save, or unlinked.
+  Cloud.follow = function () {
+    var v = readStore() || {}, id = v.id && v.key ? v.id : '', mine = Cloud.cred ? Cloud.cred.id : '', gone = !id && !!v.gone;
+    if (id === mine && gone === Cloud.gone) return false;
+    if (!id && !gone && mine) { persist(); return false; }   // a tab that had not heard of the account wrote over it: put it back
+    var join = !!id && !mine;                                  // it made the account this tab was about to make
+    Cloud.cred = id ? { id: v.id, key: v.key } : null;
+    Cloud.pub = id && typeof v.pub === 'string' ? v.pub : '';
+    Cloud.gone = gone; Cloud.want = false;
+    if (!join) Cloud.q = [];                                   // a different save, or none: what waited here was meant for the old one
+    Cloud.base = Cloud.cred || gone ? null : snapshot();
+    if (Cloud.cred && Cloud.on) Cloud.flush(true);
+    changed();
+    return true;
+  };
 
   // ---------- the queue ----------
   function push(k, a) {
@@ -150,14 +197,18 @@
   // One request. Answers 'more' (go on), 'done' or 'wait' (try again later).
   function step() {
     if (!Cloud.cred) {
-      // another tab may have made the account a moment ago
-      var other = readStore();
-      if (other && other.id && other.key) { Cloud.cred = { id: other.id, key: other.key }; Cloud.pub = other.pub || ''; Cloud.base = null; return Promise.resolve('more'); }
-      return call('POST', 'rpc', { a: 'hello', st: Cloud.base || snapshot() }).then(function (r) {
-        var b = r.body;
-        if (r.status === 200 && b && b.ok && b.id && b.key) { take(b); adopt(b.st); return 'more'; }
-        if (r.status === 429) Cloud.fails = Math.max(Cloud.fails, 6);
-        return 'wait';
+      return alone(function () {
+        if (Cloud.cred || theirs()) return 'more';   // another tab made the account while this one waited its turn
+        return call('POST', 'rpc', { a: 'hello', st: Cloud.base || snapshot() }).then(function (r) {
+          var b = r.body;
+          if (r.status === 200 && b && b.ok && b.id && b.key) {
+            if (theirs(b)) return 'more';            // (a browser that cannot take turns) another tab got there first
+            take(b); adopt(b.st);
+            return 'more';
+          }
+          if (r.status === 429) Cloud.fails = Math.max(Cloud.fails, 6);
+          return 'wait';
+        });
       });
     }
     var batch = Cloud.q.slice(0, BATCH), ids = {};
@@ -206,8 +257,9 @@
   };
 
   // ---------- is there an API here at all ----------
-  function none() {
-    Cloud.dead = true; Cloud.on = false;
+  // unsure: nothing answered at all (as opposed to a host that plainly said "no such thing here")
+  function none(unsure) {
+    Cloud.dead = true; Cloud.on = false; Cloud.unsure = !!unsure;
     if (!Cloud.cred) { Cloud.q = []; Cloud.base = null; persist(); }
     nowKnown();
     changed();
@@ -216,9 +268,10 @@
     if (Cloud.dead) return Promise.resolve(false);
     var again = function () {
       probeFails++;
-      if (!Cloud.seen && !Cloud.cred && probeFails >= 3) { none(); return false; }
-      if (Cloud.auto) later(probe, Math.min(300000, 4000 * Math.pow(2, Math.min(7, probeFails))));
-      nowKnown();
+      var fresh = !Cloud.seen && !Cloud.cred;      // nothing has ever answered from this address
+      if (fresh && probeFails >= 3) { none(true); return false; }
+      if (Cloud.auto) later(probe, fresh ? 1200 * probeFails : Math.min(300000, 4000 * Math.pow(2, Math.min(7, probeFails))));
+      if (!fresh) nowKnown();                      // the API has been here before: a bad moment, not a missing server
       changed();
       return false;
     };
@@ -226,8 +279,8 @@
       var b = r.body;
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
-        if (!b.db) { Cloud.on = false; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true;
+        if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
+        Cloud.on = true; Cloud.nodb = false;
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
@@ -239,6 +292,14 @@
     }, again);
   }
   Cloud.probe = probe;
+  // Asked when it matters (an online room is about to be opened, the network is back): if the API was written off
+  // only because nothing answered, look once more.
+  Cloud.recheck = function () {
+    if (!Cloud.dead || !Cloud.unsure) return Promise.resolve(Cloud.hosted());
+    Cloud.dead = false; Cloud.unsure = false; probeFails = 2;
+    if (!Cloud.cred && !Cloud.base) Cloud.base = snapshot();
+    return probe().then(function () { return Cloud.hosted(); });
+  };
 
   // ---------- start ----------
   Cloud.init = function (o) {
@@ -247,7 +308,8 @@
     if (o.store) Cloud.store = o.store;
     if (o.now) Cloud.now = o.now;
     if (o.auto != null) Cloud.auto = o.auto;
-    Cloud.dead = false; Cloud.on = false; Cloud.busy = null; Cloud.fails = 0; Cloud.skew = 0; probeFails = 0; pullNext = false; known = false;
+    if ('locks' in o) Cloud.locks = o.locks;
+    Cloud.dead = false; Cloud.unsure = false; Cloud.on = false; Cloud.nodb = false; Cloud.busy = null; Cloud.fails = 0; Cloud.skew = 0; probeFails = 0; pullNext = false; known = false;
     load();
     if (!Cloud.cred && !Cloud.base) Cloud.base = snapshot();
     Meta.now = function () { return Cloud.now() + Cloud.skew; };
@@ -560,8 +622,8 @@
     showLink();
     refresh();
     // the online lobby words its note by whether the relay is there; redraw it once that is known
-    if (wasOn !== Cloud.on) {
-      wasOn = Cloud.on;
+    if (wasOn !== Cloud.hosted()) {
+      wasOn = Cloud.hosted();
       var net = ZZ.Net, active = document.activeElement;
       if (App.sheet() === 'online' && net && (net.state === 'idle' || net.state === 'error') && !(active && active.id === 'nCode')) App.openSheet('online');
     }
@@ -585,20 +647,11 @@
     try { local = !/^https?:$/.test(window.location.protocol) || /[?&]cloud=off\b/.test(window.location.search); } catch (e) { local = true; }
     Cloud.init({ local: local });
     showLink();
-    window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); });
+    window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); else Cloud.recheck(); });
     window.addEventListener('pagehide', function () { Cloud.flush(); });
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden && Cloud.on && Cloud.cred && Date.now() - Cloud.last > 60000) Cloud.flush(true);
     });
-    window.addEventListener('storage', function (e) {
-      if (e.key !== KEY) return;
-      // another tab linked, unlinked or switched the save: follow it
-      var v = readStore() || {}, id = Cloud.cred ? Cloud.cred.id : '';
-      if ((v.id || '') === id && !!v.gone === Cloud.gone) return;
-      Cloud.cred = v.id && v.key ? { id: v.id, key: v.key } : null;
-      Cloud.pub = v.pub || ''; Cloud.gone = !!v.gone; Cloud.q = []; Cloud.base = null;
-      if (Cloud.cred && Cloud.on) Cloud.flush(true);
-      Cloud.onChange();
-    });
+    window.addEventListener('storage', function (e) { if (e.key === KEY) Cloud.follow(); });
   });
 })(typeof window !== 'undefined' ? window : globalThis);

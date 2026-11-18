@@ -84,11 +84,42 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   // ---------- the network is down on the very first visit ----------
   net.down = true;
   const O = await open(device('offline'));
-  ok(C.status() === 'none' && !C.dead, 'no answer yet: local for now, still willing to ask');
+  ok(C.status() === 'busy' && !C.dead, 'no answer yet: still finding out');
+  let told = null;
+  C.whenKnown(v => { told = v; });
+  ok(told === null, 'whoever asks whether the API is here is kept waiting rather than told "no"');
   M.buyItem(1);
   eq(C.q.length, 1, 'changes are kept in case the server turns up');
   await C.probe(); await C.probe();
-  ok(C.dead && C.q.length === 0, 'after three tries with no answer ever seen, it stays local and drops the queue');
+  ok(C.dead && C.unsure && C.q.length === 0 && C.status() === 'none', 'after three tries with no answer ever seen, it stays local and drops the queue');
+  ok(told === false && C.hosted() === false, 'and the one who asked gets the answer');
+  M.buyItem(1);
+  eq(C.q.length, 0, 'nothing is queued while it is local');
+  // …but that was a dead network, not a host without the API. When it matters, it looks once more.
+  eq(await C.recheck(), false, 'still nothing: still local');
+  ok(C.dead && C.unsure, 'and still unsure');
+  net.down = false;
+  eq(await C.recheck(), true, 'the network is back: the API is found after all');
+  await settle();
+  ok(C.on && !C.dead && C.hosted() && C.status() === 'new', 'the cloud is on from here', [C.on, C.dead, C.status()]);
+  const coinsO = M.data.coins;
+  M.buyItem(2);
+  await send();
+  let svO = await server(O);
+  ok(C.status() === 'ok' && svO.coins === M.data.coins && svO.coins === coinsO - M.ITEM_PRICE[2] && svO.items[1] === 2 && svO.items[2] === 1, 'what was bought while local comes along once, what is bought now is counted once', [svO.coins, coinsO, svO.items]);
+  await C.wipe(); await pg.query('DELETE FROM zz.rate');
+  net.calls = [];
+  // a host that plainly has no API is not asked again
+  net.static = true;
+  await open(device('pages2'));
+  eq([C.dead, C.unsure, await C.recheck(), net.calls.length], [true, false, false, 1], 'a plain "not here" is final');
+  net.static = false; net.calls = [];
+  // the API has answered here before: one bad moment does not make it "not here"
+  const seenDev = device('seen'); seenDev.mem['zhuanzhuan.cloud.v1'] = JSON.stringify({ id: '', key: '', pub: '', gone: false, seen: true, base: null, q: [] });
+  net.down = true;
+  await open(seenDev);
+  told = null; C.whenKnown(v => { told = v; });
+  ok(told === true && C.hosted() && !C.dead && C.status() === 'wait', 'a host known to have the API keeps counting as one while the network is down', [told, C.status()]);
   net.down = false; net.calls = [];
 
   // ---------- a first-time visitor ----------

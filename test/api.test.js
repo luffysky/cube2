@@ -328,6 +328,21 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok((await room({ a: 'close', code: rc, key: hostKey })).json.ok, 'the host closes it');
   eq([(await x(guestKey, 1, 2, [])).status, (await x(hostKey, 0, 1, [])).status, (await room({ a: 'join', code: rc, key: otherKey })).status], [404, 404, 404], 'a closed room is gone for everyone');
   eq((await pg.query('SELECT count(*)::int AS n FROM zz.mail WHERE room = $1', [rc]))[0].n, 0, 'with everything that was waiting in it');
+  // the host leaves: a goodbye sent together with "this is my last word"
+  const last = (key, role, code, out) => room({ a: 'x', code, key, role, ack: 0, out: out || [], end: true });
+  r = await room({ a: 'open', key: hostKey }, { ip: '198.51.100.210' }); const rc3 = r.json.code;
+  ok((await last(hostKey, 0, rc3)).json.ok, 'the host of an empty room says its last word');
+  eq([(await room({ a: 'join', code: rc3, key: guestKey })).status, (await pg.query('SELECT count(*)::int AS n FROM zz.rooms WHERE code = $1', [rc3]))[0].n], [404, 0], 'an empty room is gone at once: its code no longer works');
+  r = await room({ a: 'open', key: hostKey }, { ip: '198.51.100.210' }); const rc4 = r.json.code;
+  await room({ a: 'join', code: rc4, key: guestKey });
+  ok((await last(guestKey, 1, rc4, [{ n: 1, m: { t: 'bye' } }])).json.ok && (await x(hostKey, 0, 0, [], rc4)).json.in.length === 1, 'a guest leaving does not take the room down; the host hears the goodbye');
+  ok((await room({ a: 'x', code: rc4, key: hostKey, role: 0, ack: 1, out: [], end: 'yes' })).json.ok && (await x(guestKey, 1, 0, [], rc4)).status === 200, 'only a real true counts as the last word');
+  ok((await last(hostKey, 0, rc4, [{ n: 1, m: { t: 'end', score: 99 } }, { n: 2, m: { t: 'bye' } }])).json.ok, 'the host leaves a room with a guest in it');
+  r = await x(guestKey, 1, 0, [], rc4);
+  eq(r.json.in.map(l => l.m.t), ['end', 'bye'], 'the guest still collects the final score and the goodbye');
+  eq((await room({ a: 'join', code: rc4, key: otherKey })).status, 409, 'nobody new gets in meanwhile');
+  now += 15001;
+  eq([(await x(guestKey, 1, 2, [], rc4)).status, (await x(hostKey, 0, 1, [], rc4)).status, (await room({ a: 'join', code: rc4, key: otherKey })).status], [404, 404, 404], 'fifteen seconds later the room is gone');
   // rooms run out by themselves
   r = await room({ a: 'open', key: hostKey }); const rc2 = r.json.code;
   now += 3 * HOUR + 1;

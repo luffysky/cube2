@@ -188,7 +188,8 @@ const ROOM = {
   TTL: 3 * 3600000,          // a room lives this long, then it and its letters are removed
   OPEN_PER_HOUR: 40, JOIN_TRIES: 60, JOIN_WINDOW: 10 * 60000,
   MAIL_MAX: 400,             // letters that may wait unread in one box
-  BATCH: 80, MSG_BYTES: 4096, INBOX: 120
+  BATCH: 80, MSG_BYTES: 4096, INBOX: 120,
+  LINGER: 15000              // after the host has left, a guest still has this long to collect the last letters
 };
 const SEAT = /^[A-Za-z0-9_-]{20,64}$/;
 function readRoom(v) {
@@ -261,9 +262,15 @@ async function roomExchange(db, body, now) {
   const rows = await db.query(EXCHANGE, [code, role, sha(body.key), 1 - role, JSON.stringify(out), ack, now, ROOM.MAIL_MAX]);
   const r = rows[0];
   if (!r || !r.ok) return fail(404, 'room');
+  if (body.end === true && role === 0) await db.query(LEAVE, [code, sha(body.key), now + ROOM.LINGER]);   // the host's last word
   return good({ paired: !!r.paired, in: r.inbox || [], now });
 }
-// The host closes the room: the code stops working at once and anything still waiting is dropped.
+// The host leaves. With nobody else in the room it is gone at once and its code stops working. With a guest in it,
+// the room lasts a few seconds more so that the goodbye (and a final score) still reaches them; nobody new can get in.
+const LEAVE = `
+  WITH empty AS (DELETE FROM zz.rooms WHERE code = $1 AND hk = $2 AND jk IS NULL RETURNING 1)
+  UPDATE zz.rooms SET exp = LEAST(exp, $3::float8) WHERE code = $1 AND hk = $2 AND jk IS NOT NULL`;
+// The host closes the room outright: the code stops working at once and anything still waiting is dropped.
 async function roomClose(db, body) {
   const code = readRoom(body.code);
   if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');

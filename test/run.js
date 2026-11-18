@@ -4,7 +4,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 let bad = 0;
-for (const t of ['engine', 'score', 'meta', 'replay', 'openers', 'drills', 'i18n', 'api', 'cloud']) {
+for (const t of ['engine', 'score', 'meta', 'replay', 'openers', 'drills', 'i18n', 'api', 'cloud', 'tabs']) {
   const r = spawnSync(process.execPath, [path.join(__dirname, t + '.test.js')], { encoding: 'utf8' });
   const last = (r.stdout || '').trim().split('\n').pop() || '';
   console.log((r.status === 0 ? 'ok   ' : 'FAIL ') + t.padEnd(8) + last.slice(0, 90));
