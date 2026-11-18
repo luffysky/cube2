@@ -78,7 +78,7 @@
   function call(method, path, body, auth) {
     var f = Cloud.fetch || (typeof root.fetch === 'function' ? function (u, o) { return root.fetch(u, o); } : null);
     if (!f) return Promise.reject(new Error('no fetch'));
-    var o = { method: method, headers: {}, credentials: 'omit', cache: 'no-store' }, ctl = null, t = 0;
+    var o = { method: method, headers: {}, credentials: 'same-origin', cache: 'no-store' }, ctl = null, t = 0;
     if (body) { o.body = JSON.stringify(body); o.headers['Content-Type'] = 'application/json'; o.keepalive = o.body.length < 60000; }
     if (auth && Cloud.cred) o.headers.Authorization = 'Bearer ' + Cloud.cred.id + '.' + Cloud.cred.key;
     if (typeof AbortController === 'function') { ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 15000); }

@@ -74,7 +74,7 @@
 
   // ---------- our own relay ----------
   function rpc(body, last) {
-    var o = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', keepalive: !!last }, t = 0;
+    var o = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin', cache: 'no-store', keepalive: !!last }, t = 0;
     if (typeof AbortController === 'function') { var ctl = new AbortController(); o.signal = ctl.signal; t = setTimeout(function () { ctl.abort(); }, 9000); }
     return window.fetch('api/room', o).then(function (res) {
       return res.text().then(function (text) {
