@@ -51,7 +51,7 @@
   }
   // The computer that steps in when a ghost can no longer follow its recording: same pace, a style to match the attack rate.
   function botCfg(sum) {
-    var apm = (sum && sum.apm) || 10, lv = apm < 6 ? 0 : apm < 14 ? 1 : apm < 24 ? 2 : apm < 40 ? 3 : 4, L = ZZ.Bot.LEVELS[lv];
+    var apm = (sum && sum.apm) || 10, lv = apm < 1.5 ? 5 : apm < 3.5 ? 6 : apm < 6 ? 0 : apm < 14 ? 1 : apm < 24 ? 2 : apm < 40 ? 3 : 4, L = ZZ.Bot.LEVELS[lv];
     return { pps: Math.max(0.4, Math.min(3, (sum && sum.pps) || L.pps)), depth: L.depth, hold: L.hold, noise: L.noise, w: L.w };
   }
 

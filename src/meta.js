@@ -28,15 +28,19 @@
   }
   var FOES = ['阿土', '磚頭伯', '小釉', '瓦片姐', '泥作仔', '阿窯', '磨石嬸', '水泥哥', '砌牆王', '青花妹', '老窯頭', '白瓷姨', '琉璃仔', '金磚爺'];
   // The opponent for a rating: speed and care rise smoothly, the playing style switches at the level boundaries.
+  // The ladder starts with the two beginner levels, 150 points apiece (so the first tier is a gentle one), and from
+  // 300 on each level takes 450 points, as it always has.
   function botFor(rp, rnd) {
-    var L = ZZ.Bot.LEVELS, t = Math.max(0, Math.min(rp, 2400)) / 450, i = Math.min(3, Math.floor(t)), f = Math.min(1, t - i);
-    var a = L[i], b = L[i + 1], near = f < 0.5 ? a : b, over = Math.max(0, t - 4);
+    var B = ZZ.Bot, L = B.ORDER.map(function (n) { return B.LEVELS[n]; }), top = L.length - 1;
+    rp = Math.max(0, Math.min(rp, 2700));
+    var t = rp < 300 ? rp / 150 : 2 + (rp - 300) / 450, i = Math.min(top - 1, Math.floor(t)), f = Math.min(1, t - i);
+    var a = L[i], b = L[i + 1], near = f < 0.5 ? a : b, over = Math.max(0, t - top);
     var r = rnd ? rnd() : Math.random();
     return {
       name: FOES[Math.floor(r * FOES.length) % FOES.length],
       pps: Math.round((a.pps + (b.pps - a.pps) * f + over * 0.6) * 100) / 100,
       noise: Math.round((a.noise + (b.noise - a.noise) * f) * 10) / 10,
-      depth: near.depth, hold: near.hold, w: near.w, level: f < 0.5 ? i : i + 1
+      depth: near.depth, hold: near.hold, w: near.w, level: B.LEVELS.indexOf(near)
     };
   }
 
@@ -360,7 +364,7 @@
   };
 
   // ---------- after a match ----------
-  var WIN_AI = [10, 15, 22, 30, 40];
+  var WIN_AI = [10, 15, 22, 30, 40, 5, 7];   // by level number; the last two are the beginner levels
   var MODES = { ai: 1, rank: 1, ghost: 1, net: 1, sprint: 1 };
   // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
   // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
@@ -371,7 +375,7 @@
     var ms = int(m.ms != null ? m.ms : m.time, 0, 3600000), sec = ms / 1000;
     var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
     return {
-      mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 4),
+      mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 6),
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       ms: ms, time: sprint ? ms : 0,
       stats: {

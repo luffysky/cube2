@@ -1,6 +1,6 @@
 {
   "name": "zhuanzhuan",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "private": true,
   "description": "轉磚對戰：一頁式的落下方塊對戰遊戲，加上一組放在 Vercel 的小 API（匿名帳號、雲端存檔、排行榜）",
   "scripts": {

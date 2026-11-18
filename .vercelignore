@@ -1,0 +1,8 @@
+# Not part of the published site: papers, tests and tools. (The API still gets everything it needs: api/, server/, src/.)
+# A leading slash means "only at the top", so nothing with the same name deeper down is touched.
+/docs
+/test
+/tools
+/shots
+/build_tmp
+/README.md

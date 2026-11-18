@@ -1144,6 +1144,8 @@
     count: function (s) { s.clip('count', 0.7) || s.tone(660, 0.1, 'sine', 0.1); },
     go: function (s) { if (!s.clip('go', 0.7)) { s.tone(990, 0.24, 'sine', 0.12); s.tone(1485, 0.24, 'sine', 0.05); } },
     win: function (s) { s.clip('win', 0.7); [0, 2, 4, 7].forEach(function (n, i) { s.tone(SCALE[n], 0.26, 'sine', 0.08, null, 0.1 + i * 0.11); }); },
+    // a match won: the crowd, with the little fanfare on top (the fanfare alone when recorded sounds are off)
+    cheer: function (s) { s.clip('cheer', 0.85); LIB.win(s); },
     lose: function (s) { if (!s.clip('lose', 0.7)) [4, 2, 1, 0].forEach(function (n, i) { s.tone(SCALE[n] / 2, 0.3, 'triangle', 0.09, null, i * 0.13); }); },
     fail: function (s) { s.clip('fail', 0.6) || s.tone(300, 0.22, 'triangle', 0.09, 200); },
     itemGet: function (s) { if (!s.clip('itemGet', 0.7)) { s.tone(880, 0.09, 'sine', 0.1); s.tone(1320, 0.14, 'sine', 0.09, null, 0.08); } },

@@ -1,4 +1,4 @@
-/* 轉磚 drills: preset walls for the T-spin dojo. Rows are listed top to bottom and sit on the floor. */
+/* 轉磚 drills: preset walls for the spin dojo. Rows are listed top to bottom and sit on the floor. */
 (function (root) {
   'use strict';
   var ZZ = root.ZZ || require('./engine.js');
@@ -81,6 +81,18 @@
       goal: { piece: 'J', spin: 'spin', lines: 2 }, queue: ['J'],
       tip: '跟 L 轉左右相反。往右一格，順轉立起來，降進直井，再逆轉躺平。',
       board: ['XXXXX.XXXX', 'XXXXX...XX']
+    },
+    {
+      id: 'i-spin', name: '長條轉',
+      goal: { piece: 'I', spin: 'spin', lines: 1 }, queue: ['I'],
+      tip: '長條靠左立起來，對準直井降到底，再往屋簷那一邊轉，它會整條躺平鑽進去。',
+      board: ['X.XXXXXXXX', 'X.XXXXXXXX', 'X....XXXXX']
+    },
+    {
+      id: 'i-spin-l', name: '長條轉，換邊',
+      goal: { piece: 'I', spin: 'spin', lines: 1 }, queue: ['I'],
+      tip: '直井換到右邊。一樣立起來降到底，這次要往左轉。轉錯邊它會跳回屋頂上。',
+      board: ['XXXXXXXX.X', 'XXXXXXXX.X', 'XXXXX....X']
     }
   ];
 

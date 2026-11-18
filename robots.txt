@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /src/
+Disallow: /server/
+Disallow: /test/
+Disallow: /tools/
+Disallow: /docs/
+Disallow: /vendor/
+
+Sitemap: https://cube2-xi.vercel.app/sitemap.xml

@@ -66,8 +66,23 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
     await page.keyboard.press('Escape'); await page.click('[data-do="menu"]');
     await page.evaluate(() => { ZZ.peek().save.dojo = 8; });
     await page.click('[data-go="dojo"]'); await sleep(150);
-    ok(await page.evaluate(() => document.querySelectorAll('#sheetCard [data-drill]').length) === 13, 'dojo lists thirteen drills');
+    ok(await page.evaluate(() => document.querySelectorAll('#sheetCard [data-drill]').length) === 15, 'dojo lists fifteen drills');
+    ok(await page.evaluate(() => /長條轉/.test(document.querySelector('#sheetCard [data-drill="13"]').textContent) && /長條轉/.test(document.querySelector('#sheetCard [data-drill="14"]').textContent)), 'the last two are the long-bar spins');
     await page.screenshot({ path: path.join(OUT, 'n3-dojo-list.png') });
+    // the long-bar spin, played by hand: stand it up at the left wall, drop it down the shaft, turn toward the roof
+    await page.click('[data-drill="13"]'); await sleep(300);
+    for (const k of ['ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'KeyZ']) { await page.keyboard.press(k); await sleep(40); }
+    await page.keyboard.down('ArrowDown'); await sleep(700); await page.keyboard.up('ArrowDown');
+    await page.keyboard.press('KeyX'); await sleep(60);
+    ok(await ev(page, 'return S.me.spinState()') === 'spin' && await ev(page, 'return S.me.cur && S.me.cur.type') === 'I', 'the long bar twists in under the roof and is locked in', await ev(page, 'return [S.me.spinState(), S.me.cur && [S.me.cur.x, S.me.cur.y, S.me.cur.rot]]'));
+    await page.keyboard.press('Space'); await sleep(200);
+    ok(/長條轉單消/.test(await page.evaluate(() => document.getElementById('pops').textContent + document.getElementById('banner').textContent + document.getElementById('strip').textContent)), 'and is called by its name', await page.evaluate(() => document.getElementById('pops').textContent));
+    ok(await ev(page, 'return p.save.dojo') === 14, 'the drill counts as passed', await ev(page, 'return p.save.dojo'));
+    await page.screenshot({ path: path.join(OUT, 'n3b-ispin.png') });
+    await sleep(1700);
+    await page.keyboard.press('Escape'); await page.click('[data-do="menu"]');
+    await page.evaluate(() => { ZZ.peek().save.dojo = 8; });
+    await page.click('[data-go="dojo"]'); await sleep(150);
     await page.click('[data-drill="8"]'); await sleep(300);
     await page.click('[data-act="demo"]'); await sleep(4200);
     await page.screenshot({ path: path.join(OUT, 'n4-zdrill-demo.png') });

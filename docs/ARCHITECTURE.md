@@ -5,7 +5,7 @@
 ## 怎麼跑
 
 ```
-node build.js                      # 把 src/ 組成根目錄的 index.html
+node build.js                      # 把 src/ 組成根目錄的 index.html（順便產生 manifest.webmanifest、sw.js、robots.txt、sitemap.xml）
 python3 -m http.server 8765        # 在專案根目錄開一個本機伺服器（音樂要走 http 才載得到）
 ```
 
@@ -23,7 +23,7 @@ npm run dev                        # http://127.0.0.1:8770/，遊戲和 /api 同
 | 檔案 | 做什麼 | 能不能在 Node 跑 |
 |---|---|---|
 | `src/engine.js` | 規則：場地、方塊、旋轉踢牆、各種轉的判定、攻擊與水泥、得分、道具對牆面的效果 | 可以 |
-| `src/bot.js` | 電腦對手：可到達落點搜尋、評分、兩步前瞻、五個等級；旋轉雷達；道場解題 | 可以 |
+| `src/bot.js` | 電腦對手：可到達落點搜尋、評分、兩步前瞻、七個等級與整體難度（`eased`）；旋轉雷達；道場解題 | 可以 |
 | `src/meta.js` | 金幣、段位、每日任務、簽到、商店目錄、擁有與穿戴、會員、每場結算 | 可以 |
 | `src/replay.js` | 錄下一場對戰；分身（照錄影重放的對手） | 可以 |
 | `src/i18n.js` | 所有文字，每個 key 是 `[繁中, 英, 日, 韓]`；簡中由繁中即時轉換 | 可以 |
@@ -41,7 +41,11 @@ npm run dev                        # http://127.0.0.1:8770/，遊戲和 /api 同
 | `server/rules.js` | 伺服器怎麼重算一筆操作、匯入舊進度時怎麼夾值、對局回報的限制 | Node |
 | `server/db.js` | 唯一碰資料庫連線的地方；第一次用到時自動建表 | Node |
 | `tools/dev-server.js`、`tools/pglite-db.js` | 本機開發與測試用的伺服器和記憶體資料庫，正式環境不會載入 | Node |
-| `src/sfxdata.js` | 內嵌的音效（base64），由 `tools/build_audio.py` 產生 | — |
+| `src/pwa.js` | 安裝成 App：註冊 service worker、選單上的「安裝」、`?go=` 直接進某個模式 | 瀏覽器 |
+| `src/sw.template.js` | service worker 的原始檔；`build.js` 蓋上版本後寫成根目錄的 `sw.js` | — |
+| `build.js` | 組出 `index.html`，填好給搜尋引擎和分享預覽看的標籤，產生 `manifest.webmanifest`、`sw.js`、`robots.txt`、`sitemap.xml` | Node |
+| `icons/` | 圖示、分享預覽圖、安裝畫面用的截圖。圖示由 `tools/make_icons.py` 畫，其餘由 `tools/shots.js` 從遊戲本身截 | — |
+| `src/sfxdata.js` | 內嵌的音效（base64），由 `tools/build_audio.py` 產生；之後加的單一音效用 `tools/add_clip.py` | — |
 | `audio/` | 五首循環音樂（ogg 和 mp3 各一份） | — |
 | `vendor/peerjs.min.js` | 連線用的函式庫，進入連線大廳時才載入 | — |
 
@@ -77,6 +81,14 @@ npm run dev                        # http://127.0.0.1:8770/，遊戲和 /api 同
 **加一堂開局課**：在 `tools/find_opener.js` 的 `SPECS` 描述目標形狀，跑出結果後用 `tools/make_openers.js` 產生 `src/openers.js`，再到 `modes.js` 加課名 `o.<id>.n` 和說明 `o.<id>.t`。`node test/openers.test.js` 會用引擎把每一步走一遍。
 
 **調數值**：金幣、價格、段位門檻都在 `meta.js`；攻擊表和得分表在 `engine.js` 開頭；電腦等級在 `bot.js` 的 `LEVELS`。
+
+**電腦的難度**有三層。`LEVELS` 是七個等級，陣列裡的位置就是存檔和伺服器用的編號，所以新等級只能加在最後面；由易到難的順序另外寫在 `ORDER`。設定裡的「電腦難度」（`set.ai`，-2 到 2）透過 `Bot.eased` 把「對戰」裡每個等級一起調慢調粗心、或調快調精準，不影響排位賽。排位賽的對手由 `meta.js` 的 `botFor(段位分)` 決定：0 分是最簡單的「新手」，150 分「小工」，300 分起才是原本的五級，每 450 分一級。調完用 `node tools/try_levels.js` 看每個等級「兩分鐘會送幾行、會自己疊死幾次」（也可以丟一組還沒寫進去的數值給它試），`node test/sim.js` 則是更完整的單人與對打數據。
+
+**加一個音效**：`python3 -I tools/add_clip.py <名字> <音檔> [保留幾秒] [淡出幾秒]` 會裁切、轉單聲道、調到固定音量，塞進 `src/sfxdata.js`；再到 `view.js` 的 `LIB` 加一行怎麼播。
+
+**換網域**：`build.js` 的 `SITE`（或環境變數 `ZZ_SITE`）。它會寫進 canonical、分享預覽圖的網址、`robots.txt` 和 `sitemap.xml`。
+
+**重畫圖示或重截預覽圖**：`python3 -I tools/make_icons.py`；`node tools/shots.js`（需要的字型怎麼裝寫在檔案開頭），之後再 `node build.js` 一次。
 
 ## 幾個設計決定
 
@@ -183,6 +195,20 @@ Vercel 專案連到這個 GitHub 程式庫，推到 `main` 就部署正式站，
 
 想多一層保護，可以在 Vercel 的 Firewall 對 `/api/` 加每個位址的請求頻率限制。
 
+`.vercelignore` 把文件、測試和工具排除在外，它們不會出現在網站上（API 需要的 `api/`、`server/`、`src/` 都還在）。`vercel.json` 的 `headers` 幫音樂和圖示加了快取時間，並且請搜尋引擎不要收錄原始碼。
+
+## 安裝成 App、離線、被搜尋到
+
+**Service worker**（`sw.js`）只做三件事：頁面本身永遠先向網路要，四秒內沒有回應或根本沒網路才用留存的那一份，所以新版不會被舊的快取卡住；音樂和圖示第一次抓到之後留著；`api/` 底下的請求完全不碰。每次 build 版本字串都會變，瀏覽器就會換上新的 worker 並清掉舊的頁面快取。網址加 `?sw=off` 這次不註冊。
+
+**安裝**：Chrome、Edge、Android 會送 `beforeinstallprompt`，這時選單最下面出現「安裝成 App」；iPhone 沒有這個事件，改成說明怎麼用「分享 → 加入主畫面」。通訊軟體內建的瀏覽器裝不了，就不顯示。
+
+**給搜尋引擎的**：`<head>` 裡的標題、說明、canonical、五種語言的 hreflang、Open Graph、Twitter 卡片、JSON-LD（VideoGame）都由 `build.js` 從 `i18n.js` 的 `seo.*` 填進去。頁面裡的文字在 build 時先填好繁體中文，不跑程式的爬蟲也讀得到。`?lang=en` 這類網址會顯示該語言並把自己設為 canonical。文案裡刻意不用別人的商標名稱。
+
+## 各種螢幕
+
+版面分兩層。`style.css` 最後面的「各種螢幕」是斷點：≤359、480、600、768、1024、1440、1920、2560，加上橫拿的手機和橫拿的平板，管選單、面板、文字和按鍵。對局畫面的磚塊大小、兩側欄寬、平板的按鍵高度由 `ui.js` 的 `layout()` 依視窗算：手機最多 34 px 一格，平板和直立視窗到 56，橫向大螢幕到 64，側欄跟著磚塊放大。`node test/rwd.js` 會把十九種螢幕各截三張圖（`shots/rwd-*.png`）並檢查沒有東西跑出畫面。
+
 ## 測試
 
 ```
@@ -210,9 +236,12 @@ node test/browser3.js        # 道具、音樂、其他方塊的轉
 node test/sizes.js           # 各種螢幕尺寸
 node test/pad.js             # 觸控按鍵的位置與大小，七種螢幕、五種模式
 node test/cloudui.js         # 雲端存檔與排行榜的畫面（自己會啟動 tools/dev-server.js，不需要另外開伺服器）
+node test/pwa.js             # 搜尋引擎標籤、manifest 與圖示、service worker、離線、安裝、?lang= 與 ?go=（同上，自己啟動伺服器）
+node test/rwd.js             # 十九種螢幕的選單、面板、對局各截一張，檢查沒有東西超出畫面
+node test/levels.js          # 七個電腦等級、設定裡的「電腦難度」、排位不受影響、贏了才有歡呼
 ```
 
-網址參數：`?net=bc` 用瀏覽器內的測試通道代替 WebRTC；`?peer=host:port/path` 指定自己的配對伺服器；`?room=XXXXX` 直接帶入房間代碼；`?cloud=off` 這次不連雲端。
+網址參數：`?net=bc` 用瀏覽器內的測試通道代替 WebRTC；`?peer=host:port/path` 指定自己的配對伺服器；`?room=XXXXX` 直接帶入房間代碼；`?cloud=off` 這次不連雲端；`?sw=off` 這次不註冊 service worker；`?lang=en` 指定語言；`?go=sprint` 直接進某個模式（`rank`、`battle`、`online`、`ghost`、`dojo`、`openers`、`practice`、`sprint`）。
 
 ## 存在玩家瀏覽器裡的資料
 
@@ -233,4 +262,5 @@ node test/cloudui.js         # 雲端存檔與排行榜的畫面（自己會啟�
 - 自己的圖片和對戰錄影只存在裝置上，不會跟著帳號走。
 - 連線對戰在正式站走自己的中繼，穩但比直連慢一點；量大時要加上 WebRTC 直連（見上面「連線的資料怎麼走」）。純靜態空間上仍然靠 PeerJS 的公用伺服器，不保證連得上。
 - 音效是照檔名和波形挑的，沒有人實際聽過一輪。
-- 手機橫放沒有專屬版面，會請玩家轉直。
+- 手機橫放時選單有專屬版面，但對局還是會請玩家轉直（高度不夠放牆和按鍵）。
+- 勝利的歡呼音效是專案擁有者提供的檔案，原始授權還沒確認（見 `CREDITS.md`）。

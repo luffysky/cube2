@@ -19,9 +19,10 @@
   var KEY_MAX = 4;
   var DEF = {
     das: 140, arr: 20, sdf: 80, lock: 500, smooth: !env.reduce, ghost: true, radar: false, hint: true,
-    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, lang: ''
+    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, lang: '', ai: 0
   };
-  var set = {}, save = { best: 0, dojo: 0, level: 1, minutes: 2, tip: 0, items: 1, itip: 0 };
+  // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
+  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0 };
   var STORE = 'zhuanzhuan.v2';
   function keyCopy(src) { var o = {}; ACTIONS.forEach(function (a) { o[a] = (src && Array.isArray(src[a]) ? src[a] : KEYDEF[a]).filter(function (c) { return typeof c === 'string'; }).slice(0, KEY_MAX); }); return o; }
   function loadStore() {
@@ -258,7 +259,7 @@
     el.pops.appendChild(d);
     setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 980);
   }
-  function spinName(type, spin) { return type === 'T' ? t(spin === 'mini' ? 'p.mini' : 'p.tspin') : t('p.xspin', type); }
+  function spinName(type, spin) { return type === 'T' ? t(spin === 'mini' ? 'p.mini' : 'p.tspin') : type === 'I' ? t('p.ispin') : t('p.xspin', type); }
   function clearName(type, spin, lines) { return spinName(type, spin) + (lines ? t('sep') + t('ln' + lines) : ''); }
   function popup(e) {
     var main = '', gold = false, tags = [];
@@ -279,7 +280,8 @@
   function itile(id) { return '<span class="itile" style="--c:' + ITEMS[id].color + '">' + View.itemSvg(id) + '</span>'; }
 
   // ---------- starting a mode ----------
-  var TRACK = ['battle1', 'battle1', 'battle2', 'battle2', 'battle3'];
+  var TRACK = ['battle1', 'battle1', 'battle2', 'battle2', 'battle3', 'battle1', 'battle1'];   // by level number
+  function aiStep() { return clamp(Math.round(+set.ai || 0), -2, 2); }
   function begin(kind, o) {
     o = o || {};
     closeSheet(true);
@@ -307,7 +309,7 @@
         S.bot = new ZZ.Replay.Ghost(S.opp, o.rep, { onItem: foeItem, onTakeOver: function () { toast(t('gh.takeover'), 3800); } });
         S.oppName = t('gh.name');
       } else {
-        var cfg = mode === 'rank' ? o.cfg : Bot.LEVELS[o.level];
+        var cfg = mode === 'rank' ? o.cfg : Bot.eased(Bot.LEVELS[o.level], aiStep());   // ranked is the same for everyone
         S.opp = new ZZ.Game({ seed: seed, manual: true, items: !!o.items });
         S.bot = new Bot.BotPlayer(S.opp, { pps: cfg.pps, depth: cfg.depth, hold: cfg.hold, noise: cfg.noise, w: cfg.w });
         S.oppName = mode === 'rank' ? o.foe : t('lv' + o.level);
@@ -589,7 +591,7 @@
     S.botItemT += dt;
     S.botChk -= dt;
     if (S.botChk <= 0) { S.botChk = 300; S.botHoles = Bot.features(Bot.rowsOf(g.grid)).holes; }
-    var id = g.inv[0], tm = S.botItemT, wait = 700 + (4 - S.level) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false;
+    var id = g.inv[0], tm = S.botItemT, wait = 700 + (6 - Bot.LEVELS[S.level].tier) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false;
     if (id === 1) go = tm > wait && (g.stackHeight() >= 9 || tm > late);
     else if (id === 5) go = tm > wait && (S.botHoles >= 3 || tm > late);
     else if (id === 3) go = tm > 400 && (g.pendingTotal() >= 2 || tm > late);
@@ -794,7 +796,7 @@
         }), Meta.isSub() ? 30 : 5);
       }
       sfx.setDuck(0.4);
-      sfx.play(r >= 0 ? 'win' : 'lose');
+      sfx.play(r > 0 ? 'cheer' : r === 0 ? 'win' : 'lose');
       if (!why) banner(t('b.time'), '', 900);
       setTimeout(function () { if (S === st && S.state === 'over') openSheet('battleEnd'); }, why ? 300 : 900);
     };
@@ -806,7 +808,7 @@
     S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats });
     S.newBest = S.reward.best;
     sfx.setDuck(0.4);
-    sfx.play('win');
+    sfx.play(S.newBest ? 'cheer' : 'win');
     openSheet('sprintEnd');
   }
   function pause() {
@@ -864,11 +866,12 @@
     if (App.sheets[name]) return App.sheets[name]();
     if (name === 'battle') {
       h = '<h2>' + t('pickFoe') + '</h2><div class="levels" role="radiogroup" aria-label="' + t('pickFoe') + '">';
-      for (i = 0; i < Bot.LEVELS.length; i++) {
+      for (var oi = 0; oi < Bot.ORDER.length; oi++) {
+        i = Bot.ORDER[oi];
         h += '<button class="lvl" type="button" role="radio" aria-checked="' + (pick.level === i) + '" data-level="' + i + '"><b>' + t('lv' + i) +
-          '</b><span>' + t('lvn' + i) + '</span><i>' + t('pps', Bot.LEVELS[i].pps) + '</i></button>';
+          '</b><span>' + t('lvn' + i) + '</span><i>' + t('pps', Bot.eased(Bot.LEVELS[i], aiStep()).pps) + '</i></button>';
       }
-      h += '</div><h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
+      h += '</div>' + (aiStep() ? '<p class="note">' + t('aiNow', t('s.ai' + aiKey(aiStep()))) + '</p>' : '') + '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
       for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
       h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' + bringHtml() +
         '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
@@ -883,6 +886,7 @@
         [t('st.apm'), rate(me.attack, tt).toFixed(1), S.remote ? '—' : rate(op.attack, tt).toFixed(1)],
         [t('st.pps'), (me.pieces / (tt / 1000)).toFixed(2), (op.pieces / (tt / 1000)).toFixed(2)],
         [t('st.tspin'), me.spins + me.minis, S.remote ? '—' : op.spins + op.minis],
+        [t('st.xspin'), me.xspins, S.remote ? '—' : op.xspins],
         [t('st.quad'), me.quads, S.remote ? '—' : op.quads],
         [t('st.combo'), me.maxCombo, S.remote ? '—' : op.maxCombo]
       ];
@@ -920,7 +924,10 @@
     } else if (name === 'settings') {
       var langs = '<option value="">' + t('s.auto') + '</option>';
       for (i = 0; i < L.LANGS.length; i++) langs += '<option value="' + L.LANGS[i][0] + '">' + L.LANGS[i][1] + '</option>';
+      var ais = '';
+      for (i = -2; i <= 2; i++) ais += '<option value="' + i + '">' + t('s.ai' + aiKey(i)) + '</option>';
       h = '<h2>' + t('m.settings') + '</h2><div class="field line"><label for="sLang">' + t('s.lang') + '</label><select id="sLang">' + langs + '</select></div>' +
+        '<h3>' + t('s.foe') + '</h3><div class="field line"><label for="sAi">' + t('s.ai') + '</label><select id="sAi">' + ais + '</select><small>' + t('s.aiN') + '</small></div>' +
         '<h3>' + t('s.feel') + '</h3>' +
         field('sDas', t('s.das'), 60, 300, 5, t('s.dasN')) + field('sArr', t('s.arr'), 0, 80, 5, t('s.arrN')) +
         field('sSdf', t('s.sdf'), 10, 125, 5, t('s.sdfN')) + field('sLock', t('s.lock'), 200, 1000, 50, t('s.lockN')) +
@@ -983,7 +990,9 @@
     for (id in FIELDS) { $(id).value = set[FIELDS[id]]; $(id + 'O').textContent = fieldText(FIELDS[id]); }
     for (id in TOGGLES) $(id).checked = !!set[TOGGLES[id]];
     $('sLang').value = set.lang;
+    $('sAi').value = String(aiStep());
   }
+  function aiKey(n) { return n < 0 ? 'M' + (-n) : n > 0 ? 'P' + n : '0'; }
   function applySettings() {
     el.pad.classList.toggle('swap', set.swap);
     sideKeys();
@@ -997,11 +1006,20 @@
 
   // ---------- language ----------
   var FONT = { 'zh-Hans': 'Noto+Sans+SC:wght@400..900', ja: 'Zen+Maru+Gothic:wght@500;700;900', ko: 'Noto+Sans+KR:wght@400..900' }, fontDone = {};
+  // ?lang=en in the address shows that language for this visit (search engines and shared links use it);
+  // choosing a language in the settings takes over again.
+  var urlLang = (function () {
+    try { var v = new URLSearchParams(window.location.search).get('lang') || ''; return L.LANGS.some(function (x) { return x[0] === v; }) ? v : ''; } catch (e) { return ''; }
+  })();
   function applyLang() {
-    L.set(set.lang || '');
+    L.set(urlLang || set.lang || '');
     var root = document.documentElement, list, i;
     root.lang = L.lang;
-    document.title = t('title');
+    document.title = t('seo.title');
+    var md = document.querySelector('meta[name="description"]'), can = document.querySelector('link[rel="canonical"]');
+    if (md) md.setAttribute('content', t('seo.desc'));
+    // each language's own address is the one to index for that language
+    if (can) can.setAttribute('href', can.getAttribute('href').split('?')[0] + (urlLang && urlLang !== 'zh-Hant' ? '?lang=' + urlLang : ''));
     var f = FONT[L.lang];
     if (f && !fontDone[L.lang]) {
       fontDone[L.lang] = 1;
@@ -1047,6 +1065,7 @@
     if ((name === 'settings' || name === 'help') && sheetName !== name && sheetName !== 'keys') sheetBack = sheetName === 'pause' ? 'pause' : '';
     var keep = sheetName === name ? el.sheetCard.scrollTop : 0;
     sheetName = name;
+    el.sheetCard.setAttribute('data-name', name);      // (the stylesheet gives a few sheets more room on big screens)
     el.sheetCard.innerHTML = sheetHtml(name);
     el.sheet.hidden = false;
     el.sheetCard.scrollTop = keep;
@@ -1054,7 +1073,7 @@
     if (name === 'battle') $('bItems').checked = pick.items;
     if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
-    if (b && !env.touch && !keep) b.focus();
+    if (b && !env.touch && !keep) { try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); } el.sheetCard.scrollTop = 0; }   // (a long sheet opens at its top, not at its button)
   }
   function closeSheet(quiet) {
     var was = sheetName;
@@ -1132,7 +1151,8 @@
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
-      if (id === 'sLang') { if (e.type !== 'change') return; set.lang = e.target.value; saveStore(); applyLang(); openSheet('settings'); return; }
+      if (id === 'sLang') { if (e.type !== 'change') return; set.lang = e.target.value; urlLang = ''; saveStore(); applyLang(); openSheet('settings'); return; }
+      if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
       if (FIELDS[id]) {
         set[FIELDS[id]] = +e.target.value;
         $(id + 'O').textContent = fieldText(FIELDS[id]);
@@ -1155,12 +1175,18 @@
       sfx.wake();
       sfx.play('ui');
       if (tg.dataset.sheet) return openSheet(tg.dataset.sheet);
-      var go = tg.dataset.go;
-      if (App.go[go]) App.go[go]();
-      else if (go === 'battle') openBattle();
-      else if (go === 'dojo') { if (save.dojo > 0) openSheet('dojo'); else begin('dojo', { drill: 0 }); }
-      else if (go) begin(go);
+      goTo(tg.dataset.go);
     });
+  }
+  // One of the menu's entries, by name (also used by links that open the game straight into a mode).
+  var MODES = { rank: 1, battle: 1, online: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1 };
+  function goTo(go) {
+    if (typeof go !== 'string' || !MODES.hasOwnProperty(go)) return false;
+    if (typeof App.go[go] === 'function') App.go[go]();
+    else if (go === 'battle') openBattle();
+    else if (go === 'dojo') { if (save.dojo > 0) openSheet('dojo'); else begin('dojo', { drill: 0 }); }
+    else begin(go);
+    return true;
   }
   function updateMenu() {
     var d = Meta.data, r = Meta.rankOf(d.rp);
@@ -1187,17 +1213,23 @@
     sideKeys();
     el.stage.classList.toggle('wide', flip);
     var hudH = el.hud.offsetHeight || 48, stripH = el.strip.hidden ? 0 : el.strip.offsetHeight + 6;
-    var padMin = env.touch ? [128, 152, 184][set.pad] : 0;
+    // a tablet held upright has room for bigger keys
+    var padMin = env.touch ? (W >= 600 && H >= 900 ? [160, 190, 226] : [128, 152, 184])[set.pad] : 0;
     el.pad.style.minHeight = padMin + 'px';
-    var availH = H - hudH - stripH - padMin - 22, cell, oppCell = 0;
+    // on a tall screen the wall does not run edge to edge
+    var availH = H - hudH - stripH - padMin - 22 - (H >= 1000 ? 26 : 0), cell, oppCell = 0;
     var byH = Math.floor(availH / (VIS + SKY));
     if (wide) {
-      side = 112;
-      cell = clamp(Math.min(byH, Math.floor((W - 2 * side - 70 - (hasOpp ? W * 0.27 : 0)) / 10.3)), 12, 38);
+      // Tiles grow with the screen (up to 64 px on a 4K monitor) and the side columns grow with the tiles.
+      var fit = function (sd) { return Math.min(byH, Math.floor((W - 2 * sd - 70 - (hasOpp ? W * 0.27 : 0)) / 10.3)); };
+      cell = clamp(fit(112), 12, 64);
+      side = clamp(Math.round(cell * 2.95), 112, 200);
+      if (side > 112) { cell = clamp(fit(side), 12, 64); side = clamp(Math.round(cell * 2.95), 112, 200); }
       if (hasOpp) oppCell = Math.max(8, Math.round(cell * 0.7));
     } else {
-      cell = clamp(Math.min(byH, Math.floor((W - 2 * 66 - 36) / 10.3)), 10, 34);
-      side = clamp(Math.floor((W - cell * 10.3 - 40) / 2), 58, 124);
+      // phones stop at 34 px tiles, as before; tablets and tall windows go on to 56
+      cell = clamp(Math.min(byH, Math.floor((W - 2 * 66 - 36) / 10.3)), 10, W >= 600 ? 56 : 34);
+      side = clamp(Math.floor((W - cell * 10.3 - 40) / 2), 58, Math.max(124, Math.round(cell * 3.3)));
       if (hasOpp) oppCell = Math.max(4, Math.floor((side - 8) / 10));
     }
     el.stage.style.setProperty('--side', side + 'px');
@@ -1346,8 +1378,14 @@
     hero.wait = 0;
     V.hero.vis.ox = V.hero.vis.oy = V.hero.vis.ang = 0;
   }
+  // The little wall on the menu. Beside the name on a phone; on wide screens the menu has two columns (see "各種螢幕"
+  // in the stylesheet) and the wall stands above the name, as big as the left column allows.
   function heroLayout() {
-    var w = el.menu.clientWidth || 360, cell = clamp(Math.floor(Math.min(w, 560) * 0.34 / COLS), 9, 16);
+    var w = el.menu.clientWidth || 360, h = el.menu.clientHeight || 640, cell;
+    var box = el.demoCv.parentNode.parentNode, stacked = false;
+    try { stacked = window.getComputedStyle(box).gridTemplateColumns.split(' ').length === 1; } catch (e) { stacked = false; }
+    if (stacked) cell = clamp(Math.min(Math.floor((box.clientWidth || 300) * 0.7 / COLS), Math.floor(h * 0.3 / 8)), 9, 52);
+    else cell = clamp(Math.floor(Math.min(w, 720) * 0.34 / COLS), 9, 22);
     V.hero.resize(cell);
     if (!hero.g) heroLoad();
   }
@@ -1485,7 +1523,7 @@
     Meta.load();
     // the sprint record used to live with the settings; it belongs with the rest of the player's record
     if (save.best && !Meta.data.tot.sprint) { Meta.data.tot.sprint = Math.round(save.best); Meta.save(); }
-    L.set(set.lang || '');
+    L.set(urlLang || set.lang || '');
     View.readTheme();
     V.me = new View.BoardView(el.wellCv, { meter: true });
     V.opp = new View.BoardView(el.oppCv, { plain: true, sky: 0 });
@@ -1520,7 +1558,7 @@
   }
 
   App.boot = [];
-  App.set = set; App.save = save; App.el = el; App.V = V; App.sfx = sfx; App.env = env; App.input = input;
+  App.set = set; App.save = save; App.el = el; App.V = V; App.sfx = sfx; App.env = env; App.input = input; App.goTo = goTo;
   App.S = function () { return S; };
   App.screen = function () { return screen; };
   App.sheet = function () { return sheetName; };
@@ -1531,7 +1569,7 @@
   App.actName = actName; App.clearName = clearName; App.key1 = key1; App.sdfVal = sdfVal; App.foeItem = foeItem; App.endBattle = endBattle; App.setTools = setTools;
   App.tool = tool; App.buzz = buzz; App.resume = resume; App.openBattle = openBattle; App.rewardHtml = rewardHtml;
 
-  ZZ.peek = function () { return { S: S, V: V, set: set, save: save, screen: screen, sheet: sheetName, sfx: sfx, useItem: useItem, meta: Meta.data, lang: L.lang }; };
+  ZZ.peek = function () { return { S: S, V: V, set: set, save: save, screen: screen, sheet: sheetName, sfx: sfx, useItem: useItem, meta: Meta.data, lang: L.lang, hero: hero, heroLoad: heroLoad }; };
 
   var hot = window.claude && window.claude.hot;
   if (hot && hot.snapshot) {

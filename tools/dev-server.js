@@ -8,7 +8,8 @@ const db = require('../server/db.js');
 const app = require('../server/app.js');
 db.use(require('./pglite-db.js').make());
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8', '.ico': 'image/x-icon', '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   const m = /^\/api\/([a-z]+)$/.exec(url.pathname);

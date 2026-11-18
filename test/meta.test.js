@@ -18,12 +18,27 @@ ok(M.rankOf(1800).top && M.rankOf(1800).name === '窯神', 'top rank');
 ok(M.rpDelta(0, 1, 0, 0) === 20 && M.rpDelta(0, 1, 9, 3) === 35, 'win delta');
 eq(M.rpDelta(305, -1, 0, 0), -5, 'loss cannot drop below tier floor');
 eq(M.rpDelta(300, -1, 0, 0), -0, 'at floor');
-const b0 = M.botFor(0, () => 0), b1 = M.botFor(900, () => 0), b2 = M.botFor(1800, () => 0), b3 = M.botFor(2400, () => 0);
-ok(b0.pps === 0.45 && b0.level === 0, 'bot at 0');
-ok(Math.abs(b1.pps - 1.1) < 0.01 && b1.level === 2 && b1.hold, 'bot at 900');
-ok(Math.abs(b2.pps - 2.3) < 0.01 && b2.level === 4, 'bot at 1800');
-ok(b3.pps > 2.3, 'bot keeps getting faster past the top');
+// the ranked ladder: two beginner levels first (150 points each), then the five regular ones (450 each)
+const b0 = M.botFor(0, () => 0), b1 = M.botFor(1200, () => 0), b2 = M.botFor(2100, () => 0), b3 = M.botFor(2700, () => 0);
+ok(b0.pps === 0.22 && b0.level === 5 && b0.noise === 60, 'the first ranked rival is the gentlest one', b0);
+ok(M.botFor(150, () => 0).pps === 0.32 && M.botFor(150, () => 0).level === 6, 'then the second beginner level');
+ok(M.botFor(300, () => 0).pps === 0.45 && M.botFor(300, () => 0).level === 0, 'the old first rival now waits at 300');
+ok(Math.abs(b1.pps - 1.1) < 0.01 && b1.level === 2 && b1.hold, 'bot at 1200');
+ok(Math.abs(b2.pps - 2.3) < 0.01 && b2.level === 4, 'bot at 2100');
+ok(b3.pps > 2.3 && M.botFor(9999, () => 0).pps === b3.pps, 'bot keeps getting faster past the top, up to a limit');
 ok(M.botFor(600, () => 0).pps > b0.pps && M.botFor(600, () => 0).pps < b1.pps, 'bot in between');
+let lastPps = 0, climbs = true;
+for (let rp = 0; rp <= 2700; rp += 25) { const b = M.botFor(rp, () => 0); if (b.pps < lastPps) climbs = false; lastPps = b.pps; if (!ZZ.Bot.LEVELS[b.level]) climbs = false; }
+ok(climbs, 'the ladder never gets easier on the way up');
+// levels: order, and the player's own difficulty setting
+const BL = ZZ.Bot.LEVELS, BO = ZZ.Bot.ORDER;
+ok(BL.length === 7 && BO.length === 7 && BO.slice().sort().join() === '0,1,2,3,4,5,6', 'seven levels, each listed once');
+ok(BO.every((n, i) => BL[n].tier === i && (i === 0 || BL[n].pps > BL[BO[i - 1]].pps && BL[n].noise < BL[BO[i - 1]].noise)), 'listed from easiest to hardest');
+ok(BL[0].id === 'l1' && BL[4].id === 'l5', 'the old levels kept their numbers (saved games and the server use them)');
+const ez = ZZ.Bot.eased(BL[1], -2), hd = ZZ.Bot.eased(BL[1], 2), same = ZZ.Bot.eased(BL[1], 0);
+ok(same.pps === BL[1].pps && same.noise === BL[1].noise && same.w === BL[1].w, 'standard difficulty changes nothing');
+ok(ez.pps < BL[1].pps && ez.noise > BL[1].noise && hd.pps > BL[1].pps && hd.noise < BL[1].noise, 'easier is slower and sloppier, harder is faster and sharper', [ez, hd]);
+ok(ZZ.Bot.eased(BL[4], -2).noise > 0 && ZZ.Bot.eased(BL[1], 7).pps === BL[1].pps, 'even the top level slips when eased; a setting out of range counts as standard');
 // shop
 eq(M.state('tile', 'glaze'), 'ok', 'stock tile');
 eq(M.state('tile', 'neon'), 'buy', 'neon needs buying');
@@ -112,7 +127,7 @@ clock = Date.UTC(2027, 0, 1, 15, 0, 0); eq(M.seasonId(), '2027-01', 'January');
 
 // ---------- match numbers are kept inside what the match length allows ----------
 let c = M.cleanMatch({ mode: 'rank', result: 5, level: 9, ko: 999, koOpp: -3, itemsUsed: 1e9, ms: 60000, stats: { score: 1e9, sent: 1e9, spins: -5, minis: 'x', xspins: 2.4, quads: 1e9, maxCombo: 999, lines: 1e9, pieces: 1e9 } });
-eq(c, { mode: 'rank', result: 1, level: 4, ko: 60, koOpp: 0, itemsUsed: 60, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
+eq(c, { mode: 'rank', result: 1, level: 6, ko: 60, koOpp: 0, itemsUsed: 60, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
 eq(M.cleanMatch({ mode: 'hack', result: -1, stats: { score: 99999 } }).mode, 'ai', 'unknown mode becomes a plain match');
 eq(M.cleanMatch({ mode: 'ai', result: 1, stats: { score: 99999 } }).stats.score, 5000, 'no length given, so almost no score counts');
 eq(M.cleanMatch({ mode: 'sprint', result: -1, ms: 30000 }).result, 0, 'a sprint cannot be lost for points');

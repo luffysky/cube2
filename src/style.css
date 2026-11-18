@@ -55,6 +55,8 @@
 [hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
+  /* on a phone with a notch or a home bar (and as an installed app) keep clear of them; the floor still runs to the edges */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   background: var(--floor);
   color: var(--ink);
   font-family: var(--display);
@@ -98,6 +100,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .mode.primary { background: var(--wall); border-color: var(--wall); border-bottom-color: var(--edge-deep); color: var(--wall-ink); }
 .mode.primary span, .mode.primary em { color: var(--wall-ink); opacity: 0.72; }
 .menu-foot { display: flex; flex-wrap: wrap; gap: 2px 22px; }
+.about { margin: -4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 46em; text-wrap: pretty; }
 .link { position: relative; background: none; border: 0; padding: 8px 0; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--edge-deep); }
 
 /* ---------- 對局畫面 ---------- */
@@ -204,8 +207,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .key[data-k="HD"] svg, .key[data-k="D"] svg { width: 26px; height: 26px; }
 
 /* ---------- 彈出面板 ---------- */
-#sheet { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 14, 20, 0.55); touch-action: auto; }
-#sheetCard { width: 100%; max-width: 520px; max-height: 92%; overflow-y: auto; background: var(--floor); border-radius: 18px 18px 0 0; padding: 18px 16px 20px; display: flex; flex-direction: column; gap: 14px; -webkit-user-select: none; user-select: none; }
+/* 蓋住整個畫面（不只是中間那一欄），手機的瀏海和底部橫條留給邊距 */
+#sheet {
+  position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 14, 20, 0.55); touch-action: auto;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+}
+#sheetCard { width: 100%; max-width: 520px; max-height: 92%; overflow-y: auto; background: var(--floor); border-radius: 18px 18px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; -webkit-user-select: none; user-select: none; }
 @media (min-width: 720px) { #sheet { align-items: center; } #sheetCard { border-radius: 18px; } }
 #sheetCard h2 { margin: 0; font-size: 24px; font-weight: 900; line-height: 1.25; text-wrap: balance; }
 #sheetCard h3 { margin: 6px 0 0; font-size: 15px; font-weight: 900; }
@@ -378,3 +385,275 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 .lb-none { padding: 22px 12px; text-align: center; background: var(--panel); border: 1px dashed var(--edge-deep); border-radius: 12px; }
 .lb-wait { text-align: center; padding: 18px 0; }
 .roomcode.xfer { font-size: clamp(26px, 9.4vw, 44px); letter-spacing: 0.08em; }
+
+/* =====================================================================================================
+   各種螢幕
+   直拿的手機是基準，上面的樣式就是它。這裡依螢幕往上加：
+     ≤359 寬     小手機：留白和字都收一點
+     480 寬起    大手機：留白放寬
+     600 寬起    小平板直向：選單變寬，對戰區一列三個
+     768 寬起    平板：字放大，練功區一列四個
+     1024 寬起   平板橫向、筆電：選單分左右兩欄（左邊是招牌，右邊是模式）
+     1440 寬起   桌機：整體放大一級
+     1920 寬起   大螢幕：再大一級
+     2560 寬起   2K、4K、超寬螢幕：再大一級
+     橫拿的手機  （很矮的橫向畫面）選單也分左右兩欄，按鈕收扁，一頁看得完
+   對局畫面的磚塊大小和兩側欄寬是程式依螢幕算的（ui.js 的 layout），這裡只管文字、按鍵和外框。
+   ===================================================================================================== */
+
+/* ---- 小手機 ---- */
+@media (max-width: 359px) {
+  .menu-in { padding: 10px 12px 18px; gap: 12px; }
+  .hero { gap: 12px; }
+  .lede { font-size: 14px; }
+  .modes { gap: 8px; }
+  .mode { padding: 10px 12px 9px; border-radius: 12px; }
+  .mode b { font-size: 18px; }
+  .modes.two .mode { padding: 8px 10px; }
+  .modes.two .mode b { font-size: 15px; padding-right: 2.2em; }
+  .menu-foot { gap: 0 16px; }
+  .link { font-size: 14px; padding: 7px 0; }
+  #sheetCard { padding: 14px 12px 16px; gap: 12px; }
+  #sheetCard h2 { font-size: 21px; }
+  .btn { min-width: 88px; padding: 11px 10px 10px; font-size: 15px; }
+  .lvl { padding: 8px 10px; gap: 8px; }
+  .lvl b { font-size: 15px; }
+  #hud { padding: 6px 8px 2px; gap: 6px; }
+  .hud-side { gap: 8px; }
+  .score b { font-size: 46px; }
+}
+
+/* ---- 大手機 ---- */
+@media (min-width: 480px) {
+  .menu-in { padding: 18px 20px 26px; }
+  #sheetCard { padding: 20px 20px 22px; }
+}
+
+/* ---- 小平板直向 ---- */
+@media (min-width: 600px) {
+  .menu-in { max-width: 640px; padding: 22px 24px 30px; gap: 18px; }
+  .logo { font-size: 60px; }
+  .menu-in > .modes:not(.two) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .menu-in > .modes:not(.two) .mode.primary { grid-column: 1 / -1; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) { position: relative; grid-template-columns: 1fr; align-content: start; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) b { padding-right: 1.6em; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) em { position: absolute; right: 14px; top: 15px; font-size: 16px; }
+  #sheetCard { max-width: 560px; }
+  /* 平板的手比較大，按鍵也跟著大 */
+  #pad { max-width: 700px; max-height: 290px; gap: 10px; padding: 6px 16px 16px; }
+  .key { border-radius: 18px; font-size: 12px; }
+  .key svg { width: 36px; height: 36px; }
+  .key[data-k="HD"] svg, .key[data-k="D"] svg { width: 31px; height: 31px; }
+  .sidekeys .key { font-size: 14px; }
+}
+
+/* ---- 平板 ---- */
+@media (min-width: 768px) {
+  .menu-in { max-width: 720px; gap: 20px; }
+  .logo { font-size: 66px; }
+  .lede { font-size: 16px; max-width: 24em; }
+  .mode b { font-size: 21px; }
+  .mode span { font-size: 14px; }
+  .modes.two { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .me b { font-size: 17px; }
+  .me span { font-size: 13px; }
+  .link { font-size: 16px; }
+  #sheetCard { max-width: 580px; padding: 24px 24px 26px; }
+  #sheetCard[data-name="shop"], #sheetCard[data-name="help"], #sheetCard[data-name="board"] { max-width: 680px; }
+}
+
+/* ---- 平板橫向、筆電：選單左右兩欄 ---- */
+@media (min-width: 1024px) and (min-height: 560px) {
+  .menu-in {
+    max-width: 1040px; min-height: 100%; padding: 26px 32px 30px;
+    display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 48px; row-gap: 16px; align-content: center;
+    grid-template-areas: "top top" "hero modes" "hero group" "hero train" "foot foot" "about about";
+  }
+  .topbar { grid-area: top; }
+  .hero { grid-area: hero; align-self: center; grid-template-columns: 1fr; justify-items: start; gap: 24px; }
+  .menu-in > .modes:not(.two) { grid-area: modes; grid-template-columns: 1fr; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) { grid-template-columns: 1fr auto; position: static; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) b { padding-right: 0; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) em { position: static; font-size: 20px; }
+  .group { grid-area: group; }
+  .modes.two { grid-area: train; grid-template-columns: 1fr 1fr; }
+  .menu-foot { grid-area: foot; margin-top: 4px; }
+  .about { grid-area: about; }
+  .logo { font-size: 80px; margin-bottom: 14px; }
+  .lede { font-size: 17px; max-width: 22em; }
+  #sheetCard { max-width: 600px; }
+  #sheetCard[data-name="shop"], #sheetCard[data-name="help"], #sheetCard[data-name="board"] { max-width: 760px; }
+}
+
+/* ---- 桌機 ---- */
+@media (min-width: 1440px) {
+  #app { max-width: 1400px; }
+}
+@media (min-width: 1440px) and (min-height: 800px) {
+  body { font-size: 16px; }
+  .menu-in { max-width: 1200px; column-gap: 64px; row-gap: 18px; }
+  .logo { font-size: 96px; }
+  .lede { font-size: 19px; }
+  .modes { gap: 12px; }
+  .mode { padding: 15px 20px 14px; border-radius: 16px; }
+  .mode b { font-size: 23px; }
+  .mode span { font-size: 15px; }
+  .mode em { font-size: 22px; }
+  .modes.two .mode { padding: 13px 16px 12px; }
+  .modes.two .mode b { font-size: 19px; }
+  .modes.two .mode span { font-size: 13px; }
+  .modes.two .mode em { font-size: 16px; top: 14px; right: 14px; }
+  .group { font-size: 15px; }
+  .me b { font-size: 18px; }
+  .purse b { font-size: 20px; }
+  .link { font-size: 17px; }
+  .about { font-size: 13px; }
+  #sheetCard { max-width: 640px; gap: 16px; }
+  #sheetCard h2 { font-size: 27px; }
+  #sheetCard h3 { font-size: 16px; }
+  #sheetCard p, .rules, .keys, .toggle, .field, table.cmp { font-size: 15px; }
+  .btn { font-size: 17px; padding: 13px 16px 12px; }
+  .lvl b { font-size: 17px; }
+  .lvl span { font-size: 14px; }
+}
+@media (min-width: 1440px) and (min-height: 1000px) {
+  /* 對局畫面的字也跟著磚塊變大 */
+  #hud { min-height: 60px; padding: 12px 16px 6px; }
+  #clock { font-size: 42px; }
+  .pts { font-size: 16px; }
+  .stat b { font-size: 30px; }
+  .stat span { font-size: 13px; }
+  .who { font-size: 18px; }
+  .hud-title { font-size: 20px; }
+  .slot-label { font-size: 13px; padding: 1px 5px 3px; }
+  .tool { font-size: 15px; padding: 9px 6px; }
+  .chip { font-size: 18px; padding: 5px 10px 6px; }
+  #strip { font-size: 15px; padding: 9px 14px; }
+  .toast { font-size: 16px; }
+}
+
+/* ---- 大螢幕 ---- */
+@media (min-width: 1920px) {
+  #app { max-width: 1800px; }
+}
+@media (min-width: 1920px) and (min-height: 1000px) {
+  body { font-size: 17px; }
+  .menu-in { max-width: 1440px; column-gap: 88px; row-gap: 22px; padding: 36px 40px 40px; }
+  .logo { font-size: 120px; }
+  .lede { font-size: 22px; }
+  .modes { gap: 14px; }
+  .mode { padding: 18px 24px 17px; border-radius: 18px; border-bottom-width: 5px; }
+  .mode b { font-size: 27px; }
+  .mode span { font-size: 17px; }
+  .mode em { font-size: 26px; }
+  .modes.two .mode { padding: 15px 18px 14px; }
+  .modes.two .mode b { font-size: 22px; }
+  .modes.two .mode span { font-size: 15px; }
+  .modes.two .mode em { font-size: 18px; top: 17px; right: 16px; }
+  .group { font-size: 17px; }
+  .me b { font-size: 21px; }
+  .me span { font-size: 15px; }
+  .purse { padding: 8px 16px 8px 11px; }
+  .purse b { font-size: 23px; }
+  .link { font-size: 19px; }
+  .about { font-size: 15px; }
+  #sheetCard { max-width: 720px; padding: 28px 28px 30px; gap: 18px; }
+  #sheetCard[data-name="shop"], #sheetCard[data-name="help"], #sheetCard[data-name="board"] { max-width: 900px; }
+  #sheetCard h2 { font-size: 31px; }
+  #sheetCard h3 { font-size: 18px; }
+  #sheetCard p, .rules, .keys, .toggle, .field, table.cmp { font-size: 17px; }
+  .note, .field small { font-size: 14px !important; }
+  .btn { font-size: 19px; padding: 15px 18px 14px; }
+  .lvl { padding: 12px 16px; }
+  .lvl b { font-size: 19px; }
+  .lvl span { font-size: 16px; }
+  .lvl i { font-size: 18px; }
+  .seg button { font-size: 17px; padding: 11px 8px; }
+  table.cmp td { font-size: 19px; }
+  table.cmp td:first-child { font-size: 16px; }
+}
+@media (min-width: 1920px) and (min-height: 1300px) {
+  #hud { min-height: 72px; }
+  #clock { font-size: 54px; }
+  .pts { font-size: 19px; }
+  .stat b { font-size: 38px; }
+  .stat span { font-size: 15px; }
+  .who { font-size: 22px; }
+  .hud-title { font-size: 24px; }
+  .slot-label { font-size: 15px; }
+  .tool { font-size: 18px; padding: 11px 8px; }
+  .chip { font-size: 22px; }
+  #strip { font-size: 18px; }
+}
+
+/* ---- 2K、4K、超寬螢幕 ---- */
+@media (min-width: 2560px) {
+  #app { max-width: 2400px; }
+}
+@media (min-width: 2560px) and (min-height: 1300px) {
+  body { font-size: 19px; }
+  .menu-in { max-width: 1760px; column-gap: 110px; row-gap: 26px; }
+  .logo { font-size: 150px; }
+  .lede { font-size: 27px; }
+  .mode { padding: 22px 30px 21px; border-radius: 22px; }
+  .mode b { font-size: 33px; }
+  .mode span { font-size: 21px; }
+  .mode em { font-size: 31px; }
+  .modes.two .mode { padding: 18px 22px 17px; }
+  .modes.two .mode b { font-size: 26px; }
+  .modes.two .mode span { font-size: 18px; }
+  .modes.two .mode em { font-size: 21px; top: 20px; right: 20px; }
+  .group { font-size: 20px; }
+  .me b { font-size: 25px; }
+  .me span { font-size: 18px; }
+  .purse b { font-size: 27px; }
+  .link { font-size: 22px; }
+  .about { font-size: 17px; }
+  #sheetCard { max-width: 860px; padding: 34px 34px 36px; }
+  #sheetCard[data-name="shop"], #sheetCard[data-name="help"], #sheetCard[data-name="board"] { max-width: 1080px; }
+  #sheetCard h2 { font-size: 37px; }
+  #sheetCard h3 { font-size: 21px; }
+  #sheetCard p, .rules, .keys, .toggle, .field, table.cmp { font-size: 20px; }
+  .btn { font-size: 22px; padding: 18px 22px 17px; border-radius: 15px; }
+  .lvl b { font-size: 22px; }
+  .lvl span { font-size: 18px; }
+}
+
+/* ---- 橫拿的手機：選單左右兩欄、收扁，一頁看得完 ---- */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  .menu-in {
+    max-width: 920px; padding: 8px 18px 12px;
+    display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); column-gap: 22px; row-gap: 7px; align-content: start;
+    grid-template-areas: "top top" "hero modes" "hero group" "hero train" "foot foot" "about about";
+  }
+  .topbar { grid-area: top; }
+  .hero { grid-area: hero; align-self: center; grid-template-columns: 1fr; justify-items: start; gap: 10px; }
+  .logo { font-size: 44px; margin-bottom: 6px; }
+  .lede { font-size: 13px; }
+  .menu-in > .modes:not(.two) { grid-area: modes; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .menu-in > .modes:not(.two) .mode.primary { grid-column: auto; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) { position: static; grid-template-columns: 1fr auto; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) b { padding-right: 0; }
+  .menu-in > .modes:not(.two) .mode:not(.primary) em { position: static; font-size: 16px; }
+  .group { grid-area: group; margin: 0 0 -4px; font-size: 12px; }
+  .modes.two { grid-area: train; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .menu-foot { grid-area: foot; }
+  .about { grid-area: about; }
+  .mode { padding: 7px 12px 6px; border-radius: 11px; border-bottom-width: 3px; }
+  .mode b { font-size: 16px; }
+  .mode span { font-size: 11px; line-height: 1.3; }
+  .mode em { font-size: 16px; }
+  .modes.two .mode { padding: 6px 9px; }
+  .modes.two .mode b { font-size: 13px; padding-right: 0; }
+  .modes.two .mode em { position: static; font-size: 12px; }
+  .modes.two .mode span { font-size: 10px; }
+  .link { font-size: 13px; padding: 4px 0; }
+  .about { font-size: 11px; }
+  #sheet { align-items: center; }
+  #sheetCard { max-width: 640px; max-height: 96%; border-radius: 16px; padding: 14px 16px 16px; gap: 10px; }
+}
+
+/* ---- 橫拿的平板：按鍵分到左右兩個角落，拇指搆得到 ---- */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 521px) {
+  #pad { max-width: none; grid-template-columns: minmax(84px, 136px) minmax(84px, 136px) minmax(6px, 1fr) minmax(84px, 136px) minmax(84px, 136px); padding: 4px 22px 14px; }
+}

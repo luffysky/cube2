@@ -1,0 +1,116 @@
+{
+  "id": "./",
+  "name": "轉磚對戰",
+  "short_name": "轉磚",
+  "description": "轉磚對戰是免費的網頁方塊對戰遊戲：兩分鐘一場，把方塊轉進洞裡消行，送對手一面水泥牆。可以打電腦、爬排位、開房間和朋友連線，手機、平板、電腦打開就能玩。",
+  "lang": "zh-Hant",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#E4E7EA",
+  "theme_color": "#E4E7EA",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icons/shot-phone.png",
+      "sizes": "1080x2160",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "手機上的對戰畫面"
+    },
+    {
+      "src": "icons/shot-wide.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "電腦上的對戰畫面"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "排位賽",
+      "url": "./?go=rank",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "對戰",
+      "url": "./?go=battle",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "連線對戰",
+      "url": "./?go=online",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "40 行競速",
+      "url": "./?go=sprint",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

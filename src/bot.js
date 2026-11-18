@@ -406,19 +406,35 @@
     return r ? r.steps : null;
   }
 
+  // A level's place in this list is its number in saved games and in what the server is told, so new ones go at the
+  // end. ORDER is the list from easiest to hardest; tier is a level's place in that.
   var LEVELS = [
     { id: 'l1', name: '學徒', pps: 0.45, depth: 1, hold: false, noise: 14, w: { attack: 3, clearSafe: [0, 2, 3, 4, 6] } },
     { id: 'l2', name: '熟手', pps: 0.75, depth: 1, hold: false, noise: 8, w: { attack: 5, clearSafe: [0, -1, 0, 1, 4] } },
     { id: 'l3', name: '師傅', pps: 1.1, depth: 2, hold: true, noise: 4 },
     { id: 'l4', name: '老師傅', pps: 1.6, depth: 2, hold: true, noise: 1.5, w: { agg: 0.15, clearSafe: [0, -8, -6, -4, 4], well: 3 } },
-    { id: 'l5', name: '宗師', pps: 2.3, depth: 2, hold: true, noise: 0, w: { slot: 18, tWaste: 13, safe: 11, danger: 3 } }
+    { id: 'l5', name: '宗師', pps: 2.3, depth: 2, hold: true, noise: 0, w: { slot: 18, tWaste: 13, safe: 11, danger: 3 } },
+    // two for people who are new to this kind of game: slow, careless, and they hardly send anything
+    { id: 'e1', name: '新手', pps: 0.22, depth: 1, hold: false, noise: 60, w: { attack: 0, clearSafe: [0, 3, 2, 1, 0] } },
+    { id: 'e2', name: '小工', pps: 0.32, depth: 1, hold: false, noise: 30, w: { attack: 1, clearSafe: [0, 3, 3, 2, 2] } }
   ];
+  var ORDER = [5, 6, 0, 1, 2, 3, 4];
+  ORDER.forEach(function (i, tier) { LEVELS[i].tier = tier; });
+  // The player's own "make the computer easier or harder" setting, -2 to 2. Slower and sloppier, or faster and sharper.
+  var EASE = { '-2': [0.6, 2, 6], '-1': [0.8, 1.4, 3], '0': [1, 1, 0], '1': [1.2, 0.7, 0], '2': [1.4, 0.5, 0] };
+  function eased(cfg, step) {
+    var e = EASE[step] || EASE[0];
+    return {
+      pps: Math.round(cfg.pps * e[0] * 100) / 100, noise: Math.round((cfg.noise * e[1] + e[2]) * 10) / 10,
+      depth: cfg.depth, hold: cfg.hold, w: cfg.w
+    };
+  }
 
   ZZ.Bot = {
     L: L, R: R, CW: CW, CCW: CCW, SD: SD,
     rowsOf: rowsOf, reach: reach, placements: placements, pathOf: pathOf, applyMove: applyMove,
     features: features, evaluate: evaluate, slotScore: slotScore, think: think, findSpins: findSpins, solve: solve,
-    spawnPos: spawnPos, BotPlayer: BotPlayer, LEVELS: LEVELS, WEIGHTS: WEIGHTS
+    spawnPos: spawnPos, BotPlayer: BotPlayer, LEVELS: LEVELS, ORDER: ORDER, eased: eased, WEIGHTS: WEIGHTS
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
 })(typeof window !== 'undefined' ? window : globalThis);
