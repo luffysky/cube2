@@ -56,5 +56,27 @@ ok(pool.every(x => x >= 1 && x <= 200) && c1 > c200 && new Set(pool).size === 20
 M.data.coins = 1000;
 const had150 = M.data.items[150]; ok(M.buyItem(150).ok && M.data.items[150] === had150 + 1, 'item 150 can be bought');
 ok(M.run('item', [201]).ok === false && M.run('item', [1.5]).ok === false && M.run('bring', ['3']).ok === false, 'an item number out of range is refused, not rounded');
+// ---------- daily jobs in waves ----------
+clock = Date.UTC(2026, 10, 19, 17, 0, 0);       // 01:00 on 20 Nov in Taiwan: a whole day ahead
+M.reset();
+const finishAll = () => { M.data.daily.jobs.forEach(j => { j.n = 999; }); M.data.daily.jobs.forEach(j => M.claimJobId(j.id)); };
+ok(M.jobs().length === 5 && M.waveInfo().wave === 1, 'five jobs in the first wave');
+ok(!M.nextWave().ok, 'no next wave before this one is done');
+const w1 = M.data.daily.jobs.map(j => j.id).join();
+finishAll();
+let wv = M.nextWave(); ok(wv.ok && M.waveInfo().wave === 2 && M.data.daily.jobs.map(j => j.id).join() !== w1, 'a finished wave gives the next one at once, with other jobs');
+finishAll();
+let wi = M.waveInfo(); ok(wi.done && !wi.can && wi.at === clock + 12 * 3600000, 'after the second wave the third waits twelve hours', wi);
+ok(M.nextWave().why === 'wait', 'and asking early is refused');
+clock += 12 * 3600000;
+ok(M.nextWave().ok && M.waveInfo().wave === 3, 'twelve hours later the third wave opens');
+finishAll();
+wi = M.waveInfo(); ok(wi.done && wi.last && !wi.can && M.nextWave().why === 'none', 'three waves a day at most');
+clock += 12 * 3600000;
+ok(M.waveInfo().wave === 1 && !M.waveInfo().done, 'a new day starts again from the first wave');
+M.data.daily.jobs = M.data.daily.jobs.map(j => ({ id: 'box', n: 0, paid: false }));
+M.data.coins = 0; M.data.daily.draws = 0; M.draw(2);
+ok(M.data.daily.jobs[0].n === 2, 'opening boxes counts for a box job');
+
 console.log('luck tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

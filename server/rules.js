@@ -191,6 +191,10 @@ function importState(raw, now) {
   d.sub = { until: until > now ? Math.min(until, now + 30 * DAY) : 0, demo: true };
   const sd = obj(src.daily);
   if (sd.day === today) {
+    // the wave the device was on today comes along, or remaking a cloud save would start the day's waves over
+    const w = int(sd.wave, 1, Meta.WAVE.max);
+    if (w > 1) { d.daily.wave = w; d.daily.jobs = Meta.pickWave(today, w); }
+    d.daily.waveNext = w === 2 ? Math.min(now + Meta.WAVE.wait, Math.max(0, +sd.waveNext || 0)) : 0;
     d.daily.jobs.forEach(j => {
       const def = Meta.JOBS.filter(x => x.id === j.id)[0], old = list(sd.jobs).filter(x => x && x.id === j.id)[0];
       if (!def || !old) return;

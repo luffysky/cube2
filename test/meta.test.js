@@ -98,7 +98,7 @@ ok(!r.best && r.coins === 15 + 10 && M.data.tot.sprint === 80000, 'a slower spri
 r = M.finish({ mode: 'sprint', result: 1, ms: 59999, stats: {} });
 ok(r.best && r.coins === 15 + 40 + 20 && M.data.tot.sprint === 59999, 'a faster sprint takes the record');
 // daily jobs and login
-ok(M.jobs().length === 3, 'three jobs a day');
+ok(M.jobs().length === 5, 'five jobs a wave');
 const before = M.jobs().map(j => j.id).join();
 M.data.daily.jobs[0] = { id: 'win', n: 2, paid: false };
 ok(M.jobsReady() >= 1 && M.claimJob(0) === 60 && M.claimJob(0) === 0, 'claim a finished job once');
@@ -194,7 +194,7 @@ for (const n of ['小明', 'Luffy', 'class', 'gmail', 'assassin', '鶯歌磚王'
 
 // ---------- a saved record with holes in it is filled in ----------
 M.use({ coins: 12, owned: { tile: ['neon'] }, tot: { wins: 3 }, items: [0, 1], bogus: 1 });
-ok(M.data.coins === 12 && M.data.owned.bg.length === 0 && M.data.tot.wins === 3 && M.data.tot.sprint === 0 && M.data.items.length === 201 && M.data.bogus === undefined && M.data.daily.jobs.length === 3, 'use() fills gaps and drops unknown fields', M.data);
+ok(M.data.coins === 12 && M.data.owned.bg.length === 0 && M.data.tot.wins === 3 && M.data.tot.sprint === 0 && M.data.items.length === 201 && M.data.bogus === undefined && M.data.daily.jobs.length === 5, 'use() fills gaps and drops unknown fields', M.data);
 M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
 
 // ---------- level and titles ----------

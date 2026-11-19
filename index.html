@@ -2874,8 +2874,33 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     { id: 'xspin', need: 2, coin: 50, on: function (m) { return m.stats.xspins; } },
     { id: 'sprint', need: 1, coin: 40, on: function (m) { return m.mode === 'sprint' && m.result > 0 ? 1 : 0; } },
     { id: 'score', need: 1, coin: 60, on: function (m) { return m.stats.score >= 20000 ? 1 : 0; } },
-    { id: 'item', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } }
+    { id: 'item', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } },
+    { id: 'win5', need: 5, coin: 120, on: function (m) { return m.battle && m.result > 0 ? 1 : 0; } },
+    { id: 'play10', need: 10, coin: 120, on: function (m) { return m.battle ? 1 : 0; } },
+    { id: 'tst', need: 1, coin: 80, on: function (m) { return m.stats.tst; } },
+    { id: 'lines', need: 100, coin: 60, on: function (m) { return m.stats.lines; } },
+    { id: 'pieces', need: 300, coin: 50, on: function (m) { return m.stats.pieces; } },
+    { id: 'combo8', need: 1, coin: 70, on: function (m) { return m.stats.maxCombo >= 8 ? 1 : 0; } },
+    { id: 'score50', need: 1, coin: 100, on: function (m) { return m.stats.score >= 50000 ? 1 : 0; } },
+    { id: 'ko3', need: 1, coin: 60, on: function (m) { return m.battle && m.ko >= 3 ? 1 : 0; } },
+    { id: 'clean', need: 1, coin: 80, on: function (m) { return m.battle && m.result > 0 && m.koOpp === 0 ? 1 : 0; } },
+    { id: 'hard', need: 1, coin: 90, on: function (m) { return m.mode === 'ai' && m.level >= 4 && m.result > 0 ? 1 : 0; } },
+    { id: 'ghost', need: 1, coin: 40, on: function (m) { return m.mode === 'ghost' ? 1 : 0; } },
+    { id: 'online', need: 1, coin: 60, on: function (m) { return m.mode === 'net' ? 1 : 0; } },
+    { id: 'bigsend', need: 1, coin: 70, on: function (m) { return m.battle && m.stats.sent >= 20 ? 1 : 0; } },
+    { id: 'sprint90', need: 1, coin: 90, on: function (m) { return m.mode === 'sprint' && m.result > 0 && m.ms < 90000 ? 1 : 0; } },
+    { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
+    { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } }
   ];
+  // Jobs come in waves of five. Finish a wave (every job claimed) and the next one can be drawn at once; after the
+  // second, the third waits twelve hours. Three waves a day at most, and a new day starts again from the first.
+  // Every job here is an ordinary one (cat 'gen'); level jobs join when the levels mode does.
+  var WAVE = { size: 5, max: 3, wait: 12 * 3600000 };
+  function pickWave(day, wave) {
+    var rnd = new ZZ.RNG(day * 2654435761 + wave * 40503), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
+    for (var i = 0; i < WAVE.size; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
+    return jobs;
+  }
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
 
@@ -2916,7 +2941,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
+      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
       box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
@@ -2987,10 +3012,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   Meta.rollDay = function () {
     var d = Meta.data.daily, day = Meta.dayNo();
     if (d.day === day && d.jobs.length) return;
-    // three jobs a day, picked by the date so everyone gets the same set
-    var rnd = new ZZ.RNG(day * 2654435761), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
-    for (var i = 0; i < 3; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
-    d.day = day; d.jobs = jobs; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
+    // the first wave of the day, picked by the date so everyone gets the same set
+    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -3017,9 +3040,33 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (!j || !def || j.paid || j.n < def.need) return 0;
     j.paid = true;
     Meta.earn(def.coin);
+    // the second wave done: the third opens twelve hours from now
+    var d = Meta.data.daily;
+    if ((d.wave | 0) === 2 && d.jobs.every(function (x) { return x.paid; })) d.waveNext = Meta.now() + WAVE.wait;
     emit('job', [j.id]);
     return def.coin;
   };
+  Meta.WAVE = WAVE; Meta.pickWave = pickWave;
+  // where the waves stand: which one, whether the next can be drawn now, and from when
+  Meta.waveInfo = function () {
+    Meta.rollDay();
+    var d = Meta.data.daily, w = d.wave | 0 || 1, all = d.jobs.length > 0 && d.jobs.every(function (x) { return x.paid; });
+    var at = w === 2 ? d.waveNext || 0 : 0;
+    return { wave: w, max: WAVE.max, done: all, last: w >= WAVE.max, at: at, can: all && w < WAVE.max && Meta.now() >= at };
+  };
+  Meta.nextWave = function () {
+    var wi = Meta.waveInfo();
+    if (!wi.can) return { ok: false, why: !wi.done ? 'unfinished' : wi.last ? 'none' : 'wait' };
+    var d = Meta.data.daily;
+    d.wave = wi.wave + 1; d.jobs = pickWave(d.day, d.wave); d.waveNext = 0;
+    Meta.save();
+    emit('wave', []);
+    return { ok: true, wave: d.wave };
+  };
+  // progress from things other than matches (opening boxes, the wheel)
+  function jobEvent(kind, n) {
+    Meta.data.daily.jobs.forEach(function (j) { var def = job(j.id); if (def && def.ev === kind && !j.paid && j.n < def.need) j.n = Math.min(def.need, j.n + n); });
+  }
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
     Meta.rollDay();
@@ -3211,6 +3258,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (Meta.wheelLeft() < 1) return { ok: false, why: 'none' };
     var d = Meta.data, seg = pick(WHEEL, Meta.rand());
     d.daily.wheel = (d.daily.wheel | 0) + 1;
+    jobEvent('wheel', 1);
     var got = give(seg.give);
     d.wheel.n++; d.wheel.last = { n: d.wheel.n, at: Meta.now(), seg: seg.id, got: got };
     Meta.save();
@@ -3303,6 +3351,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var d = Meta.data, out = [];
     if (Meta.drawsLeft() < n) return { ok: false, why: 'none' };
     for (var i = 0; i < n; i++) { d.daily.draws++; out.push(openBox()); }
+    jobEvent('box', n);
     d.box.n++; d.box.last = { n: d.box.n, at: Meta.now(), boxes: out };
     d.tot.draws = (d.tot.draws || 0) + n;
     Meta.save();
@@ -3476,6 +3525,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     take: function () { Meta.takeBring(); return yes(1); },
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
+    wave: function () { return Meta.nextWave(); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },
@@ -8242,6 +8292,31 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'j.sprint': ['跑完一次 40 行競速', 'Finish a 40-line sprint', '40ラインスプリント完走', '40줄 스프린트 완주'],
     'j.score': ['單場拿到 20000 分', 'Score 20,000 in one match', '1戦で20000点', '한 판에 20000점'],
     'j.item': ['用掉 3 個道具', 'Use 3 items', 'アイテム3個使用', '아이템 3개 사용'],
+    'j.win5': ['贏 5 場對戰', 'Win 5 matches', '対戦で5勝', '대전 5승'],
+    'j.play10': ['打 10 場對戰', 'Play 10 matches', '対戦を10回', '대전 10판'],
+    'j.tst': ['做出 1 次 T 轉三消', 'Make a T-spin triple', 'Tスピントリプルを1回', 'T스핀 트리플 1회'],
+    'j.lines': ['消掉 100 行', 'Clear 100 lines', '100ライン消す', '100줄 지우기'],
+    'j.pieces': ['放下 300 塊', 'Place 300 pieces', 'ブロックを300個置く', '블록 300개 놓기'],
+    'j.combo8': ['一場裡連擊到 8', 'Reach an 8 combo in a match', '1試合で8コンボ', '한 판에서 8콤보'],
+    'j.score50': ['一場拿到 50,000 分', 'Score 50,000 in one match', '1試合で50,000点', '한 판에 50,000점'],
+    'j.ko3': ['一場擊倒對手 3 次', 'Knock out 3 times in one match', '1試合で3回KO', '한 판에 3번 KO'],
+    'j.clean': ['不倒地贏一場', 'Win without going down', 'ダウンなしで勝つ', '한 번도 안 쓰러지고 승리'],
+    'j.hard': ['打贏第 5 位以上的電腦師傅', 'Beat a computer rival from the 5th up', '5人目以上のCPUに勝つ', '5번째 이상 컴퓨터 상대 이기기'],
+    'j.ghost': ['打 1 場分身對戰', 'Play a ghost match', '分身対戦を1回', '분신 대전 1판'],
+    'j.online': ['打 1 場連線對戰', 'Play an online match', 'オンライン対戦を1回', '온라인 대전 1판'],
+    'j.bigsend': ['一場送出 20 行', 'Send 20 lines in one match', '1試合で20ライン送る', '한 판에 20줄 보내기'],
+    'j.sprint90': ['40 行競速 90 秒內完成', 'Finish 40 lines in under 90 s', '40ラインを90秒以内', '40줄을 90초 안에'],
+    'j.box': ['開 3 個寶箱', 'Open 3 boxes', '宝箱を3個開ける', '보물상자 3개 열기'],
+    'j.wheel': ['轉 1 次轉盤', 'Spin the wheel once', 'ルーレットを1回', '룰렛 1번 돌리기'],
+    'jb.wave': ['第 {0}／{1} 波', 'Wave {0} of {1}', '第{0}／{1}波', '{0}/{1}차'],
+    'jb.next': ['接下一波', 'Next wave', '次の波へ', '다음 차례'],
+    'jb.wait': ['第 {0} 波 {1} 開放', 'Wave {0} opens at {1}', '第{0}波は{1}に開放', '{0}차는 {1}에 열림'],
+    'jb.allDone': ['今天的 3 波都完成了，明天再來。', "All three waves done for today. See you tomorrow.", '今日の3波はすべて完了。また明日。', '오늘 3차 모두 완료. 내일 또 만나요.'],
+    'jb.waveP': ['一波 5 個任務，全部領完可以接下一波；第 2 波完成後要等 12 小時才有第 3 波。每天最多 3 波。', 'Five jobs a wave. Claim them all to draw the next; after the second, the third opens 12 hours later. Three waves a day at most.', '1波5つ。全部受け取ると次の波へ。2波目のあと3波目は12時間後。1日3波まで。', '한 차례에 5개. 모두 받으면 다음 차례로; 2차 이후 3차는 12시간 뒤. 하루 최대 3차.'],
+    'jb.gen': ['一般任務', 'Everyday jobs', '通常任務', '일반 임무'],
+    'jb.lvl': ['關卡任務', 'Level jobs', 'ステージ任務', '스테이지 임무'],
+    'jb.lvlSoon': ['關卡模式推出後開放。', 'Opens with the levels mode.', 'ステージモード公開後に開放。', '스테이지 모드 공개 후 열림.'],
+    'jb.ads': ['看廣告領獎勵', 'Coins for ads', '広告でボーナス', '광고 보상'],
     // profile
     'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
     'it.filter': ['道具分類', 'Item kinds', 'アイテムの種類', '아이템 종류'],
@@ -8651,13 +8726,33 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var d = Meta.data.daily, due = Meta.loginDue(), jobs = Meta.jobs(), day = due ? (d.login === Meta.dayNo() - 1 ? d.streak + 1 : 1) : d.streak, i;
     var pay = Meta.LOGIN[(day - 1) % Meta.LOGIN.length] * (Meta.isSub() ? 2 : 1);
     var h = '<div class="shop-top"><h2>' + t('m.jobs') + '</h2>' + coin(Meta.data.coins) + '</div><div class="rep"><div class="rep-t"><b>' + t('jb.login') + '</b><span>' + t('jb.day', day) + '</span></div>' +
-      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '</div><h3>' + t('jb.today') + '</h3><div class="levels">';
+      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '</div><h3>' + t('jb.gen') + ' · ' + esc(t('jb.wave', Meta.waveInfo().wave, Meta.WAVE.max)) + '</h3><div class="levels">';
     for (i = 0; i < jobs.length; i++) {
       var j = jobs[i], pct = Math.round(j.n / j.need * 100);
       h += '<div class="rep"><div class="rep-t"><b>' + esc(t('j.' + j.id)) + '</b><div class="bar"><i style="width:' + pct + '%"></i></div><span>' + j.n + ' / ' + j.need + '</span></div>' +
         (j.paid ? '<span class="tag on">' + t('jb.claimed') + '</span>' : j.done ? '<button class="btn sm buy main" type="button" data-job="' + j.i + '">' + t('jb.claim') + ' ' + coin(j.coin) + '</button>' : '<span class="tag">' + coin(j.coin) + '</span>') + '</div>';
     }
-    return h + '</div><p class="note">' + t('jb.resets') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+    h += '</div>';
+    // the next wave
+    var wi = Meta.waveInfo();
+    if (wi.done) {
+      if (wi.can) h += '<div class="row"><button class="btn main" type="button" data-do="nextWave">' + t('jb.next') + '</button></div>';
+      else if (wi.last) h += '<p class="note">' + t('jb.allDone') + '</p>';
+      else if (wi.at) h += '<p class="note">' + esc(t('jb.wait', wi.wave + 1, new Date(wi.at).toLocaleTimeString(L.lang, { hour: '2-digit', minute: '2-digit' }))) + '</p>';
+    }
+    h += '<p class="note">' + t('jb.waveP') + '</p>';
+    // level jobs: with the levels mode
+    h += '<h3>' + t('jb.lvl') + '</h3><p class="note">' + t('jb.lvlSoon') + '</p>';
+    // the ad reward, counted here too
+    h += '<h3>' + t('jb.ads') + '</h3><div class="rep"><div class="rep-t"><b>' + t('jb.ads') + '</b><div class="bar"><i style="width:' + Math.round((Meta.ADS.perDay - Meta.adsLeft()) / Meta.ADS.perDay * 100) + '%"></i></div><span>' + (Meta.ADS.perDay - Meta.adsLeft()) + ' / ' + Meta.ADS.perDay + '</span></div>' +
+      '<button class="btn sm" type="button" data-do="openBonus">' + t('bn.title') + '</button></div>';
+    return h + '<p class="note">' + t('jb.resets') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.acts.openBonus = function () { App.openSheet('bonus'); };
+  App.acts.nextWave = function () {
+    var r = Meta.nextWave();
+    if (r.ok) { App.sfx.play('itemGet'); App.updateMenu(); }
+    App.openSheet('jobs');
   };
   App.acts.login = function () {
     var n = Meta.claimLogin();

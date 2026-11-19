@@ -88,6 +88,8 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   const today = Math.floor((now + 8 * 3600000) / 86400000);
   const Bx = await newPlayer({ daily: { day: today, jobs: [{ id: 'tspin', n: 0, paid: false }], draws: 5 } }, '203.0.113.8');
   ok(Bx.st.daily.draws === 5, 'boxes opened today come along with the record', Bx.st.daily);
+  const Bw = await newPlayer({ daily: { day: today, jobs: [{ id: 'tspin', n: 0, paid: false }], wave: 3 } }, '203.0.113.8');
+  ok(Bw.st.daily.wave === 3 && Bw.st.daily.jobs.length === 5, 'the day\'s job wave comes along too', Bw.st.daily);
   const By = await newPlayer({ daily: { day: today - 1, jobs: [{ id: 'tspin', n: 0, paid: false }], draws: 5 } }, '203.0.113.8');
   ok(By.st.daily.draws === 0, 'yesterday\'s boxes do not count against today', By.st.daily);
   const Bz = await newPlayer({ daily: { day: today, jobs: [{ id: 'tspin', n: 0, paid: false }], draws: 999 } }, '203.0.113.8');
@@ -130,7 +132,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await rpc({ a: 'sync', ops: 'take' }, A)).status, 400, 'changes must be a list');
   eq((await rpc({ a: 'sync', ops: Array.from({ length: 41 }, () => op('take')) }, A)).status, 400, 'too many changes in one request');
   r = await sync(A, [op('name', ["Robert'); DROP TABLE zz.players;--"])]);
-  ok(r.json.ok && r.json.st.name === 'Robert); DRO' && (await pg.query('SELECT count(*)::int AS n FROM zz.players'))[0].n === 6, 'a name is just text', r.json.st.name);
+  ok(r.json.ok && r.json.st.name === 'Robert); DRO' && (await pg.query('SELECT count(*)::int AS n FROM zz.players'))[0].n === 7, 'a name is just text', r.json.st.name);
   await sync(A, [op('name', ['阿明'])]);
 
   // ---------- matches ----------

@@ -208,8 +208,33 @@
     { id: 'xspin', need: 2, coin: 50, on: function (m) { return m.stats.xspins; } },
     { id: 'sprint', need: 1, coin: 40, on: function (m) { return m.mode === 'sprint' && m.result > 0 ? 1 : 0; } },
     { id: 'score', need: 1, coin: 60, on: function (m) { return m.stats.score >= 20000 ? 1 : 0; } },
-    { id: 'item', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } }
+    { id: 'item', need: 3, coin: 30, on: function (m) { return m.itemsUsed || 0; } },
+    { id: 'win5', need: 5, coin: 120, on: function (m) { return m.battle && m.result > 0 ? 1 : 0; } },
+    { id: 'play10', need: 10, coin: 120, on: function (m) { return m.battle ? 1 : 0; } },
+    { id: 'tst', need: 1, coin: 80, on: function (m) { return m.stats.tst; } },
+    { id: 'lines', need: 100, coin: 60, on: function (m) { return m.stats.lines; } },
+    { id: 'pieces', need: 300, coin: 50, on: function (m) { return m.stats.pieces; } },
+    { id: 'combo8', need: 1, coin: 70, on: function (m) { return m.stats.maxCombo >= 8 ? 1 : 0; } },
+    { id: 'score50', need: 1, coin: 100, on: function (m) { return m.stats.score >= 50000 ? 1 : 0; } },
+    { id: 'ko3', need: 1, coin: 60, on: function (m) { return m.battle && m.ko >= 3 ? 1 : 0; } },
+    { id: 'clean', need: 1, coin: 80, on: function (m) { return m.battle && m.result > 0 && m.koOpp === 0 ? 1 : 0; } },
+    { id: 'hard', need: 1, coin: 90, on: function (m) { return m.mode === 'ai' && m.level >= 4 && m.result > 0 ? 1 : 0; } },
+    { id: 'ghost', need: 1, coin: 40, on: function (m) { return m.mode === 'ghost' ? 1 : 0; } },
+    { id: 'online', need: 1, coin: 60, on: function (m) { return m.mode === 'net' ? 1 : 0; } },
+    { id: 'bigsend', need: 1, coin: 70, on: function (m) { return m.battle && m.stats.sent >= 20 ? 1 : 0; } },
+    { id: 'sprint90', need: 1, coin: 90, on: function (m) { return m.mode === 'sprint' && m.result > 0 && m.ms < 90000 ? 1 : 0; } },
+    { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
+    { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } }
   ];
+  // Jobs come in waves of five. Finish a wave (every job claimed) and the next one can be drawn at once; after the
+  // second, the third waits twelve hours. Three waves a day at most, and a new day starts again from the first.
+  // Every job here is an ordinary one (cat 'gen'); level jobs join when the levels mode does.
+  var WAVE = { size: 5, max: 3, wait: 12 * 3600000 };
+  function pickWave(day, wave) {
+    var rnd = new ZZ.RNG(day * 2654435761 + wave * 40503), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
+    for (var i = 0; i < WAVE.size; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
+    return jobs;
+  }
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
 
@@ -250,7 +275,7 @@
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
+      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
       box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
@@ -321,10 +346,8 @@
   Meta.rollDay = function () {
     var d = Meta.data.daily, day = Meta.dayNo();
     if (d.day === day && d.jobs.length) return;
-    // three jobs a day, picked by the date so everyone gets the same set
-    var rnd = new ZZ.RNG(day * 2654435761), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
-    for (var i = 0; i < 3; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
-    d.day = day; d.jobs = jobs; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
+    // the first wave of the day, picked by the date so everyone gets the same set
+    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -351,9 +374,33 @@
     if (!j || !def || j.paid || j.n < def.need) return 0;
     j.paid = true;
     Meta.earn(def.coin);
+    // the second wave done: the third opens twelve hours from now
+    var d = Meta.data.daily;
+    if ((d.wave | 0) === 2 && d.jobs.every(function (x) { return x.paid; })) d.waveNext = Meta.now() + WAVE.wait;
     emit('job', [j.id]);
     return def.coin;
   };
+  Meta.WAVE = WAVE; Meta.pickWave = pickWave;
+  // where the waves stand: which one, whether the next can be drawn now, and from when
+  Meta.waveInfo = function () {
+    Meta.rollDay();
+    var d = Meta.data.daily, w = d.wave | 0 || 1, all = d.jobs.length > 0 && d.jobs.every(function (x) { return x.paid; });
+    var at = w === 2 ? d.waveNext || 0 : 0;
+    return { wave: w, max: WAVE.max, done: all, last: w >= WAVE.max, at: at, can: all && w < WAVE.max && Meta.now() >= at };
+  };
+  Meta.nextWave = function () {
+    var wi = Meta.waveInfo();
+    if (!wi.can) return { ok: false, why: !wi.done ? 'unfinished' : wi.last ? 'none' : 'wait' };
+    var d = Meta.data.daily;
+    d.wave = wi.wave + 1; d.jobs = pickWave(d.day, d.wave); d.waveNext = 0;
+    Meta.save();
+    emit('wave', []);
+    return { ok: true, wave: d.wave };
+  };
+  // progress from things other than matches (opening boxes, the wheel)
+  function jobEvent(kind, n) {
+    Meta.data.daily.jobs.forEach(function (j) { var def = job(j.id); if (def && def.ev === kind && !j.paid && j.n < def.need) j.n = Math.min(def.need, j.n + n); });
+  }
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
     Meta.rollDay();
@@ -545,6 +592,7 @@
     if (Meta.wheelLeft() < 1) return { ok: false, why: 'none' };
     var d = Meta.data, seg = pick(WHEEL, Meta.rand());
     d.daily.wheel = (d.daily.wheel | 0) + 1;
+    jobEvent('wheel', 1);
     var got = give(seg.give);
     d.wheel.n++; d.wheel.last = { n: d.wheel.n, at: Meta.now(), seg: seg.id, got: got };
     Meta.save();
@@ -637,6 +685,7 @@
     var d = Meta.data, out = [];
     if (Meta.drawsLeft() < n) return { ok: false, why: 'none' };
     for (var i = 0; i < n; i++) { d.daily.draws++; out.push(openBox()); }
+    jobEvent('box', n);
     d.box.n++; d.box.last = { n: d.box.n, at: Meta.now(), boxes: out };
     d.tot.draws = (d.tot.draws || 0) + n;
     Meta.save();
@@ -810,6 +859,7 @@
     take: function () { Meta.takeBring(); return yes(1); },
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
+    wave: function () { return Meta.nextWave(); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },

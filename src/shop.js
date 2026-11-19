@@ -70,6 +70,31 @@
     'j.sprint': ['跑完一次 40 行競速', 'Finish a 40-line sprint', '40ラインスプリント完走', '40줄 스프린트 완주'],
     'j.score': ['單場拿到 20000 分', 'Score 20,000 in one match', '1戦で20000点', '한 판에 20000점'],
     'j.item': ['用掉 3 個道具', 'Use 3 items', 'アイテム3個使用', '아이템 3개 사용'],
+    'j.win5': ['贏 5 場對戰', 'Win 5 matches', '対戦で5勝', '대전 5승'],
+    'j.play10': ['打 10 場對戰', 'Play 10 matches', '対戦を10回', '대전 10판'],
+    'j.tst': ['做出 1 次 T 轉三消', 'Make a T-spin triple', 'Tスピントリプルを1回', 'T스핀 트리플 1회'],
+    'j.lines': ['消掉 100 行', 'Clear 100 lines', '100ライン消す', '100줄 지우기'],
+    'j.pieces': ['放下 300 塊', 'Place 300 pieces', 'ブロックを300個置く', '블록 300개 놓기'],
+    'j.combo8': ['一場裡連擊到 8', 'Reach an 8 combo in a match', '1試合で8コンボ', '한 판에서 8콤보'],
+    'j.score50': ['一場拿到 50,000 分', 'Score 50,000 in one match', '1試合で50,000点', '한 판에 50,000점'],
+    'j.ko3': ['一場擊倒對手 3 次', 'Knock out 3 times in one match', '1試合で3回KO', '한 판에 3번 KO'],
+    'j.clean': ['不倒地贏一場', 'Win without going down', 'ダウンなしで勝つ', '한 번도 안 쓰러지고 승리'],
+    'j.hard': ['打贏第 5 位以上的電腦師傅', 'Beat a computer rival from the 5th up', '5人目以上のCPUに勝つ', '5번째 이상 컴퓨터 상대 이기기'],
+    'j.ghost': ['打 1 場分身對戰', 'Play a ghost match', '分身対戦を1回', '분신 대전 1판'],
+    'j.online': ['打 1 場連線對戰', 'Play an online match', 'オンライン対戦を1回', '온라인 대전 1판'],
+    'j.bigsend': ['一場送出 20 行', 'Send 20 lines in one match', '1試合で20ライン送る', '한 판에 20줄 보내기'],
+    'j.sprint90': ['40 行競速 90 秒內完成', 'Finish 40 lines in under 90 s', '40ラインを90秒以内', '40줄을 90초 안에'],
+    'j.box': ['開 3 個寶箱', 'Open 3 boxes', '宝箱を3個開ける', '보물상자 3개 열기'],
+    'j.wheel': ['轉 1 次轉盤', 'Spin the wheel once', 'ルーレットを1回', '룰렛 1번 돌리기'],
+    'jb.wave': ['第 {0}／{1} 波', 'Wave {0} of {1}', '第{0}／{1}波', '{0}/{1}차'],
+    'jb.next': ['接下一波', 'Next wave', '次の波へ', '다음 차례'],
+    'jb.wait': ['第 {0} 波 {1} 開放', 'Wave {0} opens at {1}', '第{0}波は{1}に開放', '{0}차는 {1}에 열림'],
+    'jb.allDone': ['今天的 3 波都完成了，明天再來。', "All three waves done for today. See you tomorrow.", '今日の3波はすべて完了。また明日。', '오늘 3차 모두 완료. 내일 또 만나요.'],
+    'jb.waveP': ['一波 5 個任務，全部領完可以接下一波；第 2 波完成後要等 12 小時才有第 3 波。每天最多 3 波。', 'Five jobs a wave. Claim them all to draw the next; after the second, the third opens 12 hours later. Three waves a day at most.', '1波5つ。全部受け取ると次の波へ。2波目のあと3波目は12時間後。1日3波まで。', '한 차례에 5개. 모두 받으면 다음 차례로; 2차 이후 3차는 12시간 뒤. 하루 최대 3차.'],
+    'jb.gen': ['一般任務', 'Everyday jobs', '通常任務', '일반 임무'],
+    'jb.lvl': ['關卡任務', 'Level jobs', 'ステージ任務', '스테이지 임무'],
+    'jb.lvlSoon': ['關卡模式推出後開放。', 'Opens with the levels mode.', 'ステージモード公開後に開放。', '스테이지 모드 공개 후 열림.'],
+    'jb.ads': ['看廣告領獎勵', 'Coins for ads', '広告でボーナス', '광고 보상'],
     // profile
     'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
     'it.filter': ['道具分類', 'Item kinds', 'アイテムの種類', '아이템 종류'],
@@ -479,13 +504,33 @@
     var d = Meta.data.daily, due = Meta.loginDue(), jobs = Meta.jobs(), day = due ? (d.login === Meta.dayNo() - 1 ? d.streak + 1 : 1) : d.streak, i;
     var pay = Meta.LOGIN[(day - 1) % Meta.LOGIN.length] * (Meta.isSub() ? 2 : 1);
     var h = '<div class="shop-top"><h2>' + t('m.jobs') + '</h2>' + coin(Meta.data.coins) + '</div><div class="rep"><div class="rep-t"><b>' + t('jb.login') + '</b><span>' + t('jb.day', day) + '</span></div>' +
-      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '</div><h3>' + t('jb.today') + '</h3><div class="levels">';
+      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '</div><h3>' + t('jb.gen') + ' · ' + esc(t('jb.wave', Meta.waveInfo().wave, Meta.WAVE.max)) + '</h3><div class="levels">';
     for (i = 0; i < jobs.length; i++) {
       var j = jobs[i], pct = Math.round(j.n / j.need * 100);
       h += '<div class="rep"><div class="rep-t"><b>' + esc(t('j.' + j.id)) + '</b><div class="bar"><i style="width:' + pct + '%"></i></div><span>' + j.n + ' / ' + j.need + '</span></div>' +
         (j.paid ? '<span class="tag on">' + t('jb.claimed') + '</span>' : j.done ? '<button class="btn sm buy main" type="button" data-job="' + j.i + '">' + t('jb.claim') + ' ' + coin(j.coin) + '</button>' : '<span class="tag">' + coin(j.coin) + '</span>') + '</div>';
     }
-    return h + '</div><p class="note">' + t('jb.resets') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+    h += '</div>';
+    // the next wave
+    var wi = Meta.waveInfo();
+    if (wi.done) {
+      if (wi.can) h += '<div class="row"><button class="btn main" type="button" data-do="nextWave">' + t('jb.next') + '</button></div>';
+      else if (wi.last) h += '<p class="note">' + t('jb.allDone') + '</p>';
+      else if (wi.at) h += '<p class="note">' + esc(t('jb.wait', wi.wave + 1, new Date(wi.at).toLocaleTimeString(L.lang, { hour: '2-digit', minute: '2-digit' }))) + '</p>';
+    }
+    h += '<p class="note">' + t('jb.waveP') + '</p>';
+    // level jobs: with the levels mode
+    h += '<h3>' + t('jb.lvl') + '</h3><p class="note">' + t('jb.lvlSoon') + '</p>';
+    // the ad reward, counted here too
+    h += '<h3>' + t('jb.ads') + '</h3><div class="rep"><div class="rep-t"><b>' + t('jb.ads') + '</b><div class="bar"><i style="width:' + Math.round((Meta.ADS.perDay - Meta.adsLeft()) / Meta.ADS.perDay * 100) + '%"></i></div><span>' + (Meta.ADS.perDay - Meta.adsLeft()) + ' / ' + Meta.ADS.perDay + '</span></div>' +
+      '<button class="btn sm" type="button" data-do="openBonus">' + t('bn.title') + '</button></div>';
+    return h + '<p class="note">' + t('jb.resets') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.acts.openBonus = function () { App.openSheet('bonus'); };
+  App.acts.nextWave = function () {
+    var r = Meta.nextWave();
+    if (r.ok) { App.sfx.play('itemGet'); App.updateMenu(); }
+    App.openSheet('jobs');
   };
   App.acts.login = function () {
     var n = Meta.claimLogin();
