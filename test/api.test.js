@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 11, 'eleven tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 12, 'twelve tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -169,6 +169,19 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(r.json.res[0].ok && r.json.st.tot.sprint === 71500, 'a real sprint counts', r.json.st.tot);
   r = await call('board', { url: '/api/board?b=sprint&s=all&me=' + A.pub });
   ok(r.json.top[0].v === 71500 && r.json.me.rank === 1 && r.json.me.v === 71500, 'sprint board shows the time', r.json);
+  // the coin ledger: written by the server, adds up to the balance, never twice for one change
+  {
+    const lg = await pg.query('SELECT key, kind, why, delta, bal FROM zz.ledger WHERE pid = $1 ORDER BY id', [A.id]);
+    const cur = (await pg.query('SELECT state FROM zz.players WHERE id = $1', [A.id]))[0].state.coins;
+    ok(lg.length > 3 && lg[0].kind === 'open' && lg.reduce((a, x) => a + x.delta, 0) === cur && lg[lg.length - 1].bal === cur, 'the ledger adds up to the balance', [lg.length, cur]);
+    ok(lg.some(x => x.kind === 'fin' && x.why === 'rank' && x.delta > 0), 'a match payout says which mode paid it', lg.filter(x => x.kind === 'fin').slice(0, 2));
+    const fx = op('fin', taped(match({ ms: 120000 })));
+    await sync(Bx, [fx]);
+    const one = (await pg.query('SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1', [Bx.id]))[0].n;
+    ok((await pg.query('SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND key = $2', [Bx.id, fx.i]))[0].n === 1, 'the line carries the change id');
+    await sync(Bx, [fx]);   // the same change sent again (a retry after a lost answer)
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1', [Bx.id]))[0].n, one, 'a retried change writes no second line');
+  }
   // the time allowance
   let fast = 0, taken = 0;
   for (let i = 0; i < 12; i++) { r = await sync(A, [op('fin', taped(match({ ms: 180000 })))]); if (r.json.res[0].ok) taken++; else if (r.json.res[0].why === 'fast') fast++; }

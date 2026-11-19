@@ -135,7 +135,22 @@ const SCHEMA = [
    )`,
   'CREATE INDEX IF NOT EXISTS matches_at ON zz.matches (at)',
   'CREATE INDEX IF NOT EXISTS matches_pid ON zz.matches (pid, at)',
-  "CREATE INDEX IF NOT EXISTS matches_room ON zz.matches (room, at) WHERE room <> ''"
+  "CREATE INDEX IF NOT EXISTS matches_room ON zz.matches (room, at) WHERE room <> ''",
+  // the coin ledger: one line per change to a player's coins, written by the server from what the rules did. key is
+  // the change's own id from the page (or sys:<time> for the server's own, such as a new day), so a retried save
+  // never writes a line twice.
+  `CREATE TABLE IF NOT EXISTS zz.ledger (
+     id bigserial PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     key text NOT NULL,
+     kind text NOT NULL,
+     why text NOT NULL DEFAULT '',
+     delta integer NOT NULL,
+     bal integer NOT NULL,
+     at double precision NOT NULL,
+     UNIQUE (pid, key)
+   )`,
+  'CREATE INDEX IF NOT EXISTS ledger_at ON zz.ledger (at)'
 ];
 let migrating = null;
 function migrate() {

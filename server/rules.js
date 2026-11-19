@@ -81,8 +81,14 @@ function readSrv(srv, now) {
 // ops: [{ i: id, k: kind, a: [arguments] }], already checked for shape by the caller.
 // Gives the new record, the server's notes, one result per change and the leaderboard marks the matches earned.
 function applyOps(state, srv, ops, now) {
+  const before = state && typeof state === 'object' && typeof state.coins === 'number' ? state.coins : null;
   const d0 = open(state, now);
   srv = readSrv(srv, now);
+  // the coin ledger: every change to the balance, worked out here from what the rules did (the page never writes it)
+  const ledger = [];
+  let bal = d0.coins;
+  const note = (key, kind, why) => { const c = Meta.data.coins; if (c !== bal) { ledger.push({ key, kind, why: why || '', delta: c - bal, bal: c, at: now }); bal = c; } };
+  if (before !== null && before !== bal) { ledger.push({ key: 'sys:' + now, kind: 'system', why: 'day', delta: bal - before, bal, at: now }); }
   if (srv.season !== d0.season) { srv.season = d0.season; srv.rg = 0; }   // a new season: ranked games start from none
   const seen = new Set(srv.ops), res = [], marks = {}, draws = [], matches = [];
   let applied = 0;
@@ -94,6 +100,7 @@ function applyOps(state, srv, ops, now) {
     let r;
     if (op.k === 'fin') { r = finish(op.a, srv, mark); if (r.ok) matches.push(Object.assign({ at: now }, r.rec)); }
     else r = Meta.run(op.k, op.a);
+    note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
     if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, boxes: r.out.boxes });
     applied++;
     res.push(r && r.ok ? { i: op.i, ok: true } : { i: op.i, ok: false, why: (r && r.why) || 'no' });
@@ -101,7 +108,7 @@ function applyOps(state, srv, ops, now) {
   if (srv.ops.length > LIMIT.OP_IDS_KEPT) srv.ops = srv.ops.slice(-LIMIT.OP_IDS_KEPT);
   const d = Meta.data, list = [];
   for (const board in marks) { list.push({ board, season: d.season, val: marks[board] }, { board, season: 'all', val: marks[board] }); }
-  return { state: clone(d), srv, res, marks: list, draws, matches, touched: applied > 0 || res.length > 0 };
+  return { state: clone(d), srv, res, marks: list, draws, matches, ledger, touched: applied > 0 || res.length > 0 };
 }
 // Does the tape back up what the match report says? Gives what the tape shows, or null.
 function proven(m, tape, srv) {

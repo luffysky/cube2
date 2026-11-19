@@ -192,14 +192,14 @@
 
 **`GET /internal/admin/v1/metrics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD`**：給動態圖表，每天一列
 
-`date`、`newPlayers`（`made`）、`activePlayers`（當天有對局紀錄的不同玩家數，來自 `zz.matches`）、`matches`（依模式）、`rankedGames`、`onlineMatches`、`boxesOpened`（依等級）、`coinsEarned` / `coinsSpent`（**需要新增金幣流水帳**，目前沒有）、`newSubs`、`steam*`（預留，`null`）。
+`date`、`newPlayers`（`made`）、`activePlayers`（當天有對局紀錄的不同玩家數，來自 `zz.matches`）、`matches`（依模式）、`rankedGames`、`onlineMatches`、`boxesOpened`（依等級）、`coinsEarned` / `coinsSpent`（來自 `zz.ledger`，依 `kind` 分類）、`newSubs`、`steam*`（預留，`null`）。
 
 **`GET /internal/admin/v1/players/{gameUserId}`**：CRM 查單一玩家
 
 代號、名字、等級、段位、金幣、道具、會員狀態、建立與最後上線時間、裝置數、最近 50 場對局、最近 50 次開箱、停權狀態。不回傳密鑰雜湊、引繼碼、網路位址。
 
 **ERP 相關目前缺的資料**（要做的話各自是新功能，先跟林董確認）：
-1. 金幣流水帳（每筆來源與去向，例如對戰、每日任務、寶箱、商店）。現在只有餘額。
+1. ~~金幣流水帳~~ **已實作（2026-11-20）**：`zz.ledger(pid, key, kind, why, delta, bal, at)`，伺服器套用每個操作時依規則算出的差額寫入，`key` 是操作 ID（冪等，`UNIQUE(pid,key)`），跟存檔同一個交易寫入；客戶端無法直接寫。開帳號時寫一筆 `open`。
 2. 付款與訂單：還沒有付費，之後接金流或 Steam 再設計。
 3. 伺服器自選地區與年齡區間（只存區間，不存生日）。
 

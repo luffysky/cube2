@@ -66,6 +66,7 @@ async function hello(db, body, ip, now) {
       await db.batch([
         [INSERT_PLAYER, [id, pub, state.name, JSON.stringify(state), JSON.stringify(rules.freshSrv(now)), state.rp, state.season, now]],
         ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), id, now]],
+        ["INSERT INTO zz.ledger (pid, key, kind, why, delta, bal, at) VALUES ($1, 'open', 'open', $2, $3, $3, $4)", [id, body.st ? 'import' : 'new', state.coins, now]],
         ['DELETE FROM zz.rate WHERE exp < $1', [now]],
         ['DELETE FROM zz.matches WHERE at < $1', [now - LIMIT.MATCHES_KEEP]]
       ]);
@@ -87,6 +88,11 @@ const SAVE = `
     SELECT u.id, m.board, m.season, m.val, $9 FROM u, jsonb_to_recordset($10::jsonb) AS m(board text, season text, val integer)
     ON CONFLICT (pid, board, season) DO UPDATE SET val = EXCLUDED.val, at = EXCLUDED.at WHERE EXCLUDED.val > zz.scores.val
     RETURNING 1
+  ), l AS (
+    INSERT INTO zz.ledger (pid, key, kind, why, delta, bal, at)
+    SELECT u.id, x.key, x.kind, x.why, x.delta, x.bal, x.at FROM u, jsonb_to_recordset($11::jsonb) AS x(key text, kind text, why text, delta integer, bal integer, at float8)
+    ON CONFLICT (pid, key) DO NOTHING
+    RETURNING 1
   )
   SELECT (SELECT count(*)::int FROM u) AS saved`;
 async function sync(db, cred, ops, now) {
@@ -95,7 +101,7 @@ async function sync(db, cred, ops, now) {
     if (!row) return fail(401, 'auth');
     if (!ops.length) return good({ st: rules.current(row.state, now), ver: row.ver, pub: row.pub, res: [], now });
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
-    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks)]);
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
     if (saved[0] && saved[0].saved === 1) {
       if (out.matches.length) await db.query('INSERT INTO zz.matches (pid, at, mode, result, proven, room, seats, data) SELECT $1, (x->>\'at\')::float8, x->>\'mode\', (x->>\'result\')::smallint, (x->>\'proven\')::boolean, x->>\'room\', (x->>\'seats\')::smallint, x->\'data\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.matches)]);
       if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, boxes) SELECT $1, (x->>\'at\')::float8, x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
