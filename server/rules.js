@@ -84,7 +84,7 @@ function applyOps(state, srv, ops, now) {
   const d0 = open(state, now);
   srv = readSrv(srv, now);
   if (srv.season !== d0.season) { srv.season = d0.season; srv.rg = 0; }   // a new season: ranked games start from none
-  const seen = new Set(srv.ops), res = [], marks = {}, draws = [];
+  const seen = new Set(srv.ops), res = [], marks = {}, draws = [], matches = [];
   let applied = 0;
   const mark = (board, val) => { if (!(board in marks) || val > marks[board]) marks[board] = val; };
   for (const op of ops) {
@@ -92,7 +92,7 @@ function applyOps(state, srv, ops, now) {
     seen.add(op.i); srv.ops.push(op.i);
     if (++srv.hn > LIMIT.OPS_PER_HOUR) { res.push({ i: op.i, ok: false, why: 'slow' }); continue; }
     let r;
-    if (op.k === 'fin') r = finish(op.a, srv, mark);
+    if (op.k === 'fin') { r = finish(op.a, srv, mark); if (r.ok) matches.push(Object.assign({ at: now }, r.rec)); }
     else r = Meta.run(op.k, op.a);
     if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, boxes: r.out.boxes });
     applied++;
@@ -101,7 +101,7 @@ function applyOps(state, srv, ops, now) {
   if (srv.ops.length > LIMIT.OP_IDS_KEPT) srv.ops = srv.ops.slice(-LIMIT.OP_IDS_KEPT);
   const d = Meta.data, list = [];
   for (const board in marks) { list.push({ board, season: d.season, val: marks[board] }, { board, season: 'all', val: marks[board] }); }
-  return { state: clone(d), srv, res, marks: list, draws, touched: applied > 0 || res.length > 0 };
+  return { state: clone(d), srv, res, marks: list, draws, matches, touched: applied > 0 || res.length > 0 };
 }
 // Does the tape back up what the match report says? Gives what the tape shows, or null.
 function proven(m, tape, srv) {
@@ -137,7 +137,10 @@ function finish(a, srv, mark) {
     if (v && m.stats.score > 0) mark('score', m.stats.score);
     if (m.mode === 'rank') srv.rg++;
   }
-  return { ok: true };
+  // one line for the match log: what was reported, and whether the piece placements backed it up
+  const st = m.stats;
+  return { ok: true, rec: { mode: m.mode, result: m.result, proven: !!v, room: m.room, seats: m.seats,
+    data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins, items: m.itemsUsed, team: m.team, quick: m.quick } } };
 }
 // The record as it stands right now (a new day or season may have begun since it was stored).
 function current(state, now) { return clone(open(state, now)); }

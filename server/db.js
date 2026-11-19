@@ -119,7 +119,23 @@ const SCHEMA = [
      at double precision NOT NULL,
      boxes jsonb NOT NULL
    )`,
-  'CREATE INDEX IF NOT EXISTS draws_at ON zz.draws (at)'
+  'CREATE INDEX IF NOT EXISTS draws_at ON zz.draws (at)',
+  // every finished match a cloud save reports, kept a year: one line per player, so an online match has a line from
+  // each seat (put together by room). proven says whether the piece placements backed the report up.
+  `CREATE TABLE IF NOT EXISTS zz.matches (
+     id bigserial PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     at double precision NOT NULL,
+     mode text NOT NULL,
+     result smallint NOT NULL,
+     proven boolean NOT NULL,
+     room text NOT NULL DEFAULT '',
+     seats smallint NOT NULL DEFAULT 1,
+     data jsonb NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS matches_at ON zz.matches (at)',
+  'CREATE INDEX IF NOT EXISTS matches_pid ON zz.matches (pid, at)',
+  "CREATE INDEX IF NOT EXISTS matches_room ON zz.matches (room, at) WHERE room <> ''"
 ];
 let migrating = null;
 function migrate() {

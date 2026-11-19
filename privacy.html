@@ -65,6 +65,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <tr><th>你自己填的名字</th><td>顯示在排行榜和房間名單上。可以留空；未滿 13 歲不能設定。</td><td>你的選擇</td></tr>
 <tr><th>排行榜成績</th><td>段位分、單場最高分、40 行競速時間，公開顯示。</td><td>提供服務</td></tr>
 <tr><th>對局的落點紀錄</th><td>每場結束時送到伺服器核對分數有沒有造假，核對完就丟掉，只留下這場的編號避免重複送。</td><td>防作弊、維護公平</td></tr>
+<tr><th>對局紀錄</th><td>有雲端存檔時，每場的模式、勝負、擊倒數、分數、送出行數、時間長度、核對結果，連線對戰另外記房間代碼和人數。用來處理客服與作弊檢舉、看遊戲平衡。</td><td>防作弊、客服、改善遊戲</td></tr>
 <tr><th>寶箱紀錄</th><td>每次開箱的時間和開到什麼，用來核對公布的機率。</td><td>公布機率的義務與消費爭議處理</td></tr>
 <tr><th>連線對戰的房間與訊息</th><td>房間代碼和雙方互傳的遊戲畫面資料。對方收到就刪除，房間最久三小時後清掉。</td><td>提供服務</td></tr>
 <tr><th>網路位址（不存原文）</th><td>擋濫用（例如一直猜引繼碼、大量建帳號），只存加了密鑰、無法還原的雜湊值。</td><td>安全</td></tr>
@@ -112,6 +113,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <li>雲端存檔與排行榜成績：直到你刪除。</li>
 <li>帳號資料：直到你刪除帳號；綁定紀錄在刪除轉磚資料或帳號時一起刪除。</li>
 <li>寶箱紀錄：至少保存到該次開箱後 180 天，之後可能刪除；你刪除雲端資料時一併刪除。</li>
+<li>對局紀錄：一年，之後自動刪除；你刪除雲端資料時一併刪除。</li>
 <li>網路位址的雜湊值：最久兩天。</li>
 <li>連線房間：最久三小時；訊息讀過就刪。</li>
 <li>引繼碼：10 分鐘或用過一次就失效。</li>
@@ -123,7 +125,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <ul>
 <li><strong>查詢、取得副本</strong>：「設定 → 隱私與資料 → 下載我的資料」會給你一份 JSON 檔。</li>
 <li><strong>更正</strong>：在「個人檔案」改名字。</li>
-<li><strong>刪除</strong>：「個人檔案 → 雲端存檔 → 刪除雲端資料」，存檔、排行榜成績和寶箱紀錄立刻刪除；裝置上的資料清除瀏覽器資料即可。有帳號時，可以只刪轉磚的資料，或刪除整個 SnowRealm Games 帳號（所有遊戲的資料一起刪）。</li>
+<li><strong>刪除</strong>：「個人檔案 → 雲端存檔 → 刪除雲端資料」，存檔、排行榜成績、對局紀錄和寶箱紀錄立刻刪除；裝置上的資料清除瀏覽器資料即可。有帳號時，可以只刪轉磚的資料，或刪除整個 SnowRealm Games 帳號（所有遊戲的資料一起刪）。</li>
 <li><strong>撤回同意</strong>：Google 字型隨時可以在設定裡關掉。</li>
 <li><strong>申訴</strong>：可以先聯絡我們；你也有權向所在地的個資主管機關申訴。</li>
 </ul>
@@ -160,6 +162,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <li><strong>A name, if you enter one</strong>, shown on leaderboards and room lists. Optional; not available under 13.</li>
 <li><strong>Leaderboard results</strong>, shown publicly.</li>
 <li><strong>Each match's piece placements</strong>, checked against the reported score to stop cheating and then discarded (only the match number is remembered, so it cannot be sent twice).</li>
+<li><strong>A match log</strong>: with a cloud save, each match's mode, result, knockouts, score, lines sent, length and whether the placements checked out, plus the room code and player count for online matches. Used for support, cheating reports and game balance.</li>
 <li><strong>Treasure box records</strong>: when each box was opened and what was in it, so the published odds can be checked.</li>
 <li><strong>Online room messages</strong>, deleted once delivered; rooms are removed after three hours at most.</li>
 <li><strong>A keyed hash of your network address</strong> (never the address itself), to slow down abuse; kept two days at most.</li>
@@ -179,7 +182,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <p>Vercel (hosting; server code runs in Singapore), Neon (database, Singapore), Google Fonts (only if you allow it), GitHub (only if you write to us there). Data may therefore be stored outside your country. We share data with no one else and use none of it for advertising or analytics.</p>
 
 <h2>6. How long we keep it</h2>
-<p>Cloud save and leaderboard results: until you delete them. Account data: until you delete the account; link records go with this game's data or the account. Treasure box records: at least 180 days after each draw, removed with your cloud data. Address hashes: two days at most. Rooms: three hours at most. Transfer codes: ten minutes or one use. Device data: until you clear this site's browser data.</p>
+<p>Cloud save and leaderboard results: until you delete them. Account data: until you delete the account; link records go with this game's data or the account. Treasure box records: at least 180 days after each draw, removed with your cloud data. Match log: one year, then deleted automatically, and removed with your cloud data. Address hashes: two days at most. Rooms: three hours at most. Transfer codes: ten minutes or one use. Device data: until you clear this site's browser data.</p>
 
 <h2>7. Your rights</h2>
 <p>Under Taiwan's Personal Data Protection Act and other laws that may apply to you (such as the EU GDPR) you can: get a copy (Settings → Privacy and data → Download my data); correct your name (Profile); delete everything (Profile → Cloud save → Delete cloud data, and clear your browser data; with an account, delete only this game's data or the whole SnowRealm Games account); withdraw consent for Google Fonts (Settings); and complain to your data protection authority. As we do not know who you are, we may ask you to make a transfer code in the game to prove a save is yours (put it in your email, never post it publicly).</p>

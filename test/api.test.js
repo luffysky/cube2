@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 10, 'ten tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 11, 'eleven tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -146,11 +146,21 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(r.json.st.tot.best === 365000, 'an absurd score is cut down to what two minutes allow', r.json.st.tot);
   r = await call('board', { url: '/api/board?b=rp&me=' + A.pub });
   ok(r.json.top.length === 0 && r.json.me === null, 'no ranked match yet, so not on the rating board');
+  // the match log: one line per reported match, with what the placements proved
+  let ml = await pg.query('SELECT mode, result, proven, room, seats, data FROM zz.matches WHERE pid = $1 ORDER BY id', [A.id]);
+  ok(ml.length === 3 && ml[0].mode === 'ai' && ml[0].result === 1 && ml[0].proven === true && ml[0].room === '' && ml[0].seats === 1 && ml[0].data.score === 12000, 'each match is logged', ml[0]);
+  ok(ml[2].data.score === 365000, 'the log keeps the score as the server cut it down', ml[2].data);
   r = await sync(A, [op('fin', taped(match({ mode: 'rank', ko: 3, koOpp: 1 })))]);
   ok(r.json.st.rp === 26 && r.json.st.rgames === 1, 'a ranked win moves the rating', r.json.st);
   r = await call('board', { url: '/api/board?b=rp&me=' + A.pub });
   ok(r.json.top.length === 1 && r.json.top[0].v === 26 && r.json.me.rank === 1 && r.json.me.v === 26, 'now on the rating board', r.json);
   // sprint
+  r = await sync(Bx, [op('fin', [match({ mode: 'net', room: 'AB23C', seats: 4, result: -1 })])]);
+  ml = await pg.query('SELECT mode, result, proven, room, seats FROM zz.matches WHERE pid = $1 ORDER BY id DESC LIMIT 1', [Bx.id]);
+  ok(ml[0].mode === 'net' && ml[0].room === 'AB23C' && ml[0].seats === 4 && ml[0].proven === false, 'an online match keeps its room, and an untaped one is marked unproven', ml[0]);
+  r = await sync(Bx, [op('fin', [match({ mode: 'ai', room: 'AB23C' })])]);
+  ml = await pg.query('SELECT room FROM zz.matches WHERE pid = $1 ORDER BY id DESC LIMIT 1', [Bx.id]);
+  eq(ml[0].room, '', 'only online matches carry a room');
   r = await sync(A, [op('fin', taped({ mode: 'sprint', result: 1, ms: 9000, stats: { lines: 40, pieces: 100 } }))]);
   ok(r.json.res[0].ok === false && r.json.res[0].why === 'range' && r.json.st.tot.sprint === 0, 'a nine-second sprint is not believed', r.json.res);
   r = await sync(A, [op('fin', taped({ mode: 'sprint', result: 1, ms: 60000, stats: { lines: 12, pieces: 30 } }))]);

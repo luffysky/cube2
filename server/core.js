@@ -10,7 +10,8 @@ const rules = require('./rules.js');
 const DAY = 86400000;
 
 const LIMIT = {
-  NEW_PER_IP_DAY: 40,        // accounts one address may create in a day
+  NEW_PER_IP_DAY: 40,
+  MATCHES_KEEP: 365 * 86400000,   // the match log is kept a year        // accounts one address may create in a day
   CODE_TRIES: 12, CODE_WINDOW: 10 * 60000,   // code guesses one address may make in ten minutes
   CODE_TTL: 10 * 60000,
   DEVICES: 5,                // devices kept on one account; the oldest drops off
@@ -65,7 +66,8 @@ async function hello(db, body, ip, now) {
       await db.batch([
         [INSERT_PLAYER, [id, pub, state.name, JSON.stringify(state), JSON.stringify(rules.freshSrv(now)), state.rp, state.season, now]],
         ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), id, now]],
-        ['DELETE FROM zz.rate WHERE exp < $1', [now]]
+        ['DELETE FROM zz.rate WHERE exp < $1', [now]],
+        ['DELETE FROM zz.matches WHERE at < $1', [now - LIMIT.MATCHES_KEEP]]
       ]);
       return good({ id, key: secret, pub, st: state, ver: 1, now });
     } catch (e) {
@@ -95,6 +97,7 @@ async function sync(db, cred, ops, now) {
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks)]);
     if (saved[0] && saved[0].saved === 1) {
+      if (out.matches.length) await db.query('INSERT INTO zz.matches (pid, at, mode, result, proven, room, seats, data) SELECT $1, (x->>\'at\')::float8, x->>\'mode\', (x->>\'result\')::smallint, (x->>\'proven\')::boolean, x->>\'room\', (x->>\'seats\')::smallint, x->\'data\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.matches)]);
       if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, boxes) SELECT $1, (x->>\'at\')::float8, x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
       return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
     }
