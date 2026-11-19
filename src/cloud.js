@@ -211,7 +211,13 @@
         });
       });
     }
-    var batch = Cloud.q.slice(0, BATCH), ids = {};
+    // as many waiting changes as fit: finished matches carry their tape, so the batch is cut by size as well as by count
+    var batch = [], bytes = 0, ids = {};
+    for (var bi = 0; bi < Cloud.q.length && batch.length < BATCH; bi++) {
+      var len = JSON.stringify(Cloud.q[bi].a).length + 60;
+      if (batch.length && bytes + len > 60000) break;
+      bytes += len; batch.push(Cloud.q[bi]);
+    }
     batch.forEach(function (o) { o.s = 1; ids[o.i] = 1; });
     var drop = function () { Cloud.q = Cloud.q.filter(function (o) { return !ids[o.i]; }); };
     return call('POST', 'rpc', { a: 'sync', ops: batch.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) }, true).then(function (r) {
@@ -223,7 +229,9 @@
         Cloud.last = Cloud.now();
         adopt(b.st);
         persist();
-        if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && (x.why === 'fast' || x.why === 'range' || x.why === 'slow'); })) Cloud.onNote('rejected');
+        // 'proof': the server could not match a result to its tape. With honest play that means this page is older than the rules on the server.
+        if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && x.why === 'proof'; })) Cloud.onNote('stale');
+        else if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && (x.why === 'fast' || x.why === 'range' || x.why === 'slow'); })) Cloud.onNote('rejected');
         return Cloud.q.length ? 'more' : 'done';
       }
       if (r.status === 401) { lost(); return 'done'; }
@@ -444,6 +452,7 @@
     'cl.badCode': ['這組碼不對，或是已經過期。', 'That code is wrong or has run out.', 'コードが違うか、有効期限が切れています。', '코드가 틀렸거나 만료되었습니다.'],
     'cl.slow': ['試太多次了，等十分鐘再試。', 'Too many tries. Wait ten minutes and try again.', '試行回数が多すぎます。10分待ってからお試しください。', '시도 횟수가 너무 많습니다. 10분 후 다시 시도하세요.'],
     'cl.err': ['現在連不上伺服器，等一下再試。', 'The server cannot be reached right now. Try again in a moment.', '現在サーバーに接続できません。少し待ってからお試しください。', '지금 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'cl.stale': ['剛剛那場伺服器沒有採計。請重新整理頁面換成最新版再打。', 'The server did not count that match. Reload the page to get the latest version, then play again.', 'さっきの試合はサーバーで記録されませんでした。ページを再読み込みして最新版にしてください。', '방금 경기는 서버에 기록되지 않았습니다. 페이지를 새로 고쳐 최신 버전으로 바꿔 주세요.'],
     'cl.privacy': ['隱私說明：存了什麼、怎麼刪', 'Privacy: what is stored and how to delete it', 'プライバシー：保存される内容と削除方法', '개인정보: 저장되는 내용과 삭제 방법'],
     'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
     'cl.delP': ['會刪掉雲端上的存檔和排行榜成績，所有連著的裝置都會斷開。這台裝置上的進度不受影響。刪了就救不回來。', 'This deletes your cloud save and your leaderboard scores and unlinks every device. Progress on this device is not touched. It cannot be undone.', 'クラウドのセーブとランキングの記録を削除し、すべての端末の接続を解除します。この端末の進行状況には影響しません。元に戻せません。', '클라우드 저장 데이터와 랭킹 기록을 삭제하고 모든 기기의 연결을 해제합니다. 이 기기의 진행 상황에는 영향이 없습니다. 되돌릴 수 없습니다.'],
@@ -630,7 +639,7 @@
       if (App.sheet() === 'online' && net && (net.state === 'idle' || net.state === 'error') && !(active && active.id === 'nCode')) App.openSheet('online');
     }
   };
-  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : 'cl.rejected'), 4600); };
+  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : kind === 'stale' ? 'cl.stale' : 'cl.rejected'), kind === 'stale' ? 7000 : 4600); };
   Cloud.onAdopt = function (any, look) {
     // progress kept with the settings follows the record: drills passed, so a second device does not start the dojo over
     var done = Meta.data.first.drills, sv = App.save, top = 0, i;

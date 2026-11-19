@@ -61,7 +61,8 @@ async function one(ws, f) {
   if (ws.readyState !== 1) return;
   const body = out.body;
   if (out.status === 200) {
-    const code = core.readRoom(f.code), seat = core.readSeat(f), room = here.get(code);
+    const code = core.readRoom(f.code), seat = core.readSeat(f);
+    if (ws.zzCode !== code) console.log('[zz] ws seated');      // one line per connection, nothing about who
     seatOf(ws, code, seat);
     const said = core.cleanMail(f.out) || [];
     let near = 0;
@@ -73,7 +74,6 @@ async function one(ws, f) {
       if (mine.length) try { peer.send(JSON.stringify({ p: mine })); } catch (e) { /* its own rounds will fetch them */ }
     });
     body.near = near;      // how many of the others are on this same machine (the page relaxes its own rounds for those)
-    void room;
   }
   ws.send(JSON.stringify({ i: f.i, s: out.status, b: body }));
 }

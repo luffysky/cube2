@@ -6,8 +6,12 @@
    this file repeats it on the server's copy. A purchase the player cannot afford, a look they do not own or a job
    that is not finished simply fails here, whatever the page claimed.
 
-   A finished match is the one thing the server has to take on trust. It is held to what a match of that length
-   can produce, and to a time allowance: matches cannot be reported faster than they could have been played.
+   A finished match comes with a tape of what the player's side did (src/replay.js). The server plays the tape
+   through the rules and compares: the reported lines, twists and score have to be what those moves produce. A
+   ranked match or a sprint without a tape that checks out is not counted at all, and only checked matches reach
+   the score board. What the tape cannot show is the other side (how often the rival went down), so that part is
+   still held to what a match of that length can produce, and to a time allowance: matches cannot be reported
+   faster than they could have been played.
 
    Everything in this file is synchronous. src/meta.js works on one shared record at a time, so no function here
    may wait for anything while it holds that record. */
@@ -16,6 +20,7 @@ const ZZ = require('../src/engine.js');
 require('../src/drills.js');
 require('../src/openers.js');
 require('../src/meta.js');
+require('../src/replay.js');
 const Meta = ZZ.Meta;
 
 Meta.store = { getItem() { return null; }, setItem() {} };   // the server keeps records in the database, never in a browser store
@@ -31,6 +36,8 @@ const LIMIT = {
   BUDGET_CAP: 8 * 3600000,   // and the most that can pile up while away (covers a long stretch offline)
   BUDGET_RATE: 1.5,          // play time earned per unit of real time
   MATCH_MIN: 20000,          // every reported match costs at least this much of the allowance
+  TAPE_BYTES: 20000,         // the longest tape accepted with one match
+  SEEDS_KEPT: 80,            // recent matches remembered, so the same tape cannot be handed in twice
   SPRINT_MIN: 15000,         // a 40-line sprint faster than this is not believed
   IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20
 };
@@ -46,7 +53,7 @@ function seasonOf(now) { Meta.now = () => now; return Meta.seasonId(); }
 
 // ---------- the server's own notes about a player (never sent to the page) ----------
 function freshSrv(now) {
-  return { ops: [], bud: LIMIT.BUDGET_START, at: now, hw: Math.floor(now / 3600000), hn: 0, rg: 0, season: '' };
+  return { ops: [], bud: LIMIT.BUDGET_START, at: now, hw: Math.floor(now / 3600000), hn: 0, rg: 0, season: '', seeds: [] };
 }
 function readSrv(srv, now) {
   const f = freshSrv(now);
@@ -56,7 +63,8 @@ function readSrv(srv, now) {
     bud: typeof srv.bud === 'number' && isFinite(srv.bud) ? srv.bud : f.bud,
     at: typeof srv.at === 'number' && isFinite(srv.at) ? srv.at : now,
     hw: typeof srv.hw === 'number' ? srv.hw : f.hw, hn: int(srv.hn, 0, 1e9),
-    rg: int(srv.rg, 0, 1e9), season: typeof srv.season === 'string' ? srv.season : ''
+    rg: int(srv.rg, 0, 1e9), season: typeof srv.season === 'string' ? srv.season : '',
+    seeds: Array.isArray(srv.seeds) ? srv.seeds.filter(x => typeof x === 'number').slice(-LIMIT.SEEDS_KEPT) : []
   };
   // the allowance fills up with real time
   const waited = Math.max(0, now - out.at);
@@ -91,17 +99,38 @@ function applyOps(state, srv, ops, now) {
   for (const board in marks) { list.push({ board, season: d.season, val: marks[board] }, { board, season: 'all', val: marks[board] }); }
   return { state: clone(d), srv, res, marks: list, touched: applied > 0 || res.length > 0 };
 }
+// Does the tape back up what the match report says? Gives what the tape shows, or null.
+function proven(m, tape, srv) {
+  if (!tape || typeof tape !== 'object') return null;
+  let size = 0;
+  try { size = JSON.stringify(tape).length; } catch (e) { return null; }
+  if (size > LIMIT.TAPE_BYTES || srv.seeds.indexOf(tape.seed) >= 0) return null;
+  const v = ZZ.Replay.check(tape);
+  if (!v) return null;
+  const st = m.stats, sprint = m.mode === 'sprint';
+  if (v.pieces !== st.pieces || v.lines !== st.lines || v.spins !== st.spins || v.minis !== st.minis || v.xspins !== st.xspins || v.quads !== st.quads || v.maxCombo !== st.maxCombo) return null;
+  if (v.ms > m.ms + 500 || v.pieces > 12 + (m.ms / 1000) * 6) return null;                 // moves made after the end, or faster than hands can go
+  // beyond what the moves score: up to two points a row for dropping a piece, and 1500 for each time the rival went down
+  if (st.score > v.score + 44 * v.pieces + 1500 * m.ko) return null;
+  if (sprint) return v.lines >= 40 && v.kos === 0 ? v : null;
+  if (st.sent > v.attack || m.koOpp !== v.kos || m.ko > 1 + Math.floor(m.ms / 5000)) return null;
+  if (m.result > 0 && m.ko < m.koOpp) return null;                                         // fewer knockouts than the rival is not a win
+  return v;
+}
 function finish(a, srv, mark) {
   const m = Meta.cleanMatch(a[0] && typeof a[0] === 'object' ? a[0] : {});
   const sprint = m.mode === 'sprint';
   if (sprint && (m.result <= 0 || m.ms < LIMIT.SPRINT_MIN || m.stats.lines < 40)) return { ok: false, why: 'range' };
+  const tape = a[1], v = proven(m, tape, srv);
+  if (!v && (sprint || m.mode === 'rank')) return { ok: false, why: 'proof' };
   const cost = Math.max(LIMIT.MATCH_MIN, m.ms);
   if (srv.bud < cost) return { ok: false, why: 'fast' };
   srv.bud -= cost;
+  if (v) { srv.seeds.push(tape.seed); if (srv.seeds.length > LIMIT.SEEDS_KEPT) srv.seeds = srv.seeds.slice(-LIMIT.SEEDS_KEPT); }
   Meta.run('fin', [m]);
   if (sprint) mark('sprint', -m.ms);
   else {
-    if (m.stats.score > 0) mark('score', m.stats.score);
+    if (v && m.stats.score > 0) mark('score', m.stats.score);
     if (m.mode === 'rank') srv.rg++;
   }
   return { ok: true };
@@ -179,4 +208,4 @@ function cleanOps(v) {
   return out;
 }
 
-module.exports = { Meta, LIMIT, applyOps, current, importState, cleanOps, freshSrv, readSrv, seasonOf, clone };
+module.exports = { ZZ, Meta, LIMIT, applyOps, current, importState, cleanOps, freshSrv, readSrv, seasonOf, clone };

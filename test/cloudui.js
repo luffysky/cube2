@@ -48,7 +48,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(await A.page.evaluate(() => !!document.querySelector('[data-do="board"]')), 'the ranked sheet offers the leaderboards');
   await A.page.tap('[data-do="rankGo"]'); await sleep(3300);
   for (const k of ['L', 'HD', 'R', 'HD', 'CW', 'HD']) { await A.page.tap('.key[data-k="' + k + '"]'); await sleep(90); }
-  await ev(A, 'S.total = 120000; S.left = 300; S.ko.me = 2; S.me.stats.score = 4321; return 1'); await sleep(2200);
+  await ev(A, 'S.total = 120000; S.left = 300; S.ko.me = 2; S.me.stats.score = 2800; return 1'); await sleep(2200);
   ok(await A.page.evaluate(() => /排位|勝|贏/.test(document.getElementById('sheetCard').textContent)), 'match ended');
   await idle(A);
   const afterMatch = await ev(A, 'return { rp: M.data.rp, coins: M.data.coins, games: M.data.tot.games, q: C.q.length, st: C.status() }');
@@ -62,7 +62,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   await shot(A, '2-board-rp');
   await A.page.tap('[data-lb="score"]'); await sleep(600);
   rows = await A.page.evaluate(() => [...document.querySelectorAll('.lb li')].map(li => li.textContent));
-  ok(rows.length === 1 && /4,321/.test(rows[0]), 'score board shows the match score', rows);
+  ok(rows.length === 1 && /2,800/.test(rows[0]), 'score board shows the match score', rows);
   ok(await A.page.evaluate(() => !!document.querySelector('[data-lbs="all"]')), 'season or all-time');
   await A.page.tap('[data-lbs="all"]'); await sleep(500);
   ok(await A.page.evaluate(() => document.querySelector('[data-lbs="all"]').getAttribute('aria-checked') === 'true' && document.querySelectorAll('.lb li').length === 1), 'all-time board');

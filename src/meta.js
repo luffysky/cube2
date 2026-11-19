@@ -401,7 +401,8 @@
     };
   };
   // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, ms }
-  Meta.finish = function (m) {
+  // tape: the proof that goes to the server with the result (see replay.js); it plays no part in the sums here
+  Meta.finish = function (m, tape) {
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
     m = Meta.cleanMatch(m);
     m.battle = m.mode !== 'sprint';
@@ -453,7 +454,7 @@
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
     delete m.battle;
-    emit('fin', [m]);
+    emit('fin', tape ? [m, tape] : [m]);
     return out;
   };
   // First time through a drill or an opener lesson pays once. What it pays is looked up here, not taken from the caller.

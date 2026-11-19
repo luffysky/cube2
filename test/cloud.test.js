@@ -69,6 +69,8 @@ const same = (a, b) => { const x = canon(JSON.parse(JSON.stringify(a))), y = can
 // test set-up only: put coins into the server's copy, then let the device fetch it
 const grant = async (dev, coins) => { const c = JSON.parse(dev.mem['zhuanzhuan.cloud.v1']); await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{coins}', to_jsonb($2::int)), ver = ver + 1 WHERE id = $1", [c.id, coins]); await C.flush(true); await settle(); };
 const players = async () => { try { return (await pg.query('SELECT count(*)::int AS n FROM zz.players'))[0].n; } catch (e) { return 0; } };
+const TAPE = require('./tape.js'); TAPE.stub(require('../server/rules.js').ZZ);
+const fin = m => M.finish(m, TAPE.fake(m));      // a match the way the page ends one: the report and a tape (a stand-in here, see test/tape.js)
 const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp: 0, itemsUsed: 0, ms: 120000, stats: { score: 12000, spins: 3, minis: 0, sent: 30, quads: 1, maxCombo: 2, xspins: 0, lines: 40, pieces: 120 } }, o || {});
 
 (async () => {
@@ -76,7 +78,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   net.static = true;
   const P = await open(device('pages'));
   eq(C.status(), 'none', 'on a plain static host there is no cloud');
-  M.buyItem(1); M.finish(match());
+  M.buyItem(1); fin(match());
   ok(C.q.length === 0 && M.data.items[1] === 1 && M.data.tot.games === 1, 'the game works as before and nothing is queued', C.q);
   eq(net.calls, ['GET health'], 'it asks once and then leaves the network alone');
   net.static = false; net.calls = [];
@@ -147,7 +149,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   net.ip = '203.0.113.6'; net.calls = [];
   await open(B);
   eq([C.status(), await players()], ['new', 1], 'an old local player: still no account until something happens');
-  const r1 = M.finish(match({ mode: 'rank', ko: 3, koOpp: 0 }));
+  const r1 = fin(match({ mode: 'rank', ko: 3, koOpp: 0 }));
   ok(r1.coins > 0 && M.data.rp === 320 + 29, 'a ranked win, worked out on the device first', [r1.coins, M.data.rp]);
   await send();
   sv = await server(B);
@@ -166,7 +168,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   ok(real >= 1000 && real < 1900 && M.owns('theme', 'market') && !M.owns('tile', 'candy') && !M.owns('bg', 'night') && sv.coins === real - 1000 && M.data.coins === sv.coins && same(sv, M.data),
     'the server does not: it sells what the real coins can pay for, undoes the rest, and the coins are the real ones', [real, M.data.coins, M.data.owned]);
   M.data.rp = 1790; M.data.peak = 1790; M.save();
-  M.finish(match({ mode: 'rank', ko: 1, koOpp: 0, result: -1 }));
+  fin(match({ mode: 'rank', ko: 1, koOpp: 0, result: -1 }));
   await send();
   ok(M.data.rp < 400 && same(await server(B), M.data), 'an edited rating is replaced by the real one', M.data.rp);
 
@@ -174,7 +176,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   await grant(B, 2000);
   eq(M.data.coins, 2000, '(test set-up: coins granted on the server show up on the device)');
   net.down = true;
-  M.buyItem(2); M.buyItem(3); M.toggleBring(2); M.finish(match({ ms: 90000 }));
+  M.buyItem(2); M.buyItem(3); M.toggleBring(2); fin(match({ ms: 90000 }));
   await send();
   ok(C.status() === 'wait' && C.q.length === 4 && C.q.every(o => !o.s), 'with no network the changes wait', [C.status(), C.q.length]);
   const localBefore = JSON.stringify(M.data);
@@ -219,7 +221,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
 
   // ---------- matches reported too fast ----------
   notes.length = 0;
-  for (let i = 0; i < 9; i++) M.finish(match({ ms: 180000, stats: { score: 20000 + i, lines: 50, pieces: 140 } }));
+  for (let i = 0; i < 9; i++) fin(match({ ms: 180000, stats: { score: 20000 + i, lines: 50, pieces: 140 } }));
   const believed = M.data.tot.games;
   await send();
   sv = await server(B);
@@ -229,7 +231,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   // ---------- a second device ----------
   now += 30 * MIN;
   await open(A);
-  M.finish(match({ stats: { score: 8000, lines: 30, pieces: 90 } }));
+  fin(match({ stats: { score: 8000, lines: 30, pieces: 90 } }));
   await send();
   const code = await C.code();
   ok(code.ok && /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code.code), 'device A asks for a code', code);
@@ -246,7 +248,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   eq(await players(), 1, "device B's old account, which nobody can reach any more, is gone");
   eq((await C.redeem(code.code, true)).why, 'code', 'the code cannot be used again');
   // both devices play; each sees the other's progress
-  M.finish(match({ ms: 100000, stats: { score: 15000, lines: 50, pieces: 130 } }));
+  fin(match({ ms: 100000, stats: { score: 15000, lines: 50, pieces: 130 } }));
   await send();
   const afterB = JSON.stringify(M.data);
   await open(A);
@@ -289,7 +291,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   const del = await C.wipe();
   ok(del.ok && C.status() === 'gone' && !C.cred && JSON.stringify(M.data) === mine, 'deleted; the progress on the device is untouched', C.status());
   eq(await players(), 0, 'nothing is left on the server');
-  M.buyItem(7); M.finish(match());
+  M.buyItem(7); fin(match());
   await send();
   ok(C.q.length === 0 && (await players()) === 0, 'an unlinked device does not make a new account by itself');
   await open(B);
@@ -344,7 +346,7 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
 
   // ---------- boards through the page's own call ----------
   const X = await open(device('X')); net.ip = '203.0.113.30';
-  M.setName('小釉'); M.finish(match({ mode: 'sprint', result: 1, ms: 66000, stats: { score: 9000, lines: 40, pieces: 100 } }));
+  M.setName('小釉'); fin(match({ mode: 'sprint', result: 1, ms: 66000, stats: { score: 9000, lines: 40, pieces: 100 } }));
   await send();
   C._forget();
   brd = await C.board('sprint', 'all');

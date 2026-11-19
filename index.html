@@ -2830,7 +2830,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     };
   };
   // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, ms }
-  Meta.finish = function (m) {
+  // tape: the proof that goes to the server with the result (see replay.js); it plays no part in the sums here
+  Meta.finish = function (m, tape) {
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
     m = Meta.cleanMatch(m);
     m.battle = m.mode !== 'sprint';
@@ -2882,7 +2883,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
     delete m.battle;
-    emit('fin', [m]);
+    emit('fin', tape ? [m, tape] : [m]);
     return out;
   };
   // First time through a drill or an opener lesson pays once. What it pays is looked up here, not taken from the caller.
@@ -4316,7 +4317,82 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function remove(i) { list(); if (i >= 0 && i < mem.length) { mem.splice(i, 1); write(); } }
   function trim(cap) { list(); if (mem.length > cap) { mem.length = cap; write(); } }
 
-  ZZ.Replay = { Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };
+  /* ---------- the tape: proof of a match ----------
+     A short list of what the player's own side did, sent to the server with the result. The server plays it through
+     the same rules (check, below) and only believes the numbers that come out. Entries:
+       [t, piece, x, y, rot, spin, held]   a piece locked (held: 1 when the hold was used to get it)
+       ['g', t, [[rows, gap], …]]          cement came up        ['o', t] knocked out        ['r', t] back up
+     Matches with items are not taped: what an item does depends on the other side too. */
+  function Tape(seed, items) { this.seed = seed >>> 0; this.ev = []; this.t = 0; this.held = 0; this.off = !!items; }
+  Tape.prototype.tick = function (dt) { this.t += dt; };
+  Tape.prototype.on = function (g, e) {
+    if (this.off) return;
+    var t = Math.round(this.t);
+    switch (e.type) {
+      case 'hold': this.held = 1; break;
+      case 'lock': this.ev.push([t, TYPES.indexOf(e.piece), e.x, e.y, e.rot, SPIN.indexOf(e.tspin), this.held]); this.held = 0; break;
+      case 'garbage': if (e.segs) this.ev.push(['g', t, e.segs]); break;
+      case 'topout': this.ev.push(['o', t]); this.held = 0; break;
+      case 'revive': this.ev.push(['r', t]); this.held = 0; break;
+      case 'itemtile': case 'chisel': case 'trowel': case 'item': this.off = true; break;
+    }
+    if (this.ev.length > TAPE_MAX) this.off = true;
+  };
+  Tape.prototype.done = function () { return this.off ? null : { v: 1, rv: ZZ.RULES, seed: this.seed, ev: this.ev }; };
+  var TAPE_MAX = 1500;
+  function whole(v, lo, hi) { return typeof v === 'number' && v === Math.floor(v) && v >= lo && v <= hi; }
+  // Plays a tape through the rules. Gives what really happened, or null when the tape is not a possible game:
+  // a piece the sequence would not have dealt, a spot a piece cannot rest in, a twist that is not one.
+  function check(p) {
+    if (!p || typeof p !== 'object' || p.v !== 1 || p.rv !== ZZ.RULES || !whole(p.seed, 0, 4294967295) || !Array.isArray(p.ev) || p.ev.length > TAPE_MAX) return null;
+    var g = new ZZ.Game({ seed: p.seed, manual: true, garbage: false, events: false }), last = 0, kos = 0, i, j;
+    g.start();
+    for (i = 0; i < p.ev.length; i++) {
+      var e = p.ev[i];
+      if (!Array.isArray(e)) return null;
+      var k = typeof e[0] === 'string' ? e[0] : 'p', t = k === 'p' ? e[0] : e[1];
+      if (!whole(t, last, 3700000)) return null;
+      last = t;
+      if (k === 'p') {
+        if (e.length !== 7 || !whole(e[1], 0, 6) || !whole(e[2], -3, ZZ.COLS) || !whole(e[3], -3, ZZ.ROWS) || !whole(e[4], 0, 3) || !whole(e[5], 0, 3) || !whole(e[6], 0, 1)) return null;
+        if (g.over || !g.cur) return null;
+        if (e[6] && !g.hold()) return null;
+        var c = g.cur, type = TYPES[e[1]], spin = SPIN[e[5]];
+        if (!c || c.type !== type || !g.fits(type, e[4], e[2], e[3]) || g.fits(type, e[4], e[2], e[3] + 1)) return null;
+        c.x = e[2]; c.y = e[3]; c.rot = e[4];
+        if (spin !== 'none') {
+          if (type === 'O') return null;
+          if (type === 'T') {
+            // without the moves themselves, a twist is believed when the corners around the T allow it
+            var could = ZZ.tspinType(function (x, y) { return g.occ(x, y); }, c.x, c.y, c.rot, 4);
+            if (spin === 'spin' || could === 'none') return null;
+          } else if (spin !== 'spin' || !g.immobile()) return null;
+        }
+        g.lock({ tspin: spin });
+      } else if (k === 'g') {
+        var segs = e[2], n = 0;
+        if (e.length !== 3 || !Array.isArray(segs) || !segs.length || segs.length > 8) return null;
+        for (j = 0; j < segs.length; j++) {
+          if (!Array.isArray(segs[j]) || !whole(segs[j][0], 1, 8) || !whole(segs[j][1], 0, ZZ.COLS - 1)) return null;
+          n += segs[j][0];
+        }
+        if (n > 8) return null;
+        for (j = 0; j < segs.length; j++) g.pushGarbage(segs[j][0], segs[j][1]);
+        g.refit();
+      } else if (k === 'o') {
+        if (e.length !== 2) return null;
+        if (!g.over) g.topOut('lock');      // the next piece had no room after cement came up
+        kos++;
+      } else if (k === 'r') {
+        if (e.length !== 2 || !g.over) return null;
+        g.revive();
+      } else return null;
+    }
+    var st = g.stats;
+    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+  }
+
+  ZZ.Replay = { Tape: Tape, check: check, Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -4643,9 +4719,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       }
       S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
       S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
+      S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
     } else if (kind === 'sprint') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.goal = 40;
+      S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, false) : null;
     } else if (kind === 'practice') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.state = 'play';
@@ -4937,6 +5015,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var K = kindOf(), i;
     if (mine) {
       if (S.rec) S.rec.on(g, e);
+      if (S.tape && g === S.me) S.tape.on(g, e);
       for (i = 0; i < App.taps.length; i++) App.taps[i](g, e);
     }
     switch (e.type) {
@@ -5110,7 +5189,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played });
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played }, S.tape && !S.used ? S.tape.done() : null);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -5128,7 +5207,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function endSprint() {
     S.state = 'over';
     input.clear();
-    S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats });
+    S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats }, S.tape ? S.tape.done() : null);
     S.newBest = S.reward.best;
     sfx.setDuck(0.4);
     sfx.play(S.newBest ? 'cheer' : 'win');
@@ -5754,6 +5833,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   }
   function playTick(dt) {
     var fz = S.freeze, K = kindOf();
+    if (S.tape) S.tape.tick(dt);
     if (S.kind === 'battle') {
       S.left -= dt;
       if (S.left <= 0) { S.left = 0; endBattle(''); return; }
@@ -7511,7 +7591,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         });
       });
     }
-    var batch = Cloud.q.slice(0, BATCH), ids = {};
+    // as many waiting changes as fit: finished matches carry their tape, so the batch is cut by size as well as by count
+    var batch = [], bytes = 0, ids = {};
+    for (var bi = 0; bi < Cloud.q.length && batch.length < BATCH; bi++) {
+      var len = JSON.stringify(Cloud.q[bi].a).length + 60;
+      if (batch.length && bytes + len > 60000) break;
+      bytes += len; batch.push(Cloud.q[bi]);
+    }
     batch.forEach(function (o) { o.s = 1; ids[o.i] = 1; });
     var drop = function () { Cloud.q = Cloud.q.filter(function (o) { return !ids[o.i]; }); };
     return call('POST', 'rpc', { a: 'sync', ops: batch.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) }, true).then(function (r) {
@@ -7523,7 +7609,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         Cloud.last = Cloud.now();
         adopt(b.st);
         persist();
-        if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && (x.why === 'fast' || x.why === 'range' || x.why === 'slow'); })) Cloud.onNote('rejected');
+        // 'proof': the server could not match a result to its tape. With honest play that means this page is older than the rules on the server.
+        if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && x.why === 'proof'; })) Cloud.onNote('stale');
+        else if (Cloud.onNote && (b.res || []).some(function (x) { return x && x.ok === false && (x.why === 'fast' || x.why === 'range' || x.why === 'slow'); })) Cloud.onNote('rejected');
         return Cloud.q.length ? 'more' : 'done';
       }
       if (r.status === 401) { lost(); return 'done'; }
@@ -7744,6 +7832,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'cl.badCode': ['這組碼不對，或是已經過期。', 'That code is wrong or has run out.', 'コードが違うか、有効期限が切れています。', '코드가 틀렸거나 만료되었습니다.'],
     'cl.slow': ['試太多次了，等十分鐘再試。', 'Too many tries. Wait ten minutes and try again.', '試行回数が多すぎます。10分待ってからお試しください。', '시도 횟수가 너무 많습니다. 10분 후 다시 시도하세요.'],
     'cl.err': ['現在連不上伺服器，等一下再試。', 'The server cannot be reached right now. Try again in a moment.', '現在サーバーに接続できません。少し待ってからお試しください。', '지금 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'cl.stale': ['剛剛那場伺服器沒有採計。請重新整理頁面換成最新版再打。', 'The server did not count that match. Reload the page to get the latest version, then play again.', 'さっきの試合はサーバーで記録されませんでした。ページを再読み込みして最新版にしてください。', '방금 경기는 서버에 기록되지 않았습니다. 페이지를 새로 고쳐 최신 버전으로 바꿔 주세요.'],
     'cl.privacy': ['隱私說明：存了什麼、怎麼刪', 'Privacy: what is stored and how to delete it', 'プライバシー：保存される内容と削除方法', '개인정보: 저장되는 내용과 삭제 방법'],
     'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
     'cl.delP': ['會刪掉雲端上的存檔和排行榜成績，所有連著的裝置都會斷開。這台裝置上的進度不受影響。刪了就救不回來。', 'This deletes your cloud save and your leaderboard scores and unlinks every device. Progress on this device is not touched. It cannot be undone.', 'クラウドのセーブとランキングの記録を削除し、すべての端末の接続を解除します。この端末の進行状況には影響しません。元に戻せません。', '클라우드 저장 데이터와 랭킹 기록을 삭제하고 모든 기기의 연결을 해제합니다. 이 기기의 진행 상황에는 영향이 없습니다. 되돌릴 수 없습니다.'],
@@ -7930,7 +8019,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (App.sheet() === 'online' && net && (net.state === 'idle' || net.state === 'error') && !(active && active.id === 'nCode')) App.openSheet('online');
     }
   };
-  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : 'cl.rejected'), 4600); };
+  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : kind === 'stale' ? 'cl.stale' : 'cl.rejected'), kind === 'stale' ? 7000 : 4600); };
   Cloud.onAdopt = function (any, look) {
     // progress kept with the settings follows the record: drills passed, so a second device does not start the dojo over
     var done = Meta.data.first.drills, sv = App.save, top = 0, i;

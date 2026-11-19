@@ -169,6 +169,81 @@
   function remove(i) { list(); if (i >= 0 && i < mem.length) { mem.splice(i, 1); write(); } }
   function trim(cap) { list(); if (mem.length > cap) { mem.length = cap; write(); } }
 
-  ZZ.Replay = { Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };
+  /* ---------- the tape: proof of a match ----------
+     A short list of what the player's own side did, sent to the server with the result. The server plays it through
+     the same rules (check, below) and only believes the numbers that come out. Entries:
+       [t, piece, x, y, rot, spin, held]   a piece locked (held: 1 when the hold was used to get it)
+       ['g', t, [[rows, gap], …]]          cement came up        ['o', t] knocked out        ['r', t] back up
+     Matches with items are not taped: what an item does depends on the other side too. */
+  function Tape(seed, items) { this.seed = seed >>> 0; this.ev = []; this.t = 0; this.held = 0; this.off = !!items; }
+  Tape.prototype.tick = function (dt) { this.t += dt; };
+  Tape.prototype.on = function (g, e) {
+    if (this.off) return;
+    var t = Math.round(this.t);
+    switch (e.type) {
+      case 'hold': this.held = 1; break;
+      case 'lock': this.ev.push([t, TYPES.indexOf(e.piece), e.x, e.y, e.rot, SPIN.indexOf(e.tspin), this.held]); this.held = 0; break;
+      case 'garbage': if (e.segs) this.ev.push(['g', t, e.segs]); break;
+      case 'topout': this.ev.push(['o', t]); this.held = 0; break;
+      case 'revive': this.ev.push(['r', t]); this.held = 0; break;
+      case 'itemtile': case 'chisel': case 'trowel': case 'item': this.off = true; break;
+    }
+    if (this.ev.length > TAPE_MAX) this.off = true;
+  };
+  Tape.prototype.done = function () { return this.off ? null : { v: 1, rv: ZZ.RULES, seed: this.seed, ev: this.ev }; };
+  var TAPE_MAX = 1500;
+  function whole(v, lo, hi) { return typeof v === 'number' && v === Math.floor(v) && v >= lo && v <= hi; }
+  // Plays a tape through the rules. Gives what really happened, or null when the tape is not a possible game:
+  // a piece the sequence would not have dealt, a spot a piece cannot rest in, a twist that is not one.
+  function check(p) {
+    if (!p || typeof p !== 'object' || p.v !== 1 || p.rv !== ZZ.RULES || !whole(p.seed, 0, 4294967295) || !Array.isArray(p.ev) || p.ev.length > TAPE_MAX) return null;
+    var g = new ZZ.Game({ seed: p.seed, manual: true, garbage: false, events: false }), last = 0, kos = 0, i, j;
+    g.start();
+    for (i = 0; i < p.ev.length; i++) {
+      var e = p.ev[i];
+      if (!Array.isArray(e)) return null;
+      var k = typeof e[0] === 'string' ? e[0] : 'p', t = k === 'p' ? e[0] : e[1];
+      if (!whole(t, last, 3700000)) return null;
+      last = t;
+      if (k === 'p') {
+        if (e.length !== 7 || !whole(e[1], 0, 6) || !whole(e[2], -3, ZZ.COLS) || !whole(e[3], -3, ZZ.ROWS) || !whole(e[4], 0, 3) || !whole(e[5], 0, 3) || !whole(e[6], 0, 1)) return null;
+        if (g.over || !g.cur) return null;
+        if (e[6] && !g.hold()) return null;
+        var c = g.cur, type = TYPES[e[1]], spin = SPIN[e[5]];
+        if (!c || c.type !== type || !g.fits(type, e[4], e[2], e[3]) || g.fits(type, e[4], e[2], e[3] + 1)) return null;
+        c.x = e[2]; c.y = e[3]; c.rot = e[4];
+        if (spin !== 'none') {
+          if (type === 'O') return null;
+          if (type === 'T') {
+            // without the moves themselves, a twist is believed when the corners around the T allow it
+            var could = ZZ.tspinType(function (x, y) { return g.occ(x, y); }, c.x, c.y, c.rot, 4);
+            if (spin === 'spin' || could === 'none') return null;
+          } else if (spin !== 'spin' || !g.immobile()) return null;
+        }
+        g.lock({ tspin: spin });
+      } else if (k === 'g') {
+        var segs = e[2], n = 0;
+        if (e.length !== 3 || !Array.isArray(segs) || !segs.length || segs.length > 8) return null;
+        for (j = 0; j < segs.length; j++) {
+          if (!Array.isArray(segs[j]) || !whole(segs[j][0], 1, 8) || !whole(segs[j][1], 0, ZZ.COLS - 1)) return null;
+          n += segs[j][0];
+        }
+        if (n > 8) return null;
+        for (j = 0; j < segs.length; j++) g.pushGarbage(segs[j][0], segs[j][1]);
+        g.refit();
+      } else if (k === 'o') {
+        if (e.length !== 2) return null;
+        if (!g.over) g.topOut('lock');      // the next piece had no room after cement came up
+        kos++;
+      } else if (k === 'r') {
+        if (e.length !== 2 || !g.over) return null;
+        g.revive();
+      } else return null;
+    }
+    var st = g.stats;
+    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+  }
+
+  ZZ.Replay = { Tape: Tape, check: check, Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
 })(typeof window !== 'undefined' ? window : globalThis);

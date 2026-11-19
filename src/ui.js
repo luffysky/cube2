@@ -320,9 +320,11 @@
       }
       S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
       S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
+      S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
     } else if (kind === 'sprint') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.goal = 40;
+      S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, false) : null;
     } else if (kind === 'practice') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.state = 'play';
@@ -614,6 +616,7 @@
     var K = kindOf(), i;
     if (mine) {
       if (S.rec) S.rec.on(g, e);
+      if (S.tape && g === S.me) S.tape.on(g, e);
       for (i = 0; i < App.taps.length; i++) App.taps[i](g, e);
     }
     switch (e.type) {
@@ -787,7 +790,7 @@
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played });
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played }, S.tape && !S.used ? S.tape.done() : null);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -805,7 +808,7 @@
   function endSprint() {
     S.state = 'over';
     input.clear();
-    S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats });
+    S.reward = Meta.finish({ mode: 'sprint', result: 1, ms: S.time, stats: S.me.stats }, S.tape ? S.tape.done() : null);
     S.newBest = S.reward.best;
     sfx.setDuck(0.4);
     sfx.play(S.newBest ? 'cheer' : 'win');
@@ -1431,6 +1434,7 @@
   }
   function playTick(dt) {
     var fz = S.freeze, K = kindOf();
+    if (S.tape) S.tape.tick(dt);
     if (S.kind === 'battle') {
       S.left -= dt;
       if (S.left <= 0) { S.left = 0; endBattle(''); return; }

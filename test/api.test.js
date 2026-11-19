@@ -38,6 +38,8 @@ function call(name, o) {
 }
 const rpc = (body, cred, o) => call('rpc', Object.assign({ method: 'POST', body, headers: Object.assign({}, cred ? { authorization: 'Bearer ' + cred.id + '.' + cred.key } : {}, (o && o.headers) || {}) }, o && o.ip ? { ip: o.ip } : {}));
 let opN = 0;
+const TAPE = require('./tape.js'); TAPE.stub(rules.ZZ);
+const taped = m => [m, TAPE.fake(m)];      // a match report with a stand-in tape that states the same numbers (see test/tape.js)
 const op = (k, a) => ({ i: 'op' + String(++opN).padStart(6, '0'), k, a: a || [] });
 const sync = (cred, ops, o) => rpc({ a: 'sync', ops: ops || [] }, cred, o);
 const match = (o) => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp: 0, itemsUsed: 0, ms: 120000, stats: { score: 12000, spins: 3, minis: 0, sent: 30, quads: 1, maxCombo: 2, xspins: 0, lines: 40, pieces: 120 } }, o || {});
@@ -121,7 +123,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   await sync(A, [op('name', ['阿明'])]);
 
   // ---------- matches ----------
-  r = await sync(A, [op('fin', [match()])]);
+  r = await sync(A, [op('fin', taped(match()))]);
   let stA = r.json.st;
   ok(r.json.res[0].ok && stA.coins === coinsAfter + 30 + 22 + 8 + 50 && stA.tot.games === 1 && stA.tot.best === 12000, 'a match pays what the rules say', stA);
   r = await call('board', { url: '/api/board?b=score&me=' + A.pub });
@@ -129,38 +131,93 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(/s-maxage=30/.test(r.headers['cache-control']), 'boards are cached for half a minute');
   r = await call('board', { url: '/api/board?b=score&s=all' });
   ok(r.json.top.length === 1 && r.json.scope === 'all' && r.json.me === null, 'and on the all-time board', r.json);
-  r = await sync(A, [op('fin', [match({ stats: { score: 9000, lines: 30, pieces: 90 } })])]);
+  r = await sync(A, [op('fin', taped(match({ stats: { score: 9000, lines: 30, pieces: 90 } })))]);
   r = await call('board', { url: '/api/board?b=score' });
   eq(r.json.top[0].v, 12000, 'a lower score does not replace the best');
-  r = await sync(A, [op('fin', [match({ stats: { score: 5e9, sent: 5e9, lines: 1, pieces: 1 } })])]);
+  r = await sync(A, [op('fin', taped(match({ stats: { score: 5e9, sent: 5e9, lines: 1, pieces: 1 } })))]);
   ok(r.json.st.tot.best === 365000, 'an absurd score is cut down to what two minutes allow', r.json.st.tot);
   r = await call('board', { url: '/api/board?b=rp&me=' + A.pub });
   ok(r.json.top.length === 0 && r.json.me === null, 'no ranked match yet, so not on the rating board');
-  r = await sync(A, [op('fin', [match({ mode: 'rank', ko: 3, koOpp: 1 })])]);
+  r = await sync(A, [op('fin', taped(match({ mode: 'rank', ko: 3, koOpp: 1 })))]);
   ok(r.json.st.rp === 26 && r.json.st.rgames === 1, 'a ranked win moves the rating', r.json.st);
   r = await call('board', { url: '/api/board?b=rp&me=' + A.pub });
   ok(r.json.top.length === 1 && r.json.top[0].v === 26 && r.json.me.rank === 1 && r.json.me.v === 26, 'now on the rating board', r.json);
   // sprint
-  r = await sync(A, [op('fin', [{ mode: 'sprint', result: 1, ms: 9000, stats: { lines: 40, pieces: 100 } }])]);
+  r = await sync(A, [op('fin', taped({ mode: 'sprint', result: 1, ms: 9000, stats: { lines: 40, pieces: 100 } }))]);
   ok(r.json.res[0].ok === false && r.json.res[0].why === 'range' && r.json.st.tot.sprint === 0, 'a nine-second sprint is not believed', r.json.res);
-  r = await sync(A, [op('fin', [{ mode: 'sprint', result: 1, ms: 60000, stats: { lines: 12, pieces: 30 } }])]);
+  r = await sync(A, [op('fin', taped({ mode: 'sprint', result: 1, ms: 60000, stats: { lines: 12, pieces: 30 } }))]);
   ok(r.json.res[0].why === 'range', 'nor one that cleared too few lines');
-  r = await sync(A, [op('fin', [{ mode: 'sprint', result: 1, ms: 71500, stats: { score: 9000, lines: 40, pieces: 101 } }])]);
+  r = await sync(A, [op('fin', taped({ mode: 'sprint', result: 1, ms: 71500, stats: { score: 9000, lines: 40, pieces: 101 } }))]);
   ok(r.json.res[0].ok && r.json.st.tot.sprint === 71500, 'a real sprint counts', r.json.st.tot);
   r = await call('board', { url: '/api/board?b=sprint&s=all&me=' + A.pub });
   ok(r.json.top[0].v === 71500 && r.json.me.rank === 1 && r.json.me.v === 71500, 'sprint board shows the time', r.json);
   // the time allowance
   let fast = 0, taken = 0;
-  for (let i = 0; i < 12; i++) { r = await sync(A, [op('fin', [match({ ms: 180000 })])]); if (r.json.res[0].ok) taken++; else if (r.json.res[0].why === 'fast') fast++; }
+  for (let i = 0; i < 12; i++) { r = await sync(A, [op('fin', taped(match({ ms: 180000 })))]); if (r.json.res[0].ok) taken++; else if (r.json.res[0].why === 'fast') fast++; }
   ok(taken >= 1 && taken <= 3 && fast >= 9, 'matches cannot be reported faster than they could be played', [taken, fast]);
   const gamesNow = r.json.st.tot.games;
   now += 10 * MIN;
-  r = await sync(A, [op('fin', [match({ ms: 180000 })])]);
+  r = await sync(A, [op('fin', taped(match({ ms: 180000 })))]);
   ok(r.json.res[0].ok && r.json.st.tot.games === gamesNow + 1, 'after real time has passed they are accepted again', r.json.res);
   // The allowance so far: 900 s to start with, 551.5 s of matches and one 180 s match used, 900 s gained in the ten
   // minutes just waited, another 180 s used: 888.5 s left. At the 20-second minimum that is 44 more matches, however short.
-  const burst = (await sync(A, Array.from({ length: 40 }, () => op('fin', [match({ ms: 1 })])))).json.res.concat((await sync(A, Array.from({ length: 40 }, () => op('fin', [match({ ms: 1 })])))).json.res);
+  const burst = (await sync(A, Array.from({ length: 40 }, () => op('fin', taped(match({ ms: 1 })))))).json.res.concat((await sync(A, Array.from({ length: 40 }, () => op('fin', taped(match({ ms: 1 })))))).json.res);
   eq([burst.filter(x => x.ok).length, burst.filter(x => x.why === 'fast').length], [44, 36], 'even one-millisecond matches use up the allowance');
+
+  // ---------- the tape: what a match report has to be backed by ----------
+  {
+    now += 6 * HOUR;
+    const T = await newPlayer({ name: '帶子' }, '203.0.113.77');
+    const res = async (a) => (await sync(T, [op('fin', a)])).json;
+    const real = TAPE.fin('rank', { seed: 4242, ms: 90000, garbage: 2 });
+    let j = await res(real);
+    ok(j.res[0].ok && j.st.rgames === 1, 'a ranked match with a true tape counts', j.res);
+    j = await res(TAPE.fin('rank', { seed: 4242, ms: 90000, garbage: 2 }));
+    ok(j.res[0].ok === false && j.res[0].why === 'proof' && j.st.rgames === 1, 'the same tape handed in again does not', j.res);
+    j = await res([real[0]]);
+    ok(j.res[0].why === 'proof', 'a ranked match with no tape is not counted', j.res);
+    const lie = TAPE.fin('rank', { seed: 4243, ms: 90000 }); lie[0].stats.lines += 10;
+    ok((await res(lie)).res[0].why === 'proof', 'more lines than the moves cleared');
+    const lie2 = TAPE.fin('rank', { seed: 4244, ms: 90000 }); lie2[0].stats.score += 100000;
+    ok((await res(lie2)).res[0].why === 'proof', 'more points than the moves score');
+    const lie3 = TAPE.fin('rank', { seed: 4245, ms: 90000 }); lie3[0].stats.spins += 5;
+    ok((await res(lie3)).res[0].why === 'proof', 'twists that never happened');
+    const lie4 = TAPE.fin('rank', { seed: 4246, ms: 90000, garbage: 6, level: 5 });
+    ok(lie4[1].ev.some(e => e[0] === 'o'), 'the test match has a knockout in it');
+    lie4[0].koOpp = 0; lie4[0].result = 1; lie4[0].ko = 2;
+    ok((await res(lie4)).res[0].why === 'proof', 'hiding your own knockouts');
+    const lie5 = TAPE.fin('rank', { seed: 4247, ms: 90000 }); lie5[0].ko = 40;
+    ok((await res(lie5)).res[0].why === 'proof', 'more knockouts than there was time for');
+    const lie6 = TAPE.fin('rank', { seed: 4248, ms: 90000 }); lie6[1].seed = 4249;
+    ok((await res(lie6)).res[0].why === 'proof', 'a tape for a different deal of pieces');
+    const lie7 = TAPE.fin('rank', { seed: 4250, ms: 90000 }); const p7 = lie7[1].ev.find(e => typeof e[0] === 'number'); p7[3] -= 3;
+    ok((await res(lie7)).res[0].why === 'proof', 'a piece left hanging in the air');
+    const lie8 = TAPE.fin('rank', { seed: 4251, ms: 90000 }); lie8[1].ev.filter(e => typeof e[0] === 'number' && e[1] !== 1).forEach(e => { e[5] = 3; });
+    ok((await res(lie8)).res[0].why === 'proof', 'every piece claimed as a twist');
+    const lie9 = TAPE.fin('rank', { seed: 4252, ms: 90000 }); lie9[0].ms = 20000;
+    ok((await res(lie9)).res[0].why === 'proof', 'ninety seconds of moves in a twenty-second match');
+    ok((await res([real[0], 'tape'])).res[0].why === 'proof' && (await res([real[0], { v: 1, rv: 1, seed: 5, ev: 'x' }])).res[0].why === 'proof' && (await res([real[0], { v: 1, rv: 99, seed: 5, ev: [] }])).res[0].why === 'proof', 'nonsense where the tape should be');
+    const big = TAPE.fin('rank', { seed: 4253, ms: 90000 }); big[1].pad = 'x'.repeat(30000);
+    ok((await res(big)).res[0].why === 'proof', 'an oversized tape');
+    // sprint
+    const sp = TAPE.fin('sprint', { seed: 4300 });
+    j = await res(sp);
+    ok(j.res[0].ok && j.st.tot.sprint === sp[0].ms, 'a sprint with a true tape counts', j.res);
+    const sl = TAPE.fin('sprint', { seed: 4301 }); sl[0].ms = Math.max(15000, sl[0].ms - 20000);
+    ok((await res(sl)).res[0].why === 'proof', 'a sprint reported faster than its own tape');
+    ok((await res([sp[0]])).res[0].why === 'proof', 'a sprint with no tape');
+    // other matches still pay without a tape, but only checked ones reach the score board
+    now += HOUR;
+    const free = TAPE.fin('ai', { seed: 4400, ms: 60000 });
+    j = await res([Object.assign({}, free[0], { stats: Object.assign({}, free[0].stats, { score: 150000 }) })]);
+    ok(j.res[0].ok && j.st.tot.best === 150000, 'a match against the computer without a tape still pays', j.res);
+    let b = (await call('board', { url: '/api/board?b=score&s=all&me=' + T.pub })).json;
+    ok(!b.me || b.me.v < 150000, 'but its score stays off the board', b.me);
+    j = await res(free);
+    b = (await call('board', { url: '/api/board?b=score&s=all&me=' + T.pub })).json;
+    ok(j.res[0].ok && b.me && b.me.v === Math.max(real[0].stats.score, free[0].stats.score), 'a checked score goes on the board', [b.me, free[0].stats.score]);
+    ok((await rpc({ a: 'delete' }, T)).json.ok, 'the tape player leaves again');
+  }
 
   // ---------- two devices saving at the same moment ----------
   now += HOUR;
@@ -172,10 +229,10 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
 
   // ---------- boards with several players ----------
   const C = await newPlayer({ name: '小釉' }, '203.0.113.9'), D = await newPlayer({ name: '' }, '203.0.113.10');
-  await sync(C, [op('fin', [match({ stats: { score: 30000, lines: 60, pieces: 150 } })]), op('fin', [match({ mode: 'rank', ko: 1 })])]);
+  await sync(C, [op('fin', taped(match({ stats: { score: 30000, lines: 60, pieces: 150 } }))), op('fin', taped(match({ mode: 'rank', ko: 1 })))]);
   now += 1000;
-  await sync(D, [op('fin', [match({ stats: { score: 30000, lines: 60, pieces: 150 } })])]);
-  await sync(B, [op('fin', [match({ mode: 'rank', result: -1, ko: 0, koOpp: 3 })])]);
+  await sync(D, [op('fin', taped(match({ stats: { score: 30000, lines: 60, pieces: 150 } })))]);
+  await sync(B, [op('fin', taped(match({ mode: 'rank', result: -1, ko: 0, koOpp: 3 })))]);
   r = await call('board', { url: '/api/board?b=score&me=' + D.pub });
   ok(r.json.top[0].p === A.pub && r.json.top[1].p === C.pub && r.json.top[2].p === D.pub && r.json.top[1].v === 30000 && r.json.me.rank === 3, 'best first; ties go to whoever got there first', r.json.top.map(x => x.n + ':' + x.v));
   ok(r.json.top[2].n === '' && Object.keys(r.json.top[0]).join() === 'p,n,v', 'rows carry a tag, a name and a value and nothing else', r.json.top[2]);
@@ -221,7 +278,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok((await rpc({ a: 'redeem', code: r.json.code }, null, { ip: '198.51.100.67' })).json.ok, 'another address is not affected');
   // a device that already had its own account: it leaves that one, and an account nobody can reach is removed
   const E = await newPlayer({ name: '舊機' }, '203.0.113.11');
-  await sync(E, [op('fin', [match({ stats: { score: 777, lines: 5, pieces: 20 } })])]);
+  await sync(E, [op('fin', taped(match({ stats: { score: 777, lines: 5, pieces: 20 } })))]);
   r = await rpc({ a: 'code' }, A);
   r = await rpc({ a: 'redeem', code: r.json.code }, E, { ip: '198.51.100.2' });
   ok(r.json.peek.same === false, 'peek from another account');
@@ -253,7 +310,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(r.json.st.season === '2026-12' && r.json.st.note && r.json.st.note.kind === 'season' && r.json.st.rgames === 0, 'the season turns over for everyone at the same moment', r.json.st);
   r = await call('board', { url: '/api/board?b=rp' });
   ok(r.json.season === '2026-12' && r.json.top.length === 0, 'a new season starts with an empty rating board', r.json);
-  r = await sync(A3, [op('note'), op('fin', [match({ mode: 'rank', ko: 2 })])]);
+  r = await sync(A3, [op('note'), op('fin', taped(match({ mode: 'rank', ko: 2 })))]);
   ok(r.json.st.note === null && r.json.st.rgames === 1, 'first ranked match of the new season', r.json.st);
   r = await call('board', { url: '/api/board?b=rp&me=' + A.pub });
   ok(r.json.top.length === 1 && r.json.me.rank === 1, 'and back on the board');
@@ -417,8 +474,9 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await call('rpc', { method: 'POST', body: '{"a":' })).status, 400, 'broken JSON');
   eq((await call('rpc', { method: 'POST', body: '[1,2]' })).status, 400, 'a list is not a request');
   eq((await call('rpc', { method: 'POST', body: '"hello"' })).status, 400, 'nor is a string');
-  eq((await call('rpc', { method: 'POST', body: { a: 'hello', pad: 'x'.repeat(30000) } })).status, 413, 'too big');
-  eq((await call('rpc', { method: 'POST', parsed: { a: 'hello', pad: 'x'.repeat(30000) } })).status, 413, 'too big, already parsed');
+  eq((await call('rpc', { method: 'POST', body: { a: 'hello', pad: 'x'.repeat(100000) } })).status, 413, 'too big');
+  eq((await call('room', { method: 'POST', body: { a: 'open', pad: 'x'.repeat(30000) } })).status, 413, 'the smaller limit still holds where no tapes travel');
+  eq((await call('rpc', { method: 'POST', parsed: { a: 'hello', pad: 'x'.repeat(100000) } })).status, 413, 'too big, already parsed');
   eq((await rpc({ a: 'nope' })).status, 400, 'unknown action');
   eq((await rpc({})).status, 400, 'no action');
   eq((await rpc({ a: 'hello' }, null, { headers: { origin: 'https://evil.example' } })).status, 403, 'another site may not call it');

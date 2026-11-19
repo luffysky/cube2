@@ -15,7 +15,7 @@ const db = require('./db.js');
 const core = require('./core.js');
 const rules = require('./rules.js');
 
-const MAX_BODY = 24 * 1024;
+const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
 function setClock(fn) { clock = fn || (() => Date.now()); }
 
@@ -42,7 +42,8 @@ function ipTag(req) {
   const raw = String(header(req, 'x-real-ip') || header(req, 'x-forwarded-for') || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim().slice(0, 64);
   return crypto.createHmac('sha256', ipKey).update(raw).digest('base64url').slice(0, 22);
 }
-function readBody(req) {
+function readBody(req, MAX_BODY) {
+  MAX_BODY = MAX_BODY || 24 * 1024;
   return new Promise((resolve, reject) => {
     const bad = (status, why) => { const e = new Error(why); e.status = status; e.why = why; reject(e); };
     if (!/^application\/json\b/i.test(header(req, 'content-type') || '')) return bad(415, 'type');
@@ -102,7 +103,7 @@ const routes = {
   async rpc(req, res) {
     if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
     if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
-    const body = await readBody(req), now = clock(), cred = core.readCred(header(req, 'authorization'));
+    const body = await readBody(req, MAX_SYNC), now = clock(), cred = core.readCred(header(req, 'authorization'));
     let out;
     switch (body.a) {
       case 'hello':
