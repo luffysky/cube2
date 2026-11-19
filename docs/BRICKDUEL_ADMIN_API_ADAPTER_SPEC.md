@@ -162,6 +162,53 @@
 
 ---
 
+
+### 3.6 後台 Dashboard 用的統計（林董 2026-11-20 要求：CRM、ERP、動態圖表、越詳細越好）
+
+後台（GPT）負責 CRM、ERP 畫面和圖表；cube2 提供數據。全部唯讀，認證同 3.1。
+
+**`GET /internal/admin/v1/metrics`**：當下的數字
+
+| 欄位 | 意思 | 來源 / 狀態 |
+|---|---|---|
+| `players.total` | 有雲端存檔的玩家數 | `zz.players` |
+| `players.guest` | 路人（沒綁 SnowRealm Games 帳號） | 目前 = total；Identity 上線後扣掉已綁定的 |
+| `players.linked` | 已綁 SnowRealm Games 帳號 | 目前 0（`null` 表示功能未上線） |
+| `players.steam` | 用 Steam 登入或綁 Steam 的 | **預留**，目前 `null` |
+| `players.banned` | 被停權 | `ban` |
+| `players.minorDeclared` | 自填未滿 18 的 | **需要新增**：目前地區年齡只存在裝置上，要不要同步到伺服器需另外決定（只存區間） |
+| `devices.total` | 綁在雲端存檔上的裝置數 | `zz.keys` 筆數（每個玩家最多 5 台） |
+| `devices.perPlayer` | 平均每人幾台 | 同上 |
+| `devices.unsaved` | 玩過但還沒建雲端存檔的裝置 | **伺服器看不到**；要算就得加匿名開啟計數，需另外決定 |
+| `subs.active` | 目前是會員的 | `state.sub.until > now`（現在是免費體驗） |
+| `subs.trial` / `subs.paid` | 體驗 / 付費會員 | 目前全是體驗；付費上線後區分；**Steam 訂閱預留** |
+| `active.d1` `active.d7` `active.d30` | 1、7、30 天內有上線的玩家 | `seen` |
+| `economy.coinsOutstanding` | 玩家手上金幣總和 | `state.coins` |
+| `economy.itemsOutstanding` | 各道具總數 | `state.items` |
+| `matches.today` 依模式 | 今天各模式場數 | `zz.matches` |
+| `boxes.today` 依等級 | 今天開出的寶箱 | `zz.draws` |
+| `online.openRooms` `online.quickQueue` | 連線房間、配對等待 | `zz.rooms`、`zz.queue` |
+| `regions` | 各地區玩家數 | 同 `minorDeclared`，需先決定要不要把自選地區同步到伺服器 |
+
+**`GET /internal/admin/v1/metrics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD`**：給動態圖表，每天一列
+
+`date`、`newPlayers`（`made`）、`activePlayers`（當天有對局紀錄的不同玩家數，來自 `zz.matches`）、`matches`（依模式）、`rankedGames`、`onlineMatches`、`boxesOpened`（依等級）、`coinsEarned` / `coinsSpent`（**需要新增金幣流水帳**，目前沒有）、`newSubs`、`steam*`（預留，`null`）。
+
+**`GET /internal/admin/v1/players/{gameUserId}`**：CRM 查單一玩家
+
+代號、名字、等級、段位、金幣、道具、會員狀態、建立與最後上線時間、裝置數、最近 50 場對局、最近 50 次開箱、停權狀態。不回傳密鑰雜湊、引繼碼、網路位址。
+
+**ERP 相關目前缺的資料**（要做的話各自是新功能，先跟林董確認）：
+1. 金幣流水帳（每筆來源與去向，例如對戰、每日任務、寶箱、商店）。現在只有餘額。
+2. 付款與訂單：還沒有付費，之後接金流或 Steam 再設計。
+3. 伺服器自選地區與年齡區間（只存區間，不存生日）。
+
+### 3.7 Steam 預留介面（還不實作）
+
+- 管理 API 的所有 Steam 欄位先回 `null`，欄位名稱先固定，之後不用改後台。
+- 玩家登入：`BRICKDUEL_IDENTITY_ADAPTER_SPEC.md` 會定義可替換的身分來源，`provider` 先列 `device`（現在的匿名裝置）、`snowrealm`、`steam`。Steam 預計流程是在伺服器用 Steam Web API 驗證 session ticket，換成 SnowRealm Identity 的身分；**cube2 不碰真實 ticket**，等 GPT 的 Identity 設計好再接。
+- Steam 銷售與玩家數據（Steamworks 報表）由後台直接向 Steam 拿，不經過 cube2。
+
 ## 4. 階段對照
 
 | 端點 / 項目 | 規劃 | 已寫碼 | CI 成功 | 測試環境上線 | 正式可用 |
@@ -170,6 +217,8 @@
 | `players` | ✓ | — | — | — | — |
 | `draws` | ✓ | — | — | — | — |
 | `matches` | ✓ | 資料表已寫碼（API 未寫） | — | — | — |
+| `metrics`、`metrics/daily`、`players/{id}` | ✓ | — | — | — | — |
+| Steam 欄位與登入 | 預留 | — | — | — | — |
 | JWT 驗證層（可替換 Auth Adapter） | ✓ | — | — | — | — |
 | 稽核紀錄表 | ✓ | — | — | — | — |
 
