@@ -23,11 +23,19 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.screenshot({ path: path.join(OUT, 'consent.png') });
     ok(await page.evaluate(() => !document.querySelector('#sheetCard input[type=checkbox]') && !!document.querySelector('[data-do="consentAll"]') && !!document.querySelector('[data-do="consentMin"]')), 'nothing is ticked in advance: two equal buttons');
     await page.click('[data-do="consentMin"]'); await sleep(200);
-    ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && /先選年齡/.test(document.getElementById('sheetCard').textContent)), 'it asks for an age before going on');
-    await page.click('[data-age="child"]'); await sleep(150);
+    ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && /先選地區和年齡/.test(document.getElementById('sheetCard').textContent)), 'it asks for region and age before going on');
+    ok(await page.evaluate(() => document.querySelectorAll('[data-region]').length === 10 && document.querySelectorAll('[data-age]').length === 5 && document.querySelectorAll('[data-cslang]').length === 5), 'ten regions, five age bands, five languages, as in SPINREALM');
+    ok(await page.evaluate(() => !document.querySelector('[data-region][aria-checked="true"]')), 'no region is picked for the player');
+    await page.click('[data-cslang="en"]'); await sleep(200);
+    ok(await page.evaluate(() => ZZ.peek().lang === 'en' && /Where do you live/.test(document.getElementById('sheetCard').textContent)), 'the language can be changed right there');
+    await page.click('[data-cslang="zh-Hant"]'); await sleep(200);
+    await page.click('[data-region="tw"]'); await sleep(100);
+    await page.click('[data-do="consentMin"]'); await sleep(200);
+    ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && !ZZ.Consent.done()), 'a region alone is not enough');
+    await page.click('[data-age="u13"]'); await sleep(150);
     ok(await page.evaluate(() => /不開放連線對戰/.test(document.getElementById('sheetCard').textContent)), 'under 13 is told what is closed');
     await page.click('[data-do="consentMin"]'); await sleep(400);      // without Google Fonts
-    ok(await page.evaluate(() => !ZZ.peek().sheet && ZZ.Consent.done() && ZZ.Consent.child() && !ZZ.Consent.fonts()), 'the answers are kept');
+    ok(await page.evaluate(() => !ZZ.peek().sheet && ZZ.Consent.done() && ZZ.Consent.child() && ZZ.Consent.region() === 'tw' && !ZZ.Consent.fonts()), 'the answers are kept');
     ok(fonts.length === 0, 'fonts declined: still nothing from Google', fonts);
     // under 13
     await page.evaluate(() => ZZ.App.go.online()); await sleep(200);
@@ -50,6 +58,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.click('[data-do="changeAge"]'); await sleep(200);
     await page.click('[data-age="adult"]'); await sleep(100);
     await page.click('[data-do="consentAll"]'); await sleep(300);
+    ok(await page.evaluate(() => ZZ.Consent.age() === 'adult' && !ZZ.Consent.minor()), 'the age band changes');
     await page.evaluate(() => ZZ.App.go.online()); await sleep(300);
     ok(await page.evaluate(() => ZZ.peek().sheet === 'online'), 'as an adult online play opens');
     // the mainland notice in Simplified Chinese only
@@ -57,6 +66,12 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !document.getElementById('cnNotice').hidden && /适龄提示/.test(document.getElementById('cnNotice').textContent) && /健康生活/.test(document.getElementById('cnNotice').textContent)), 'Simplified Chinese shows the age mark and the healthy-gaming advice');
     await page.goto(URL + '&lang=en'); await sleep(700);
     ok(await page.evaluate(() => document.getElementById('cnNotice').hidden), 'other languages do not');
+    await page.evaluate(() => ZZ.Consent.set({ region: 'cn' })); await sleep(100);
+    ok(await page.evaluate(() => !document.getElementById('cnNotice').hidden), 'nor unless the player says they live in mainland China');
+    // the first version's answers: 18+ carries over, 13 to 17 is asked again (it is now three bands)
+    await page.evaluate(() => localStorage.setItem('zhuanzhuan.consent.v1', JSON.stringify({ v: 1, at: 1, fonts: false, age: 'teen' })));
+    await page.goto(URL); await sleep(900);
+    ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && !document.querySelector('[data-age][aria-checked="true"]')), 'an old 13-to-17 answer is asked again');
     // the pages
     for (const f of ['privacy.html', 'terms.html']) {
       const r = await page.goto(URL.replace(/index\.html.*$/, f));

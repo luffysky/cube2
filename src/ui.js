@@ -1274,7 +1274,7 @@
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
-      if (id === 'sLang') { if (e.type !== 'change') return; set.lang = e.target.value; urlLang = ''; saveStore(); applyLang(); openSheet('settings'); return; }
+      if (id === 'sLang') { if (e.type !== 'change') return; setLang(e.target.value); openSheet('settings'); return; }
       if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
       if (FIELDS[id]) {
         set[FIELDS[id]] = +e.target.value;
@@ -1700,6 +1700,8 @@
   App.fmtClock = fmtClock; App.fmtTime = fmtTime; App.saveStore = saveStore; App.applySettings = applySettings; App.applyLook = applyLook; App.applyLang = applyLang;
   App.applyLang = applyLang; App.toMenu = toMenu; App.layout = layout; App.updateMenu = updateMenu; App.rankName = rankName; App.stepCells = stepCells; App.stepDemo = stepDemo;
   App.actName = actName; App.clearName = clearName; App.key1 = key1; App.sdfVal = sdfVal; App.foeItem = foeItem; App.endBattle = endBattle; App.setTools = setTools;
+  function setLang(v) { set.lang = v; urlLang = ''; saveStore(); applyLang(); }
+  App.setLang = setLang;
   App.tool = tool; App.buzz = buzz; App.resume = resume; App.openBattle = openBattle; App.rewardHtml = rewardHtml;
 
   ZZ.peek = function () { return { S: S, V: V, set: set, save: save, screen: screen, sheet: sheetName, sfx: sfx, useItem: useItem, meta: Meta.data, lang: L.lang, hero: hero, heroLoad: heroLoad }; };
