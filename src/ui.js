@@ -409,18 +409,18 @@
       var f = M.foes[s], p = Net.peers[s], e = p && p.end;
       list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone });
     });
-    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent); };
+    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); };
     list.sort(better);
     list.forEach(function (p, i) { p.place = i && !better(list[i - 1], p) ? list[i - 1].place : i + 1; });
     var out = { list: list, teams: null, r: 0 };
     if (M.teams) {
       var tm = [0, 1].map(function (k) {
         var mine = list.filter(function (p) { return p.team === k; });
-        return { downs: mine.reduce(function (a, p) { return a + p.downs; }, 0), sent: mine.reduce(function (a, p) { return a + p.sent; }, 0), out: mine.every(function (p) { return p.gone; }) };
+        return { downs: mine.reduce(function (a, p) { return a + p.downs; }, 0), sent: mine.reduce(function (a, p) { return a + p.sent; }, 0), score: mine.reduce(function (a, p) { return a + p.score; }, 0), out: mine.every(function (p) { return p.gone; }) };
       });
       out.teams = tm;
       var us = tm[M.myTeam], them = tm[1 - M.myTeam];
-      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : 0;
+      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : us.score !== them.score ? (us.score > them.score ? 1 : -1) : 0;
     } else {
       var me = list.filter(function (p) { return p.me; })[0], tops = list.filter(function (p) { return p.place === 1; }).length;
       out.r = why === 'left' ? 1 : me.place === 1 ? (tops > 1 ? 0 : 1) : -1;
@@ -880,7 +880,7 @@
     var settle = function () {
       if (S !== st) return;
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
-      var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
+      var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched }, S.tape && !S.used ? S.tape.done() : null);
@@ -1010,7 +1010,7 @@
       h = verdict() +
         (S.why === 'left' ? '<p>' + t('net.foeLeft') + '</p>' : '') +
         '<div class="score"><div><b>' + S.ko.me + '</b><span>' + t('r.yourKo') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + S.ko.opp + '</b><span>' + t('r.foeKo', foe) + '</span></div></div>' +
-        (S.ko.me === S.ko.opp && S.result !== 0 && !S.why ? '<p>' + t('r.tie') + '</p>' : '') + rewardHtml(S.reward) +
+        (S.ko.me === S.ko.opp && S.result !== 0 && !S.why ? '<p>' + t(me.sent === op.sent ? 'r.tieScore' : 'r.tie') + '</p>' : '') + rewardHtml(S.reward) +
         '<table class="cmp"><thead><tr><th></th><th>' + t('you') + '</th><th>' + foe + '</th></tr></thead><tbody>';
       for (i = 0; i < rows.length; i++) h += '<tr><td>' + rows[i][0] + '</td><td>' + rows[i][1] + '</td><td>' + rows[i][2] + '</td></tr>';
       h += '</tbody></table>' + (S.saved ? '<p class="note">' + t('recSaved') + '</p>' : '') + (App.endExtra ? App.endExtra() : '') + '<div class="row">' +

@@ -1643,8 +1643,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'mp.place': ['第 {0}', '#{0}', '{0} 位', '{0}위'],
     'mp.usDown': ['我們倒地', 'Our downs', '味方のダウン', '우리 팀 다운'],
     'mp.themDown': ['對方倒地', 'Their downs', '相手のダウン', '상대 팀 다운'],
-    'mp.rule': ['倒地最少的人贏；一樣多就比送出的行數。', 'Fewest downs wins; a tie goes to whoever sent more lines.', 'ダウンが一番少ない人の勝ち。同じなら送ったライン数で決まります。', '다운이 가장 적은 사람이 이깁니다. 같으면 보낸 줄 수로 정합니다.'],
-    'mp.ruleTeam': ['兩人加起來倒地比較少的隊伍贏；一樣多就比送出的行數。', 'The team with fewer downs between them wins; a tie goes to the team that sent more lines.', 'ふたりのダウン合計が少ないチームの勝ち。同じなら送ったライン数で決まります。', '두 사람의 다운 합계가 적은 팀이 이깁니다. 같으면 보낸 줄 수로 정합니다.'],
+    'mp.rule': ['倒地最少的人贏；一樣多比送出的行數，再一樣就比分數。', 'Fewest downs wins; if level, most lines sent, then highest score.', 'ダウンが一番少ない人の勝ち。同じなら送ったライン数、それも同じならスコアで決まります。', '다운이 가장 적은 사람이 이깁니다. 같으면 보낸 줄 수, 그것도 같으면 점수로 정합니다.'],
+    'mp.ruleTeam': ['兩人加起來倒地比較少的隊伍贏；一樣多比送出的行數，再一樣就比分數。', 'The team with fewer downs between them wins; if level, most lines sent, then highest score.', 'ふたりのダウン合計が少ないチームの勝ち。同じなら送ったライン数、それも同じならスコアで決まります。', '두 사람의 다운 합계가 적은 팀이 이깁니다. 같으면 보낸 줄 수, 그것도 같으면 점수로 정합니다.'],
     'ko': ['擊倒', 'KOs', 'KO', 'KO'],
     'sent': ['送出', 'Sent', '送り', '보냄'],
     'pts': ['{0} 分', '{0} pts', '{0} 点', '{0}점'],
@@ -1792,6 +1792,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'r.yourKo': ['你的擊倒', 'Your KOs', 'あなたのKO', '내 KO'],
     'r.foeKo': ['{0}的擊倒', "{0}'s KOs", '{0}のKO', '{0}의 KO'],
     'r.vs': ['比', ':', '対', ':'],
+    'r.tieScore': ['擊倒數和送出的行數都一樣，改比分數。', 'KOs and lines sent were level, so score decided it.', 'KO数も送ったライン数も同じなので、スコアで決着。', 'KO 수와 보낸 줄 수가 같아 점수로 결정했습니다.'],
     'r.tie': ['擊倒數一樣，改比送出的行數。', 'KOs were level, so lines sent decided it.', 'KO数が同じなので、送ったライン数で決着。', 'KO 수가 같아 보낸 줄 수로 결정했습니다.'],
     'st.sent': ['送出行數', 'Lines sent', '送ったライン', '보낸 줄'],
     'st.apm': ['每分鐘攻擊', 'Attack per minute', '1分あたりの火力', '분당 공격'],
@@ -1935,7 +1936,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'h.bt1': ['你送出的行會先抵銷紅條裡排隊的水泥行，剩下的才送給對手。', 'Lines you send first cancel cement queued in your red bar. The rest goes to your rival.', '送るラインはまず赤いバーで待機中のセメントを相殺し、残りが相手に届きます。', '보내는 줄은 먼저 빨간 막대에 대기 중인 시멘트를 상쇄하고, 나머지가 상대에게 갑니다.'],
     'h.bt2': ['放下一塊卻沒有消行，排隊的水泥行就會從底下頂上來。', 'Place a piece without clearing and the queued cement rises from below.', '消さずに置くと、待機中のセメントが下からせり上がります。', '지우지 못하고 놓으면 대기 중인 시멘트가 아래에서 올라옵니다.'],
     'h.bt3': ['牆頂到天花板算被擊倒一次，水泥行會掉光，然後繼續打。', 'Topping out is one KO against you. The cement falls away and play goes on.', '天井まで積み上がると1回KO。セメントが消えて続行します。', '천장까지 차면 KO 1회. 시멘트가 사라지고 계속합니다.'],
-    'h.bt4': ['時間到比擊倒次數，一樣多就比送出的行數。', 'When time runs out, most KOs wins. If level, most lines sent.', '時間切れでKO数を比較。同数なら送ったライン数。', '시간이 끝나면 KO 수로, 같으면 보낸 줄 수로 가립니다.'],
+    'h.bt4': ['時間到比擊倒次數；一樣多比送出的行數，再一樣就比分數。', 'When time runs out, most KOs wins. If level, most lines sent, then highest score.', '時間切れでKO数の多いほうが勝ち。同じなら送ったライン数、それも同じならスコアで決着。', '시간이 끝나면 KO가 많은 쪽이 이깁니다. 같으면 보낸 줄 수, 그것도 같으면 점수로 정합니다.'],
     'h.sc': ['分數與金幣', 'Score and coins', 'スコアとコイン', '점수와 코인'],
     'h.sc1': ['消行、各種轉、連擊、全清、擊倒對手都有分數；軟降每格 1 分，硬降每格 2 分。', 'Clears, spins, combos, perfect clears and KOs all score. Soft drop gives 1 per cell, hard drop 2.', 'ライン消去、スピン、コンボ、パーフェクト、KOで得点。ソフト1マス1点、ハード1マス2点。', '줄 지우기, 스핀, 콤보, 퍼펙트, KO로 점수를 얻습니다. 소프트 1칸 1점, 하드 1칸 2점.'],
     'h.sc2': ['每場結束會依分數、勝負和擊倒數發金幣。金幣可以在商店換外觀，或買道具帶進一般對戰。', 'After each match you earn coins for score, result and KOs. Spend them in the shop on looks, or on items to bring into casual matches.', '対戦後、スコア・勝敗・KO数に応じてコインがもらえます。ショップで見た目や、通常対戦に持ち込むアイテムと交換できます。', '대전이 끝나면 점수·승패·KO에 따라 코인을 받습니다. 상점에서 외형이나 일반 대전에 가져갈 아이템과 바꿀 수 있습니다.'],
@@ -5038,18 +5039,18 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       var f = M.foes[s], p = Net.peers[s], e = p && p.end;
       list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone });
     });
-    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent); };
+    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); };
     list.sort(better);
     list.forEach(function (p, i) { p.place = i && !better(list[i - 1], p) ? list[i - 1].place : i + 1; });
     var out = { list: list, teams: null, r: 0 };
     if (M.teams) {
       var tm = [0, 1].map(function (k) {
         var mine = list.filter(function (p) { return p.team === k; });
-        return { downs: mine.reduce(function (a, p) { return a + p.downs; }, 0), sent: mine.reduce(function (a, p) { return a + p.sent; }, 0), out: mine.every(function (p) { return p.gone; }) };
+        return { downs: mine.reduce(function (a, p) { return a + p.downs; }, 0), sent: mine.reduce(function (a, p) { return a + p.sent; }, 0), score: mine.reduce(function (a, p) { return a + p.score; }, 0), out: mine.every(function (p) { return p.gone; }) };
       });
       out.teams = tm;
       var us = tm[M.myTeam], them = tm[1 - M.myTeam];
-      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : 0;
+      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : us.score !== them.score ? (us.score > them.score ? 1 : -1) : 0;
     } else {
       var me = list.filter(function (p) { return p.me; })[0], tops = list.filter(function (p) { return p.place === 1; }).length;
       out.r = why === 'left' ? 1 : me.place === 1 ? (tops > 1 ? 0 : 1) : -1;
@@ -5509,7 +5510,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var settle = function () {
       if (S !== st) return;
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
-      var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
+      var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched }, S.tape && !S.used ? S.tape.done() : null);
@@ -5639,7 +5640,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       h = verdict() +
         (S.why === 'left' ? '<p>' + t('net.foeLeft') + '</p>' : '') +
         '<div class="score"><div><b>' + S.ko.me + '</b><span>' + t('r.yourKo') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + S.ko.opp + '</b><span>' + t('r.foeKo', foe) + '</span></div></div>' +
-        (S.ko.me === S.ko.opp && S.result !== 0 && !S.why ? '<p>' + t('r.tie') + '</p>' : '') + rewardHtml(S.reward) +
+        (S.ko.me === S.ko.opp && S.result !== 0 && !S.why ? '<p>' + t(me.sent === op.sent ? 'r.tieScore' : 'r.tie') + '</p>' : '') + rewardHtml(S.reward) +
         '<table class="cmp"><thead><tr><th></th><th>' + t('you') + '</th><th>' + foe + '</th></tr></thead><tbody>';
       for (i = 0; i < rows.length; i++) h += '<tr><td>' + rows[i][0] + '</td><td>' + rows[i][1] + '</td><td>' + rows[i][2] + '</td></tr>';
       h += '</tbody></table>' + (S.saved ? '<p class="note">' + t('recSaved') + '</p>' : '') + (App.endExtra ? App.endExtra() : '') + '<div class="row">' +
