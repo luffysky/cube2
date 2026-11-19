@@ -32,9 +32,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await until(async () => (await st(A)).net === 'matching', 3000), 'A is looking');
     await sleep(1200);
     ok(await A.evaluate(() => /正在找對手/.test(document.getElementById('sheetCard').textContent)), 'A sees the countdown');
-    await B.evaluate(() => { ZZ.App.go.online(); });
-    await sleep(300);
-    await B.click('[data-do="netQuick"]');
+    await B.goto(URL + '&go=quick');      // the app shortcut: straight into matchmaking
     const both = await until(async () => { const a = await st(A), b = await st(B); return a.S && b.S && a.S.mode === 'net' && b.S.mode === 'net'; }, 15000);
     const a = await st(A), b = await st(B);
     ok(both, 'they found each other and the match started by itself', [a, b]);

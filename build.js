@@ -111,7 +111,7 @@ const manifest = {
     { src: 'icons/shot-phone.png', sizes: '1080x2160', type: 'image/png', form_factor: 'narrow', label: '手機上的對戰畫面' },
     { src: 'icons/shot-wide.png', sizes: '1920x1080', type: 'image/png', form_factor: 'wide', label: '電腦上的對戰畫面' }
   ].filter(s => fs.existsSync(path.join(root, s.src))),
-  shortcuts: [['rank', 'm.rank'], ['battle', 'm.battle'], ['online', 'm.online'], ['sprint', 'm.sprint']].map(([go, key]) => ({
+  shortcuts: [['quick', 'net.quick'], ['rank', 'm.rank'], ['online', 'm.online'], ['sprint', 'm.sprint']].map(([go, key]) => ({
     name: t(key), url: './?go=' + go, icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }]
   }))
 };

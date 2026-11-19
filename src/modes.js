@@ -298,6 +298,8 @@
   // ---------- online lobby ----------
   var joinCode = '', copied = false;
   App.go.online = function () { App.openSheet('online'); };
+  // ?go=quick (and the app shortcut): straight into random matchmaking
+  App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
   function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')); }

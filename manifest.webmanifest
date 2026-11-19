@@ -69,8 +69,8 @@
   ],
   "shortcuts": [
     {
-      "name": "排位賽",
-      "url": "./?go=rank",
+      "name": "隨機配對",
+      "url": "./?go=quick",
       "icons": [
         {
           "src": "icons/icon-192.png",
@@ -80,8 +80,8 @@
       ]
     },
     {
-      "name": "對戰",
-      "url": "./?go=battle",
+      "name": "排位賽",
+      "url": "./?go=rank",
       "icons": [
         {
           "src": "icons/icon-192.png",
