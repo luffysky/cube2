@@ -32,6 +32,8 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(ROOT + path.sep)) { res.statusCode = 403; return res.end('no'); }
   fs.readFile(file, (err, buf) => {
     if (err) { res.statusCode = 404; return res.end('not found'); }
+    // the same content policy the real site sends, so the browser tests run under it too
+    try { const csp = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).headers[0].headers.find(h => h.key === 'Content-Security-Policy'); if (csp && !/[?&]csp=off/.test(req.url)) res.setHeader('Content-Security-Policy', csp.value); } catch (e) { /* no policy yet */ }
     res.setHeader('Content-Type', TYPES[path.extname(file)] || 'application/octet-stream');
     res.setHeader('Cache-Control', 'no-store');
     res.end(buf);

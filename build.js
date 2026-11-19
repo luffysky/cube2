@@ -71,6 +71,27 @@ for (const [k, f] of Object.entries(parts)) {
   html = html.split(mark).join(body.trim());
 }
 fs.writeFileSync(path.join(root, 'index.html'), html);
+
+// ---------- which scripts the page may run ----------
+// The page's own scripts are written into it, so the browser is told exactly which ones they are (by their hashes)
+// and runs nothing else: text that somehow got into the page as a script, or one from another address, stays dead.
+// The list goes out as a header from vercel.json, and the local dev server sends the same header.
+const hashes = [];
+html.replace(/<script>([\s\S]*?)<\/script>/g, (all, body) => { hashes.push("'sha256-" + crypto.createHash('sha256').update(body).digest('base64') + "'"); return all; });
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' " + hashes.join(' '),
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",      // the page sizes things with style attributes
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob:",
+  "media-src 'self' data: blob:",
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+  "worker-src 'self'", "manifest-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
+].join('; ');
+const vfile = path.join(root, 'vercel.json'), vj = JSON.parse(fs.readFileSync(vfile, 'utf8'));
+const all = vj.headers.find(h => h.source === '/(.*)');
+all.headers = all.headers.filter(h => h.key !== 'Content-Security-Policy').concat([{ key: 'Content-Security-Policy', value: CSP }]);
+fs.writeFileSync(vfile, JSON.stringify(vj, null, 2) + '\n');
 const build = crypto.createHash('sha256').update(html).digest('hex').slice(0, 12);
 
 // ---------- the app manifest ----------

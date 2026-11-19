@@ -256,8 +256,24 @@
   Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
   Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); emit('unsub', []); };
   // A name is at most 12 characters, with nothing that could be read as markup.
+  // Names everyone can see on the leaderboard. Two kinds are turned away (the name becomes empty, which shows as the
+  // player's tag): insults, and names that pretend to speak for the game. The check ignores case, spacing, punctuation
+  // and the usual digit-for-letter swaps. It is a short list on purpose: a long one mostly catches innocent names.
+  var BAD_NAME = ['fuck', 'shit', 'bitch', 'cunt', 'nigg', 'faggot', 'retard', 'whore', 'slut', 'nazi', 'hitler', 'porn', 'pussy', 'penis', 'vagina',
+    '幹你', '干你', '操你', '肏', '屄', '雞巴', '鸡巴', '雞掰', '機掰', '机掰', '婊子', '賤人', '贱人', '妓女', '強姦', '强奸', '智障', '低能', '白癡', '白痴', '去死', '傻逼', '傻屄', '他媽的', '他妈的', '媽的', '妈的', '靠北', '靠腰', '垃圾人', '廢物', '废物', '支那',
+    '死ね', 'くそ', 'ばか', 'まんこ', 'ちんこ', '씨발', '시발', '병신', '좆', '개새끼', '지랄',
+    'admin', 'moderator', 'official', 'snowrealm', 'system', 'support', '官方', '管理員', '管理员', '客服', '系統', '系统', '運営', '公式', '운영자', '관리자'];
+  var LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '!': 'i' };
+  Meta.badName = function (v) {
+    var flat = String(v == null ? '' : v).normalize('NFKC').toLowerCase().replace(/[0134578@$!]/g, function (c) { return LEET[c]; }).replace(/[\s\-_.·•*~^|/,:;+=()\[\]{}#%?]/g, '');
+    if (!flat) return false;
+    if (flat === 'gm' || flat === 'mod') return true;
+    for (var i = 0; i < BAD_NAME.length; i++) if (flat.indexOf(BAD_NAME[i]) >= 0) return true;
+    return false;
+  };
   Meta.cleanName = function (v) {
-    return Array.from(String(v == null ? '' : v).replace(/[<>&"'`\\\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 12).join('').trim();
+    var name = Array.from(String(v == null ? '' : v).replace(/[<>&"'`\\\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 12).join('').trim();
+    return Meta.badName(name) ? '' : name;
   };
   Meta.setName = function (v) {
     v = Meta.cleanName(v);

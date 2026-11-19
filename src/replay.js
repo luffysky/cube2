@@ -41,7 +41,7 @@
   Recorder.prototype.item = function (id) { this.ev.push(['i', Math.round(this.t), id]); };
   Recorder.prototype.done = function (sum) {
     var ev = this.ev.map(function (e) { return e[0] === 'k' && e.length > 5 ? e.slice(0, 5) : e; });
-    return { v: 1, at: Date.now(), info: this.info, sum: sum, ev: ev };
+    return { v: 1, rv: ZZ.RULES, at: Date.now(), info: this.info, sum: sum, ev: ev };
   };
 
   function queueOf(rep) {
@@ -147,7 +147,7 @@
     mem = [];
     try {
       var st = storage(), raw = st && st.getItem(KEY), d = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(d)) mem = d.filter(function (r) { return r && r.v === 1 && Array.isArray(r.ev) && r.info && r.sum; });
+      if (Array.isArray(d)) mem = d.filter(function (r) { return r && r.v === 1 && (r.rv || 1) === ZZ.RULES && Array.isArray(r.ev) && r.info && r.sum; });   // recordings made under other rules no longer line up
     } catch (e) { /* none kept */ }
     return mem;
   }

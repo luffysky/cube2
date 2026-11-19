@@ -444,6 +444,7 @@
     'cl.badCode': ['這組碼不對，或是已經過期。', 'That code is wrong or has run out.', 'コードが違うか、有効期限が切れています。', '코드가 틀렸거나 만료되었습니다.'],
     'cl.slow': ['試太多次了，等十分鐘再試。', 'Too many tries. Wait ten minutes and try again.', '試行回数が多すぎます。10分待ってからお試しください。', '시도 횟수가 너무 많습니다. 10분 후 다시 시도하세요.'],
     'cl.err': ['現在連不上伺服器，等一下再試。', 'The server cannot be reached right now. Try again in a moment.', '現在サーバーに接続できません。少し待ってからお試しください。', '지금 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'cl.privacy': ['隱私說明：存了什麼、怎麼刪', 'Privacy: what is stored and how to delete it', 'プライバシー：保存される内容と削除方法', '개인정보: 저장되는 내용과 삭제 방법'],
     'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
     'cl.delP': ['會刪掉雲端上的存檔和排行榜成績，所有連著的裝置都會斷開。這台裝置上的進度不受影響。刪了就救不回來。', 'This deletes your cloud save and your leaderboard scores and unlinks every device. Progress on this device is not touched. It cannot be undone.', 'クラウドのセーブとランキングの記録を削除し、すべての端末の接続を解除します。この端末の進行状況には影響しません。元に戻せません。', '클라우드 저장 데이터와 랭킹 기록을 삭제하고 모든 기기의 연결을 해제합니다. 이 기기의 진행 상황에는 영향이 없습니다. 되돌릴 수 없습니다.'],
     'cl.delYes': ['確定刪除', 'Yes, delete', '削除する', '삭제'],
@@ -501,6 +502,7 @@
       h += '<h3>' + t('cl.del') + '</h3><p class="note">' + t('cl.delP') + '</p><div class="row">' +
         (ui.del ? btn('cloudDelNo', 'cancel') + btn('cloudDelYes', 'cl.delYes') : btn('cloudDel', 'cl.del')) + '</div>';
     }
+    h += '<p class="note"><a href="privacy.html" target="_blank" rel="noopener">' + t('cl.privacy') + '</a></p>';
     return h + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
   function refresh() {

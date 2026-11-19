@@ -1448,6 +1448,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     BOX: BOX, SHAPES: SHAPES, kicksFor: kicksFor, tspinType: tspinType, calcAttack: calcAttack, calcScore: calcScore,
     RNG: RNG, Game: Game
   };
+  // The number of this set of rules. A recording only plays back (and a reported match only checks out) under the
+  // rules it was made with, so raise it whenever a change here would make the same moves end differently.
+  ZZ.RULES = 1;
   root.ZZ = ZZ;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -2682,8 +2685,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
   Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); emit('unsub', []); };
   // A name is at most 12 characters, with nothing that could be read as markup.
+  // Names everyone can see on the leaderboard. Two kinds are turned away (the name becomes empty, which shows as the
+  // player's tag): insults, and names that pretend to speak for the game. The check ignores case, spacing, punctuation
+  // and the usual digit-for-letter swaps. It is a short list on purpose: a long one mostly catches innocent names.
+  var BAD_NAME = ['fuck', 'shit', 'bitch', 'cunt', 'nigg', 'faggot', 'retard', 'whore', 'slut', 'nazi', 'hitler', 'porn', 'pussy', 'penis', 'vagina',
+    '幹你', '干你', '操你', '肏', '屄', '雞巴', '鸡巴', '雞掰', '機掰', '机掰', '婊子', '賤人', '贱人', '妓女', '強姦', '强奸', '智障', '低能', '白癡', '白痴', '去死', '傻逼', '傻屄', '他媽的', '他妈的', '媽的', '妈的', '靠北', '靠腰', '垃圾人', '廢物', '废物', '支那',
+    '死ね', 'くそ', 'ばか', 'まんこ', 'ちんこ', '씨발', '시발', '병신', '좆', '개새끼', '지랄',
+    'admin', 'moderator', 'official', 'snowrealm', 'system', 'support', '官方', '管理員', '管理员', '客服', '系統', '系统', '運営', '公式', '운영자', '관리자'];
+  var LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '!': 'i' };
+  Meta.badName = function (v) {
+    var flat = String(v == null ? '' : v).normalize('NFKC').toLowerCase().replace(/[0134578@$!]/g, function (c) { return LEET[c]; }).replace(/[\s\-_.·•*~^|/,:;+=()\[\]{}#%?]/g, '');
+    if (!flat) return false;
+    if (flat === 'gm' || flat === 'mod') return true;
+    for (var i = 0; i < BAD_NAME.length; i++) if (flat.indexOf(BAD_NAME[i]) >= 0) return true;
+    return false;
+  };
   Meta.cleanName = function (v) {
-    return Array.from(String(v == null ? '' : v).replace(/[<>&"'`\\\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 12).join('').trim();
+    var name = Array.from(String(v == null ? '' : v).replace(/[<>&"'`\\\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 12).join('').trim();
+    return Meta.badName(name) ? '' : name;
   };
   Meta.setName = function (v) {
     v = Meta.cleanName(v);
@@ -4169,7 +4188,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Recorder.prototype.item = function (id) { this.ev.push(['i', Math.round(this.t), id]); };
   Recorder.prototype.done = function (sum) {
     var ev = this.ev.map(function (e) { return e[0] === 'k' && e.length > 5 ? e.slice(0, 5) : e; });
-    return { v: 1, at: Date.now(), info: this.info, sum: sum, ev: ev };
+    return { v: 1, rv: ZZ.RULES, at: Date.now(), info: this.info, sum: sum, ev: ev };
   };
 
   function queueOf(rep) {
@@ -4275,7 +4294,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     mem = [];
     try {
       var st = storage(), raw = st && st.getItem(KEY), d = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(d)) mem = d.filter(function (r) { return r && r.v === 1 && Array.isArray(r.ev) && r.info && r.sum; });
+      if (Array.isArray(d)) mem = d.filter(function (r) { return r && r.v === 1 && (r.rv || 1) === ZZ.RULES && Array.isArray(r.ev) && r.info && r.sum; });   // recordings made under other rules no longer line up
     } catch (e) { /* none kept */ }
     return mem;
   }
@@ -7656,6 +7675,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'cl.badCode': ['這組碼不對，或是已經過期。', 'That code is wrong or has run out.', 'コードが違うか、有効期限が切れています。', '코드가 틀렸거나 만료되었습니다.'],
     'cl.slow': ['試太多次了，等十分鐘再試。', 'Too many tries. Wait ten minutes and try again.', '試行回数が多すぎます。10分待ってからお試しください。', '시도 횟수가 너무 많습니다. 10분 후 다시 시도하세요.'],
     'cl.err': ['現在連不上伺服器，等一下再試。', 'The server cannot be reached right now. Try again in a moment.', '現在サーバーに接続できません。少し待ってからお試しください。', '지금 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'cl.privacy': ['隱私說明：存了什麼、怎麼刪', 'Privacy: what is stored and how to delete it', 'プライバシー：保存される内容と削除方法', '개인정보: 저장되는 내용과 삭제 방법'],
     'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
     'cl.delP': ['會刪掉雲端上的存檔和排行榜成績，所有連著的裝置都會斷開。這台裝置上的進度不受影響。刪了就救不回來。', 'This deletes your cloud save and your leaderboard scores and unlinks every device. Progress on this device is not touched. It cannot be undone.', 'クラウドのセーブとランキングの記録を削除し、すべての端末の接続を解除します。この端末の進行状況には影響しません。元に戻せません。', '클라우드 저장 데이터와 랭킹 기록을 삭제하고 모든 기기의 연결을 해제합니다. 이 기기의 진행 상황에는 영향이 없습니다. 되돌릴 수 없습니다.'],
     'cl.delYes': ['確定刪除', 'Yes, delete', '削除する', '삭제'],
@@ -7713,6 +7733,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       h += '<h3>' + t('cl.del') + '</h3><p class="note">' + t('cl.delP') + '</p><div class="row">' +
         (ui.del ? btn('cloudDelNo', 'cancel') + btn('cloudDelYes', 'cl.delYes') : btn('cloudDel', 'cl.del')) + '</div>';
     }
+    h += '<p class="note"><a href="privacy.html" target="_blank" rel="noopener">' + t('cl.privacy') + '</a></p>';
     return h + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
   function refresh() {

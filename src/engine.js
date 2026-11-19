@@ -643,6 +643,9 @@
     BOX: BOX, SHAPES: SHAPES, kicksFor: kicksFor, tspinType: tspinType, calcAttack: calcAttack, calcScore: calcScore,
     RNG: RNG, Game: Game
   };
+  // The number of this set of rules. A recording only plays back (and a reported match only checks out) under the
+  // rules it was made with, so raise it whenever a change here would make the same moves end differently.
+  ZZ.RULES = 1;
   root.ZZ = ZZ;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
 })(typeof window !== 'undefined' ? window : globalThis);

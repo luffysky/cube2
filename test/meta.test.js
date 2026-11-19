@@ -186,6 +186,9 @@ M.run('name', [{ evil: 1 }]); eq(M.data.name, '', 'a name that is not text becom
 M.run('name', ['𝓐'.repeat(40)]); eq(Array.from(M.data.name).length, 12, 'twelve characters, counted whole');
 eq(M.cleanName('<script>alert(1)</script>'), 'scriptalert(', 'markup characters dropped');
 eq(M.cleanName('a\u202Eb\u0000c\n d'), 'abc d', 'control and direction marks dropped');
+// names on the public boards: insults and names posing as staff are cleared, ordinary ones are left alone
+for (const n of ['Sh1t head', 'f.u.c.k', '官方客服', 'GM', 'ＡＤＭＩＮ', '操你', 'SnowRealm', '씨발']) eq(M.cleanName(n), '', 'name ' + n + ' is turned away');
+for (const n of ['小明', 'Luffy', 'class', 'gmail', 'assassin', '鶯歌磚王', 'grape', 'Dickens', 'たのしね']) eq(M.cleanName(n), n, 'name ' + n + ' is kept');
 
 // ---------- a saved record with holes in it is filled in ----------
 M.use({ coins: 12, owned: { tile: ['neon'] }, tot: { wins: 3 }, items: [0, 1], bogus: 1 });
