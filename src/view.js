@@ -1154,7 +1154,10 @@
     itemTile: function (s) { s.clip('pluck', 0.5) || s.tone(1400, 0.05, 'sine', 0.05); },
     ui: function (s) { s.clip('ui', 0.4) || s.tone(900, 0.03, 'sine', 0.05); },
     undo: function (s) { s.clip('undo', 0.5) || s.tone(660, 0.05, 'triangle', 0.05, 440); },
-    tick: function (s) { s.clip('ui', 0.4) || s.tone(880, 0.04, 'sine', 0.05); }
+    tick: function (s) { s.clip('ui', 0.4) || s.tone(880, 0.04, 'sine', 0.05); },
+    // the clock running out: a woodblock-like tock each second, then a brighter double beep for 3-2-1
+    tock: function (s) { s.tone(1046, 0.07, 'sine', 0.11, 880); s.noise(0.02, 0.05, 1800, 5000); },
+    tockHi: function (s) { s.tone(1568, 0.09, 'square', 0.05); s.tone(1568, 0.12, 'sine', 0.12, null, 0); }
   };
   Sound.prototype.play = function (name, a, b) {
     if (!this.ac || this.cfg().vol <= 0 || !LIB[name]) return;

@@ -1555,8 +1555,12 @@
     var fz = S.freeze, K = kindOf();
     if (S.tape) S.tape.tick(dt);
     if (S.kind === 'battle') {
+      var secBefore = Math.ceil(S.left / 1000);
       S.left -= dt;
       if (S.left <= 0) { S.left = 0; endBattle(''); return; }
+      // last ten seconds: one beep as each second starts, sharper for the final three
+      var sec = Math.ceil(S.left / 1000);
+      if (sec < secBefore && sec <= 10 && S.state === 'play') sfx.play(sec <= 3 ? 'tockHi' : 'tock');
       if (S.rec) S.rec.tick(dt);
       var sides = ['me', 'opp'];
       for (var i = 0; i < 2; i++) {
