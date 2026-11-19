@@ -297,6 +297,7 @@
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
+      if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';

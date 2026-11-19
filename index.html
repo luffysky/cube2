@@ -6137,8 +6137,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         }
       }
     };
-    sock.onclose = sock.onerror = function () {
+    sock.onclose = sock.onerror = function (ev) {
       if (self.ws !== sock) return;
+      self.wsWhy = (ev && ev.type || '') + ' ' + (ev && ev.code || '') + ' up=' + (self.wsUp ? 1 : 0);
       self.ws = null; self.wsUp = false;
       for (var i in self.wsWait) { clearTimeout(self.wsWait[i].t); self.wsWait[i].no(new Error('socket')); }
       self.wsWait = {};
@@ -6359,6 +6360,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
   // is the open socket carrying this room right now (the lobby says so)
   Net.fast = function () { return !!(link && link.wsUp); };
+  // for looking into a connection that will not come up (?wsdebug=1 shows it in the lobby)
+  Net.wsInfo = function () { return link && link.wsOpen ? 'tries ' + link.wsTries + ' · up ' + (link.wsUp ? 1 : 0) + ' · socket ' + (link.ws ? link.ws.readyState : '-') + ' · last ' + (link.wsWhy || '-') + ' · near ' + link.near + '/' + link.seats : 'no relay'; };
   Net.leave = function () {
     send({ t: 'bye' });
     var st = link;
@@ -6872,6 +6875,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
+      if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';

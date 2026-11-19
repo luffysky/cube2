@@ -38,7 +38,11 @@ function leave(ws) {
 }
 function attach(server, opts) {
   const wss = new WebSocketServer({ server, maxPayload: MAX_FRAME, perMessageDeflate: false, path: opts && opts.path,
-    verifyClient: (info, done) => (sameSite(info.req) ? done(true) : done(false, 403, 'origin')) });
+    verifyClient: (info, done) => {
+      const fine = sameSite(info.req);
+      console.log('[zz] ws upgrade ' + (fine ? 'accepted' : 'refused: another site'));      // nothing about who is asking
+      return fine ? done(true) : done(false, 403, 'origin');
+    } });
   wss.on('connection', ws => {
     let tick = 0, count = 0, chain = Promise.resolve();
     ws.on('error', () => { /* the close that follows does the tidying */ });

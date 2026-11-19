@@ -151,8 +151,9 @@
         }
       }
     };
-    sock.onclose = sock.onerror = function () {
+    sock.onclose = sock.onerror = function (ev) {
       if (self.ws !== sock) return;
+      self.wsWhy = (ev && ev.type || '') + ' ' + (ev && ev.code || '') + ' up=' + (self.wsUp ? 1 : 0);
       self.ws = null; self.wsUp = false;
       for (var i in self.wsWait) { clearTimeout(self.wsWait[i].t); self.wsWait[i].no(new Error('socket')); }
       self.wsWait = {};
@@ -373,6 +374,8 @@
   };
   // is the open socket carrying this room right now (the lobby says so)
   Net.fast = function () { return !!(link && link.wsUp); };
+  // for looking into a connection that will not come up (?wsdebug=1 shows it in the lobby)
+  Net.wsInfo = function () { return link && link.wsOpen ? 'tries ' + link.wsTries + ' · up ' + (link.wsUp ? 1 : 0) + ' · socket ' + (link.ws ? link.ws.readyState : '-') + ' · last ' + (link.wsWhy || '-') + ' · near ' + link.near + '/' + link.seats : 'no relay'; };
   Net.leave = function () {
     send({ t: 'bye' });
     var st = link;
