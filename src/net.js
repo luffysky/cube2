@@ -14,11 +14,15 @@
   var ZZ = window.ZZ, App = ZZ.App, TYPES = ZZ.TYPES, ROWS = ZZ.ROWS, COLS = ZZ.COLS;
   var CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', PREFIX = 'zhuanzhuan-v1-', LIB = 'vendor/peerjs.min.js';
   var Net = {
-    state: 'idle',            // idle, opening, waiting, joining, ready, playing, error
+    state: 'idle',            // idle, opening, waiting, joining, matching, ready, playing, error
     code: '', host: false, me: '', foe: '', err: '', cfg: { minutes: 2, items: false },
     seated: false,            // joining through the relay: in the room, the host has not answered yet
-    wantAgain: false, foeAgain: false, onChange: null
+    wantAgain: false, foeAgain: false, onChange: null,
+    matched: false,           // this room came from random matchmaking: the match starts by itself
+    quickSince: 0, onNoOne: null      // onNoOne(): nobody turned up in time (the page then offers a computer)
   };
+  var quickT = 0, quickTries = 0;
+  Net.QUICK_WAIT = 20000;
   var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0, epoch = 0, relayed = false;
   var qs = (function () { try { return new URLSearchParams(window.location.search); } catch (e) { return { get: function () { return null; } }; } })();
 
@@ -294,6 +298,7 @@
     shut();
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
+    Net.matched = false; clearInterval(quickT); quickT = 0;
     epoch++;
   }
 
@@ -376,6 +381,44 @@
   Net.fast = function () { return !!(link && link.wsUp); };
   // for looking into a connection that will not come up (?wsdebug=1 shows it in the lobby)
   Net.wsInfo = function () { return link && link.wsOpen ? 'tries ' + link.wsTries + ' · up ' + (link.wsUp ? 1 : 0) + ' · socket ' + (link.ws ? link.ws.readyState : '-') + ' · last ' + (link.wsWhy || '-') + ' · near ' + link.near + '/' + link.seats : 'no relay'; };
+  // ---------- random matchmaking ----------
+  // Ask the server for anyone. Someone already waiting: sit down in their room. Nobody: wait in a room of our own,
+  // telling the server every few seconds that we are still here. After QUICK_WAIT without a real player, give up and
+  // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
+  Net.quick = function (name, again) {
+    reset(name, false);
+    if (!again) quickTries = 0;
+    Net.matched = true; Net.quickSince = Date.now();
+    Net.cfg = { minutes: 2, items: false };
+    setState('matching');
+    var run = epoch;
+    transport(function (kind) {
+      if (run !== epoch || Net.state !== 'matching') return;
+      if (kind !== 'relay') return fail('noquick');      // a plain static host has no server to match through
+      var key = seatKey();
+      relayed = true;
+      rpc({ a: 'quick', key: key }).then(function (r) {
+        if (run !== epoch || Net.state !== 'matching') return;
+        var b = r.body;
+        if (r.status !== 200 || !b || !b.ok || !b.code) return fail(r.status === 429 ? 'slow' : 'server');
+        Net.code = String(b.code);
+        Net.host = b.seat === 0;
+        wire(new Relay(Net.code, key, b.seat === 0 ? 0 : 1));
+        quickT = setInterval(function () {
+          if (run !== epoch || Net.state !== 'matching') { clearInterval(quickT); quickT = 0; return; }
+          var waited = Date.now() - Net.quickSince;
+          if (waited >= Net.QUICK_WAIT) { clearInterval(quickT); quickT = 0; return noOne(); }
+          if (Net.host && Math.floor(waited / 1000) % 6 === 5) rpc({ a: 'still', code: Net.code, key: key }).then(null, function () { /* the next one will do */ });
+          changed();      // the seconds on screen
+        }, 1000);
+      }, function () { if (run === epoch && Net.state === 'matching') fail('server'); });
+    });
+  };
+  function noOne() {
+    var f = Net.onNoOne;
+    Net.leave();
+    if (f) f();
+  }
   Net.leave = function () {
     send({ t: 'bye' });
     var st = link;
@@ -497,6 +540,8 @@
         Net.foe = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
+        // a matched room: the host starts once both have said hello (a moment later, so both see who they got)
+        if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items }; changed(); } break;
@@ -532,11 +577,12 @@
   };
   function dropped() {
     if (!link && !peer) return;
+    if (Net.state === 'matching' && Net.matched && quickTries < 2 && Date.now() - Net.quickSince < Net.QUICK_WAIT) { quickTries++; shut(); return Net.quick(Net.me, true); }
     var S = App.S(), mid = !!S && S.remote && (S.state === 'play' || S.state === 'count');
     shut();
     if (mid) { Net.state = 'idle'; App.endBattle('left'); return; }
     if (endWait) { var f = endWait; endWait = null; settle(f); }
-    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining') {
+    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining' || Net.state === 'matching') {
       Net.err = Net.state === 'joining' && Net.seated ? 'host' : 'lost';      // in the room, but the host never answered
       Net.seated = false;
       setState('error');

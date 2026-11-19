@@ -4712,6 +4712,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         S.opp = new ZZ.Game({ seed: seed, manual: true, items: !!o.items });
         S.bot = new Bot.BotPlayer(S.opp, { pps: cfg.pps, depth: cfg.depth, hold: cfg.hold, noise: cfg.noise, w: cfg.w });
         S.oppName = mode === 'rank' ? o.foe : t('lv' + o.level);
+        if (o.quickCpu) S.oppName = t('net.cpuTag', S.oppName);      // from random matchmaking: say plainly that it is the computer
       }
       if (mode !== 'net') {
         S.me.onAttack = function (n) { S.opp.receive(n); };
@@ -6000,11 +6001,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   var ZZ = window.ZZ, App = ZZ.App, TYPES = ZZ.TYPES, ROWS = ZZ.ROWS, COLS = ZZ.COLS;
   var CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', PREFIX = 'zhuanzhuan-v1-', LIB = 'vendor/peerjs.min.js';
   var Net = {
-    state: 'idle',            // idle, opening, waiting, joining, ready, playing, error
+    state: 'idle',            // idle, opening, waiting, joining, matching, ready, playing, error
     code: '', host: false, me: '', foe: '', err: '', cfg: { minutes: 2, items: false },
     seated: false,            // joining through the relay: in the room, the host has not answered yet
-    wantAgain: false, foeAgain: false, onChange: null
+    wantAgain: false, foeAgain: false, onChange: null,
+    matched: false,           // this room came from random matchmaking: the match starts by itself
+    quickSince: 0, onNoOne: null      // onNoOne(): nobody turned up in time (the page then offers a computer)
   };
+  var quickT = 0, quickTries = 0;
+  Net.QUICK_WAIT = 20000;
   var peer = null, link = null, dirty = false, urgent = false, acc = 0, foeEnd = null, endWait = null, joinT = 0, epoch = 0, relayed = false;
   var qs = (function () { try { return new URLSearchParams(window.location.search); } catch (e) { return { get: function () { return null; } }; } })();
 
@@ -6280,6 +6285,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     shut();
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
+    Net.matched = false; clearInterval(quickT); quickT = 0;
     epoch++;
   }
 
@@ -6362,6 +6368,44 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Net.fast = function () { return !!(link && link.wsUp); };
   // for looking into a connection that will not come up (?wsdebug=1 shows it in the lobby)
   Net.wsInfo = function () { return link && link.wsOpen ? 'tries ' + link.wsTries + ' · up ' + (link.wsUp ? 1 : 0) + ' · socket ' + (link.ws ? link.ws.readyState : '-') + ' · last ' + (link.wsWhy || '-') + ' · near ' + link.near + '/' + link.seats : 'no relay'; };
+  // ---------- random matchmaking ----------
+  // Ask the server for anyone. Someone already waiting: sit down in their room. Nobody: wait in a room of our own,
+  // telling the server every few seconds that we are still here. After QUICK_WAIT without a real player, give up and
+  // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
+  Net.quick = function (name, again) {
+    reset(name, false);
+    if (!again) quickTries = 0;
+    Net.matched = true; Net.quickSince = Date.now();
+    Net.cfg = { minutes: 2, items: false };
+    setState('matching');
+    var run = epoch;
+    transport(function (kind) {
+      if (run !== epoch || Net.state !== 'matching') return;
+      if (kind !== 'relay') return fail('noquick');      // a plain static host has no server to match through
+      var key = seatKey();
+      relayed = true;
+      rpc({ a: 'quick', key: key }).then(function (r) {
+        if (run !== epoch || Net.state !== 'matching') return;
+        var b = r.body;
+        if (r.status !== 200 || !b || !b.ok || !b.code) return fail(r.status === 429 ? 'slow' : 'server');
+        Net.code = String(b.code);
+        Net.host = b.seat === 0;
+        wire(new Relay(Net.code, key, b.seat === 0 ? 0 : 1));
+        quickT = setInterval(function () {
+          if (run !== epoch || Net.state !== 'matching') { clearInterval(quickT); quickT = 0; return; }
+          var waited = Date.now() - Net.quickSince;
+          if (waited >= Net.QUICK_WAIT) { clearInterval(quickT); quickT = 0; return noOne(); }
+          if (Net.host && Math.floor(waited / 1000) % 6 === 5) rpc({ a: 'still', code: Net.code, key: key }).then(null, function () { /* the next one will do */ });
+          changed();      // the seconds on screen
+        }, 1000);
+      }, function () { if (run === epoch && Net.state === 'matching') fail('server'); });
+    });
+  };
+  function noOne() {
+    var f = Net.onNoOne;
+    Net.leave();
+    if (f) f();
+  }
   Net.leave = function () {
     send({ t: 'bye' });
     var st = link;
@@ -6483,6 +6527,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         Net.foe = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
+        // a matched room: the host starts once both have said hello (a moment later, so both see who they got)
+        if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items }; changed(); } break;
@@ -6518,11 +6564,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
   function dropped() {
     if (!link && !peer) return;
+    if (Net.state === 'matching' && Net.matched && quickTries < 2 && Date.now() - Net.quickSince < Net.QUICK_WAIT) { quickTries++; shut(); return Net.quick(Net.me, true); }
     var S = App.S(), mid = !!S && S.remote && (S.state === 'play' || S.state === 'count');
     shut();
     if (mid) { Net.state = 'idle'; App.endBattle('left'); return; }
     if (endWait) { var f = endWait; endWait = null; settle(f); }
-    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining') {
+    if (Net.state === 'ready' || Net.state === 'playing' || Net.state === 'waiting' || Net.state === 'joining' || Net.state === 'matching') {
       Net.err = Net.state === 'joining' && Net.seated ? 'host' : 'lost';      // in the room, but the host never answered
       Net.seated = false;
       setState('error');
@@ -6634,6 +6681,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'les.next': ['下一課', 'Next lesson', '次のレッスン', '다음 과'],
     'les.prog': ['進度', 'Progress', '進み具合', '진행'],
     // online
+    'net.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '빠른 매칭'],
+    'net.quickP': ['先找線上的真人；{0} 秒內沒有人，就改跟電腦打（會標示是電腦）。', 'Looks for a real player first. If nobody turns up within {0} seconds, you play the computer instead (and it says so).', 'まずオンラインの人を探します。{0} 秒以内に見つからなければ、コンピューターと対戦します（そう表示されます）。', '먼저 온라인의 실제 사람을 찾습니다. {0}초 안에 없으면 컴퓨터와 대전합니다(컴퓨터라고 표시됩니다).'],
+    'net.matching': ['正在找對手⋯ {0} 秒', 'Looking for a player… {0} s', '対戦相手を探しています… {0} 秒', '상대를 찾는 중… {0}초'],
+    'net.matchingP': ['找到真人就會自動開始。', 'The match starts by itself once someone is found.', '見つかったら自動で始まります。', '상대를 찾으면 자동으로 시작합니다.'],
+    'net.found': ['找到對手了：{0}，馬上開始。', 'Found a player: {0}. Starting now.', '相手が見つかりました：{0}。すぐに始まります。', '상대를 찾았습니다: {0}. 곧 시작합니다.'],
+    'net.noOne': ['現在沒有其他真人在線，先跟電腦打一場。', 'No other players are online right now, so this one is against the computer.', '今はほかにオンラインの人がいないので、コンピューターと対戦します。', '지금은 온라인인 다른 사람이 없어 컴퓨터와 대전합니다.'],
+    'net.cpuTag': ['電腦｜{0}', 'Computer · {0}', 'コンピューター｜{0}', '컴퓨터 · {0}'],
+    'net.e.noquick': ['這個網址沒有配對伺服器，只能用房間代碼連線。', 'Quick match needs the game\'s server, which this address does not have. Use a room code instead.', 'このアドレスにはマッチングサーバーがありません。部屋コードで接続してください。', '이 주소에는 매칭 서버가 없습니다. 방 코드로 연결하세요.'],
     'net.open': ['開房間', 'Open a room', '部屋を作る', '방 만들기'],
     'net.join': ['加入', 'Join', '入る', '참가'],
     'net.codePh': ['朋友給的 5 碼代碼', "Your friend's 5-character code", '友だちの5文字コード', '친구의 5자리 코드'],
@@ -6866,12 +6921,18 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
+    else if (st === 'matching') {
+      var left = Math.max(0, Math.ceil((Net.QUICK_WAIT - (Date.now() - Net.quickSince)) / 1000));
+      h += '<p><b>' + t('net.matching', left) + '</b></p><div class="bar"><i style="width:' + Math.round(100 * (1 - left / (Net.QUICK_WAIT / 1000))) + '%"></i></div><p class="note">' + t('net.matchingP') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
+    }
     else if (st === 'joining') h += '<p>' + t(Net.seated ? 'net.seated' : 'net.joining') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
         (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('net.keepOpen') + '</p>' : '') +
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+    } else if ((st === 'ready' || st === 'playing') && Net.matched) {
+      h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b></p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
@@ -6886,13 +6947,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     } else {
       if (st === 'error') h += '<p class="warn">' + t('net.e.' + Net.err) + '</p>';
       // arriving through a friend's invite link, joining is the main thing to do
-      h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode) + '</div><h3>' + t('net.or') + '</h3>' +
+      var hosted = ZZ.Cloud && ZZ.Cloud.hosted();
+      if (hosted) h += '<div class="row">' + btn('netQuick', 'net.quick', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
+      h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode && !hosted) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
         btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
     }
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; };
+  App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
+  App.acts.netQuickAgain = function () { App.toMenu(); App.openSheet('online'); Net.quick(myName()); };
+  // nobody real in time: a computer at about the player's own level, named as a computer
+  Net.onNoOne = function () {
+    var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
+    App.closeSheet(true);
+    App.toast(t('net.noOne'), 4200);
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true });
+  };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };
   App.acts.netQuit = function () { Net.leave(); App.openSheet('online'); };
@@ -6923,6 +6995,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
   App.endExtra = function () {
     var S = App.S();
+    if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return '';
     if (Net.wantAgain && !Net.foeAgain) return '<p class="note">' + t('net.waitAgain') + '</p>';
     if (Net.foeAgain && !Net.wantAgain) return '<p class="note">' + t('net.foeWants') + '</p>';

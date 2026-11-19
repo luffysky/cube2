@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 8, 'eight tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 9, 'nine tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -386,6 +386,43 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq([(await x(guestKey, 1, 2, [])).status, (await x(hostKey, 0, 1, [])).status, (await room({ a: 'join', code: rc, key: otherKey })).status], [404, 404, 404], 'a closed room is gone for everyone');
   eq((await pg.query('SELECT count(*)::int AS n FROM zz.post WHERE room = $1', [rc]))[0].n, 0, 'with everything that was waiting in it');
 
+// ---------- random matchmaking ----------
+{
+  const Q = n => ('quick-match-seat-' + n + '-yyyyyyyyyyyyyyyyyyyy').slice(0, 32);
+  const quick = (n, ip) => room({ a: 'quick', key: Q(n) }, { ip: ip || '198.51.100.' + (50 + n) });
+  const a = await quick(1);
+  ok(a.status === 200 && a.json.seat === 0 && a.json.quick, 'the first to ask for anyone waits in a room of their own', a.json);
+  const b = await quick(2);
+  ok(b.json.seat === 1 && b.json.code === a.json.code, 'the next one sits down in that room', [a.json, b.json]);
+  const ex = await room({ a: 'x', code: a.json.code, key: Q(1), seat: 0, out: [] });
+  ok(ex.json.paired === true, 'and the host sees a guest');
+  const c = await quick(3);
+  ok(c.json.seat === 0 && c.json.code !== a.json.code, 'a full room is not offered again', c.json);
+  eq((await room({ a: 'still', code: c.json.code, key: Q(3) })).json.queued, true, 'a waiting host can say it is still here');
+  eq((await room({ a: 'still', code: c.json.code, key: Q(4) })).json.queued, false, 'but only with its own key');
+  // a host who stopped saying so is skipped
+  now += 40000;
+  const d = await quick(5);
+  ok(d.json.seat === 0 && d.json.code !== c.json.code, 'a host gone quiet is not matched', d.json);
+  // several asking at once: each waiting host gets exactly one guest
+  const hosts = await Promise.all([6, 7, 8].map(n => quick(n)));
+  const guests = await Promise.all([9, 10, 11, 12, 13].map(n => quick(n)));
+  const codes = guests.filter(g => g.json.seat === 1).map(g => g.json.code);
+  ok(new Set(codes).size === codes.length, 'no room gets two guests', guests.map(g => g.json));
+  const waiting = hosts.filter(h => h.json.seat === 0).map(h => h.json.code);
+  ok(waiting.length >= 1 && waiting.every(c => codes.indexOf(c) >= 0), 'every host left waiting was matched', [waiting, codes]);
+  // leaving takes the room off the queue
+  const e = await quick(14, '198.51.100.99');
+  await room({ a: 'x', code: e.json.code, key: Q(14), seat: 0, out: [], end: true });
+  const f = await quick(15, '198.51.100.98');
+  ok(f.json.code !== e.json.code, 'a host who left is not matched');
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.queue WHERE code = $1', [e.json.code]))[0].n, 0, 'and the queue forgets it');
+  // one address cannot hammer it
+  let slow = 0;
+  for (let i = 0; i < 35; i++) if ((await room({ a: 'quick', key: Q(20) }, { ip: '198.51.100.200' })).status === 429) slow++;
+  ok(slow >= 4, 'asking too often from one address is slowed down', slow);
+  eq((await room({ a: 'quick', key: 'short' })).status, 400, 'a bad key is refused');
+}
 // ---------- rooms with more than two seats ----------
 {
   const K = n => ('seat-key-number-' + n + '-xxxxxxxxxxxxxxxxxxxx').slice(0, 32);

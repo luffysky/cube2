@@ -104,7 +104,14 @@ const SCHEMA = [
      n integer NOT NULL,
      body jsonb NOT NULL,
      PRIMARY KEY (room, dst, src, n)
-   )`
+   )`,
+  // random matchmaking: rooms whose host is waiting for anyone at all. seen is refreshed while the host waits.
+  `CREATE TABLE IF NOT EXISTS zz.queue (
+     code text PRIMARY KEY REFERENCES zz.rooms(code) ON DELETE CASCADE,
+     made double precision NOT NULL,
+     seen double precision NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS queue_made ON zz.queue (made)'
 ];
 let migrating = null;
 function migrate() {

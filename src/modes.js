@@ -56,6 +56,14 @@
     'les.next': ['下一課', 'Next lesson', '次のレッスン', '다음 과'],
     'les.prog': ['進度', 'Progress', '進み具合', '진행'],
     // online
+    'net.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '빠른 매칭'],
+    'net.quickP': ['先找線上的真人；{0} 秒內沒有人，就改跟電腦打（會標示是電腦）。', 'Looks for a real player first. If nobody turns up within {0} seconds, you play the computer instead (and it says so).', 'まずオンラインの人を探します。{0} 秒以内に見つからなければ、コンピューターと対戦します（そう表示されます）。', '먼저 온라인의 실제 사람을 찾습니다. {0}초 안에 없으면 컴퓨터와 대전합니다(컴퓨터라고 표시됩니다).'],
+    'net.matching': ['正在找對手⋯ {0} 秒', 'Looking for a player… {0} s', '対戦相手を探しています… {0} 秒', '상대를 찾는 중… {0}초'],
+    'net.matchingP': ['找到真人就會自動開始。', 'The match starts by itself once someone is found.', '見つかったら自動で始まります。', '상대를 찾으면 자동으로 시작합니다.'],
+    'net.found': ['找到對手了：{0}，馬上開始。', 'Found a player: {0}. Starting now.', '相手が見つかりました：{0}。すぐに始まります。', '상대를 찾았습니다: {0}. 곧 시작합니다.'],
+    'net.noOne': ['現在沒有其他真人在線，先跟電腦打一場。', 'No other players are online right now, so this one is against the computer.', '今はほかにオンラインの人がいないので、コンピューターと対戦します。', '지금은 온라인인 다른 사람이 없어 컴퓨터와 대전합니다.'],
+    'net.cpuTag': ['電腦｜{0}', 'Computer · {0}', 'コンピューター｜{0}', '컴퓨터 · {0}'],
+    'net.e.noquick': ['這個網址沒有配對伺服器，只能用房間代碼連線。', 'Quick match needs the game\'s server, which this address does not have. Use a room code instead.', 'このアドレスにはマッチングサーバーがありません。部屋コードで接続してください。', '이 주소에는 매칭 서버가 없습니다. 방 코드로 연결하세요.'],
     'net.open': ['開房間', 'Open a room', '部屋を作る', '방 만들기'],
     'net.join': ['加入', 'Join', '入る', '참가'],
     'net.codePh': ['朋友給的 5 碼代碼', "Your friend's 5-character code", '友だちの5文字コード', '친구의 5자리 코드'],
@@ -288,12 +296,18 @@
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
+    else if (st === 'matching') {
+      var left = Math.max(0, Math.ceil((Net.QUICK_WAIT - (Date.now() - Net.quickSince)) / 1000));
+      h += '<p><b>' + t('net.matching', left) + '</b></p><div class="bar"><i style="width:' + Math.round(100 * (1 - left / (Net.QUICK_WAIT / 1000))) + '%"></i></div><p class="note">' + t('net.matchingP') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
+    }
     else if (st === 'joining') h += '<p>' + t(Net.seated ? 'net.seated' : 'net.joining') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
         (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('net.keepOpen') + '</p>' : '') +
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+    } else if ((st === 'ready' || st === 'playing') && Net.matched) {
+      h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b></p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
@@ -308,13 +322,24 @@
     } else {
       if (st === 'error') h += '<p class="warn">' + t('net.e.' + Net.err) + '</p>';
       // arriving through a friend's invite link, joining is the main thing to do
-      h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode) + '</div><h3>' + t('net.or') + '</h3>' +
+      var hosted = ZZ.Cloud && ZZ.Cloud.hosted();
+      if (hosted) h += '<div class="row">' + btn('netQuick', 'net.quick', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
+      h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode && !hosted) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
         btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
     }
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; };
+  App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
+  App.acts.netQuickAgain = function () { App.toMenu(); App.openSheet('online'); Net.quick(myName()); };
+  // nobody real in time: a computer at about the player's own level, named as a computer
+  Net.onNoOne = function () {
+    var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
+    App.closeSheet(true);
+    App.toast(t('net.noOne'), 4200);
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true });
+  };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };
   App.acts.netQuit = function () { Net.leave(); App.openSheet('online'); };
@@ -345,6 +370,7 @@
   };
   App.endExtra = function () {
     var S = App.S();
+    if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return '';
     if (Net.wantAgain && !Net.foeAgain) return '<p class="note">' + t('net.waitAgain') + '</p>';
     if (Net.foeAgain && !Net.wantAgain) return '<p class="note">' + t('net.foeWants') + '</p>';

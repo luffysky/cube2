@@ -313,6 +313,7 @@
         S.opp = new ZZ.Game({ seed: seed, manual: true, items: !!o.items });
         S.bot = new Bot.BotPlayer(S.opp, { pps: cfg.pps, depth: cfg.depth, hold: cfg.hold, noise: cfg.noise, w: cfg.w });
         S.oppName = mode === 'rank' ? o.foe : t('lv' + o.level);
+        if (o.quickCpu) S.oppName = t('net.cpuTag', S.oppName);      // from random matchmaking: say plainly that it is the computer
       }
       if (mode !== 'net') {
         S.me.onAttack = function (n) { S.opp.receive(n); };

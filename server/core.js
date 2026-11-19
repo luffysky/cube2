@@ -230,6 +230,50 @@ async function roomJoin(db, body, ip, now) {
   if (!there[0]) return fail(404, 'room');
   return there[0].seat === null || there[0].seat === undefined ? fail(409, 'full') : good({ code, seat: there[0].seat, cap: there[0].cap, now });
 }
+// ---------- random matchmaking ----------
+// Someone asks for "anyone". If a host is already waiting in the queue, the oldest one is taken off it (by exactly one
+// asker, even when several ask at once) and the asker sits down in that room. Otherwise the asker opens a room and
+// waits in the queue themselves. A waiting host says "still here" every few seconds; a host that stops saying it
+// (a closed tab, a phone that went to sleep) is skipped, so nobody is matched with an empty chair.
+const QUICK = { STALE: 25000, TRIES: 30, WINDOW: 10 * 60000 };
+const CLAIM = `
+  DELETE FROM zz.queue WHERE code = (
+    SELECT q.code FROM zz.queue q JOIN zz.rooms r ON r.code = q.code
+    WHERE q.seen > $1 AND r.exp > $2 AND cardinality(r.ks) = 1 AND r.cap = 2 AND NOT ($3 = ANY(r.ks))
+    ORDER BY q.made LIMIT 1 FOR UPDATE OF q SKIP LOCKED
+  ) RETURNING code`;
+async function roomQuick(db, body, ip, now) {
+  if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
+  if (await bump(db, 'quick', ip, QUICK.WINDOW, now) > QUICK.TRIES) return fail(429, 'slow');
+  const hash = sha(body.key);
+  for (let tries = 0; tries < 3; tries++) {
+    const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash]);
+    if (!got[0]) break;
+    const sat = await db.query('UPDATE zz.rooms SET ks = ks || $2::text WHERE code = $1 AND exp > $3 AND cardinality(ks) < cap RETURNING cap', [got[0].code, hash, now]);
+    if (sat[0]) return good({ code: got[0].code, seat: 1, cap: 2, quick: true, now });
+  }
+  for (let tries = 0; ; tries++) {
+    const code = pick(CODE_ABC, 5);
+    try {
+      await db.batch([
+        ['DELETE FROM zz.rooms WHERE exp < $1', [now]],
+        ['INSERT INTO zz.rooms (code, hk, exp, ks, cap) VALUES ($1, $2, $3, ARRAY[$2], 2)', [code, hash, now + ROOM.TTL]],
+        ['INSERT INTO zz.queue (code, made, seen) VALUES ($1, $2, $2)', [code, now]]
+      ]);
+      return good({ code, seat: 0, cap: 2, quick: true, now });
+    } catch (e) {
+      if (e && e.code === '23505' && tries < 6) continue;
+      throw e;
+    }
+  }
+}
+// The waiting host is still here. Answers whether the room is still waiting in the queue.
+async function roomStill(db, body, now) {
+  const code = readRoom(body.code);
+  if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
+  const got = await db.query('UPDATE zz.queue q SET seen = $3 FROM zz.rooms r WHERE q.code = $1 AND r.code = q.code AND r.ks[1] = $2 RETURNING 1 AS x', [code, sha(body.key), now]);
+  return good({ queued: !!got[0], now });
+}
 // The host shuts the door: nobody else can take a seat (the match is starting with whoever is here).
 async function roomLock(db, body, now) {
   const code = readRoom(body.code);
@@ -303,4 +347,4 @@ async function roomClose(db, body) {
   return good({});
 }
 
-module.exports = { readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomLock, roomExchange, roomClose };
+module.exports = { readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
