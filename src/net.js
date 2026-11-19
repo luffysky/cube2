@@ -36,10 +36,19 @@
     try { if (peer) peer.destroy(); } catch (e2) { /* already gone */ }
     link = null; peer = null;
   }
-  function send(m) {
+  // to: one seat (only the game's own relay can address one; the other ways have just two people anyway)
+  function send(m, to) {
     if (!link) return;
-    try { link.send(m); } catch (e) { /* the close handler deals with a dead link */ }
+    try { if (typeof to === 'number' && relayed) link.send(m, to); else link.send(m); } catch (e) { /* the close handler deals with a dead link */ }
   }
+  // ---------- who is in the room ----------
+  // peers: everybody else, by seat. A room for more than two only exists through the game's own relay; over a
+  // direct link there is exactly one other person, whose seat is simply "the other one".
+  Net.seat = 0; Net.peers = {}; Net.SEATS = 4;
+  function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
+  Net.count = function () { return 1 + peerList().length; };
+  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { return { seat: s, name: s === Net.seat ? Net.me : Net.peers[s].name, me: s === Net.seat }; }); };
+  function firstName() { var l = peerList(); return l.length ? Net.peers[l[0]].name : ''; }
 
   // ---------- transports ----------
   function loadLib(cb) {
@@ -282,7 +291,7 @@
     c.on('open', function () {
       clearTimeout(joinT);
       send({ t: 'hello', v: 1, name: Net.me });
-      if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items });
+      if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team });
       else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
     c.on('data', onMsg);
@@ -299,6 +308,7 @@
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     Net.matched = false; clearInterval(quickT); quickT = 0;
+    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false;
     epoch++;
   }
 
@@ -311,7 +321,7 @@
       if (kind === 'relay') {
         var key = seatKey();
         relayed = true;
-        return rpc({ a: 'open', key: key }).then(function (r) {
+        return rpc({ a: 'open', key: key, cap: Net.SEATS }).then(function (r) {
           if (run !== epoch || Net.state !== 'opening') return;
           if (r.status !== 200 || !r.body || !r.body.ok || !r.body.code) return fail(r.status === 429 ? 'slow' : 'server');
           Net.code = String(r.body.code);
@@ -363,7 +373,8 @@
         return rpc({ a: 'join', code: code, key: key }).then(function (r) {
           if (run !== epoch || Net.state !== 'joining') return;
           if (r.status !== 200 || !r.body || !r.body.ok) return fail(r.status === 404 ? 'room' : r.status === 409 ? 'full' : r.status === 429 ? 'slow' : 'server');
-          wire(new Relay(code, key, 1));
+          Net.seat = r.body.seat >= 1 && r.body.seat < Net.SEATS ? r.body.seat : 1;
+          wire(new Relay(code, key, Net.seat));
         }, function () { if (run === epoch && Net.state === 'joining') fail('server'); });
       }
       loadLib(function (ok) {
@@ -402,8 +413,8 @@
         var b = r.body;
         if (r.status !== 200 || !b || !b.ok || !b.code) return fail(r.status === 429 ? 'slow' : 'server');
         Net.code = String(b.code);
-        Net.host = b.seat === 0;
-        wire(new Relay(Net.code, key, b.seat === 0 ? 0 : 1));
+        Net.host = b.seat === 0; Net.seat = Net.host ? 0 : 1;
+        wire(new Relay(Net.code, key, Net.seat));
         quickT = setInterval(function () {
           if (run !== epoch || Net.state !== 'matching') { clearInterval(quickT); quickT = 0; return; }
           var waited = Date.now() - Net.quickSince;
@@ -428,29 +439,48 @@
   };
   Net.setCfg = function (c) {
     if (!Net.host) return;
-    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items };
-    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items });
+    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team };
+    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team });
     changed();
   };
 
   // ---------- match ----------
-  function startMatch(seed, minutes, items) {
+  // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
+  function startMatch(seed, minutes, items, multi) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
-    App.begin('battle', { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') });
+    peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
+    var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
+    if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
+    Net.multi = !!multi;
+    App.begin('battle', o);
   }
   Net.start = function () {
     if (!Net.host || !link || (Net.state !== 'ready' && Net.state !== 'playing')) return;
-    var seed = (Math.random() * 4294967296) >>> 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: Net.cfg.items });
-    startMatch(seed, Net.cfg.minutes, Net.cfg.items);
+    var seed = (Math.random() * 4294967296) >>> 0, roster = Net.roster(), multi = null;
+    // whoever is here plays; nobody else can come in now
+    if (relayed && link.code) rpc({ a: 'lock', code: link.code, key: link.key }).then(null, function () { /* the room still works, it just stays open */ });
+    if (roster.length >= 3) {
+      var names = {}, teams = null;
+      roster.forEach(function (r) { names[r.seat] = r.name; });
+      if (Net.cfg.team && roster.length === 4) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
+      multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
+    }
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi);
   };
+  function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
     Net.wantAgain = true;
     send({ t: 'again' });
-    if (Net.host && Net.foeAgain) Net.start(); else changed();
+    if (Net.host && everyoneAgain()) Net.start(); else changed();
   };
-  Net.attack = function (n) { send({ t: 'a', n: n }); };
+  // in a match of three or four, cement goes to the player picked as the target
+  Net.attack = function (n) {
+    var S = App.S();
+    if (S && S.multi) { var to = S.multi.target; if (to != null && Net.peers[to] && !Net.peers[to].gone) send({ t: 'a', n: n }, to); return; }
+    send({ t: 'a', n: n });
+  };
   Net.item = function (id) { send({ t: 'i', id: id }); };
 
   function pack(g) {
@@ -461,14 +491,16 @@
       s += (v & 15).toString(16);
       if (v >> 4) items.push([x, r, v >> 4]);
     }
+    var S = App.S();
     return { t: 's', f: first, g: s, it: items, c: c ? [TYPES.indexOf(c.type), c.x, c.y, c.rot] : 0, p: g.pendingTotal(),
-      st: [st.sent, st.score, st.lines, st.pieces, st.attack], sh: g.shield > 0 ? 1 : 0, ov: g.over ? 1 : 0 };
+      st: [st.sent, st.score, st.lines, st.pieces, st.attack], sh: g.shield > 0 ? 1 : 0, ov: g.over ? 1 : 0, d: S && S.ko ? S.ko.opp : 0 };
   }
   // Paints the other player's wall onto our stand-in game.
-  function mirror(m) {
+  function mirror(m, g) {
     var S = App.S();
     if (!S || !S.remote) return;
-    var g = S.opp, first = int(m.f, 0, ROWS), s = String(m.g || ''), r, x, i;
+    g = g || S.opp;
+    var first = int(m.f, 0, ROWS), s = String(m.g || ''), r, x, i;
     if (s.length !== (ROWS - first) * COLS) return;
     for (r = 0; r < ROWS; r++) {
       var row = g.grid[r];
@@ -530,37 +562,83 @@
     }
     if (o) S.opp.events.push(o);
   }
-  function onMsg(m) {
+  function onMsg(m, from) {
     if (!m || typeof m !== 'object') return;
     var S = App.S(), live = !!S && S.remote && S.state === 'play';
+    if (typeof from !== 'number' || from < 0 || from >= Net.SEATS || from === Net.seat) from = Net.seat === 0 ? 1 : 0;     // a direct link: the one other person
+    var who = Net.peers[from];
+    if (who) who.heard = Date.now();
+    // in a match of three or four, each wall arrives with its seat; only the one on show gets the effects
+    if (S && S.multi && S.remote) {
+      if (m.t === 's') { var f = S.multi.foes[from]; if (f) { mirror(m, f.g); f.downs = int(m.d, 0, 99); f.sent = f.g.stats.sent; } return; }
+      if (m.t === 'e') { if (from === S.multi.target) foeEvent(m.e); return; }
+      if (m.t === 'i') return;
+    }
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items }); }
-        Net.foe = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
+        var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
+        Net.peers[from].name = nm; Net.peers[from].gone = false;
+        Net.foe = firstName();
         Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
         // a matched room: the host starts once both have said hello (a moment later, so both see who they got)
         if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
-      case 'cfg': if (!Net.host) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items }; changed(); } break;
-      case 'start': if (!Net.host && link) startMatch(+m.seed || 1, m.minutes, m.items); break;
+      case 'cfg': if (!Net.host && from === 0) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items, team: !!m.team }; changed(); } break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi)); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
       case 'i': if (live) App.foeItem(int(m.id, 1, 7)); break;
       case 'end':
-        foeEnd = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
+        var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
+        if (who) who.end = tally;
+        if (S && S.multi) { if (endWait && allEnded()) { var g0 = endWait; endWait = null; settle(g0); } break; }
+        foeEnd = tally;
         if (live) App.endBattle('');
         else if (endWait) { var f = endWait; endWait = null; settle(f); }
         break;
-      case 'again': Net.foeAgain = true; if (Net.host && Net.wantAgain) Net.start(); else changed(); break;
-      case 'bye': dropped(); break;
+      case 'again':
+        if (who) who.again = true;
+        Net.foeAgain = true;
+        if (Net.host && Net.wantAgain && everyoneAgain()) Net.start(); else changed();
+        break;
+      case 'bye':
+        // with others still in the room, only the one who left goes; the room itself ends with its host
+        if (from !== 0 && Net.count() > 2) { gone(from); break; }
+        dropped();
+        break;
     }
+  }
+  function readMulti(v) {
+    if (!v || typeof v !== 'object' || !Array.isArray(v.roster)) return null;
+    var roster = [], names = {}, teams = null, i, s;
+    for (i = 0; i < v.roster.length && i < Net.SEATS; i++) { s = v.roster[i]; if (s === Math.floor(s) && s >= 0 && s < Net.SEATS && roster.indexOf(s) < 0) roster.push(s); }
+    if (roster.length < 3 || roster.indexOf(Net.seat) < 0) return null;
+    roster.forEach(function (r) { names[r] = String((v.names && v.names[r]) || '').replace(/[<>&"]/g, '').slice(0, 12); });
+    if (v.teams && typeof v.teams === 'object' && roster.length === 4) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
+    return { roster: roster, names: names, teams: teams };
+  }
+  function allEnded() { var S = App.S(); return !S || !S.multi || peerList().every(function (s) { return Net.peers[s].end || Net.peers[s].gone || !S.multi.foes[s]; }); }
+  // one player of three or four has left (said goodbye, or went silent mid-match)
+  function gone(seat) {
+    var p = Net.peers[seat], S = App.S();
+    if (!p) return;
+    if (S && S.multi && S.multi.foes[seat] && Net.state === 'playing') { p.gone = true; if (App.foeGone) App.foeGone(seat); }
+    else delete Net.peers[seat];
+    Net.foe = firstName();
+    if (endWait && allEnded()) { var f = endWait; endWait = null; settle(f); }
+    if (Net.host && Net.state === 'ready' && Net.wantAgain && everyoneAgain()) return Net.start();
+    if (!peerList().some(function (s) { return !Net.peers[s].gone; }) && Net.state !== 'playing') { Net.peers = {}; Net.foe = ''; if (Net.host) setState('waiting'); else changed(); }
+    else changed();
   }
   function settle(cb) {
     var S = App.S();
+    if (S && S.multi) return cb();
     if (S && S.remote && foeEnd) { S.ko.me = foeEnd.downs; S.opp.stats.sent = foeEnd.sent; S.opp.stats.score = foeEnd.score; }
     cb();
   }
@@ -570,7 +648,7 @@
     Net.state = 'ready';
     send(pack(S.me));
     send({ t: 'end', downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score });
-    if (foeEnd) return settle(cb);
+    if (S.multi ? allEnded() : foeEnd) return settle(cb);
     endWait = cb;
     // through the relay the other side's tally takes a little longer to arrive
     setTimeout(function () { if (endWait === cb) { endWait = null; settle(cb); } }, relayed ? 4000 : 1500);
@@ -614,6 +692,8 @@
   Net.tick = function (dt) {
     var S = App.S();
     acc += dt;
+    // a player of three or four who has gone silent mid-match counts as gone
+    if (S && S.multi) peerList().forEach(function (s) { var p = Net.peers[s]; if (!p.gone && Date.now() - (p.heard || 0) > QUIET.play) gone(s); });
     if (!link || !S || !(dirty || acc > 500) || !(urgent || acc >= 66)) return;
     acc = 0; dirty = urgent = false;
     send(pack(S.me));

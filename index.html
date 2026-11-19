@@ -177,6 +177,24 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 #strip { margin: 0 12px 4px; padding: 7px 12px; background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; font-size: 13px; line-height: 1.45; min-height: 52px; }
 #strip b { font-weight: 900; }
 #strip .now { color: var(--gold-ink); font-weight: 700; }
+/* a match of three or four: one name tag per other player, the target picked out; tap one to aim at it */
+#strip:has(.foes) { padding: 5px; min-height: 0; }
+.foes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
+.foe { position: relative; overflow: hidden; display: grid; gap: 1px; text-align: left; min-height: 44px; padding: 5px 8px 7px; border: 1px solid var(--edge); border-radius: 8px; background: var(--floor); color: var(--ink); font: inherit; font-size: 12px; line-height: 1.25; cursor: pointer; }
+.foe b { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foe span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.foe i { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--h); background: var(--alarm); transition: width .2s; }
+.foe.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.foe.on b::before { content: "▶ "; color: var(--gold-ink); }
+.foe.mate, .foe.gone { cursor: default; opacity: .62; }
+.foe.mate { border-style: dashed; }
+.foe.t0 { border-left: 4px solid #D9432F; } .foe.t1 { border-left: 4px solid #2F7FD9; }
+.foe:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.cmp tr.mine td { font-weight: 800; color: var(--gold-ink); }
+.roster { list-style: none; margin: 6px 0 10px; padding: 0; display: grid; gap: 5px; }
+.roster li { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid var(--edge); border-radius: 8px; background: var(--floor); }
+.roster li.t0 { border-left: 4px solid #D9432F; } .roster li.t1 { border-left: 4px solid #2F7FD9; }
+.roster small { color: var(--muted); }
 #strip .keys-note { color: var(--muted); font-size: 12px; }
 
 #stage { flex: 0 0 auto; display: grid; grid-template-columns: var(--side, 66px) auto var(--side, 66px); justify-content: center; align-items: start; gap: 8px; padding: 4px 8px 6px; }
@@ -1573,6 +1591,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     // play screen
     'you': ['你', 'You', 'あなた', '나'],
     'foe': ['對手', 'Rival', '相手', '상대'],
+    'mp.down': ['倒地', 'Downs', 'ダウン', '다운'],
+    'mp.downs': ['倒地 {0}', '{0} down', 'ダウン {0}', '다운 {0}'],
+    'mp.target': ['目標：{0}', 'Target: {0}', 'ターゲット：{0}', '타깃: {0}'],
+    'mp.mate': ['隊友', 'Teammate', '味方', '팀원'],
+    'mp.enemy': ['對手', 'Rival', '相手', '상대'],
+    'mp.gone': ['離開了', 'Left', '退出', '나감'],
+    'mp.left': ['{0} 離開了。', '{0} left.', '{0} が退出しました。', '{0} 님이 나갔습니다.'],
+    'mp.player': ['玩家', 'Player', 'プレイヤー', '플레이어'],
+    'mp.place': ['第 {0}', '#{0}', '{0} 位', '{0}위'],
+    'mp.usDown': ['我們倒地', 'Our downs', '味方のダウン', '우리 팀 다운'],
+    'mp.themDown': ['對方倒地', 'Their downs', '相手のダウン', '상대 팀 다운'],
+    'mp.rule': ['倒地最少的人贏；一樣多就比送出的行數。', 'Fewest downs wins; a tie goes to whoever sent more lines.', 'ダウンが一番少ない人の勝ち。同じなら送ったライン数で決まります。', '다운이 가장 적은 사람이 이깁니다. 같으면 보낸 줄 수로 정합니다.'],
+    'mp.ruleTeam': ['兩人加起來倒地比較少的隊伍贏；一樣多就比送出的行數。', 'The team with fewer downs between them wins; a tie goes to the team that sent more lines.', 'ふたりのダウン合計が少ないチームの勝ち。同じなら送ったライン数で決まります。', '두 사람의 다운 합계가 적은 팀이 이깁니다. 같으면 보낸 줄 수로 정합니다.'],
     'ko': ['擊倒', 'KOs', 'KO', 'KO'],
     'sent': ['送出', 'Sent', '送り', '보냄'],
     'pts': ['{0} 分', '{0} pts', '{0} 点', '{0}점'],
@@ -4698,7 +4729,20 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [] });
       S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
-      if (mode === 'net') {
+      if (mode === 'net' && o.multi) {
+        // three or four players: a mirror wall for each of the others; the one picked as the target is on show
+        var M = o.multi, foes = {}, order = [], myTeam = M.teams ? M.teams[M.me] : -1;
+        M.roster.forEach(function (st) {
+          if (st === M.me) return;
+          foes[st] = { seat: st, name: M.names[st] || t('foe'), team: M.teams ? M.teams[st] : -1, g: new ZZ.Game({ seed: seed, manual: true, garbage: false }), downs: 0, sent: 0, gone: false };
+          order.push(st);
+        });
+        S.multi = { me: M.me, teams: M.teams, myTeam: myTeam, foes: foes, order: order, target: null };
+        S.remote = true; S.bot = null;
+        var first = order.filter(enemy)[0];
+        S.multi.target = first; S.opp = foes[first].g; S.oppName = foes[first].name;
+        S.me.onAttack = function (n) { ZZ.Net.attack(n); };
+      } else if (mode === 'net') {
         S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false });   // a mirror of the other player's wall
         S.remote = true; S.bot = null;
         S.oppName = o.oppName || t('foe');
@@ -4748,6 +4792,73 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     }
   }
 
+  // ---------- three or four players ----------
+  function enemy(seat) { var M = S && S.multi; return !!M && !!M.foes[seat] && (!M.teams || M.teams[seat] !== M.myTeam); }
+  function setTarget(seat) {
+    var M = S && S.multi, f = M && M.foes[seat];
+    if (!f || f.gone || !enemy(seat) || M.target === seat) return;
+    M.target = seat; S.opp = f.g; S.oppName = f.name;
+    V.opp.fx = []; V.opp.parts = []; V.opp.koT = 0;
+    setupHud(); foeKey = '';
+    sfx.play('move');
+  }
+  function foeGone(seat) {
+    var M = S && S.multi, f = M && M.foes[seat];
+    if (!f || f.gone) return;
+    f.gone = true; foeKey = '';
+    toast(t('mp.left', f.name), 3000);
+    if (S.state === 'over') return;
+    var live = M.order.filter(function (s) { return enemy(s) && !M.foes[s].gone; });
+    if (!live.length) return endBattle('left');
+    if (M.target === seat) { M.target = null; setTarget(live[0]); }
+  }
+  var foeKey = '';
+  function drawFoes() {
+    var M = S.multi;
+    if (!M) return;
+    var key = M.target + '|' + L.lang + '|' + M.order.map(function (s) { var f = M.foes[s]; return s + ':' + f.downs + ':' + f.sent + ':' + (f.gone ? 1 : 0) + ':' + stackOf(f.g); }).join(',');
+    if (key === foeKey) return;
+    foeKey = key;
+    var h = '';
+    M.order.forEach(function (s) {
+      var f = M.foes[s], foe = enemy(s), on = M.target === s, hi = stackOf(f.g);
+      h += '<button type="button" class="foe' + (on ? ' on' : '') + (f.gone ? ' gone' : '') + (foe ? '' : ' mate') + (M.teams ? ' t' + f.team : '') + '" data-foe="' + s + '"' +
+        (foe && !f.gone ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(f.name) + '</b><span>' + (f.gone ? t('mp.gone') : foe ? t('mp.downs', f.downs) : t('mp.mate')) +
+        '</span><i style="--h:' + Math.round(hi / VIS * 100) + '%"></i></button>';
+    });
+    el.strip.innerHTML = '<div class="foes">' + h + '</div>';
+  }
+  function stackOf(g) {
+    for (var r = 0; r < g.grid.length; r++) for (var x = 0; x < g.grid[r].length; x++) if (g.grid[r][x]) return g.grid.length - r;
+    return 0;
+  }
+  // where everybody finished, best first: fewest knockouts, then most lines sent; players who left come last
+  function standings(why) {
+    var M = S.multi, Net = ZZ.Net, list = [{ seat: M.me, name: t('you'), me: true, team: M.myTeam, downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score, gone: false }];
+    M.order.forEach(function (s) {
+      var f = M.foes[s], p = Net.peers[s], e = p && p.end;
+      list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone });
+    });
+    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent); };
+    list.sort(better);
+    list.forEach(function (p, i) { p.place = i && !better(list[i - 1], p) ? list[i - 1].place : i + 1; });
+    var out = { list: list, teams: null, r: 0 };
+    if (M.teams) {
+      var tm = [0, 1].map(function (k) {
+        var mine = list.filter(function (p) { return p.team === k; });
+        return { downs: mine.reduce(function (a, p) { return a + p.downs; }, 0), sent: mine.reduce(function (a, p) { return a + p.sent; }, 0), out: mine.every(function (p) { return p.gone; }) };
+      });
+      out.teams = tm;
+      var us = tm[M.myTeam], them = tm[1 - M.myTeam];
+      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : 0;
+    } else {
+      var me = list.filter(function (p) { return p.me; })[0], tops = list.filter(function (p) { return p.place === 1; }).length;
+      out.r = why === 'left' ? 1 : me.place === 1 ? (tops > 1 ? 0 : 1) : -1;
+    }
+    out.foeDowns = list.filter(function (p) { return !p.me && (!M.teams || p.team !== M.myTeam); }).reduce(function (a, p) { return a + p.downs; }, 0);
+    return out;
+  }
+
   function restart() {
     if (!S || S.kind === 'battle') return;
     var K = kindOf();
@@ -4759,7 +4870,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function setupHud() {
     var k = S.kind, K = kindOf();
     el.strip.hidden = !(k === 'dojo' || (K && K.strip));
-    if (k === 'battle') {
+    if (k === 'battle' && S.multi) {
+      el.strip.hidden = false;
+      foeKey = '';
+      var nameM = '<span class="who">' + esc(S.oppName) + '</span>', youM = '<span class="who">' + t('you') + '</span>';
+      el.hudL.innerHTML = youM + stat('koOpp', t('mp.down')) + stat('sentMe', t('sent'));
+      el.hudR.innerHTML = stat('sentOpp', t('sent')) + stat('downT', t('mp.down')) + nameM;
+      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
+      el.oppName.textContent = t('mp.target', S.oppName);
+      el.oppNameW.textContent = t('mp.target', S.oppName);
+    } else if (k === 'battle') {
       var name = '<span class="who">' + esc(S.oppName) + '</span>', you = '<span class="who">' + t('you') + '</span>';
       if (S.flip) {
         el.hudL.innerHTML = name + stat('koOpp', t('ko')) + stat('sentOpp', t('sent'));
@@ -5140,7 +5260,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   }
   function onTopOut(g, v, mine, now) {
     var K = kindOf();
-    if (S.kind === 'battle') {
+    if (S.kind === 'battle' && S.multi && !mine) {
+      v.knock(now); sfx.play('ko');      // the target went down: counted from its own report, not here
+    } else if (S.kind === 'battle') {
       var k = mine ? 'me' : 'opp', other = mine ? 'opp' : 'me';
       S.ko[other]++;
       S[other].stats.score += 1500;
@@ -5189,6 +5311,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (S !== st) return;
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
+      if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played }, S.tape && !S.used ? S.tape.done() : null);
       S.saved = false;
@@ -5281,6 +5404,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     } else if (name === 'pause') {
       h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
         btn('again', S && S.kind === 'battle' ? 'rematch' : 'restart') + btn('settings', 'm.settings') + btn('help', 'm.help') + btn('menu', 'toMenu') + '</div>';
+    } else if (name === 'battleEnd' && S.multi && S.stand) {
+      var sd = S.stand, M = S.multi;
+      h = '<h2>' + t(S.result > 0 ? 'r.win' : S.result < 0 ? 'r.lose' : 'r.draw') + '</h2>';
+      if (sd.teams) h += '<div class="score"><div><b>' + sd.teams[M.myTeam].downs + '</b><span>' + t('mp.usDown') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + sd.teams[1 - M.myTeam].downs + '</b><span>' + t('mp.themDown') + '</span></div></div>';
+      h += '<p class="note">' + t(sd.teams ? 'mp.ruleTeam' : 'mp.rule') + '</p>' + rewardHtml(S.reward) +
+        '<table class="cmp"><thead><tr><th></th><th>' + t('mp.player') + '</th><th>' + t('mp.down') + '</th><th>' + t('sent') + '</th><th>' + t('score') + '</th></tr></thead><tbody>';
+      sd.list.forEach(function (p) {
+        h += '<tr' + (p.me ? ' class="mine"' : '') + '><td>' + (p.gone ? '—' : t('mp.place', p.place)) + '</td><td>' + esc(p.name) + (sd.teams && !p.me ? ' <small>' + t(p.team === M.myTeam ? 'mp.mate' : 'mp.enemy') + '</small>' : '') +
+          '</td><td>' + p.downs + '</td><td>' + p.sent + '</td><td>' + L.num(p.score) + '</td></tr>';
+      });
+      h += '</tbody></table>' + (App.endExtra ? App.endExtra() : '') + '<div class="row">' + btn('again', 'again', true) + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'battleEnd') {
       var me = S.me.stats, op = S.opp.stats, tt = Math.max(1, S.total - S.left), foe = esc(S.oppName);
       var rows = [
@@ -5751,6 +5885,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var me = S.me, st = me.stats, K = kindOf();
     if (S.kind === 'battle') {
       txt('koMe', String(S.ko.me)); txt('koOpp', String(S.ko.opp));
+      if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
       txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent));
       txt('ptsMe', t('pts', L.num(st.score)));
       var c = $('clock');
@@ -5900,6 +6035,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     el.wellWrap.style.transform = Math.abs(s.x) + Math.abs(s.y) > 0.25 ? 'translate3d(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px,0)' : '';
     drawSide();
     drawChips();
+    if (S.multi) drawFoes();
     updateHud();
   }
 
@@ -5922,6 +6058,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextBox', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'sideL', 'sideR', 'itemKey', 'halfKey', 'holdKey',
       'toast', 'mtoast', 'rotate',
       'sheet', 'sheetCard', 'demoCv'].forEach(function (id) { el[id] = $(id); });
+    // a name tag above the wall in a match of three or four: that player becomes the target
+    el.strip.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-foe]'); if (b && S && S.multi) { setTarget(+b.getAttribute('data-foe')); b.blur(); } });
     loadStore();
     rebuildKeys();
     Meta.load();
@@ -5966,7 +6104,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   App.S = function () { return S; };
   App.screen = function () { return screen; };
   App.sheet = function () { return sheetName; };
-  App.begin = begin; App.openSheet = openSheet; App.closeSheet = closeSheet; App.sheetDo = sheetDo; App.toast = toast; App.banner = banner; App.popRaw = popRaw;
+  App.begin = begin; App.foeGone = function (s) { if (S && S.multi) foeGone(s); }; App.setTarget = function (s) { if (S && S.multi) setTarget(s); }; App.openSheet = openSheet; App.closeSheet = closeSheet; App.sheetDo = sheetDo; App.toast = toast; App.banner = banner; App.popRaw = popRaw;
   App.txt = txt; App.stat = stat; App.esc = esc; App.btn = btn; App.coin = coin; App.itile = itile; App.ul = ul; App.field = field; App.toggle = toggle;
   App.fmtClock = fmtClock; App.fmtTime = fmtTime; App.saveStore = saveStore; App.applySettings = applySettings; App.applyLook = applyLook; App.applyLang = applyLang;
   App.toMenu = toMenu; App.layout = layout; App.updateMenu = updateMenu; App.rankName = rankName; App.stepCells = stepCells; App.stepDemo = stepDemo;
@@ -6023,10 +6161,19 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     try { if (peer) peer.destroy(); } catch (e2) { /* already gone */ }
     link = null; peer = null;
   }
-  function send(m) {
+  // to: one seat (only the game's own relay can address one; the other ways have just two people anyway)
+  function send(m, to) {
     if (!link) return;
-    try { link.send(m); } catch (e) { /* the close handler deals with a dead link */ }
+    try { if (typeof to === 'number' && relayed) link.send(m, to); else link.send(m); } catch (e) { /* the close handler deals with a dead link */ }
   }
+  // ---------- who is in the room ----------
+  // peers: everybody else, by seat. A room for more than two only exists through the game's own relay; over a
+  // direct link there is exactly one other person, whose seat is simply "the other one".
+  Net.seat = 0; Net.peers = {}; Net.SEATS = 4;
+  function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
+  Net.count = function () { return 1 + peerList().length; };
+  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { return { seat: s, name: s === Net.seat ? Net.me : Net.peers[s].name, me: s === Net.seat }; }); };
+  function firstName() { var l = peerList(); return l.length ? Net.peers[l[0]].name : ''; }
 
   // ---------- transports ----------
   function loadLib(cb) {
@@ -6269,7 +6416,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     c.on('open', function () {
       clearTimeout(joinT);
       send({ t: 'hello', v: 1, name: Net.me });
-      if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items });
+      if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team });
       else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
     c.on('data', onMsg);
@@ -6286,6 +6433,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     Net.matched = false; clearInterval(quickT); quickT = 0;
+    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false;
     epoch++;
   }
 
@@ -6298,7 +6446,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       if (kind === 'relay') {
         var key = seatKey();
         relayed = true;
-        return rpc({ a: 'open', key: key }).then(function (r) {
+        return rpc({ a: 'open', key: key, cap: Net.SEATS }).then(function (r) {
           if (run !== epoch || Net.state !== 'opening') return;
           if (r.status !== 200 || !r.body || !r.body.ok || !r.body.code) return fail(r.status === 429 ? 'slow' : 'server');
           Net.code = String(r.body.code);
@@ -6350,7 +6498,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         return rpc({ a: 'join', code: code, key: key }).then(function (r) {
           if (run !== epoch || Net.state !== 'joining') return;
           if (r.status !== 200 || !r.body || !r.body.ok) return fail(r.status === 404 ? 'room' : r.status === 409 ? 'full' : r.status === 429 ? 'slow' : 'server');
-          wire(new Relay(code, key, 1));
+          Net.seat = r.body.seat >= 1 && r.body.seat < Net.SEATS ? r.body.seat : 1;
+          wire(new Relay(code, key, Net.seat));
         }, function () { if (run === epoch && Net.state === 'joining') fail('server'); });
       }
       loadLib(function (ok) {
@@ -6389,8 +6538,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         var b = r.body;
         if (r.status !== 200 || !b || !b.ok || !b.code) return fail(r.status === 429 ? 'slow' : 'server');
         Net.code = String(b.code);
-        Net.host = b.seat === 0;
-        wire(new Relay(Net.code, key, b.seat === 0 ? 0 : 1));
+        Net.host = b.seat === 0; Net.seat = Net.host ? 0 : 1;
+        wire(new Relay(Net.code, key, Net.seat));
         quickT = setInterval(function () {
           if (run !== epoch || Net.state !== 'matching') { clearInterval(quickT); quickT = 0; return; }
           var waited = Date.now() - Net.quickSince;
@@ -6415,29 +6564,48 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   };
   Net.setCfg = function (c) {
     if (!Net.host) return;
-    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items };
-    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items });
+    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team };
+    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team });
     changed();
   };
 
   // ---------- match ----------
-  function startMatch(seed, minutes, items) {
+  // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
+  function startMatch(seed, minutes, items, multi) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
-    App.begin('battle', { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') });
+    peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
+    var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
+    if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
+    Net.multi = !!multi;
+    App.begin('battle', o);
   }
   Net.start = function () {
     if (!Net.host || !link || (Net.state !== 'ready' && Net.state !== 'playing')) return;
-    var seed = (Math.random() * 4294967296) >>> 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: Net.cfg.items });
-    startMatch(seed, Net.cfg.minutes, Net.cfg.items);
+    var seed = (Math.random() * 4294967296) >>> 0, roster = Net.roster(), multi = null;
+    // whoever is here plays; nobody else can come in now
+    if (relayed && link.code) rpc({ a: 'lock', code: link.code, key: link.key }).then(null, function () { /* the room still works, it just stays open */ });
+    if (roster.length >= 3) {
+      var names = {}, teams = null;
+      roster.forEach(function (r) { names[r.seat] = r.name; });
+      if (Net.cfg.team && roster.length === 4) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
+      multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
+    }
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi);
   };
+  function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
     Net.wantAgain = true;
     send({ t: 'again' });
-    if (Net.host && Net.foeAgain) Net.start(); else changed();
+    if (Net.host && everyoneAgain()) Net.start(); else changed();
   };
-  Net.attack = function (n) { send({ t: 'a', n: n }); };
+  // in a match of three or four, cement goes to the player picked as the target
+  Net.attack = function (n) {
+    var S = App.S();
+    if (S && S.multi) { var to = S.multi.target; if (to != null && Net.peers[to] && !Net.peers[to].gone) send({ t: 'a', n: n }, to); return; }
+    send({ t: 'a', n: n });
+  };
   Net.item = function (id) { send({ t: 'i', id: id }); };
 
   function pack(g) {
@@ -6448,14 +6616,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       s += (v & 15).toString(16);
       if (v >> 4) items.push([x, r, v >> 4]);
     }
+    var S = App.S();
     return { t: 's', f: first, g: s, it: items, c: c ? [TYPES.indexOf(c.type), c.x, c.y, c.rot] : 0, p: g.pendingTotal(),
-      st: [st.sent, st.score, st.lines, st.pieces, st.attack], sh: g.shield > 0 ? 1 : 0, ov: g.over ? 1 : 0 };
+      st: [st.sent, st.score, st.lines, st.pieces, st.attack], sh: g.shield > 0 ? 1 : 0, ov: g.over ? 1 : 0, d: S && S.ko ? S.ko.opp : 0 };
   }
   // Paints the other player's wall onto our stand-in game.
-  function mirror(m) {
+  function mirror(m, g) {
     var S = App.S();
     if (!S || !S.remote) return;
-    var g = S.opp, first = int(m.f, 0, ROWS), s = String(m.g || ''), r, x, i;
+    g = g || S.opp;
+    var first = int(m.f, 0, ROWS), s = String(m.g || ''), r, x, i;
     if (s.length !== (ROWS - first) * COLS) return;
     for (r = 0; r < ROWS; r++) {
       var row = g.grid[r];
@@ -6517,37 +6687,83 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     }
     if (o) S.opp.events.push(o);
   }
-  function onMsg(m) {
+  function onMsg(m, from) {
     if (!m || typeof m !== 'object') return;
     var S = App.S(), live = !!S && S.remote && S.state === 'play';
+    if (typeof from !== 'number' || from < 0 || from >= Net.SEATS || from === Net.seat) from = Net.seat === 0 ? 1 : 0;     // a direct link: the one other person
+    var who = Net.peers[from];
+    if (who) who.heard = Date.now();
+    // in a match of three or four, each wall arrives with its seat; only the one on show gets the effects
+    if (S && S.multi && S.remote) {
+      if (m.t === 's') { var f = S.multi.foes[from]; if (f) { mirror(m, f.g); f.downs = int(m.d, 0, 99); f.sent = f.g.stats.sent; } return; }
+      if (m.t === 'e') { if (from === S.multi.target) foeEvent(m.e); return; }
+      if (m.t === 'i') return;
+    }
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items }); }
-        Net.foe = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
+        var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
+        Net.peers[from].name = nm; Net.peers[from].gone = false;
+        Net.foe = firstName();
         Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
         // a matched room: the host starts once both have said hello (a moment later, so both see who they got)
         if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
-      case 'cfg': if (!Net.host) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items }; changed(); } break;
-      case 'start': if (!Net.host && link) startMatch(+m.seed || 1, m.minutes, m.items); break;
+      case 'cfg': if (!Net.host && from === 0) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items, team: !!m.team }; changed(); } break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi)); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
       case 'i': if (live) App.foeItem(int(m.id, 1, 7)); break;
       case 'end':
-        foeEnd = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
+        var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
+        if (who) who.end = tally;
+        if (S && S.multi) { if (endWait && allEnded()) { var g0 = endWait; endWait = null; settle(g0); } break; }
+        foeEnd = tally;
         if (live) App.endBattle('');
         else if (endWait) { var f = endWait; endWait = null; settle(f); }
         break;
-      case 'again': Net.foeAgain = true; if (Net.host && Net.wantAgain) Net.start(); else changed(); break;
-      case 'bye': dropped(); break;
+      case 'again':
+        if (who) who.again = true;
+        Net.foeAgain = true;
+        if (Net.host && Net.wantAgain && everyoneAgain()) Net.start(); else changed();
+        break;
+      case 'bye':
+        // with others still in the room, only the one who left goes; the room itself ends with its host
+        if (from !== 0 && Net.count() > 2) { gone(from); break; }
+        dropped();
+        break;
     }
+  }
+  function readMulti(v) {
+    if (!v || typeof v !== 'object' || !Array.isArray(v.roster)) return null;
+    var roster = [], names = {}, teams = null, i, s;
+    for (i = 0; i < v.roster.length && i < Net.SEATS; i++) { s = v.roster[i]; if (s === Math.floor(s) && s >= 0 && s < Net.SEATS && roster.indexOf(s) < 0) roster.push(s); }
+    if (roster.length < 3 || roster.indexOf(Net.seat) < 0) return null;
+    roster.forEach(function (r) { names[r] = String((v.names && v.names[r]) || '').replace(/[<>&"]/g, '').slice(0, 12); });
+    if (v.teams && typeof v.teams === 'object' && roster.length === 4) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
+    return { roster: roster, names: names, teams: teams };
+  }
+  function allEnded() { var S = App.S(); return !S || !S.multi || peerList().every(function (s) { return Net.peers[s].end || Net.peers[s].gone || !S.multi.foes[s]; }); }
+  // one player of three or four has left (said goodbye, or went silent mid-match)
+  function gone(seat) {
+    var p = Net.peers[seat], S = App.S();
+    if (!p) return;
+    if (S && S.multi && S.multi.foes[seat] && Net.state === 'playing') { p.gone = true; if (App.foeGone) App.foeGone(seat); }
+    else delete Net.peers[seat];
+    Net.foe = firstName();
+    if (endWait && allEnded()) { var f = endWait; endWait = null; settle(f); }
+    if (Net.host && Net.state === 'ready' && Net.wantAgain && everyoneAgain()) return Net.start();
+    if (!peerList().some(function (s) { return !Net.peers[s].gone; }) && Net.state !== 'playing') { Net.peers = {}; Net.foe = ''; if (Net.host) setState('waiting'); else changed(); }
+    else changed();
   }
   function settle(cb) {
     var S = App.S();
+    if (S && S.multi) return cb();
     if (S && S.remote && foeEnd) { S.ko.me = foeEnd.downs; S.opp.stats.sent = foeEnd.sent; S.opp.stats.score = foeEnd.score; }
     cb();
   }
@@ -6557,7 +6773,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     Net.state = 'ready';
     send(pack(S.me));
     send({ t: 'end', downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score });
-    if (foeEnd) return settle(cb);
+    if (S.multi ? allEnded() : foeEnd) return settle(cb);
     endWait = cb;
     // through the relay the other side's tally takes a little longer to arrive
     setTimeout(function () { if (endWait === cb) { endWait = null; settle(cb); } }, relayed ? 4000 : 1500);
@@ -6601,6 +6817,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Net.tick = function (dt) {
     var S = App.S();
     acc += dt;
+    // a player of three or four who has gone silent mid-match counts as gone
+    if (S && S.multi) peerList().forEach(function (s) { var p = Net.peers[s]; if (!p.gone && Date.now() - (p.heard || 0) > QUIET.play) gone(s); });
     if (!link || !S || !(dirty || acc > 500) || !(urgent || acc >= 66)) return;
     acc = 0; dirty = urgent = false;
     send(pack(S.me));
@@ -6681,6 +6899,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'les.next': ['下一課', 'Next lesson', '次のレッスン', '다음 과'],
     'les.prog': ['進度', 'Progress', '進み具合', '진행'],
     // online
+    'mp.code': ['房間代碼：{0}', 'Room code: {0}', '部屋コード：{0}', '방 코드: {0}'],
+    'mp.inRoom': ['房間裡 {0}／{1} 人', '{0} of {1} in the room', '部屋に {0}／{1} 人', '방 인원 {0}/{1}명'],
+    'mp.host': ['房主', 'host', 'ホスト', '방장'],
+    'mp.teamMode': ['2 對 2 分組', '2 vs 2 teams', '2 対 2 のチーム戦', '2 대 2 팀전'],
+    'mp.teamA': ['紅隊', 'Red', '赤チーム', '레드 팀'],
+    'mp.teamB': ['藍隊', 'Blue', '青チーム', '블루 팀'],
+    'mp.noItems': ['三人以上的房間不開道具。', 'Rooms of three or more play without items.', '3 人以上の部屋ではアイテムなしです。', '3명 이상인 방은 아이템 없이 진행합니다.'],
+    'mp.more': ['最多可以四個人一起打：把代碼也傳給其他朋友。', 'Up to four can play: send the code to more friends.', '最大 4 人で遊べます。ほかの友だちにもコードを送りましょう。', '최대 4명이 함께할 수 있습니다. 다른 친구에게도 코드를 보내세요.'],
     'net.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '빠른 매칭'],
     'net.quickP': ['先找線上的真人；{0} 秒內沒有人，就改跟電腦打（會標示是電腦）。', 'Looks for a real player first. If nobody turns up within {0} seconds, you play the computer instead (and it says so).', 'まずオンラインの人を探します。{0} 秒以内に見つからなければ、コンピューターと対戦します（そう表示されます）。', '먼저 온라인의 실제 사람을 찾습니다. {0}초 안에 없으면 컴퓨터와 대전합니다(컴퓨터라고 표시됩니다).'],
     'net.matching': ['正在找對手⋯ {0} 秒', 'Looking for a player… {0} s', '対戦相手を探しています… {0} 秒', '상대를 찾는 중… {0}초'],
@@ -6929,10 +7155,29 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
-        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('net.keepOpen') + '</p>' : '') +
+        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('mp.more') + '</p><p class="note">' + t('net.keepOpen') + '</p>' : '') +
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.matched) {
       h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b></p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+    } else if ((st === 'ready' || st === 'playing') && Net.relayed() && !Net.matched) {
+      // the game's own relay: up to four in a room
+      var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && n === 4;
+      h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.SEATS) + '</h3><ul class="roster">';
+      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
+      h += '</ul>';
+      if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
+      if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
+      if (Net.host) {
+        h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
+        for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
+        h += '</div>';
+        if (n === 2) h += App.toggle('nItems', t('itemsMode'));
+        else h += '<p class="note">' + t('mp.noItems') + '</p>';
+        if (n === 4) h += App.toggle('nTeam', t('mp.teamMode'));
+        h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
+      } else {
+        h += '<p>' + esc(rulesText()) + (n === 4 && Net.cfg.team ? '　' + t('mp.teamMode') : '') + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+      }
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
@@ -6955,7 +7200,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     }
     return h;
   };
-  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; };
+  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
   App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
   App.acts.netQuickAgain = function () { App.toMenu(); App.openSheet('online'); Net.quick(myName()); };
   // nobody real in time: a computer at about the player's own level, named as a computer
@@ -6980,7 +7225,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     try { navigator.share({ title: t('title'), text: t('net.shareText', Net.code), url: inviteUrl() }).catch(function () { /* closed without sharing */ }); } catch (e) { /* not available */ }
   };
   App.inputs.push(function (el) {
-    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked }); return true; }
+    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team }); return true; }
+    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked }); return true; }
     if (el.id === 'nCode') { joinCode = el.value.toUpperCase(); return true; }
     return false;
   });
@@ -7009,7 +7255,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     if (d.ghost != null) { startGhost(+d.ghost); return true; }
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
-    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items }); return true; }
+    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team }); return true; }
     return false;
   });
 

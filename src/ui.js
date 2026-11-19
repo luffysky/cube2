@@ -299,7 +299,20 @@
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [] });
       S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
-      if (mode === 'net') {
+      if (mode === 'net' && o.multi) {
+        // three or four players: a mirror wall for each of the others; the one picked as the target is on show
+        var M = o.multi, foes = {}, order = [], myTeam = M.teams ? M.teams[M.me] : -1;
+        M.roster.forEach(function (st) {
+          if (st === M.me) return;
+          foes[st] = { seat: st, name: M.names[st] || t('foe'), team: M.teams ? M.teams[st] : -1, g: new ZZ.Game({ seed: seed, manual: true, garbage: false }), downs: 0, sent: 0, gone: false };
+          order.push(st);
+        });
+        S.multi = { me: M.me, teams: M.teams, myTeam: myTeam, foes: foes, order: order, target: null };
+        S.remote = true; S.bot = null;
+        var first = order.filter(enemy)[0];
+        S.multi.target = first; S.opp = foes[first].g; S.oppName = foes[first].name;
+        S.me.onAttack = function (n) { ZZ.Net.attack(n); };
+      } else if (mode === 'net') {
         S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false });   // a mirror of the other player's wall
         S.remote = true; S.bot = null;
         S.oppName = o.oppName || t('foe');
@@ -349,6 +362,73 @@
     }
   }
 
+  // ---------- three or four players ----------
+  function enemy(seat) { var M = S && S.multi; return !!M && !!M.foes[seat] && (!M.teams || M.teams[seat] !== M.myTeam); }
+  function setTarget(seat) {
+    var M = S && S.multi, f = M && M.foes[seat];
+    if (!f || f.gone || !enemy(seat) || M.target === seat) return;
+    M.target = seat; S.opp = f.g; S.oppName = f.name;
+    V.opp.fx = []; V.opp.parts = []; V.opp.koT = 0;
+    setupHud(); foeKey = '';
+    sfx.play('move');
+  }
+  function foeGone(seat) {
+    var M = S && S.multi, f = M && M.foes[seat];
+    if (!f || f.gone) return;
+    f.gone = true; foeKey = '';
+    toast(t('mp.left', f.name), 3000);
+    if (S.state === 'over') return;
+    var live = M.order.filter(function (s) { return enemy(s) && !M.foes[s].gone; });
+    if (!live.length) return endBattle('left');
+    if (M.target === seat) { M.target = null; setTarget(live[0]); }
+  }
+  var foeKey = '';
+  function drawFoes() {
+    var M = S.multi;
+    if (!M) return;
+    var key = M.target + '|' + L.lang + '|' + M.order.map(function (s) { var f = M.foes[s]; return s + ':' + f.downs + ':' + f.sent + ':' + (f.gone ? 1 : 0) + ':' + stackOf(f.g); }).join(',');
+    if (key === foeKey) return;
+    foeKey = key;
+    var h = '';
+    M.order.forEach(function (s) {
+      var f = M.foes[s], foe = enemy(s), on = M.target === s, hi = stackOf(f.g);
+      h += '<button type="button" class="foe' + (on ? ' on' : '') + (f.gone ? ' gone' : '') + (foe ? '' : ' mate') + (M.teams ? ' t' + f.team : '') + '" data-foe="' + s + '"' +
+        (foe && !f.gone ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(f.name) + '</b><span>' + (f.gone ? t('mp.gone') : foe ? t('mp.downs', f.downs) : t('mp.mate')) +
+        '</span><i style="--h:' + Math.round(hi / VIS * 100) + '%"></i></button>';
+    });
+    el.strip.innerHTML = '<div class="foes">' + h + '</div>';
+  }
+  function stackOf(g) {
+    for (var r = 0; r < g.grid.length; r++) for (var x = 0; x < g.grid[r].length; x++) if (g.grid[r][x]) return g.grid.length - r;
+    return 0;
+  }
+  // where everybody finished, best first: fewest knockouts, then most lines sent; players who left come last
+  function standings(why) {
+    var M = S.multi, Net = ZZ.Net, list = [{ seat: M.me, name: t('you'), me: true, team: M.myTeam, downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score, gone: false }];
+    M.order.forEach(function (s) {
+      var f = M.foes[s], p = Net.peers[s], e = p && p.end;
+      list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone });
+    });
+    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent); };
+    list.sort(better);
+    list.forEach(function (p, i) { p.place = i && !better(list[i - 1], p) ? list[i - 1].place : i + 1; });
+    var out = { list: list, teams: null, r: 0 };
+    if (M.teams) {
+      var tm = [0, 1].map(function (k) {
+        var mine = list.filter(function (p) { return p.team === k; });
+        return { downs: mine.reduce(function (a, p) { return a + p.downs; }, 0), sent: mine.reduce(function (a, p) { return a + p.sent; }, 0), out: mine.every(function (p) { return p.gone; }) };
+      });
+      out.teams = tm;
+      var us = tm[M.myTeam], them = tm[1 - M.myTeam];
+      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : 0;
+    } else {
+      var me = list.filter(function (p) { return p.me; })[0], tops = list.filter(function (p) { return p.place === 1; }).length;
+      out.r = why === 'left' ? 1 : me.place === 1 ? (tops > 1 ? 0 : 1) : -1;
+    }
+    out.foeDowns = list.filter(function (p) { return !p.me && (!M.teams || p.team !== M.myTeam); }).reduce(function (a, p) { return a + p.downs; }, 0);
+    return out;
+  }
+
   function restart() {
     if (!S || S.kind === 'battle') return;
     var K = kindOf();
@@ -360,7 +440,16 @@
   function setupHud() {
     var k = S.kind, K = kindOf();
     el.strip.hidden = !(k === 'dojo' || (K && K.strip));
-    if (k === 'battle') {
+    if (k === 'battle' && S.multi) {
+      el.strip.hidden = false;
+      foeKey = '';
+      var nameM = '<span class="who">' + esc(S.oppName) + '</span>', youM = '<span class="who">' + t('you') + '</span>';
+      el.hudL.innerHTML = youM + stat('koOpp', t('mp.down')) + stat('sentMe', t('sent'));
+      el.hudR.innerHTML = stat('sentOpp', t('sent')) + stat('downT', t('mp.down')) + nameM;
+      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
+      el.oppName.textContent = t('mp.target', S.oppName);
+      el.oppNameW.textContent = t('mp.target', S.oppName);
+    } else if (k === 'battle') {
       var name = '<span class="who">' + esc(S.oppName) + '</span>', you = '<span class="who">' + t('you') + '</span>';
       if (S.flip) {
         el.hudL.innerHTML = name + stat('koOpp', t('ko')) + stat('sentOpp', t('sent'));
@@ -741,7 +830,9 @@
   }
   function onTopOut(g, v, mine, now) {
     var K = kindOf();
-    if (S.kind === 'battle') {
+    if (S.kind === 'battle' && S.multi && !mine) {
+      v.knock(now); sfx.play('ko');      // the target went down: counted from its own report, not here
+    } else if (S.kind === 'battle') {
       var k = mine ? 'me' : 'opp', other = mine ? 'opp' : 'me';
       S.ko[other]++;
       S[other].stats.score += 1500;
@@ -790,6 +881,7 @@
       if (S !== st) return;
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
+      if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played }, S.tape && !S.used ? S.tape.done() : null);
       S.saved = false;
@@ -882,6 +974,17 @@
     } else if (name === 'pause') {
       h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
         btn('again', S && S.kind === 'battle' ? 'rematch' : 'restart') + btn('settings', 'm.settings') + btn('help', 'm.help') + btn('menu', 'toMenu') + '</div>';
+    } else if (name === 'battleEnd' && S.multi && S.stand) {
+      var sd = S.stand, M = S.multi;
+      h = '<h2>' + t(S.result > 0 ? 'r.win' : S.result < 0 ? 'r.lose' : 'r.draw') + '</h2>';
+      if (sd.teams) h += '<div class="score"><div><b>' + sd.teams[M.myTeam].downs + '</b><span>' + t('mp.usDown') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + sd.teams[1 - M.myTeam].downs + '</b><span>' + t('mp.themDown') + '</span></div></div>';
+      h += '<p class="note">' + t(sd.teams ? 'mp.ruleTeam' : 'mp.rule') + '</p>' + rewardHtml(S.reward) +
+        '<table class="cmp"><thead><tr><th></th><th>' + t('mp.player') + '</th><th>' + t('mp.down') + '</th><th>' + t('sent') + '</th><th>' + t('score') + '</th></tr></thead><tbody>';
+      sd.list.forEach(function (p) {
+        h += '<tr' + (p.me ? ' class="mine"' : '') + '><td>' + (p.gone ? '—' : t('mp.place', p.place)) + '</td><td>' + esc(p.name) + (sd.teams && !p.me ? ' <small>' + t(p.team === M.myTeam ? 'mp.mate' : 'mp.enemy') + '</small>' : '') +
+          '</td><td>' + p.downs + '</td><td>' + p.sent + '</td><td>' + L.num(p.score) + '</td></tr>';
+      });
+      h += '</tbody></table>' + (App.endExtra ? App.endExtra() : '') + '<div class="row">' + btn('again', 'again', true) + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'battleEnd') {
       var me = S.me.stats, op = S.opp.stats, tt = Math.max(1, S.total - S.left), foe = esc(S.oppName);
       var rows = [
@@ -1352,6 +1455,7 @@
     var me = S.me, st = me.stats, K = kindOf();
     if (S.kind === 'battle') {
       txt('koMe', String(S.ko.me)); txt('koOpp', String(S.ko.opp));
+      if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
       txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent));
       txt('ptsMe', t('pts', L.num(st.score)));
       var c = $('clock');
@@ -1501,6 +1605,7 @@
     el.wellWrap.style.transform = Math.abs(s.x) + Math.abs(s.y) > 0.25 ? 'translate3d(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px,0)' : '';
     drawSide();
     drawChips();
+    if (S.multi) drawFoes();
     updateHud();
   }
 
@@ -1523,6 +1628,8 @@
       'chips', 'wellWrap', 'wellCv', 'pops', 'banner', 'nextBox', 'nextCv', 'tools', 'pauseBtn', 'oppWide', 'oppNameW', 'oppFrame', 'pad', 'sideL', 'sideR', 'itemKey', 'halfKey', 'holdKey',
       'toast', 'mtoast', 'rotate',
       'sheet', 'sheetCard', 'demoCv'].forEach(function (id) { el[id] = $(id); });
+    // a name tag above the wall in a match of three or four: that player becomes the target
+    el.strip.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-foe]'); if (b && S && S.multi) { setTarget(+b.getAttribute('data-foe')); b.blur(); } });
     loadStore();
     rebuildKeys();
     Meta.load();
@@ -1567,7 +1674,7 @@
   App.S = function () { return S; };
   App.screen = function () { return screen; };
   App.sheet = function () { return sheetName; };
-  App.begin = begin; App.openSheet = openSheet; App.closeSheet = closeSheet; App.sheetDo = sheetDo; App.toast = toast; App.banner = banner; App.popRaw = popRaw;
+  App.begin = begin; App.foeGone = function (s) { if (S && S.multi) foeGone(s); }; App.setTarget = function (s) { if (S && S.multi) setTarget(s); }; App.openSheet = openSheet; App.closeSheet = closeSheet; App.sheetDo = sheetDo; App.toast = toast; App.banner = banner; App.popRaw = popRaw;
   App.txt = txt; App.stat = stat; App.esc = esc; App.btn = btn; App.coin = coin; App.itile = itile; App.ul = ul; App.field = field; App.toggle = toggle;
   App.fmtClock = fmtClock; App.fmtTime = fmtTime; App.saveStore = saveStore; App.applySettings = applySettings; App.applyLook = applyLook; App.applyLang = applyLang;
   App.toMenu = toMenu; App.layout = layout; App.updateMenu = updateMenu; App.rankName = rankName; App.stepCells = stepCells; App.stepDemo = stepDemo;

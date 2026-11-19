@@ -123,6 +123,24 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 #strip { margin: 0 12px 4px; padding: 7px 12px; background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; font-size: 13px; line-height: 1.45; min-height: 52px; }
 #strip b { font-weight: 900; }
 #strip .now { color: var(--gold-ink); font-weight: 700; }
+/* a match of three or four: one name tag per other player, the target picked out; tap one to aim at it */
+#strip:has(.foes) { padding: 5px; min-height: 0; }
+.foes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; }
+.foe { position: relative; overflow: hidden; display: grid; gap: 1px; text-align: left; min-height: 44px; padding: 5px 8px 7px; border: 1px solid var(--edge); border-radius: 8px; background: var(--floor); color: var(--ink); font: inherit; font-size: 12px; line-height: 1.25; cursor: pointer; }
+.foe b { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foe span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.foe i { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--h); background: var(--alarm); transition: width .2s; }
+.foe.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.foe.on b::before { content: "▶ "; color: var(--gold-ink); }
+.foe.mate, .foe.gone { cursor: default; opacity: .62; }
+.foe.mate { border-style: dashed; }
+.foe.t0 { border-left: 4px solid #D9432F; } .foe.t1 { border-left: 4px solid #2F7FD9; }
+.foe:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.cmp tr.mine td { font-weight: 800; color: var(--gold-ink); }
+.roster { list-style: none; margin: 6px 0 10px; padding: 0; display: grid; gap: 5px; }
+.roster li { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 1px solid var(--edge); border-radius: 8px; background: var(--floor); }
+.roster li.t0 { border-left: 4px solid #D9432F; } .roster li.t1 { border-left: 4px solid #2F7FD9; }
+.roster small { color: var(--muted); }
 #strip .keys-note { color: var(--muted); font-size: 12px; }
 
 #stage { flex: 0 0 auto; display: grid; grid-template-columns: var(--side, 66px) auto var(--side, 66px); justify-content: center; align-items: start; gap: 8px; padding: 4px 8px 6px; }
