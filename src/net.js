@@ -604,6 +604,8 @@
       case 'i': if (live) App.foeItem(int(m.id, 1, 7)); break;
       case 'end':
         var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
+        // the rest of the result card (older pages do not send these)
+        if (m.x && typeof m.x === 'object') tally.x = { attack: int(m.x.attack, 0, 99999), spins: int(m.x.spins, 0, 9999), minis: int(m.x.minis, 0, 9999), xspins: int(m.x.xspins, 0, 9999), quads: int(m.x.quads, 0, 9999), maxCombo: int(m.x.maxCombo, 0, 99), pieces: int(m.x.pieces, 0, 99999) };
         if (who) who.end = tally;
         if (S && S.multi) { if (endWait && allEnded()) { var g0 = endWait; endWait = null; settle(g0); } break; }
         foeEnd = tally;
@@ -647,7 +649,10 @@
   function settle(cb) {
     var S = App.S();
     if (S && S.multi) return cb();
-    if (S && S.remote && foeEnd) { S.ko.me = foeEnd.downs; S.opp.stats.sent = foeEnd.sent; S.opp.stats.score = foeEnd.score; }
+    if (S && S.remote && foeEnd) {
+      S.ko.me = foeEnd.downs; S.opp.stats.sent = foeEnd.sent; S.opp.stats.score = foeEnd.score;
+      if (foeEnd.x) { for (var k in foeEnd.x) S.opp.stats[k] = foeEnd.x[k]; S.oppFull = true; }
+    }
     cb();
   }
   // Called when our clock runs out: tell the other side our tally, then wait a moment for theirs.
@@ -655,7 +660,8 @@
     var S = App.S();
     Net.state = 'ready';
     send(pack(S.me));
-    send({ t: 'end', downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score });
+    var ms = S.me.stats;
+    send({ t: 'end', downs: S.ko.opp, sent: ms.sent, score: ms.score, x: { attack: ms.attack, spins: ms.spins, minis: ms.minis, xspins: ms.xspins, quads: ms.quads, maxCombo: ms.maxCombo, pieces: ms.pieces } });
     if (S.multi ? allEnded() : foeEnd) return settle(cb);
     endWait = cb;
     // through the relay the other side's tally takes a little longer to arrive

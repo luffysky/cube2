@@ -1003,12 +1003,12 @@
       var rows = [
         [t('score'), L.num(me.score), L.num(op.score)],
         [t('st.sent'), me.sent, op.sent],
-        [t('st.apm'), rate(me.attack, tt).toFixed(1), S.remote ? '—' : rate(op.attack, tt).toFixed(1)],
+        [t('st.apm'), rate(me.attack, tt).toFixed(1), S.remote && !S.oppFull ? '—' : rate(op.attack, tt).toFixed(1)],
         [t('st.pps'), (me.pieces / (tt / 1000)).toFixed(2), (op.pieces / (tt / 1000)).toFixed(2)],
-        [t('st.tspin'), me.spins + me.minis, S.remote ? '—' : op.spins + op.minis],
-        [t('st.xspin'), me.xspins, S.remote ? '—' : op.xspins],
-        [t('st.quad'), me.quads, S.remote ? '—' : op.quads],
-        [t('st.combo'), me.maxCombo, S.remote ? '—' : op.maxCombo]
+        [t('st.tspin'), me.spins + me.minis, S.remote && !S.oppFull ? '—' : op.spins + op.minis],
+        [t('st.xspin'), me.xspins, S.remote && !S.oppFull ? '—' : op.xspins],
+        [t('st.quad'), me.quads, S.remote && !S.oppFull ? '—' : op.quads],
+        [t('st.combo'), me.maxCombo, S.remote && !S.oppFull ? '—' : op.maxCombo]
       ];
       h = verdict() +
         (S.why === 'left' ? '<p>' + t('net.foeLeft') + '</p>' : '') +

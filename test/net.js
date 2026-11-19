@@ -86,6 +86,8 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   const rA = await ev(A, 'return {sheet:p.sheet, r:S.result, ko:S.ko}'), rB = await ev(B, 'return {sheet:p.sheet, r:S.result, ko:S.ko}');
   ok(rA.sheet === 'battleEnd' && rB.sheet === 'battleEnd', 'both see the result', [rA, rB]);
   ok(rA.r === 1 && rB.r === -1 && rA.ko.me === rB.ko.opp, 'results agree: host won', [rA, rB]);
+  const dash = await A.evaluate(() => [...document.querySelectorAll('#sheetCard table.cmp tbody td:last-child')].map(td => td.textContent));
+  ok(dash.length >= 8 && dash.indexOf('—') < 0, "the rival's whole column is filled in", dash);
   if (RELAY) {
     // Both pages are tabs of one browser here, so they share one save. Both finished at the same moment and both
     // wanted to make the cloud account: there must be one account, and both results must be on it.

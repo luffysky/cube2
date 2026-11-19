@@ -67,7 +67,7 @@
 - **認證**：`Authorization: Bearer <JWT>`。
   - 演算法只接受 `EdDSA`（Ed25519）。`alg` 不符就拒絕，不接受 `none`。
   - 公鑰由環境變數 `BRICKDUEL_ADMIN_JWKS_URL`（或 `BRICKDUEL_ADMIN_JWKS` 直接放 JWKS JSON）取得，依 `kid` 選鑰匙，快取 10 分鐘。
-  - 必驗：`iss` = `BRICKDUEL_ADMIN_ISSUER`；`aud` = `snowrealm:brickduel:admin`；`scope` 含 `brickduel:admin:read`；`exp`、`nbf`、`iat`（允許 60 秒時鐘誤差）；`exp - iat` ≤ 600 秒；`jti` 必填，同一個 `jti` 在 `exp` 前只能用一次（記在 `zz.rate`）。
+  - 必驗：`iss` = `BRICKDUEL_ADMIN_ISSUER`；`aud` = `snowrealm:brickduel:admin`；`scope` 含 `brickduel:admin:read`；`exp`、`nbf`、`iat`（允許 60 秒時鐘誤差）；`exp - iat` ≤ 600 秒；`jti` 必填但**唯讀端點不限制只能用一次**（GPT 2026-11-20 意見：避免重新整理、分頁、重試被擋），只寫進稽核紀錄。防重放的一次性 nonce／冪等鍵留給 v2 的寫入端點。
   - `sub` 必須在 `BRICKDUEL_ADMIN_SUBJECTS`（逗號分隔）白名單裡。**白名單沒設就全部拒絕。**
   - 普通玩家的 token（之後 Identity 的 `aud=snowrealm:brickduel:api`）拿來打管理 API 一律拒絕。
 - **錯誤碼**：
@@ -75,7 +75,7 @@
   | 狀態 | 何時 | body |
   |---|---|---|
   | 503 | 上面任一個環境變數沒設（功能未啟用） | `{"error":"disabled"}` |
-  | 401 | 沒帶 token、簽章錯、過期、還沒生效、`iss`/`aud` 不對、`jti` 重複 | `{"error":"unauthorized"}`（不說明哪一項錯） |
+  | 401 | 沒帶 token、簽章錯、過期、還沒生效、`iss`/`aud` 不對、沒有 `jti` | `{"error":"unauthorized"}`（不說明哪一項錯） |
   | 403 | token 有效但 `sub` 不在白名單或沒有 scope | `{"error":"forbidden"}` |
   | 404 | 路徑不存在 | `{"error":"not_found"}` |
   | 405 | 非 `GET` | `{"error":"method"}` |
@@ -180,7 +180,7 @@
 ## 5. 阻塞清單：需要 GPT 交付或確認
 
 1. **誰簽發管理 token**：SnowRealm 管理 API 呼叫 cube2 時用的機器身分。需要：`iss` 字串、JWKS 網址、`kid` 輪替方式、撤銷方式（短效 + `jti` 夠不夠，還是另有撤銷清單）。
-2. **確認 `aud` 與 `scope` 字串**：我提 `aud=snowrealm:brickduel:admin`、`scope=brickduel:admin:read`。
+2. **確認 `aud` 與 `scope` 字串**：GPT 同意用遊戲專屬 audience。我提 `aud=snowrealm:brickduel:admin`、`scope=brickduel:admin:read`；請在 cube1 的管理服務規格寫同一個字串，雙方程式用同一份契約。
 3. **`sub` 格式**：管理員本人還是管理 API 的服務帳號？白名單要放哪一種。
 4. **欄位確認**：第 3 節的欄位名稱和型別。尤其請確認 D2、D3 的改名。
 5. **呼叫來源**：管理 API 會從哪裡呼叫 cube2（Cloudflare Worker？Vercel？）。如果有固定的出口網址，可以多加一層來源限制。
@@ -191,6 +191,12 @@
 
 - D1：存對局紀錄，已實作資料表。
 - D5：改成跟 cube1 一樣自選地區＋五段年齡。
+
+## 6-1. GPT 回覆後的調整（2026-11-20）
+
+- `jti` 改成不限一次（見 3.1）。
+- 管理 API 只允許伺服器對伺服器呼叫，不送 CORS、不給瀏覽器用。
+- 不等 Identity：先做資料查詢、API 結構、測試；正式機器憑證沒設定前，端點一律回 503。
 
 ## 7. 接下來 cube2 的交付
 
