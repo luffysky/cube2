@@ -4,6 +4,12 @@ const ZZ = require('../src/engine.js');
 require('../src/bot.js'); require('../src/meta.js'); require('../src/replay.js');
 // o: { seed, ms (how long to play), level, garbage (rows thrown at the player every five seconds), sprint }
 function play(o) {
+  // the computer player rolls dice for its slips; fixed here so the same seed always plays the same match
+  const dice = Math.random; let d = (o.seed ^ 0x5bd1e995) >>> 0;
+  Math.random = () => { d = (d + 0x6D2B79F5) | 0; let t = Math.imul(d ^ (d >>> 15), 1 | d); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  try { return playOne(o); } finally { Math.random = dice; }
+}
+function playOne(o) {
   const seed = o.seed >>> 0, g = new ZZ.Game({ seed, manual: true });
   const bot = new ZZ.Bot.BotPlayer(g, Object.assign({}, ZZ.Bot.LEVELS[o.level == null ? 3 : o.level], { pps: o.pps || 2.5 }));
   const tape = new ZZ.Replay.Tape(seed, false);
