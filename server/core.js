@@ -123,7 +123,7 @@ async function sync(db, cred, ops, now) {
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
     if (saved[0] && saved[0].saved === 1) {
       if (out.matches.length) await db.query('INSERT INTO zz.matches (pid, at, mode, result, proven, room, seats, data) SELECT $1, (x->>\'at\')::float8, x->>\'mode\', (x->>\'result\')::smallint, (x->>\'proven\')::boolean, x->>\'room\', (x->>\'seats\')::smallint, x->\'data\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.matches)]);
-      if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, boxes) SELECT $1, (x->>\'at\')::float8, x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
+      if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, kind, boxes) SELECT $1, (x->>\'at\')::float8, x->>\'kind\', x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
       return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
     }
     // another device saved in between: read again and repeat on top of that

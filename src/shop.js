@@ -72,6 +72,7 @@
     'j.item': ['用掉 3 個道具', 'Use 3 items', 'アイテム3個使用', '아이템 3개 사용'],
     // profile
     'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
+    'bx.more': ['寶箱 +{0} 次', '+{0} box today', '宝箱 +{0} 回', '보물상자 +{0}회'],
     'bx.left': ['今天還能開 {0} 次（每天 {1} 次，半夜十二點重算）', '{0} left today ({1} a day, back at midnight)', '今日はあと {0} 回（1 日 {1} 回、0 時にリセット）', '오늘 {0}회 남음(하루 {1}회, 자정에 초기화)'],
     'bx.member': ['會員每天 {0} 次。', 'Members get {0} a day.', 'メンバーは 1 日 {0} 回。', '멤버는 하루 {0}회.'],
     'bx.draw1': ['開一個', 'Open one', '1 回開ける', '1개 열기'],
@@ -472,8 +473,10 @@
     if (g.kind === 'item') return App.itile(g.id) + ' ' + esc(t('i' + g.id));
     if (g.kind === 'coins') return App.coin(g.n);
     if (g.kind === 'look') return '<b>' + esc(t('bx.look', t('c.' + g.k + '.' + g.id))) + '</b>';
+    if (g.kind === 'box') return '<b>' + esc(t('bx.more', g.n)) + '</b>';
     return '';
   }
+  App.prizeText = prizeText; App.pct = pct;
   function pct(v) { return (Math.round(v * 100) / 100) + '%'; }
   function oddsHtml() {
     var h = '<h3>' + t('bx.oddsH') + '</h3><p class="note">' + t('bx.oddsP') + '</p><table class="cmp odds"><thead><tr><th>' + t('bx.grade') + '</th><th>' + t('bx.inside') + '</th><th>' + t('bx.chance') + '</th></tr></thead><tbody>';

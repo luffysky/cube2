@@ -249,8 +249,8 @@
       items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0 },
-      box: { n: 0, last: null },
+      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
+      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -258,7 +258,7 @@
   }
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
-    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
+    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
     SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
     TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
@@ -323,7 +323,7 @@
     // three jobs a day, picked by the date so everyone gets the same set
     var rnd = new ZZ.RNG(day * 2654435761), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
     for (var i = 0; i < 3; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
-    d.day = day; d.jobs = jobs; d.draws = 0; d.ads = 0;
+    d.day = day; d.jobs = jobs; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -506,6 +506,70 @@
     { id: 'gem', p: 2, prizes: [{ p: 70, kind: 'look', max: 99999 }, { p: 30, kind: 'items', n: 5, coins: 500 }] }
   ];
   Meta.BOX = BOX; Meta.DRAWS = DRAWS;
+  // ---------- the wheel and the slot machine ----------
+  // Like the boxes: drawn by the server when there is a cloud save, odds published in the game, every draw kept.
+  // The wheel is free once a day (twice for members). The slot costs coins, a few a day at most, and pays back a
+  // little less than it takes on average, so it uses up spare coins rather than making them.
+  var WHEEL = [
+    { id: 'c20', p: 30, give: { coins: 20 } },
+    { id: 'c50', p: 22, give: { coins: 50 } },
+    { id: 'item1', p: 15, give: { items: 1 } },
+    { id: 'box1', p: 10, give: { box: 1 } },
+    { id: 'c100', p: 12, give: { coins: 100 } },
+    { id: 'item3', p: 6, give: { items: 3 } },
+    { id: 'c300', p: 4, give: { coins: 300 } },
+    { id: 'c1000', p: 1, give: { coins: 1000 } }
+  ];
+  var WHEEL_FREE = { free: 1, sub: 2 };
+  var SLOT = { cost: 50, perDay: 20, outs: [
+    { id: 'lose', p: 48.5, give: {} },
+    { id: 'pair', p: 35, give: { coins: 60 } },
+    { id: 'gold1', p: 10, give: { items: 1 } },
+    { id: 'three', p: 4, give: { coins: 250 } },
+    { id: 'gold2', p: 2, give: { coins: 150 } },
+    { id: 'gold3', p: 0.5, give: { coins: 1000 } }
+  ] };
+  Meta.WHEEL = WHEEL; Meta.WHEEL_FREE = WHEEL_FREE; Meta.SLOT = SLOT;
+  function randItem() { return 1 + Math.floor(Meta.rand() * Meta.ITEM_KINDS) % Meta.ITEM_KINDS; }
+  function give(g) {
+    var d = Meta.data, got = [], i;
+    if (g.coins) { d.coins += g.coins; d.tot.coins += g.coins; got.push({ kind: 'coins', n: g.coins }); }
+    for (i = 0; i < (g.items || 0); i++) { var id = randItem(); d.items[id] = Math.min(99, (d.items[id] | 0) + 1); got.push({ kind: 'item', id: id }); }
+    if (g.box) { d.daily.draws = Math.max(0, d.daily.draws - g.box); got.push({ kind: 'box', n: g.box }); }
+    return got;
+  }
+  Meta.wheelLeft = function () { Meta.rollDay(); return Math.max(0, (Meta.isSub() ? WHEEL_FREE.sub : WHEEL_FREE.free) - (Meta.data.daily.wheel | 0)); };
+  Meta.slotLeft = function () { Meta.rollDay(); return Math.max(0, SLOT.perDay - (Meta.data.daily.slot | 0)); };
+  function wheelNow() {
+    if (Meta.wheelLeft() < 1) return { ok: false, why: 'none' };
+    var d = Meta.data, seg = pick(WHEEL, Meta.rand());
+    d.daily.wheel = (d.daily.wheel | 0) + 1;
+    var got = give(seg.give);
+    d.wheel.n++; d.wheel.last = { n: d.wheel.n, at: Meta.now(), seg: seg.id, got: got };
+    Meta.save();
+    return { ok: true, seg: seg.id, got: got };
+  }
+  function slotNow() {
+    if (Meta.slotLeft() < 1) return { ok: false, why: 'none' };
+    if (!Meta.spend(SLOT.cost)) return { ok: false, why: 'poor', n: SLOT.cost - Meta.data.coins };
+    var d = Meta.data, out = pick(SLOT.outs, Meta.rand());
+    d.daily.slot = (d.daily.slot | 0) + 1;
+    var got = give(out.give);
+    d.slot.n++; d.slot.last = { n: d.slot.n, at: Meta.now(), out: out.id, got: got };
+    Meta.save();
+    return { ok: true, out: out.id, got: got };
+  }
+  Meta.spinWheel = function () {
+    if (Meta.wheelLeft() < 1) return { ok: false, why: 'none' };
+    if (!here()) { emit('wheel', []); return { ok: true, pending: true }; }
+    var r = wheelNow(); if (r.ok) emit('wheel', []); return r;
+  };
+  Meta.pullSlot = function () {
+    if (Meta.slotLeft() < 1) return { ok: false, why: 'none' };
+    if (Meta.data.coins < SLOT.cost) return { ok: false, why: 'poor', n: SLOT.cost - Meta.data.coins };
+    if (!here()) { emit('slot', []); return { ok: true, pending: true }; }
+    var r = slotNow(); if (r.ok) emit('slot', []); return r;
+  };
   // ---------- watching an ad for coins ----------
   // A reward is only ever paid by the server: either the ad network's signed callback says the ad was watched (see
   // server/ads.js), or a member claims the same reward without an ad. Both share one daily count.
@@ -550,7 +614,7 @@
       if (pool.length) { var one = pool[Math.floor(Meta.rand() * pool.length) % pool.length]; d.owned[one.k].push(one.id); got.push({ kind: 'look', k: one.k, id: one.id }); }
       else got.push({ kind: 'coins', n: Math.round(prize.max >= 99999 ? 800 : prize.max / 2) });      // owns everything that could come: coins instead
     } else if (prize.kind === 'items') {
-      for (i = 0; i < prize.n; i++) got.push({ kind: 'item', id: 1 + Math.floor(Meta.rand() * 7) % 7 });
+      for (i = 0; i < prize.n; i++) got.push({ kind: 'item', id: randItem() });
       if (prize.coins) got.push({ kind: 'coins', n: prize.coins });
     } else got.push({ kind: 'coins', n: prize.n });
     got.forEach(function (g) {
@@ -728,6 +792,8 @@
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
     // a draw on the page while the server keeps the cloud save does nothing here: the server's answer brings the boxes
+    wheel: function () { if (!here()) return yes(Meta.wheelLeft() >= 1); var r = wheelNow(); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
+    slot: function () { if (!here()) return yes(Meta.slotLeft() >= 1 && Meta.data.coins >= SLOT.cost); var r = slotNow(); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     adFree: function () { if (!here()) return yes(Meta.isSub() && Meta.adsLeft() >= 1); var r = Meta.adFree(); return r.ok ? { ok: true } : { ok: false, why: r.why }; },
     draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },

@@ -746,3 +746,14 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .picks { display: flex; flex-wrap: wrap; gap: 6px; }
 .picks button { padding: 7px 12px; font-size: 14px; font-weight: 700; background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; color: var(--ink); }
 .picks button[aria-checked="true"] { background: var(--wall); border-color: var(--wall); color: var(--wall-ink); }
+/* the prize wheel and the slot reels */
+.wheel { display: flex; justify-content: center; margin: 4px 0 10px; }
+.wheel-svg { width: min(240px, 70vw); height: auto; }
+.wheel-svg text { font: 800 10px var(--num), sans-serif; fill: #1B2530; }
+.reels { display: flex; justify-content: center; gap: 10px; margin: 6px 0 10px; }
+.reels .sym { width: 64px; height: 64px; border-radius: 14px; background: var(--c); border: 3px solid var(--wall); box-shadow: inset 0 -6px 0 rgba(0,0,0,0.15), inset 0 6px 0 rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; }
+.reels .sym.gold { background: #FFE8A3; }
+.reels .sym.gold .coin { width: 34px; height: 34px; }
+@media (prefers-reduced-motion: reduce) { #wheelRot { transition: none !important; } }
+/* a button that cannot be used right now looks it */
+.btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }

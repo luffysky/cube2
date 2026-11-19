@@ -645,6 +645,30 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     delete process.env.ADS_SSV_KEYS_URL; delete process.env.ADS_AD_UNITS; ads.setFetch(null);
   }
 
+  // ---------- the wheel and the slot machine: drawn by the server, limited per day, logged ----------
+  {
+    const W = await newPlayer(null, '203.0.113.62');
+    r = await sync(W, [op('wheel')]);
+    ok(r.json.res[0].ok && r.json.st.daily.wheel === 1 && r.json.st.wheel.last && r.json.st.wheel.last.got.length >= 1, 'the server spins the wheel', r.json.st.wheel);
+    r = await sync(W, [op('wheel')]);
+    ok(r.json.res[0].ok === false && r.json.st.wheel.n === 1, 'once a day for a non-member', r.json.res);
+    const c0 = r.json.st.coins;
+    r = await sync(W, [op('slot')]);
+    const sl = r.json.st.slot.last, won = sl.got.filter(g => g.kind === 'coins').reduce((a, g) => a + g.n, 0);
+    ok(r.json.res[0].ok && r.json.st.coins === c0 - 50 + won && r.json.st.daily.slot === 1, 'a pull costs 50 coins and pays what the server drew', [c0, r.json.st.coins, sl]);
+    const logged = await pg.query("SELECT kind FROM zz.draws WHERE pid = $1 ORDER BY id", [W.id]);
+    eq(logged.map(x => x.kind), ['wheel', 'slot'], 'both are logged with their kind');
+    const lg = await pg.query("SELECT kind, delta FROM zz.ledger WHERE pid = $1 AND kind = 'slot'", [W.id]);
+    ok(lg.length === 1 && lg[0].delta === won - 50, 'and the slot shows in the coin ledger as cost and win together', lg);
+    // twenty a day; and no pull without the coins
+    const ops = []; for (let i = 0; i < 25; i++) ops.push(op('slot'));
+    r = await sync(W, ops);
+    ok(r.json.st.daily.slot <= 20, 'at most twenty pulls a day', r.json.st.daily.slot);
+    const Poor = await newPlayer({ coins: 10 }, '203.0.113.63');
+    r = await sync(Poor, [op('slot')]);
+    ok(r.json.res[0].ok === false, 'no pull without the coins', r.json.res);
+  }
+
   // ---------- when the database is in trouble ----------
   const logged = []; const realErr = console.error; console.error = (...a) => logged.push(a.join(' '));
   dbm.use({ query: async () => { const e = new Error('connect failed for postgresql://neondb_owner:s3cretPass@ep-x.neon.tech/neondb?sslmode=require'); e.code = 'XX000'; throw e; }, batch: async () => { throw new Error('boom'); } });

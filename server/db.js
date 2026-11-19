@@ -120,6 +120,8 @@ const SCHEMA = [
      boxes jsonb NOT NULL
    )`,
   'CREATE INDEX IF NOT EXISTS draws_at ON zz.draws (at)',
+  // the wheel and the slot machine are logged in the same table (kind says which)
+  "ALTER TABLE zz.draws ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'box'",
   // every finished match a cloud save reports, kept a year: one line per player, so an online match has a line from
   // each seat (put together by room). proven says whether the piece placements backed the report up.
   `CREATE TABLE IF NOT EXISTS zz.matches (

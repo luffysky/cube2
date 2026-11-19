@@ -67,7 +67,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <tr><th>對局的落點紀錄</th><td>每場結束時送到伺服器核對分數有沒有造假，核對完就丟掉，只留下這場的編號避免重複送。</td><td>防作弊、維護公平</td></tr>
 <tr><th>金幣流水帳</th><td>有雲端存檔時，每次金幣增減的原因（例如對戰、每日任務、商店）、數量、之後的餘額和時間，由伺服器記錄。用來處理客服、查作弊、看遊戲經濟。</td><td>客服、防作弊、營運</td></tr>
 <tr><th>對局紀錄</th><td>有雲端存檔時，每場的模式、勝負、擊倒數、分數、送出行數、時間長度、核對結果，連線對戰另外記房間代碼和人數。用來處理客服與作弊檢舉、看遊戲平衡。</td><td>防作弊、客服、改善遊戲</td></tr>
-<tr><th>寶箱紀錄</th><td>每次開箱的時間和開到什麼，用來核對公布的機率。</td><td>公布機率的義務與消費爭議處理</td></tr>
+<tr><th>寶箱、轉盤、拉霸紀錄</th><td>每次開箱、轉盤、拉霸的時間和結果，用來核對公布的機率。</td><td>公布機率的義務與消費爭議處理</td></tr>
 <tr><th>連線對戰的房間與訊息</th><td>房間代碼和雙方互傳的遊戲畫面資料。對方收到就刪除，房間最久三小時後清掉。</td><td>提供服務</td></tr>
 <tr><th>網路位址（不存原文）</th><td>擋濫用（例如一直猜引繼碼、大量建帳號），只存加了密鑰、無法還原的雜湊值。</td><td>安全</td></tr>
 <tr><th>一般連線紀錄</th><td>網站主機（Vercel）依它的規則記錄請求，用於維運與除錯。</td><td>維運、安全</td></tr>
@@ -124,7 +124,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <ul>
 <li>雲端存檔與排行榜成績：直到你刪除。</li>
 <li>帳號資料：直到你刪除帳號；綁定紀錄在刪除轉磚資料或帳號時一起刪除。</li>
-<li>寶箱紀錄：至少保存到該次開箱後 180 天，之後可能刪除；你刪除雲端資料時一併刪除。</li>
+<li>寶箱、轉盤、拉霸紀錄：至少保存到該次開箱後 180 天，之後可能刪除；你刪除雲端資料時一併刪除。</li>
 <li>對局紀錄：一年，之後自動刪除；你刪除雲端資料時一併刪除。</li>
 <li>金幣流水帳：跟雲端存檔一樣，直到你刪除。</li>
 <li>網路位址的雜湊值：最久兩天。</li>
@@ -177,7 +177,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <li><strong>Each match's piece placements</strong>, checked against the reported score to stop cheating and then discarded (only the match number is remembered, so it cannot be sent twice).</li>
 <li><strong>A coin ledger</strong>: with a cloud save, the server records each change to your coins (what it was for, how much, the balance after, and when), for support, cheating checks and the game's economy.</li>
 <li><strong>A match log</strong>: with a cloud save, each match's mode, result, knockouts, score, lines sent, length and whether the placements checked out, plus the room code and player count for online matches. Used for support, cheating reports and game balance.</li>
-<li><strong>Treasure box records</strong>: when each box was opened and what was in it, so the published odds can be checked.</li>
+<li><strong>Treasure box, wheel and slot records</strong>: when each box was opened and what was in it, so the published odds can be checked.</li>
 <li><strong>Online room messages</strong>, deleted once delivered; rooms are removed after three hours at most.</li>
 <li><strong>A keyed hash of your network address</strong> (never the address itself), to slow down abuse; kept two days at most.</li>
 <li><strong>Ordinary request logs</strong> kept by our host (Vercel) under its own terms.</li>

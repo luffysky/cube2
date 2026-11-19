@@ -102,7 +102,8 @@ function applyOps(state, srv, ops, now) {
     else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
-    if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, boxes: r.out.boxes });
+    if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, kind: 'box', boxes: r.out.boxes });
+    if ((op.k === 'wheel' || op.k === 'slot') && r && r.ok && r.out && r.out.got) draws.push({ at: now, kind: op.k, boxes: [{ grade: r.out.seg || r.out.out, got: r.out.got }] });
     applied++;
     res.push(r && r.ok ? { i: op.i, ok: true } : { i: op.i, ok: false, why: (r && r.why) || 'no' });
   }
@@ -201,6 +202,8 @@ function importState(raw, now) {
   // boxes already opened today come along, or deleting and remaking a cloud save would hand out a fresh day of boxes
   d.daily.draws = sd.day === today ? int(sd.draws, 0, Meta.DRAWS.sub) : 0;
   d.daily.ads = sd.day === today ? int(sd.ads, 0, Meta.ADS.perDay) : 0;
+  d.daily.wheel = sd.day === today ? int(sd.wheel, 0, Meta.WHEEL_FREE.sub) : 0;
+  d.daily.slot = sd.day === today ? int(sd.slot, 0, Meta.SLOT.perDay) : 0;
   const t = obj(src.tot);
   d.tot.games = int(t.games, 0, 1e6); d.tot.wins = int(t.wins, 0, d.tot.games);
   d.tot.best = int(t.best, 0, 600000);
