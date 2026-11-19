@@ -150,7 +150,14 @@ const SCHEMA = [
      at double precision NOT NULL,
      UNIQUE (pid, key)
    )`,
-  'CREATE INDEX IF NOT EXISTS ledger_at ON zz.ledger (at)'
+  'CREATE INDEX IF NOT EXISTS ledger_at ON zz.ledger (at)',
+  // every rewarded-ad callback the network vouched for, so one ad never pays twice
+  `CREATE TABLE IF NOT EXISTS zz.adtx (
+     tx text PRIMARY KEY,
+     pid uuid REFERENCES zz.players(id) ON DELETE CASCADE,
+     at double precision NOT NULL,
+     paid boolean NOT NULL
+   )`
 ];
 let migrating = null;
 function migrate() {

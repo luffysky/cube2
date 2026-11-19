@@ -95,6 +95,25 @@ const SAVE = `
     RETURNING 1
   )
   SELECT (SELECT count(*)::int FROM u) AS saved`;
+// A reward the ad network has vouched for (server/ads.js checked the signature): pay it once, to the player whose
+// public tag the ad carried. Answers ok even when nothing is paid (already paid, or none left today), so the network
+// stops retrying.
+async function adReward(db, tag, tx, now) {
+  if ((await db.query('SELECT 1 FROM zz.adtx WHERE tx = $1', [tx])).length) return good({ paid: false, why: 'dup' });
+  for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
+    const rows = await db.query('SELECT id, pub, state, srv, ver FROM zz.players WHERE pub = $1 AND NOT ban', [tag]);
+    const row = rows[0];
+    if (!row) return good({ paid: false, why: 'who' });
+    const out = rules.applyOps(row.state, row.srv, [{ i: 'ad:' + tx.slice(0, 60), k: 'adGrant', a: [], srv: true }], now), d = out.state;
+    const paid = !!(out.res[0] && out.res[0].ok && !out.res[0].dup);
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
+    if (saved[0] && saved[0].saved === 1) {
+      await db.query('INSERT INTO zz.adtx (tx, pid, at, paid) VALUES ($1, $2, $3, $4) ON CONFLICT (tx) DO NOTHING', [tx, row.id, now, paid]);
+      return good({ paid, why: paid ? '' : (out.res[0] && out.res[0].why) || 'no' });
+    }
+  }
+  return fail(409, 'busy');
+}
 async function sync(db, cred, ops, now) {
   for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
     const row = await findPlayer(db, cred);
@@ -360,4 +379,4 @@ async function roomClose(db, body) {
   return good({});
 }
 
-module.exports = { readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

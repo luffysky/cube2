@@ -203,6 +203,15 @@
 2. 付款與訂單：還沒有付費，之後接金流或 Steam 再設計。
 3. 伺服器自選地區與年齡區間（只存區間，不存生日）。
 
+### 3.6-1 看廣告領獎勵（已寫碼，預設關閉）
+
+- 每次 15 金幣、每日 30 次（2026-11-20 林董定）；會員免看直接領，共用每日次數。
+- 回呼：`GET /api/ad`（廣告平台呼叫，不給瀏覽器）。驗 Google SSV 格式的 ECDSA 簽章（金鑰從 `ADS_SSV_KEYS_URL` 取、快取 12 小時）、`ad_unit` 在 `ADS_AD_UNITS` 白名單、`timestamp` 一小時內；`custom_data` = 玩家公開代號。
+- 冪等：`zz.adtx(tx PK)` + 操作 ID `ad:<tx>` + 流水帳 `UNIQUE(pid,key)` 三層。發幣用伺服器專用操作 `adGrant`，頁面無法送出（不在 `Meta.OPS`）。
+- 兩個環境變數沒設就回 503、`/api/health` 的 `ads: false`，前端按鈕不能按。
+- 後台可讀：`zz.adtx`（每次回呼、是否發幣）、`zz.ledger` 的 `adGrant` / `adFree`。
+- 尚未做：前端載入廣告 SDK、CMP/TCF 同意流程（等廣告帳號核准）。
+
 ### 3.7 Steam 預留介面（還不實作）
 
 - 管理 API 的所有 Steam 欄位先回 `null`，欄位名稱先固定，之後不用改後台。

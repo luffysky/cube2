@@ -13,6 +13,7 @@
 const crypto = require('crypto');
 const db = require('./db.js');
 const core = require('./core.js');
+const ads = require('./ads.js');
 const rules = require('./rules.js');
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
@@ -68,7 +69,7 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), region: process.env.VERCEL_REGION || '', now: clock() };
     if (url.searchParams.get('deep') && out.db) {
       // a look at the database itself: is it reachable, how long does one round trip take
       const t0 = Date.now();
@@ -77,6 +78,16 @@ const routes = {
       return send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=15' });
     }
     send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=60' });
+  },
+  // the rewarded-ad network's callback (GET, signed). Not for pages: nothing is paid without a valid signature.
+  async ad(req, res, url) {
+    if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
+    if (!ads.configured()) return send(res, 503, { ok: false, why: 'off' });
+    const raw = (req.url || '').split('?')[1] || '';
+    const v = await ads.verify(raw, { now: clock() });
+    if (!v.ok) { log('ad', v.why); return send(res, v.why === 'keys' ? 502 : 403, { ok: false, why: 'denied' }); }
+    const out = await db.run(d => core.adReward(d, v.tag, v.tx, clock()));
+    send(res, out.status, out.body);
   },
   async board(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });

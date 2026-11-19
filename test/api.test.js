@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 12, 'twelve tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 13, 'thirteen tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -591,6 +591,59 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok((await call('rpc', { method: 'POST', parsed: Buffer.from('{"a":"hello"}'), ip: '192.0.2.53' })).json.ok, 'or as bytes');
   r = await rpc({ a: 'hello' }, null, { ip: '192.0.2.54' });
   ok(!('access-control-allow-origin' in r.headers) && r.headers['x-content-type-options'] === 'nosniff', 'no cross-site access is offered', r.headers);
+
+  // ---------- rewarded ads: paid only on a signed callback, once, within the day ----------
+  {
+    const crypto = require('crypto'), ads = require('../server/ads.js');
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const pem = publicKey.export({ type: 'spki', format: 'pem' });
+    ads.setFetch(async () => ({ ok: true, json: async () => ({ keys: [{ keyId: 77, pem }] }) }));
+    const P = await newPlayer(null, '203.0.113.60');
+    const signedQ = (o, key) => {
+      const q = 'ad_network=5450213213286189855&ad_unit=' + (o.unit || 'unit-1') + '&custom_data=' + (o.tag || P.pub) + '&key_id=77&reward_amount=15&reward_item=coins&timestamp=' + (o.ts || now) + '&transaction_id=' + o.tx + '&user_id=x';
+      const sig = crypto.sign('sha256', Buffer.from(q), { key: key || privateKey, dsaEncoding: 'der' }).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return q + '&signature=' + sig + '&key_id=77';
+    };
+    const coins = async () => (await pg.query('SELECT state FROM zz.players WHERE id = $1', [P.id]))[0].state;
+    let a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000001' }) });
+    eq(a.status, 503, 'with no ad settings the callback is switched off');
+    r = await call('health');
+    ok(r.json.ads === false, 'health says ads are off');
+    process.env.ADS_SSV_KEYS_URL = 'https://keys.test/verifier.json'; process.env.ADS_AD_UNITS = 'unit-1';
+    const c0 = (await coins()).coins;
+    a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000001' }) });
+    ok(a.status === 200 && a.json.paid === true && (await coins()).coins === c0 + 15, 'a signed callback pays 15 coins', a.json);
+    a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000001' }) });
+    ok(a.status === 200 && a.json.paid === false && (await coins()).coins === c0 + 15, 'the same transaction never pays twice', a.json);
+    const other = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey;
+    a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000002' }, other) });
+    ok(a.status === 403 && (await coins()).coins === c0 + 15, 'a forged signature is refused', a.json);
+    a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000003' }).replace('reward_amount=15', 'reward_amount=99999') });
+    ok(a.status === 403, 'a changed amount breaks the signature');
+    a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000004', unit: 'unit-9' }) });
+    ok(a.status === 403, 'only our own ad units pay');
+    a = await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx000005', ts: now - 2 * HOUR }) });
+    ok(a.status === 403, 'an old callback is not paid');
+    for (let i = 10; i < 50; i++) await call('ad', { url: '/api/ad?' + signedQ({ tx: 'tx0000' + i }) });
+    const st = await coins();
+    ok(st.daily.ads === 30 && st.coins === c0 + 30 * 15, 'thirty a day at most', [st.daily.ads, st.coins - c0]);
+    const lg = await pg.query("SELECT count(*)::int AS n, sum(delta)::int AS s FROM zz.ledger WHERE pid = $1 AND kind = 'adGrant'", [P.id]);
+    ok(lg[0].n === 30 && lg[0].s === 450, 'every paid ad is in the coin ledger', lg[0]);
+    // a page cannot pay itself
+    r = await sync(P, [op('adGrant')]);
+    ok(r.status === 400, 'the server-only change cannot be sent by a page', r.json);
+    // a member takes the reward without an ad, from the same daily count
+    now += DAY;
+    await sync(P, [op('sub')]);
+    const m0 = (await coins());
+    r = await sync(P, [op('adFree')]);
+    ok(r.json.res[0].ok && r.json.st.coins === m0.coins + 15 && r.json.st.daily.ads === 1, 'a member claims without an ad', r.json.res);
+    const Q = await newPlayer(null, '203.0.113.61');
+    r = await sync(Q, [op('adFree')]);
+    ok(r.json.res[0].ok === false, 'a non-member cannot', r.json.res);
+    now -= DAY;
+    delete process.env.ADS_SSV_KEYS_URL; delete process.env.ADS_AD_UNITS; ads.setFetch(null);
+  }
 
   // ---------- when the database is in trouble ----------
   const logged = []; const realErr = console.error; console.error = (...a) => logged.push(a.join(' '));

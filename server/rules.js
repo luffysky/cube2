@@ -99,6 +99,7 @@ function applyOps(state, srv, ops, now) {
     if (++srv.hn > LIMIT.OPS_PER_HOUR) { res.push({ i: op.i, ok: false, why: 'slow' }); continue; }
     let r;
     if (op.k === 'fin') { r = finish(op.a, srv, mark); if (r.ok) matches.push(Object.assign({ at: now }, r.rec)); }
+    else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
     if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, boxes: r.out.boxes });
@@ -199,6 +200,7 @@ function importState(raw, now) {
   d.daily.win = sd.win === today ? today : 0;
   // boxes already opened today come along, or deleting and remaking a cloud save would hand out a fresh day of boxes
   d.daily.draws = sd.day === today ? int(sd.draws, 0, Meta.DRAWS.sub) : 0;
+  d.daily.ads = sd.day === today ? int(sd.ads, 0, Meta.ADS.perDay) : 0;
   const t = obj(src.tot);
   d.tot.games = int(t.games, 0, 1e6); d.tot.wins = int(t.wins, 0, d.tot.games);
   d.tot.best = int(t.best, 0, 600000);

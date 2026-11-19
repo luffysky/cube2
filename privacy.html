@@ -100,11 +100,22 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 </ul>
 <p><strong>選擇性的：Google 字型。</strong>遊戲的字型放在 Google Fonts。只有你在第一次進來的畫面或「設定 → 隱私與資料」允許之後，瀏覽器才會連到 Google 下載字型（Google 會因此看到你的網路位址）。不允許也能完整玩，只是用裝置內建的字型。隨時可以改。</p>
 
+<h2 id="ads">4-1. 看廣告領金幣（尚未開通）</h2>
+<p>遊戲裡有「看廣告領金幣」，目前<strong>還沒開通，也不會載入任何廣告程式</strong>。開通後的做法：</p>
+<ul>
+<li>只有你在「福利」按下按鈕才會播廣告，不會強迫你看，也不會在遊戲中途跳出來。</li>
+<li>廣告由 Google 的廣告服務播放。按下去之後，你的瀏覽器才會連到 Google，Google 會依它的規則處理你的網路位址、裝置資訊等資料。</li>
+<li>看完之後，Google 直接通知我們的伺服器，伺服器確認簽章才發金幣。我們只記交易編號、時間和有沒有發，用來避免重複發放。</li>
+<li>未滿 13 歲不顯示廣告。未滿 18 歲只用非個人化廣告。歐洲經濟區、英國和瑞士的玩家，在載入廣告前會先詢問同不同意個人化廣告。</li>
+<li>開通前本政策會更新，詳細說明會一起公布。</li>
+</ul>
+
 <h2 id="others">5. 經手的服務</h2>
 <ul>
 <li><strong>Vercel</strong>：網站和伺服器程式的主機，伺服器程式在新加坡區域執行。</li>
 <li><strong>Neon</strong>：資料庫，位於新加坡。</li>
 <li><strong>Google Fonts</strong>：只在你允許時使用。</li>
+<li><strong>Google 廣告服務</strong>：只在「看廣告領金幣」開通、而且你自己按下去時使用（目前未開通）。</li>
 <li><strong>GitHub</strong>：只在你自己到問題回報頁留言時。</li>
 </ul>
 <p>這些服務依照各自的條款處理資料，可能把資料存放在你所在地以外的國家（例如新加坡、美國）。我們不把資料提供給其他任何人，也不拿去做廣告或分析。</p>
@@ -180,6 +191,9 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <h2>4. Cookies and storage on your device</h2>
 <p>The game uses <strong>no cookies</strong>. It uses the browser's storage (localStorage and IndexedDB) for what the game itself needs: settings, progress, the cloud save identity, match recordings, your first-visit choices and member pictures. Without these the game cannot remember anything, so they are not optional.</p>
 <p><strong>Optional: Google Fonts.</strong> Only after you allow it (on the first-visit screen or in Settings → Privacy and data) does your browser fetch the game's fonts from Google, which then sees your network address. Without it the game uses your device's fonts. You can change this any time.</p>
+
+<h2>4a. Coins for an ad (not switched on yet)</h2>
+<p>The game has a "coins for an ad" button. It is <strong>not switched on yet, and no ad code is loaded</strong>. Once it is: an ad plays only when you press the button; it is shown by Google's ad service, so your browser then contacts Google, which handles your network address and device details under its own terms; after the ad Google tells our server directly, and coins are paid only if that message's signature checks out (we keep the transaction id, the time and whether it paid, to never pay twice); there are no ads under 13, only non-personalised ads under 18, and players in the EEA, the UK and Switzerland are asked about personalised ads before any ad loads. This policy will be updated before it is switched on.</p>
 
 <h2>5. Services involved</h2>
 <p>Vercel (hosting; server code runs in Singapore), Neon (database, Singapore), Google Fonts (only if you allow it), GitHub (only if you write to us there). Data may therefore be stored outside your country. We share data with no one else and use none of it for advertising or analytics.</p>

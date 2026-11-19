@@ -249,7 +249,7 @@
       items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0 },
+      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0 },
       box: { n: 0, last: null },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
@@ -323,7 +323,7 @@
     // three jobs a day, picked by the date so everyone gets the same set
     var rnd = new ZZ.RNG(day * 2654435761), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
     for (var i = 0; i < 3; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
-    d.day = day; d.jobs = jobs; d.draws = 0;
+    d.day = day; d.jobs = jobs; d.draws = 0; d.ads = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -506,6 +506,36 @@
     { id: 'gem', p: 2, prizes: [{ p: 70, kind: 'look', max: 99999 }, { p: 30, kind: 'items', n: 5, coins: 500 }] }
   ];
   Meta.BOX = BOX; Meta.DRAWS = DRAWS;
+  // ---------- watching an ad for coins ----------
+  // A reward is only ever paid by the server: either the ad network's signed callback says the ad was watched (see
+  // server/ads.js), or a member claims the same reward without an ad. Both share one daily count.
+  var ADS = { coins: 15, perDay: 30 };
+  Meta.ADS = ADS;
+  Meta.adsLeft = function () { Meta.rollDay(); return Math.max(0, ADS.perDay - (Meta.data.daily.ads | 0)); };
+  function grantAd() {
+    if (Meta.adsLeft() < 1) return { ok: false, why: 'none' };
+    var d = Meta.data;
+    d.daily.ads = (d.daily.ads | 0) + 1;
+    d.coins += ADS.coins; d.tot.coins += ADS.coins;
+    Meta.save();
+    return { ok: true, n: ADS.coins };
+  }
+  // a member takes the reward without an ad; with a cloud save the server does it (the page only asks)
+  Meta.adFree = function () {
+    if (!Meta.isSub()) return { ok: false, why: 'sub' };
+    if (Meta.adsLeft() < 1) return { ok: false, why: 'none' };
+    if (!here()) { emit('adFree', []); return { ok: true, pending: true }; }
+    var r = grantAd();
+    if (r.ok) emit('adFree', []);
+    return r;
+  };
+  // changes only the server may make: never in Meta.OPS, so a page cannot send them
+  var SERVER_RUN = { adGrant: function () { return grantAd(); } };
+  Meta.runServer = function (k) {
+    if (!SERVER_RUN.hasOwnProperty(k)) return { ok: false, why: 'op' };
+    Meta.quiet++;
+    try { return SERVER_RUN[k](); } finally { Meta.quiet--; }
+  };
   // Meta.remote(): set by the page's cloud code, true while a cloud save is linked (the server does the drawing then)
   function here() { return !(typeof Meta.remote === 'function' && Meta.remote()); }
   Meta.rand = function () { return Math.random(); };
@@ -698,6 +728,7 @@
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
     // a draw on the page while the server keeps the cloud save does nothing here: the server's answer brings the boxes
+    adFree: function () { if (!here()) return yes(Meta.isSub() && Meta.adsLeft() >= 1); var r = Meta.adFree(); return r.ok ? { ok: true } : { ok: false, why: r.why }; },
     draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
