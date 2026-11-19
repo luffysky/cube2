@@ -135,7 +135,7 @@
     if (this.dead || this.ws || this.wsTries > 4 || typeof window.WebSocket !== 'function' || qs.get('ws') === 'off' || !/^https?:$/.test(loc.protocol)) return;
     try { sock = new window.WebSocket((loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + loc.pathname.replace(/[^\/]*$/, '') + 'api/ws'); } catch (e) { this.wsTries = 9; return; }
     this.ws = sock; this.wsTries++;
-    sock.onopen = function () { if (self.ws !== sock) return; self.wsUp = true; self.wsTries = 0; self.pump(0); };
+    sock.onopen = function () { if (self.ws !== sock) return; self.wsUp = true; self.wsTries = 0; self.pump(0); if (link === self) changed(); };
     sock.onmessage = function (ev) {
       var f = null, w, k, it;
       if (self.ws !== sock || self.dead) return;
@@ -371,6 +371,8 @@
       });
     });
   };
+  // is the open socket carrying this room right now (the lobby says so)
+  Net.fast = function () { return !!(link && link.wsUp); };
   Net.leave = function () {
     send({ t: 'bye' });
     var st = link;

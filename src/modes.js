@@ -69,6 +69,7 @@
     'net.waitFriend': ['等朋友進來…', 'Waiting for your friend…', '友だちを待っています…', '친구를 기다리는 중…'],
     'net.joining': ['正在連線…', 'Connecting…', '接続中…', '연결 중…'],
     'net.seated': ['進房了，等房主那邊回應…房主要把遊戲留在畫面上才收得到。', 'You are in the room. Waiting for the host to answer… The host has to keep the game on screen.', '部屋に入りました。ホストの応答を待っています…ホストはゲームを画面に表示しておく必要があります。', '방에 들어왔습니다. 방장의 응답을 기다리는 중… 방장이 게임을 화면에 띄워 두어야 합니다.'],
+    'net.fast': ['即時連線已開啟，對手的動作會更快傳到。', 'Live link is on: your rival\'s moves reach you sooner.', 'リアルタイム接続中。相手の動きがより早く届きます。', '실시간 연결이 켜졌습니다. 상대의 움직임이 더 빨리 전달됩니다.'],
     'net.connected': ['已連上：{0}', 'Connected: {0}', '接続完了：{0}', '연결됨: {0}'],
     'net.waitHost': ['規則由房主決定。等房主按開始…', 'The host sets the rules. Waiting for the host to start…', 'ルールはホストが決めます。開始を待っています…', '규칙은 방장이 정합니다. 시작을 기다리는 중…'],
     'net.start': ['開始', 'Start', '開始', '시작'],
@@ -295,6 +296,7 @@
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
+      if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
