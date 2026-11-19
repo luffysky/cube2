@@ -229,6 +229,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .pop.gold .m { color: var(--gold); }
 .pop .s { display: block; margin-top: 2px; font-size: 14px; font-weight: 700; color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); white-space: nowrap; }
 .pop .a { display: inline-block; margin-top: 4px; padding: 1px 9px 2px; border-radius: 99px; background: #fff; color: #1B2530; font: italic 800 18px/1.2 var(--num); }
+.pop .p { display: block; margin-top: 3px; font: italic 800 16px/1.15 var(--num); color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 8px rgba(0, 0, 0, 0.3); white-space: nowrap; }
+.pop.gold .p { color: var(--gold); }
 @keyframes pop {
   0% { transform: scale(0.6); opacity: 0; }
   12% { transform: scale(1.12); opacity: 1; }
@@ -4879,13 +4881,14 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     clearTimeout(bannerT);
     if (text && ms) bannerT = setTimeout(function () { el.banner.innerHTML = ''; }, ms);
   }
-  function popRaw(main, tags, atk, gold) {
+  function popRaw(main, tags, atk, gold, pts) {
     var d = document.createElement('div');
     d.className = 'pop' + (gold ? ' gold' : '');
     var h = '';
     if (main) h += '<span class="m">' + esc(main) + '</span>';
     if (tags && tags.length) h += '<span class="s">' + esc(tags.join('　')) + '</span>';
     if (atk) h += '<span class="a">+' + atk + '</span>';
+    if (pts) h += '<span class="p">+' + esc(t('pts', L.num(pts))) + '</span>';
     d.innerHTML = h;
     while (el.pops.children.length > 1) el.pops.removeChild(el.pops.firstChild);
     el.pops.appendChild(d);
@@ -4900,8 +4903,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (e.b2b) tags.push(t('p.b2b'));
     if (e.combo > 0) tags.push(t('chip.combo', e.combo));
     if (e.perfect) tags.push(t('p.perfect'));
-    if (!main && !tags.length && !e.attack) return;
-    popRaw(main, tags, e.attack, gold);
+    // points for every clear (and for a spin that clears nothing), kept small under the main call
+    var pts = e.lines || e.tspin !== 'none' ? e.score : 0;
+    if (!main && !tags.length && !e.attack && !pts) return;
+    popRaw(main, tags, e.attack, gold, pts);
   }
   function txt(id, v) {
     var e = $(id);

@@ -247,13 +247,14 @@
     clearTimeout(bannerT);
     if (text && ms) bannerT = setTimeout(function () { el.banner.innerHTML = ''; }, ms);
   }
-  function popRaw(main, tags, atk, gold) {
+  function popRaw(main, tags, atk, gold, pts) {
     var d = document.createElement('div');
     d.className = 'pop' + (gold ? ' gold' : '');
     var h = '';
     if (main) h += '<span class="m">' + esc(main) + '</span>';
     if (tags && tags.length) h += '<span class="s">' + esc(tags.join('　')) + '</span>';
     if (atk) h += '<span class="a">+' + atk + '</span>';
+    if (pts) h += '<span class="p">+' + esc(t('pts', L.num(pts))) + '</span>';
     d.innerHTML = h;
     while (el.pops.children.length > 1) el.pops.removeChild(el.pops.firstChild);
     el.pops.appendChild(d);
@@ -268,8 +269,10 @@
     if (e.b2b) tags.push(t('p.b2b'));
     if (e.combo > 0) tags.push(t('chip.combo', e.combo));
     if (e.perfect) tags.push(t('p.perfect'));
-    if (!main && !tags.length && !e.attack) return;
-    popRaw(main, tags, e.attack, gold);
+    // points for every clear (and for a spin that clears nothing), kept small under the main call
+    var pts = e.lines || e.tspin !== 'none' ? e.score : 0;
+    if (!main && !tags.length && !e.attack && !pts) return;
+    popRaw(main, tags, e.attack, gold, pts);
   }
   function txt(id, v) {
     var e = $(id);

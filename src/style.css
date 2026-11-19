@@ -179,6 +179,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .pop.gold .m { color: var(--gold); }
 .pop .s { display: block; margin-top: 2px; font-size: 14px; font-weight: 700; color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); white-space: nowrap; }
 .pop .a { display: inline-block; margin-top: 4px; padding: 1px 9px 2px; border-radius: 99px; background: #fff; color: #1B2530; font: italic 800 18px/1.2 var(--num); }
+.pop .p { display: block; margin-top: 3px; font: italic 800 16px/1.15 var(--num); color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 8px rgba(0, 0, 0, 0.3); white-space: nowrap; }
+.pop.gold .p { color: var(--gold); }
 @keyframes pop {
   0% { transform: scale(0.6); opacity: 0; }
   12% { transform: scale(1.12); opacity: 1; }
