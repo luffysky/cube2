@@ -883,7 +883,7 @@
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched }, S.tape && !S.used ? S.tape.done() : null);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -940,9 +940,14 @@
       h += '<div class="rankbox' + (rk.up ? ' up' : '') + '"><b>' + esc(rankName(to)) + '</b><span>' + t('rateLine', (rk.delta >= 0 ? '+' : '') + rk.delta) + '</span>' +
         '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
     }
+    if (rw.level) {
+      var lv = rw.level, up = lv.to > lv.from, lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100);
+      h += '<div class="rankbox lvbox' + (up ? ' up' : '') + '"><b>' + esc(up ? t('xp.up', lv.to) : t('xp.lv', lv.to)) + '</b><span>' + t('xp.got', rw.xp) + '</span><div class="bar"><i style="width:' + lp + '%"></i></div></div>';
+    }
+    if (rw.titles) for (i = 0; i < rw.titles.length; i++) h += '<p class="note newtitle">' + esc(t('tt.new', t('tt.' + rw.titles[i]))) + '</p>';
     if (rw.coins) {
       h += '<div class="earn"><div class="earn-top"><span>' + t('earned') + '</span>' + coin(rw.coins) + '</div><ul>';
-      for (i = 0; i < rw.parts.length; i++) h += '<li><span>' + esc(t('w.' + rw.parts[i].key, rw.parts[i].arg ? rankName(rw.parts[i].arg) : '')) + '</span><b>+' + rw.parts[i].n + '</b></li>';
+      for (i = 0; i < rw.parts.length; i++) h += '<li><span>' + esc(t('w.' + rw.parts[i].key, rw.parts[i].arg ? rankName(rw.parts[i].arg) : rw.parts[i].lv || '')) + '</span><b>+' + rw.parts[i].n + '</b></li>';
       h += '</ul></div>';
     }
     for (i = 0; i < rw.jobs.length; i++) h += '<p class="note">' + esc(t('jobDone', t('j.' + rw.jobs[i]))) + '</p>';
@@ -1298,7 +1303,7 @@
   function updateMenu() {
     var d = Meta.data, r = Meta.rankOf(d.rp);
     txt('mName', d.name || t('player'));
-    txt('mRank', rankName(r));
+    txt('mRank', t('xp.lv', Meta.level().lv) + ' · ' + t('tt.' + Meta.titleNow()) + ' · ' + rankName(r));
     txt('mCoins', L.num(d.coins));
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');

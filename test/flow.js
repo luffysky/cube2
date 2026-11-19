@@ -27,7 +27,7 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   {
     const { ctx, page } = await open('rank', desk);
     await page.click('[data-go="rank"]'); await sleep(200);
-    ok(await page.evaluate(() => document.querySelector('.rankbox.big b').textContent.indexOf('陶土') === 0), 'rank sheet shows the starting tier');
+    ok(await page.evaluate(() => document.querySelector('.rankbox.big b').textContent.indexOf('地基') === 0), 'rank sheet shows the starting tier');
     await page.click('[data-do="rankGo"]'); await sleep(2600);
     ok(await ev(page, 'return S.kind === "battle" && S.mode === "rank" && S.state === "play" && !S.o.items && S.total === 120000'), 'ranked match runs for 2 minutes without items');
     ok(await ev(page, 'return !!S.oppName && !!document.getElementById("ptsMe")'), 'opponent has a name and the score line exists');

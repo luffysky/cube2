@@ -10,11 +10,11 @@ const mem = {}; M.store = { getItem: k => mem[k] || null, setItem: (k, v) => { m
 let clock = new Date(2026, 10, 18, 12).getTime(); M.now = () => clock;
 M.load();
 eq(M.data.coins, 200, 'starting coins');
-eq(M.rankOf(0).name, '陶土 III', 'rank 0');
-eq(M.rankOf(250).name, '陶土 I', 'rank 250');
-eq(M.rankOf(300).name, '紅磚 III', 'rank 300');
-eq(M.rankOf(1799).name, '鎏金 I', 'rank 1799');
-ok(M.rankOf(1800).top && M.rankOf(1800).name === '窯神', 'top rank');
+eq(M.rankOf(0).name, '地基 III', 'rank 0');
+eq(M.rankOf(250).name, '地基 I', 'rank 250');
+eq(M.rankOf(300).name, '石牆 III', 'rank 300');
+eq(M.rankOf(1799).name, '天空城 I', 'rank 1799');
+ok(M.rankOf(1800).top && M.rankOf(1800).name === '通天塔', 'top rank');
 ok(M.rpDelta(0, 1, 0, 0) === 20 && M.rpDelta(0, 1, 9, 3) === 35, 'win delta');
 eq(M.rpDelta(305, -1, 0, 0), -5, 'loss cannot drop below tier floor');
 eq(M.rpDelta(300, -1, 0, 0), -0, 'at floor');
@@ -73,23 +73,25 @@ eq(M.data.equip.tile, 'glaze', 'unowned look reverts after membership ends');
 eq(M.data.equip.bg, 'wall', 'custom bg reverts');
 eq(M.data.equip.theme, 'market', 'owned look stays');
 // match rewards
+// level-up coins come on top of a match's own pay; the sums below are about the match
+const noLv = r => r.coins - r.parts.filter(p => p.key === 'lvup').reduce((a, p) => a + p.n, 0);
 M.data.coins = 0;
 let r = M.finish({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp: 0, ms: 120000, stats: { score: 12000, spins: 3, minis: 0, sent: 30, quads: 1, maxCombo: 2, xspins: 0 } });
-eq(r.coins, 30 + 22 + 8 + 50, 'ai win coins with first win of the day');
+eq(noLv(r), 30 + 22 + 8 + 50, 'ai win coins with first win of the day');
 eq(M.data.coins, r.coins, 'coins banked');
 r = M.finish({ mode: 'ai', result: -1, level: 2, ko: 0, koOpp: 2, ms: 120000, stats: { score: 2000, spins: 0, minis: 0, sent: 3, quads: 0, maxCombo: 0, xspins: 0 } });
-eq(r.coins, 5 + 5, 'loss still pays a little');
+eq(noLv(r), 5 + 5, 'loss still pays a little');
 r = M.finish({ mode: 'rank', result: 1, ko: 3, koOpp: 1, ms: 120000, stats: { score: 0, spins: 0, minis: 0, sent: 0, quads: 0, maxCombo: 0, xspins: 0 } });
 ok(r.rank && r.rank.delta === 26 && M.data.rp === 26 && !r.rank.up, 'ranked win moves rating');
 M.data.rp = 90; M.data.peak = 90;
 r = M.finish({ mode: 'rank', result: 1, ko: 1, koOpp: 0, ms: 120000, stats: { score: 0, spins: 0, minis: 0, sent: 0, quads: 0, maxCombo: 0, xspins: 0 } });
-ok(r.rank.up && r.rank.to.name === '陶土 II' && r.rank.bonus === 40, 'promotion pays a bonus');
+ok(r.rank.up && r.rank.to.name === '地基 II' && r.rank.bonus === 40, 'promotion pays a bonus');
 M.subscribe();
 r = M.finish({ mode: 'ai', result: -1, level: 0, ko: 0, ms: 120000, stats: { score: 4000, spins: 0, minis: 0, sent: 0, quads: 0, maxCombo: 0, xspins: 0 } });
-eq(r.coins, 15 + 8, 'member boost');
+eq(noLv(r), 15 + 8, 'member boost');
 M.cancelSub();
 r = M.finish({ mode: 'sprint', result: 1, ms: 80000, stats: { score: 0, spins: 0, minis: 0, sent: 0, quads: 0, maxCombo: 0, xspins: 0 } });
-eq(r.coins, 15 + 20 + 20, 'sprint reward');
+eq(noLv(r), 15 + 20 + 20, 'sprint reward');
 ok(r.best && M.data.tot.sprint === 80000, 'first sprint is the record');
 r = M.finish({ mode: 'sprint', result: 1, ms: 95000, stats: {} });
 ok(!r.best && r.coins === 15 + 10 && M.data.tot.sprint === 80000, 'a slower sprint leaves the record alone', r);
@@ -127,7 +129,7 @@ clock = Date.UTC(2027, 0, 1, 15, 0, 0); eq(M.seasonId(), '2027-01', 'January');
 
 // ---------- match numbers are kept inside what the match length allows ----------
 let c = M.cleanMatch({ mode: 'rank', result: 5, level: 9, ko: 999, koOpp: -3, itemsUsed: 1e9, ms: 60000, stats: { score: 1e9, sent: 1e9, spins: -5, minis: 'x', xspins: 2.4, quads: 1e9, maxCombo: 999, lines: 1e9, pieces: 1e9 } });
-eq(c, { mode: 'rank', result: 1, level: 6, ko: 60, koOpp: 0, itemsUsed: 60, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
+eq(c, { mode: 'rank', result: 1, level: 6, team: false, quick: false, ko: 60, koOpp: 0, itemsUsed: 60, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, tst: 0, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
 eq(M.cleanMatch({ mode: 'hack', result: -1, stats: { score: 99999 } }).mode, 'ai', 'unknown mode becomes a plain match');
 eq(M.cleanMatch({ mode: 'ai', result: 1, stats: { score: 99999 } }).stats.score, 5000, 'no length given, so almost no score counts');
 eq(M.cleanMatch({ mode: 'sprint', result: -1, ms: 30000 }).result, 0, 'a sprint cannot be lost for points');
@@ -194,5 +196,59 @@ for (const n of ['小明', 'Luffy', 'class', 'gmail', 'assassin', '鶯歌磚王'
 M.use({ coins: 12, owned: { tile: ['neon'] }, tot: { wins: 3 }, items: [0, 1], bogus: 1 });
 ok(M.data.coins === 12 && M.data.owned.bg.length === 0 && M.data.tot.wins === 3 && M.data.tot.sprint === 0 && M.data.items.length === 8 && M.data.bogus === undefined && M.data.daily.jobs.length === 3, 'use() fills gaps and drops unknown fields', M.data);
 M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
+
+// ---------- level and titles ----------
+{
+  M.reset();
+  const lv = M.levelOf;
+  ok(lv(0).lv === 1 && lv(59).lv === 1 && lv(60).lv === 2 && lv(60 + 80).lv === 3 && lv(1e9).lv === 100 && lv(1e9).top, 'level curve: 60 xp, then 20 more each level, up to 100');
+  const win = { mode: 'ai', result: 1, level: 2, ko: 1, koOpp: 0, ms: 120000, stats: { score: 3000, spins: 0, minis: 0, sent: 5, quads: 0, maxCombo: 0, xspins: 0, lines: 10, pieces: 40 } };
+  let r = M.finish(win);
+  eq(r.xp, 20 + 15 + 2, 'a win: 20, 15 for winning, a little for the score');
+  r = M.finish(Object.assign({}, win, { result: -1, ko: 0, koOpp: 2 }));
+  eq(r.xp, 20 + 2, 'a loss still earns');
+  r = M.finish(win);
+  ok(r.level.from === 1 && r.level.to === 2 && r.parts.some(p => p.key === 'lvup' && p.n === M.lvCoins(2)), 'reaching level 2 pays coins', r);
+  M.data.xp = 0;
+  r = M.finish(Object.assign({}, win, { stats: Object.assign({}, win.stats, { score: 1e6 }) }));
+  ok(r.xp <= 50, 'the score part is capped', r.xp);
+  // titles
+  M.reset();
+  eq(M.titleNow(), 'lv1', 'everyone starts as a level-1 title');
+  ok(!M.hasTitle('lv10') && !M.wearTitle('lv10'), 'a title not reached cannot be worn');
+  M.data.xp = 1e6;
+  ok(M.hasTitle('lv100') && M.titleNow() === 'lv100', 'level titles come with the level, the highest shows by default');
+  M.data.xp = 0;
+  r = M.finish(Object.assign({}, win, { stats: Object.assign({}, win.stats, { tst: 1 }) }));
+  ok(r.titles.indexOf('tst') >= 0 && r.titles.indexOf('clean') >= 0 && M.hasTitle('tst'), 'a T-spin triple and a win without going down earn titles', r.titles);
+  r = M.finish(Object.assign({}, win, { stats: Object.assign({}, win.stats, { tst: 1 }) }));
+  eq(r.titles, [], 'a title is earned once');
+  ok(M.wearTitle('tst') && M.titleNow() === 'tst', 'an earned title can be worn');
+  eq(M.run('title', ['combo10']).ok, false, 'not one not earned');
+  eq(M.run('title', ['']).ok, true, 'taking the title off is fine');
+  eq(M.titleNow(), 'lv1', 'and the level title shows again');
+  ok(!M.hasTitle('member'), 'the member title needs a membership');
+  M.subscribe(); ok(M.hasTitle('member'), 'and comes with one'); M.cancelSub();
+  // counted titles
+  M.reset();
+  for (let i = 0; i < 4; i++) M.finish(Object.assign({}, win, { mode: 'net', quick: true }));
+  ok(!M.hasTitle('street'), 'four quick-match wins in a row are not yet enough');
+  M.finish(Object.assign({}, win, { mode: 'net', quick: true }));
+  ok(M.hasTitle('street') && M.data.tot.qbest === 5, 'the fifth earns it');
+  M.finish(Object.assign({}, win, { mode: 'net', quick: true, result: -1, ko: 0, koOpp: 1 }));
+  eq(M.data.tot.qstreak, 0, 'a loss ends the streak');
+  M.reset();
+  for (let i = 0; i < 20; i++) M.finish(Object.assign({}, win, { mode: 'ai', team: true }));
+  ok(!M.hasTitle('duo'), 'team wins count only in online team matches');
+  for (let i = 0; i < 20; i++) M.finish(Object.assign({}, win, { mode: 'net', team: true }));
+  ok(M.hasTitle('duo'), 'twenty team wins');
+  M.reset();
+  const nowWas = M.now;
+  M.now = () => Date.UTC(2026, 10, 19, 18, 30);   // 02:30 in Taiwan
+  M.finish(win); ok(M.hasTitle('night'), 'a win in the small hours');
+  M.now = () => Date.UTC(2026, 10, 19, 4, 30);
+  M.reset(); M.finish(win); ok(!M.hasTitle('night'), 'not at noon');
+  M.now = nowWas;
+}
 console.log('meta tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

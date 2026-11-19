@@ -356,10 +356,23 @@
     var d = Meta.data, r = Meta.rankOf(d.rp), pct = r.top ? 100 : Math.round(r.into / r.need * 100), tt = d.tot;
     var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
     var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
-      '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div><table class="cmp"><tbody>';
+      '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    var lv = Meta.level(), lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100), now = Meta.titleNow();
+    h += '<div class="rankbox lvbox"><b>' + t('xp.lv', lv.lv) + ' · ' + esc(t('tt.' + now)) + '</b><span>' + (lv.top ? t('xp.max') : lv.into + ' / ' + lv.need) + '</span><div class="bar"><i style="width:' + lp + '%"></i></div></div>' +
+      '<h3>' + t('tt.head') + '</h3><p class="note">' + t('tt.pick') + '</p><div class="titles">';
+    Meta.TITLES.forEach(function (tt) {
+      var have = Meta.hasTitle(tt.id), on = now === tt.id;
+      h += '<button type="button" class="ttl' + (on ? ' on' : '') + '" data-title="' + tt.id + '"' + (have ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(t('tt.' + tt.id)) + '</b><span>' + esc(have ? (on ? t('tt.on') : t('tt.' + tt.id + '.d')) : t('tt.lock') + '：' + t('tt.' + tt.id + '.d')) + '</span></button>';
+    });
+    h += '</div><table class="cmp"><tbody>';
     rows.forEach(function (x) { h += '<tr><td>' + t(x[0]) + '</td><td>' + x[1] + '</td></tr>'; });
     return h + '</tbody></table>' + (App.profileExtra ? App.profileExtra() : '') + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
+
+  App.clicks.push(function (d) {
+    if (d.title != null) { if (Meta.wearTitle(d.title)) { App.sfx.play('move'); App.openSheet('profile'); App.updateMenu(); } return true; }
+    return false;
+  });
 
   // Bring the saved pictures back when the page opens.
   App.boot.push(function () {

@@ -241,7 +241,7 @@
       } else return null;
     }
     var st = g.stats;
-    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
   }
 
   ZZ.Replay = { Tape: Tape, check: check, Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };

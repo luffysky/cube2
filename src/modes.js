@@ -5,13 +5,13 @@
   var $ = function (id) { return document.getElementById(id); };
 
   L.add({
-    'tier0': ['陶土', 'Clay', '陶土', '점토'],
-    'tier1': ['紅磚', 'Brick', '赤レンガ', '벽돌'],
-    'tier2': ['青瓦', 'Slate', '瓦', '기와'],
-    'tier3': ['白瓷', 'Porcelain', '白磁', '백자'],
-    'tier4': ['琉璃', 'Glass', '瑠璃', '유리'],
-    'tier5': ['鎏金', 'Gilt', '金箔', '금박'],
-    'tier6': ['窯神', 'Kiln god', '窯神', '가마신'],
+    'tier0': ['地基', 'Foundation', '土台', '토대'],
+    'tier1': ['石牆', 'Stone Wall', '石垣', '돌담'],
+    'tier2': ['塔樓', 'Tower', '塔', '망루'],
+    'tier3': ['城堡', 'Castle', '城', '성'],
+    'tier4': ['要塞', 'Fortress', '要塞', '요새'],
+    'tier5': ['天空城', 'Sky City', '天空城', '천공성'],
+    'tier6': ['通天塔', 'Skyspire', '天空の塔', '하늘탑'],
     'foes': ['阿土|磚頭伯|小釉|瓦片姐|泥作仔|阿窯|磨石嬸|水泥哥|砌牆王|青花妹', 'Clay|Old Brick|Glaze|Slate|Mortar|Kiln|Terra|Grout|Mason|Cobalt', 'ツチ|レンガ爺|ユウ|カワラ姐|サカン|カマ|ミガキ|セメント兄|ツミ王|アイ', '흙이|벽돌 할배|유약이|기와 언니|미장이|가마|돌이|시멘트 형|쌓기왕|청화'],
     'rk.toNext': ['再 {0} 分升段', '{0} to the next step', '昇格まであと{0}', '승급까지 {0}'],
     'rk.top': ['已經到頂了，分數繼續累積。', 'You are at the top. Points keep counting.', '最高ランクです。ポイントは積み上がります。', '최고 랭크입니다. 점수는 계속 쌓입니다.'],
@@ -322,7 +322,7 @@
       // the game's own relay: up to four in a room
       var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && n === 4;
       h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.SEATS) + '</h3><ul class="roster">';
-      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
+      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';

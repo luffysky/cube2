@@ -47,7 +47,14 @@
   Net.seat = 0; Net.peers = {}; Net.SEATS = 4;
   function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
   Net.count = function () { return 1 + peerList().length; };
-  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { return { seat: s, name: s === Net.seat ? Net.me : Net.peers[s].name, me: s === Net.seat }; }); };
+  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { var p = s === Net.seat ? null : Net.peers[s]; return { seat: s, name: p ? p.name : Net.me, me: !p, lv: p ? p.lv : ZZ.Meta.level().lv, tt: p ? p.tt : ZZ.Meta.titleNow() }; }); };
+  // who I am, for the others' room list: name, level and the title on show
+  function hello(ack) {
+    var M = ZZ.Meta, o = { t: 'hello', v: 1, name: Net.me };
+    try { o.lv = M.level().lv; o.tt = M.titleNow(); } catch (e) { /* the list just shows the name */ }
+    if (ack) o.ack = 1;
+    return o;
+  }
   function firstName() { var l = peerList(); return l.length ? Net.peers[l[0]].name : ''; }
 
   // ---------- transports ----------
@@ -290,7 +297,7 @@
     link = c;
     c.on('open', function () {
       clearTimeout(joinT);
-      send({ t: 'hello', v: 1, name: Net.me });
+      send(hello(0));
       if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team });
       else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
@@ -577,10 +584,11 @@
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
+        if (!m.ack) { send(hello(1)); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
         var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
+        Net.peers[from].lv = int(m.lv, 1, 999); Net.peers[from].tt = typeof m.tt === 'string' && /^[a-z0-9]{1,12}$/.test(m.tt) ? m.tt : '';
         Net.foe = firstName();
         Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();

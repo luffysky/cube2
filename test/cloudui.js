@@ -58,7 +58,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   // ---------- leaderboards ----------
   await A.page.tap('#mBoard'); await sleep(700);
   let rows = await A.page.evaluate(() => [...document.querySelectorAll('.lb li')].map(li => li.textContent));
-  ok(rows.length === 1 && /阿明/.test(rows[0]) && /你/.test(rows[0]) && /陶土/.test(rows[0]), 'rating board shows the player', rows);
+  ok(rows.length === 1 && /阿明/.test(rows[0]) && /你/.test(rows[0]) && /地基/.test(rows[0]) && /Lv 1/.test(rows[0]), 'rating board shows the player', rows);
   await shot(A, '2-board-rp');
   await A.page.tap('[data-lb="score"]'); await sleep(600);
   rows = await A.page.evaluate(() => [...document.querySelectorAll('.lb li')].map(li => li.textContent));

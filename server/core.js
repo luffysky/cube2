@@ -18,6 +18,7 @@ const LIMIT = {
   SAVE_TRIES: 4
 };
 const BOARDS = { rp: 1, score: 1, sprint: 1 };
+const TITLE_ID = /^[a-z0-9]{1,12}$/;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: nothing to misread
 const PUB_ABC = 'abcdefghjkmnpqrstuvwxyz23456789';
 
@@ -159,21 +160,21 @@ async function board(db, b, scope, me, now) {
   const season = rules.seasonOf(now), mine = typeof me === 'string' && PUB.test(me) ? me : '';
   let top, own;
   if (b === 'rp') {
-    top = ['SELECT pub AS p, name AS n, rp AS v FROM zz.players WHERE season = $1 AND rg > 0 AND NOT ban ORDER BY rp DESC, seen LIMIT ' + LIMIT.BOARD_ROWS, [season]];
+    top = ["SELECT pub AS p, name AS n, rp AS v, COALESCE(state->>'xp', '0') AS x, COALESCE(state->>'title', '') AS t FROM zz.players WHERE season = $1 AND rg > 0 AND NOT ban ORDER BY rp DESC, seen LIMIT " + LIMIT.BOARD_ROWS, [season]];
     own = [`SELECT me.rp AS v, 1 + (SELECT count(*)::int FROM zz.players o WHERE o.season = $1 AND o.rg > 0 AND NOT o.ban AND (o.rp > me.rp OR (o.rp = me.rp AND o.seen < me.seen))) AS rank
             FROM zz.players me WHERE me.pub = $2 AND me.season = $1 AND me.rg > 0 AND NOT me.ban`, [season, mine]];
     scope = 'season';
   } else {
     scope = scope === 'all' ? 'all' : 'season';
     const s = scope === 'all' ? 'all' : season;
-    top = ['SELECT p.pub AS p, p.name AS n, s.val AS v FROM zz.scores s JOIN zz.players p ON p.id = s.pid WHERE s.board = $1 AND s.season = $2 AND NOT p.ban ORDER BY s.val DESC, s.at LIMIT ' + LIMIT.BOARD_ROWS, [b, s]];
+    top = ["SELECT p.pub AS p, p.name AS n, s.val AS v, COALESCE(p.state->>'xp', '0') AS x, COALESCE(p.state->>'title', '') AS t FROM zz.scores s JOIN zz.players p ON p.id = s.pid WHERE s.board = $1 AND s.season = $2 AND NOT p.ban ORDER BY s.val DESC, s.at LIMIT " + LIMIT.BOARD_ROWS, [b, s]];
     own = [`SELECT ms.val AS v, 1 + (SELECT count(*)::int FROM zz.scores o JOIN zz.players op ON op.id = o.pid
               WHERE o.board = $1 AND o.season = $2 AND NOT op.ban AND (o.val > ms.val OR (o.val = ms.val AND o.at < ms.at))) AS rank
             FROM zz.scores ms JOIN zz.players mp ON mp.id = ms.pid WHERE mp.pub = $3 AND ms.board = $1 AND ms.season = $2 AND NOT mp.ban`, [b, s, mine]];
   }
   const out = await db.batch(mine ? [top, own] : [top]), flip = b === 'sprint' ? -1 : 1;
   const row = mine && out[1][0];
-  return good({ b, scope, season, top: out[0].map(r => ({ p: r.p, n: r.n, v: r.v * flip })), me: row ? { rank: row.rank, v: row.v * flip } : null, now });
+  return good({ b, scope, season, top: out[0].map(r => ({ p: r.p, n: r.n, v: r.v * flip, lv: rules.Meta.levelOf(+r.x || 0).lv, t: TITLE_ID.test(r.t) ? r.t : '' })), me: row ? { rank: row.rank, v: row.v * flip } : null, now });
 }
 
 // ---------- rooms for online matches ----------

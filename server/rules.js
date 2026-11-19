@@ -39,7 +39,7 @@ const LIMIT = {
   TAPE_BYTES: 20000,         // the longest tape accepted with one match
   SEEDS_KEPT: 80,            // recent matches remembered, so the same tape cannot be handed in twice
   SPRINT_MIN: 15000,         // a 40-line sprint faster than this is not believed
-  IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20
+  IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20, IMPORT_XP: 5000
 };
 
 function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
@@ -108,7 +108,7 @@ function proven(m, tape, srv) {
   const v = ZZ.Replay.check(tape);
   if (!v) return null;
   const st = m.stats, sprint = m.mode === 'sprint';
-  if (v.pieces !== st.pieces || v.lines !== st.lines || v.spins !== st.spins || v.minis !== st.minis || v.xspins !== st.xspins || v.quads !== st.quads || v.maxCombo !== st.maxCombo) return null;
+  if (v.pieces !== st.pieces || v.lines !== st.lines || v.spins !== st.spins || v.tst !== st.tst || v.minis !== st.minis || v.xspins !== st.xspins || v.quads !== st.quads || v.maxCombo !== st.maxCombo) return null;
   if (v.ms > m.ms + 500 || v.pieces > 12 + (m.ms / 1000) * 6) return null;                 // moves made after the end, or faster than hands can go
   // beyond what the moves score: up to two points a row for dropping a piece, and 1500 for each time the rival went down
   if (st.score > v.score + 44 * v.pieces + 1500 * m.ko) return null;
@@ -153,6 +153,8 @@ function importState(raw, now) {
   d.peak = Math.max(d.rp, int(src.peak, 0, LIMIT.IMPORT_RP));
   d.rgames = 0;
   d.streak = int(src.streak, 0, 50);
+  d.xp = int(src.xp, 0, LIMIT.IMPORT_XP);      // titles are not brought in: they are earned where the server can see it
+  d.titles = []; d.title = '';
   Meta.KINDS.forEach(kind => {
     const got = [];
     list(obj(src.owned)[kind]).forEach(id => {

@@ -10,7 +10,7 @@
   function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
 
   // ---------- ladder ----------
-  var TIERS = ['陶土', '紅磚', '青瓦', '白瓷', '琉璃', '鎏金', '窯神'];
+  var TIERS = ['地基', '石牆', '塔樓', '城堡', '要塞', '天空城', '通天塔'];
   var DIVS = ['III', 'II', 'I'], STEP = 100, TOP_RP = 18 * STEP;
   function rankOf(rp) {
     rp = Math.max(0, Math.round(rp || 0));
@@ -123,17 +123,45 @@
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
 
+  // ---------- level and titles ----------
+  // The level is a second ladder, apart from ranked: every match in every mode earns experience, and it never goes down.
+  // The first levels come quickly (60 xp, a couple of matches); each one after needs 20 more.
+  var LV_MAX = 100;
+  function lvNeed(l) { return 60 + 20 * (l - 1); }
+  function levelOf(xp) {
+    var l = 1, left = Math.max(0, Math.floor(xp || 0));
+    while (l < LV_MAX && left >= lvNeed(l)) { left -= lvNeed(l); l++; }
+    return { lv: l, into: l < LV_MAX ? left : 0, need: l < LV_MAX ? lvNeed(l) : 0, top: l >= LV_MAX };
+  }
+  function lvCoins(l) { return 30 + 5 * l; }      // paid on reaching level l
+  // Titles a player can wear next to the name. Level titles come with the level; the others are earned once and kept.
+  // hour(): the hour of day in the game's own time zone (for the night owl).
+  function hourNow() { return new Date(Meta.now() + TZ * 60000).getUTCHours(); }
+  var TITLES = [
+    { id: 'lv1', lv: 1 }, { id: 'lv10', lv: 10 }, { id: 'lv20', lv: 20 }, { id: 'lv35', lv: 35 }, { id: 'lv50', lv: 50 }, { id: 'lv75', lv: 75 }, { id: 'lv100', lv: 100 },
+    { id: 'tst', on: function (m) { return m.battle && m.stats.tst > 0; } },
+    { id: 'combo10', on: function (m) { return m.stats.maxCombo >= 10; } },
+    { id: 'clean', on: function (m) { return m.battle && m.result > 0 && m.koOpp === 0 && m.ms >= 60000; } },
+    { id: 'quad100', tot: function (d) { return d.tot.quads >= 100; } },
+    { id: 'night', on: function (m) { var h = hourNow(); return m.result > 0 && h < 4; } },
+    { id: 'duo', tot: function (d) { return d.tot.duo >= 20; } },
+    { id: 'street', tot: function (d) { return d.tot.qbest >= 5; } },
+    { id: 'member', sub: true }
+  ];
+  function titleDef(id) { for (var i = 0; i < TITLES.length; i++) if (TITLES[i].id === id) return TITLES[i]; return null; }
+
   // ---------- state ----------
   function blank() {
     return {
       v: 1, coins: 200, name: '', rp: 0, peak: 0, season: '', rgames: 0, streak: 0,
+      xp: 0, titles: [], title: '',
       owned: { tile: [], bg: [], theme: [], fx: [] },
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
       items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0 },
-      tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
+      tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
     };
@@ -141,7 +169,8 @@
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
     TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
-    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find
+    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
+    TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
   function storage() {
     if (Meta.store) return Meta.store;
@@ -251,6 +280,29 @@
     return true;
   };
   Meta.isSub = function () { return Meta.data.sub.until > Meta.now(); };
+  Meta.level = function () { return levelOf(Meta.data.xp); };
+  Meta.hasTitle = function (id) {
+    var t = titleDef(id);
+    if (!t) return false;
+    if (t.lv) return Meta.level().lv >= t.lv;
+    if (t.sub) return Meta.isSub();
+    return Meta.data.titles.indexOf(id) >= 0;
+  };
+  // the title on show: the one picked, or else the highest level title reached
+  Meta.titleNow = function () {
+    var d = Meta.data;
+    if (d.title && Meta.hasTitle(d.title)) return d.title;
+    for (var i = TITLES.length - 1; i >= 0; i--) if (TITLES[i].lv && Meta.hasTitle(TITLES[i].id)) return TITLES[i].id;
+    return 'lv1';
+  };
+  Meta.wearTitle = function (id) {
+    if (typeof id !== 'string' || (id && !Meta.hasTitle(id))) return false;
+    if (Meta.data.title === id) return true;
+    Meta.data.title = id;
+    Meta.save();
+    emit('title', [id]);
+    return true;
+  };
   Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
   // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
   Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
@@ -382,6 +434,15 @@
   // ---------- after a match ----------
   var WIN_AI = [10, 15, 22, 30, 40, 5, 7];   // by level number; the last two are the beginner levels
   var MODES = { ai: 1, rank: 1, ghost: 1, net: 1, sprint: 1 };
+  // titles earned by this match and the ones whose counts it just reached (only titles not held yet)
+  function earnTitles(m) {
+    var d = Meta.data, got = [];
+    TITLES.forEach(function (t) {
+      if (t.lv || t.sub || d.titles.indexOf(t.id) >= 0) return;
+      if ((t.on && t.on(m)) || (t.tot && t.tot(d))) { d.titles.push(t.id); got.push(t.id); }
+    });
+    return got;
+  }
   // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
   // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
   //   ms: how long it was played (for a sprint, the finishing time)
@@ -392,11 +453,12 @@
     var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
     return {
       mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 6),
+      team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       ms: ms, time: sprint ? ms : 0,
       stats: {
         score: cap(st.score, 3000, 5000), sent: sprint ? 0 : cap(st.sent, 6, 20), spins: cap(st.spins, 1.5, 4), minis: cap(st.minis, 1.5, 4),
-        xspins: cap(st.xspins, 1.5, 4), quads: cap(st.quads, 1, 3), maxCombo: int(st.maxCombo, 0, 40), lines: cap(st.lines, 5, 8), pieces: cap(st.pieces, 6, 10)
+        xspins: cap(st.xspins, 1.5, 4), tst: cap(st.tst, 1, 2), quads: cap(st.quads, 1, 3), maxCombo: int(st.maxCombo, 0, 40), lines: cap(st.lines, 5, 8), pieces: cap(st.pieces, 6, 10)
       }
     };
   };
@@ -451,6 +513,16 @@
       j.n += def.on(m) || 0;
       if (j.n >= def.need) out.jobs.push(def.id);
     });
+    // experience: something for every match, more for winning and for playing well; a level up pays coins
+    var xp = m.battle ? 20 + (m.result > 0 ? 15 : m.result === 0 ? 8 : 0) + Math.min(15, Math.floor(sc / 1500)) : m.result > 0 ? 25 : 10, was = levelOf(d.xp);
+    d.xp += xp;
+    var now = levelOf(d.xp);
+    out.xp = xp; out.level = { from: was.lv, to: now.lv, into: now.into, need: now.need, top: now.top };
+    for (var l = was.lv + 1; l <= now.lv; l++) { var lc = lvCoins(l); parts.push({ key: 'lvup', n: lc, lv: l }); out.coins += lc; }
+    d.tot.quads += st.quads || 0;
+    if (m.mode === 'net' && m.team && m.result > 0) d.tot.duo++;
+    if (m.mode === 'net' && m.quick) { d.tot.qstreak = m.result > 0 ? d.tot.qstreak + 1 : 0; d.tot.qbest = Math.max(d.tot.qbest, d.tot.qstreak); }
+    out.titles = earnTitles(m);
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
     delete m.battle;
@@ -479,6 +551,7 @@
   function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
+    title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
     set: function (a) { return Meta.buySet(str(a[0])); },

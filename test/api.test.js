@@ -235,7 +235,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   await sync(B, [op('fin', taped(match({ mode: 'rank', result: -1, ko: 0, koOpp: 3 })))]);
   r = await call('board', { url: '/api/board?b=score&me=' + D.pub });
   ok(r.json.top[0].p === A.pub && r.json.top[1].p === C.pub && r.json.top[2].p === D.pub && r.json.top[1].v === 30000 && r.json.me.rank === 3, 'best first; ties go to whoever got there first', r.json.top.map(x => x.n + ':' + x.v));
-  ok(r.json.top[2].n === '' && Object.keys(r.json.top[0]).join() === 'p,n,v', 'rows carry a tag, a name and a value and nothing else', r.json.top[2]);
+  ok(r.json.top[2].n === '' && Object.keys(r.json.top[0]).join() === 'p,n,v,lv,t' && r.json.top[0].lv >= 1, 'rows carry a tag, a name, a value, a level and a title, and nothing else', r.json.top[2]);
   r = await call('board', { url: '/api/board?b=rp&me=' + B.pub });
   ok(r.json.top[0].p === B.pub && r.json.top[0].v === 900 && r.json.me.rank === 1 && r.json.top.length === 3, 'rating board in order', r.json.top);
   await pg.query('UPDATE zz.players SET ban = true WHERE pub = $1', [B.pub]);

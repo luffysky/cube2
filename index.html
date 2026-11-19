@@ -729,6 +729,18 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 @media (orientation: landscape) and (min-width: 900px) and (min-height: 521px) {
   #pad { max-width: none; grid-template-columns: minmax(84px, 136px) minmax(84px, 136px) minmax(6px, 1fr) minmax(84px, 136px) minmax(84px, 136px); padding: 4px 22px 14px; }
 }
+
+/* titles in the profile: earned ones can be worn, the rest show how to get them */
+.titles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 6px 0 14px; }
+.ttl { display: grid; gap: 2px; text-align: left; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 8px; background: var(--floor); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.35; cursor: pointer; }
+.ttl b { font-weight: 800; }
+.ttl span { color: var(--muted); font-size: 12px; }
+.ttl.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.ttl:disabled { opacity: .5; cursor: default; }
+.ttl:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.lvbox b { color: var(--gold-ink); }
+.newtitle { color: var(--gold-ink); font-weight: 700; }
+.lb li b small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -1768,6 +1780,31 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     'w.played': ['打完一場', 'Match played', '対戦完了', '대전 완료'],
     'w.ko': ['擊倒', 'KOs', 'KO', 'KO'],
     'w.first': ['今天第一勝', 'First win today', '本日の初勝利', '오늘의 첫 승'],
+    'w.lvup': ['升上 Lv {0}', 'Reached Lv {0}', 'Lv {0} に到達', 'Lv {0} 달성'],
+    'xp.got': ['經驗 +{0}', '+{0} XP', '経験値 +{0}', '경험치 +{0}'],
+    'xp.lv': ['Lv {0}', 'Lv {0}', 'Lv {0}', 'Lv {0}'],
+    'xp.up': ['升級了！Lv {0}', 'Level up! Lv {0}', 'レベルアップ！Lv {0}', '레벨 업! Lv {0}'],
+    'xp.max': ['已經滿級', 'Max level', '最大レベル', '최대 레벨'],
+    'tt.new': ['得到新稱號：{0}', 'New title: {0}', '新しい称号：{0}', '새 칭호: {0}'],
+    'tt.head': ['稱號', 'Titles', '称号', '칭호'],
+    'tt.pick': ['點一下就戴上，顯示在你的名字旁邊。', 'Tap one to wear it next to your name.', 'タップすると名前の横に表示されます。', '누르면 이름 옆에 표시됩니다.'],
+    'tt.lock': ['還沒拿到', 'Not yet', '未獲得', '미획득'],
+    'tt.on': ['戴著', 'Wearing', '装備中', '착용 중'],
+    'tt.lv1': ['搬磚工', 'Brick Hauler', 'レンガ運び', '벽돌 나르미'], 'tt.lv1.d': ['一開始就有', 'Everyone starts here', '最初から', '처음부터'],
+    'tt.lv10': ['砌牆學徒', 'Wall Apprentice', '壁積み見習い', '벽 쌓기 견습생'], 'tt.lv10.d': ['Lv 10', 'Lv 10', 'Lv 10', 'Lv 10'],
+    'tt.lv20': ['泥作師傅', 'Mason', '左官の親方', '미장 장인'], 'tt.lv20.d': ['Lv 20', 'Lv 20', 'Lv 20', 'Lv 20'],
+    'tt.lv35': ['建築匠人', 'Builder', '建築職人', '건축 장인'], 'tt.lv35.d': ['Lv 35', 'Lv 35', 'Lv 35', 'Lv 35'],
+    'tt.lv50': ['營造大師', 'Master Builder', '造営の名匠', '건설 대가'], 'tt.lv50.d': ['Lv 50', 'Lv 50', 'Lv 50', 'Lv 50'],
+    'tt.lv75': ['造城者', 'City Maker', '城を築く者', '도시를 세운 자'], 'tt.lv75.d': ['Lv 75', 'Lv 75', 'Lv 75', 'Lv 75'],
+    'tt.lv100': ['築天者', 'Sky Builder', '天を築く者', '하늘을 쌓은 자'], 'tt.lv100.d': ['Lv 100', 'Lv 100', 'Lv 100', 'Lv 100'],
+    'tt.tst': ['三消之刃', 'Triple Blade', '三列の刃', '트리플 블레이드'], 'tt.tst.d': ['對戰中做出 T 轉三消', 'Land a T-spin triple in a match', '対戦で T スピントリプルを決める', '대전에서 T스핀 트리플 성공'],
+    'tt.combo10': ['停不下來', 'Unstoppable', '止まらない', '멈출 수 없어'], 'tt.combo10.d': ['連擊到 10', 'Reach a 10 combo', '10 コンボを達成', '10 콤보 달성'],
+    'tt.clean': ['不倒翁', 'Still Standing', '倒れない人', '오뚝이'], 'tt.clean.d': ['一分鐘以上的對戰，一次都沒倒地就贏', 'Win a match of a minute or more without going down once', '1 分以上の対戦で一度もダウンせずに勝つ', '1분 이상의 대전에서 한 번도 다운되지 않고 승리'],
+    'tt.quad100': ['四消職人', 'Quad Artisan', '4ライン職人', '쿼드 장인'], 'tt.quad100.d': ['累計四消 100 次', '100 quads in total', '4 ライン消しを合計 100 回', '쿼드 누적 100회'],
+    'tt.night': ['夜貓子', 'Night Owl', '夜ふかし', '올빼미'], 'tt.night.d': ['半夜 0 點到 4 點贏一場（台灣時間）', 'Win between midnight and 4 a.m. (Taiwan time)', '深夜 0 時〜4 時に勝つ（台湾時間）', '밤 0시~4시에 승리(대만 시간)'],
+    'tt.duo': ['最佳拍檔', 'Best Partners', '名コンビ', '환상의 짝꿍'], 'tt.duo.d': ['2 對 2 贏 20 場', 'Win 20 team matches', '2 対 2 で 20 勝', '2 대 2에서 20승'],
+    'tt.street': ['路上的狠角色', 'Street Legend', '路上の猛者', '길거리의 강자'], 'tt.street.d': ['隨機配對連勝 5 場', 'Win 5 quick matches in a row', 'ランダムマッチで 5 連勝', '빠른 매칭 5연승'],
+    'tt.member': ['金磚會員', 'Gold Brick Member', '金レンガ会員', '금벽돌 멤버'], 'tt.member.d': ['會員專屬', 'Members only', 'メンバー限定', '멤버 전용'],
     'w.member': ['會員加成', 'Member bonus', 'メンバーボーナス', '멤버 보너스'],
     'w.promo': ['升上 {0}', 'Promoted to {0}', '{0}に昇格', '{0} 승급'],
     'w.sprint': ['跑完 40 行', 'Finished 40 lines', '40ライン完走', '40줄 완주'],
@@ -2470,7 +2507,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
 
   // ---------- ladder ----------
-  var TIERS = ['陶土', '紅磚', '青瓦', '白瓷', '琉璃', '鎏金', '窯神'];
+  var TIERS = ['地基', '石牆', '塔樓', '城堡', '要塞', '天空城', '通天塔'];
   var DIVS = ['III', 'II', 'I'], STEP = 100, TOP_RP = 18 * STEP;
   function rankOf(rp) {
     rp = Math.max(0, Math.round(rp || 0));
@@ -2583,17 +2620,45 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
 
+  // ---------- level and titles ----------
+  // The level is a second ladder, apart from ranked: every match in every mode earns experience, and it never goes down.
+  // The first levels come quickly (60 xp, a couple of matches); each one after needs 20 more.
+  var LV_MAX = 100;
+  function lvNeed(l) { return 60 + 20 * (l - 1); }
+  function levelOf(xp) {
+    var l = 1, left = Math.max(0, Math.floor(xp || 0));
+    while (l < LV_MAX && left >= lvNeed(l)) { left -= lvNeed(l); l++; }
+    return { lv: l, into: l < LV_MAX ? left : 0, need: l < LV_MAX ? lvNeed(l) : 0, top: l >= LV_MAX };
+  }
+  function lvCoins(l) { return 30 + 5 * l; }      // paid on reaching level l
+  // Titles a player can wear next to the name. Level titles come with the level; the others are earned once and kept.
+  // hour(): the hour of day in the game's own time zone (for the night owl).
+  function hourNow() { return new Date(Meta.now() + TZ * 60000).getUTCHours(); }
+  var TITLES = [
+    { id: 'lv1', lv: 1 }, { id: 'lv10', lv: 10 }, { id: 'lv20', lv: 20 }, { id: 'lv35', lv: 35 }, { id: 'lv50', lv: 50 }, { id: 'lv75', lv: 75 }, { id: 'lv100', lv: 100 },
+    { id: 'tst', on: function (m) { return m.battle && m.stats.tst > 0; } },
+    { id: 'combo10', on: function (m) { return m.stats.maxCombo >= 10; } },
+    { id: 'clean', on: function (m) { return m.battle && m.result > 0 && m.koOpp === 0 && m.ms >= 60000; } },
+    { id: 'quad100', tot: function (d) { return d.tot.quads >= 100; } },
+    { id: 'night', on: function (m) { var h = hourNow(); return m.result > 0 && h < 4; } },
+    { id: 'duo', tot: function (d) { return d.tot.duo >= 20; } },
+    { id: 'street', tot: function (d) { return d.tot.qbest >= 5; } },
+    { id: 'member', sub: true }
+  ];
+  function titleDef(id) { for (var i = 0; i < TITLES.length; i++) if (TITLES[i].id === id) return TITLES[i]; return null; }
+
   // ---------- state ----------
   function blank() {
     return {
       v: 1, coins: 200, name: '', rp: 0, peak: 0, season: '', rgames: 0, streak: 0,
+      xp: 0, titles: [], title: '',
       owned: { tile: [], bg: [], theme: [], fx: [] },
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
       items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0 },
-      tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0 },
+      tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
     };
@@ -2601,7 +2666,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
     TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
-    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find
+    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
+    TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
   function storage() {
     if (Meta.store) return Meta.store;
@@ -2711,6 +2777,29 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     return true;
   };
   Meta.isSub = function () { return Meta.data.sub.until > Meta.now(); };
+  Meta.level = function () { return levelOf(Meta.data.xp); };
+  Meta.hasTitle = function (id) {
+    var t = titleDef(id);
+    if (!t) return false;
+    if (t.lv) return Meta.level().lv >= t.lv;
+    if (t.sub) return Meta.isSub();
+    return Meta.data.titles.indexOf(id) >= 0;
+  };
+  // the title on show: the one picked, or else the highest level title reached
+  Meta.titleNow = function () {
+    var d = Meta.data;
+    if (d.title && Meta.hasTitle(d.title)) return d.title;
+    for (var i = TITLES.length - 1; i >= 0; i--) if (TITLES[i].lv && Meta.hasTitle(TITLES[i].id)) return TITLES[i].id;
+    return 'lv1';
+  };
+  Meta.wearTitle = function (id) {
+    if (typeof id !== 'string' || (id && !Meta.hasTitle(id))) return false;
+    if (Meta.data.title === id) return true;
+    Meta.data.title = id;
+    Meta.save();
+    emit('title', [id]);
+    return true;
+  };
   Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
   // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
   Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
@@ -2842,6 +2931,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   // ---------- after a match ----------
   var WIN_AI = [10, 15, 22, 30, 40, 5, 7];   // by level number; the last two are the beginner levels
   var MODES = { ai: 1, rank: 1, ghost: 1, net: 1, sprint: 1 };
+  // titles earned by this match and the ones whose counts it just reached (only titles not held yet)
+  function earnTitles(m) {
+    var d = Meta.data, got = [];
+    TITLES.forEach(function (t) {
+      if (t.lv || t.sub || d.titles.indexOf(t.id) >= 0) return;
+      if ((t.on && t.on(m)) || (t.tot && t.tot(d))) { d.titles.push(t.id); got.push(t.id); }
+    });
+    return got;
+  }
   // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
   // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
   //   ms: how long it was played (for a sprint, the finishing time)
@@ -2852,11 +2950,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
     return {
       mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 6),
+      team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       ms: ms, time: sprint ? ms : 0,
       stats: {
         score: cap(st.score, 3000, 5000), sent: sprint ? 0 : cap(st.sent, 6, 20), spins: cap(st.spins, 1.5, 4), minis: cap(st.minis, 1.5, 4),
-        xspins: cap(st.xspins, 1.5, 4), quads: cap(st.quads, 1, 3), maxCombo: int(st.maxCombo, 0, 40), lines: cap(st.lines, 5, 8), pieces: cap(st.pieces, 6, 10)
+        xspins: cap(st.xspins, 1.5, 4), tst: cap(st.tst, 1, 2), quads: cap(st.quads, 1, 3), maxCombo: int(st.maxCombo, 0, 40), lines: cap(st.lines, 5, 8), pieces: cap(st.pieces, 6, 10)
       }
     };
   };
@@ -2911,6 +3010,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       j.n += def.on(m) || 0;
       if (j.n >= def.need) out.jobs.push(def.id);
     });
+    // experience: something for every match, more for winning and for playing well; a level up pays coins
+    var xp = m.battle ? 20 + (m.result > 0 ? 15 : m.result === 0 ? 8 : 0) + Math.min(15, Math.floor(sc / 1500)) : m.result > 0 ? 25 : 10, was = levelOf(d.xp);
+    d.xp += xp;
+    var now = levelOf(d.xp);
+    out.xp = xp; out.level = { from: was.lv, to: now.lv, into: now.into, need: now.need, top: now.top };
+    for (var l = was.lv + 1; l <= now.lv; l++) { var lc = lvCoins(l); parts.push({ key: 'lvup', n: lc, lv: l }); out.coins += lc; }
+    d.tot.quads += st.quads || 0;
+    if (m.mode === 'net' && m.team && m.result > 0) d.tot.duo++;
+    if (m.mode === 'net' && m.quick) { d.tot.qstreak = m.result > 0 ? d.tot.qstreak + 1 : 0; d.tot.qbest = Math.max(d.tot.qbest, d.tot.qstreak); }
+    out.titles = earnTitles(m);
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
     delete m.battle;
@@ -2939,6 +3048,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
+    title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
     set: function (a) { return Meta.buySet(str(a[0])); },
@@ -4420,7 +4530,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       } else return null;
     }
     var st = g.stats;
-    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
   }
 
   ZZ.Replay = { Tape: Tape, check: check, Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };
@@ -5313,7 +5423,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched }, S.tape && !S.used ? S.tape.done() : null);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -5370,9 +5480,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       h += '<div class="rankbox' + (rk.up ? ' up' : '') + '"><b>' + esc(rankName(to)) + '</b><span>' + t('rateLine', (rk.delta >= 0 ? '+' : '') + rk.delta) + '</span>' +
         '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
     }
+    if (rw.level) {
+      var lv = rw.level, up = lv.to > lv.from, lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100);
+      h += '<div class="rankbox lvbox' + (up ? ' up' : '') + '"><b>' + esc(up ? t('xp.up', lv.to) : t('xp.lv', lv.to)) + '</b><span>' + t('xp.got', rw.xp) + '</span><div class="bar"><i style="width:' + lp + '%"></i></div></div>';
+    }
+    if (rw.titles) for (i = 0; i < rw.titles.length; i++) h += '<p class="note newtitle">' + esc(t('tt.new', t('tt.' + rw.titles[i]))) + '</p>';
     if (rw.coins) {
       h += '<div class="earn"><div class="earn-top"><span>' + t('earned') + '</span>' + coin(rw.coins) + '</div><ul>';
-      for (i = 0; i < rw.parts.length; i++) h += '<li><span>' + esc(t('w.' + rw.parts[i].key, rw.parts[i].arg ? rankName(rw.parts[i].arg) : '')) + '</span><b>+' + rw.parts[i].n + '</b></li>';
+      for (i = 0; i < rw.parts.length; i++) h += '<li><span>' + esc(t('w.' + rw.parts[i].key, rw.parts[i].arg ? rankName(rw.parts[i].arg) : rw.parts[i].lv || '')) + '</span><b>+' + rw.parts[i].n + '</b></li>';
       h += '</ul></div>';
     }
     for (i = 0; i < rw.jobs.length; i++) h += '<p class="note">' + esc(t('jobDone', t('j.' + rw.jobs[i]))) + '</p>';
@@ -5728,7 +5843,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   function updateMenu() {
     var d = Meta.data, r = Meta.rankOf(d.rp);
     txt('mName', d.name || t('player'));
-    txt('mRank', rankName(r));
+    txt('mRank', t('xp.lv', Meta.level().lv) + ' · ' + t('tt.' + Meta.titleNow()) + ' · ' + rankName(r));
     txt('mCoins', L.num(d.coins));
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
@@ -6172,7 +6287,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   Net.seat = 0; Net.peers = {}; Net.SEATS = 4;
   function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
   Net.count = function () { return 1 + peerList().length; };
-  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { return { seat: s, name: s === Net.seat ? Net.me : Net.peers[s].name, me: s === Net.seat }; }); };
+  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { var p = s === Net.seat ? null : Net.peers[s]; return { seat: s, name: p ? p.name : Net.me, me: !p, lv: p ? p.lv : ZZ.Meta.level().lv, tt: p ? p.tt : ZZ.Meta.titleNow() }; }); };
+  // who I am, for the others' room list: name, level and the title on show
+  function hello(ack) {
+    var M = ZZ.Meta, o = { t: 'hello', v: 1, name: Net.me };
+    try { o.lv = M.level().lv; o.tt = M.titleNow(); } catch (e) { /* the list just shows the name */ }
+    if (ack) o.ack = 1;
+    return o;
+  }
   function firstName() { var l = peerList(); return l.length ? Net.peers[l[0]].name : ''; }
 
   // ---------- transports ----------
@@ -6415,7 +6537,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     link = c;
     c.on('open', function () {
       clearTimeout(joinT);
-      send({ t: 'hello', v: 1, name: Net.me });
+      send(hello(0));
       if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team });
       else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
@@ -6702,10 +6824,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send({ t: 'hello', v: 1, name: Net.me, ack: 1 }); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
+        if (!m.ack) { send(hello(1)); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
         var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
+        Net.peers[from].lv = int(m.lv, 1, 999); Net.peers[from].tt = typeof m.tt === 'string' && /^[a-z0-9]{1,12}$/.test(m.tt) ? m.tt : '';
         Net.foe = firstName();
         Net.seated = false;
         if (Net.state !== 'playing') setState('ready'); else changed();
@@ -6848,13 +6971,13 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   var $ = function (id) { return document.getElementById(id); };
 
   L.add({
-    'tier0': ['陶土', 'Clay', '陶土', '점토'],
-    'tier1': ['紅磚', 'Brick', '赤レンガ', '벽돌'],
-    'tier2': ['青瓦', 'Slate', '瓦', '기와'],
-    'tier3': ['白瓷', 'Porcelain', '白磁', '백자'],
-    'tier4': ['琉璃', 'Glass', '瑠璃', '유리'],
-    'tier5': ['鎏金', 'Gilt', '金箔', '금박'],
-    'tier6': ['窯神', 'Kiln god', '窯神', '가마신'],
+    'tier0': ['地基', 'Foundation', '土台', '토대'],
+    'tier1': ['石牆', 'Stone Wall', '石垣', '돌담'],
+    'tier2': ['塔樓', 'Tower', '塔', '망루'],
+    'tier3': ['城堡', 'Castle', '城', '성'],
+    'tier4': ['要塞', 'Fortress', '要塞', '요새'],
+    'tier5': ['天空城', 'Sky City', '天空城', '천공성'],
+    'tier6': ['通天塔', 'Skyspire', '天空の塔', '하늘탑'],
     'foes': ['阿土|磚頭伯|小釉|瓦片姐|泥作仔|阿窯|磨石嬸|水泥哥|砌牆王|青花妹', 'Clay|Old Brick|Glaze|Slate|Mortar|Kiln|Terra|Grout|Mason|Cobalt', 'ツチ|レンガ爺|ユウ|カワラ姐|サカン|カマ|ミガキ|セメント兄|ツミ王|アイ', '흙이|벽돌 할배|유약이|기와 언니|미장이|가마|돌이|시멘트 형|쌓기왕|청화'],
     'rk.toNext': ['再 {0} 分升段', '{0} to the next step', '昇格まであと{0}', '승급까지 {0}'],
     'rk.top': ['已經到頂了，分數繼續累積。', 'You are at the top. Points keep counting.', '最高ランクです。ポイントは積み上がります。', '최고 랭크입니다. 점수는 계속 쌓입니다.'],
@@ -7165,7 +7288,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       // the game's own relay: up to four in a room
       var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && n === 4;
       h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.SEATS) + '</h3><ul class="roster">';
-      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
+      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
@@ -7688,10 +7811,23 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
     var d = Meta.data, r = Meta.rankOf(d.rp), pct = r.top ? 100 : Math.round(r.into / r.need * 100), tt = d.tot;
     var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
     var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
-      '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div><table class="cmp"><tbody>';
+      '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    var lv = Meta.level(), lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100), now = Meta.titleNow();
+    h += '<div class="rankbox lvbox"><b>' + t('xp.lv', lv.lv) + ' · ' + esc(t('tt.' + now)) + '</b><span>' + (lv.top ? t('xp.max') : lv.into + ' / ' + lv.need) + '</span><div class="bar"><i style="width:' + lp + '%"></i></div></div>' +
+      '<h3>' + t('tt.head') + '</h3><p class="note">' + t('tt.pick') + '</p><div class="titles">';
+    Meta.TITLES.forEach(function (tt) {
+      var have = Meta.hasTitle(tt.id), on = now === tt.id;
+      h += '<button type="button" class="ttl' + (on ? ' on' : '') + '" data-title="' + tt.id + '"' + (have ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(t('tt.' + tt.id)) + '</b><span>' + esc(have ? (on ? t('tt.on') : t('tt.' + tt.id + '.d')) : t('tt.lock') + '：' + t('tt.' + tt.id + '.d')) + '</span></button>';
+    });
+    h += '</div><table class="cmp"><tbody>';
     rows.forEach(function (x) { h += '<tr><td>' + t(x[0]) + '</td><td>' + x[1] + '</td></tr>'; });
     return h + '</tbody></table>' + (App.profileExtra ? App.profileExtra() : '') + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
+
+  App.clicks.push(function (d) {
+    if (d.title != null) { if (Meta.wearTitle(d.title)) { App.sfx.play('move'); App.openSheet('profile'); App.updateMenu(); } return true; }
+    return false;
+  });
 
   // Bring the saved pictures back when the page opens.
   App.boot.push(function () {
@@ -8311,7 +8447,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
         for (i = 0; i < top.length; i++) {
           var r = top[i], me = !!Cloud.pub && r.p === Cloud.pub;
           if (me) mine = true;
-          h += '<li' + (me ? ' class="me"' : '') + '><i>' + (i + 1) + '</i><b>' + esc(nameOf(r.n, r.p)) + (me ? '<em>' + t('lb.you') + '</em>' : '') + '</b><span>' + valueOf(b, r.v) + '</span></li>';
+          h += '<li' + (me ? ' class="me"' : '') + '><i>' + (i + 1) + '</i><b>' + esc(nameOf(r.n, r.p)) + (me ? '<em>' + t('lb.you') + '</em>' : '') + (r.lv ? '<small>' + t('xp.lv', r.lv) + (r.t && L.has('tt.' + r.t) ? ' · ' + esc(t('tt.' + r.t)) : '') + '</small>' : '') + '</b><span>' + valueOf(b, r.v) + '</span></li>';
         }
         h += '</ol>';
       }

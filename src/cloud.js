@@ -602,7 +602,7 @@
         for (i = 0; i < top.length; i++) {
           var r = top[i], me = !!Cloud.pub && r.p === Cloud.pub;
           if (me) mine = true;
-          h += '<li' + (me ? ' class="me"' : '') + '><i>' + (i + 1) + '</i><b>' + esc(nameOf(r.n, r.p)) + (me ? '<em>' + t('lb.you') + '</em>' : '') + '</b><span>' + valueOf(b, r.v) + '</span></li>';
+          h += '<li' + (me ? ' class="me"' : '') + '><i>' + (i + 1) + '</i><b>' + esc(nameOf(r.n, r.p)) + (me ? '<em>' + t('lb.you') + '</em>' : '') + (r.lv ? '<small>' + t('xp.lv', r.lv) + (r.t && L.has('tt.' + r.t) ? ' · ' + esc(t('tt.' + r.t)) : '') + '</small>' : '') + '</b><span>' + valueOf(b, r.v) + '</span></li>';
         }
         h += '</ol>';
       }

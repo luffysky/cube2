@@ -54,6 +54,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     const cpu = await until(async () => { const c = await st(C); return c.S && c.S.kind === 'battle'; }, 9000);
     const c = await st(C);
     ok(cpu && c.S.mode === 'ai' && /電腦/.test(c.S.opp), 'nobody came, so the computer plays, and is named as the computer', c);
+    await sleep(1000);      // the goodbye that takes the room down is on its way
     const rooms = await (await fetch('http://127.0.0.1:' + PORT + '/_dev/state')).json();
     ok(!rooms.rooms.some(r => r.seats === 1 && r.exp > Date.now() + 60000 && r.code), 'the empty room was taken down', rooms.rooms);
     // and the end card offers to look for a real player again

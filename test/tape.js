@@ -40,7 +40,7 @@ function fin(mode, o, more) {
 let seedNo = 1000;
 function fake(m) {
   const c = ZZ.Meta.cleanMatch(m), st = c.stats;
-  return { v: 1, rv: ZZ.RULES, seed: seedNo++, ev: [], standIn: { ms: c.ms, kos: c.koOpp, pieces: st.pieces, lines: st.lines, attack: st.sent, score: st.score, spins: st.spins, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo } };
+  return { v: 1, rv: ZZ.RULES, seed: seedNo++, ev: [], standIn: { ms: c.ms, kos: c.koOpp, pieces: st.pieces, lines: st.lines, attack: st.sent, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo } };
 }
 // zz: the copy of the game code the server under test uses (it can be a different copy from the one loaded here)
 function stub(zz) {
