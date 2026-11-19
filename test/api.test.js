@@ -56,7 +56,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 7, 'seven tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 8, 'eight tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -285,7 +285,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await x(otherKey, 0, 0, [])).status, 404, 'a wrong key gets nothing');
   eq((await x(hostKey, 1, 0, [])).status, 404, "the host's key does not open the guest's seat");
   eq((await room({ a: 'join', code: 'ZZZZZ', key: guestKey })).status, 404, 'joining a room that does not exist');
-  eq((await room({ a: 'join', code: rc, key: hostKey })).status, 409, 'the host cannot take both seats');
+  { const again = await room({ a: 'join', code: rc, key: hostKey }); ok(again.status === 200 && again.json.seat === 0, 'the host asking to join is told the seat it already has, and takes no second one', again.json); }
   r = await room({ a: 'join', code: rc.toLowerCase().split('').join(' '), key: guestKey });
   ok(r.json.ok && r.json.code === rc, 'a friend joins with the code, typed any old way', r.json);
   ok((await room({ a: 'join', code: rc, key: guestKey })).json.ok, 'asking again with the same key is fine (a retry)');
@@ -302,7 +302,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq(r.json.in.length, 2, 'not acknowledged yet, so it is still there (the answer may have been lost)');
   r = await x(guestKey, 1, 2, []);
   eq(r.json.in.length, 0, 'acknowledged: nothing new');
-  eq((await pg.query('SELECT count(*)::int AS n FROM zz.mail WHERE room = $1 AND dst = 1', [rc]))[0].n, 0, 'and the read letters are removed');
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.post WHERE room = $1 AND dst = 1', [rc]))[0].n, 0, 'and the read letters are removed');
   r = await x(hostKey, 0, 0, [{ n: 2, m: { t: 'cfg', minutes: 3 } }, { n: 3, m: { t: 'start', seed: 7 } }]);
   eq(r.json.in.map(l => [l.n, l.m.t, l.m.name]), [[1, 'hello', '小華']], 'the host collects the reply');
   r = await x(hostKey, 0, 1, [{ n: 3, m: { t: 'start', seed: 7 } }, { n: 4, m: { t: 'a', n: 4 } }]);
@@ -314,20 +314,65 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await x(hostKey, 0, 0, [{ n: 5, m: 'text' }])).status, 400, 'each one an object');
   eq((await x(hostKey, 0, 0, [{ n: 5, m: { big: 'x'.repeat(5000) } }])).status, 400, 'and not huge');
   eq((await x(hostKey, 0, 0, Array.from({ length: 81 }, (_, i) => ({ n: 10 + i, m: {} })))).status, 400, 'nor too many at once');
-  eq((await x(hostKey, 0, "0; DROP TABLE zz.mail", [], "x' OR '1'='1")).status, 404, 'odd codes find no room');
-  ok((await x(hostKey, 0, '1; DROP TABLE zz.mail', [])).json.ok && (await pg.query('SELECT count(*)::int AS n FROM zz.mail'))[0].n >= 0, 'an odd acknowledgement is just a number');
+  eq((await x(hostKey, 0, "0; DROP TABLE zz.post", [], "x' OR '1'='1")).status, 404, 'odd codes find no room');
+  ok((await x(hostKey, 0, '1; DROP TABLE zz.post', [])).json.ok && (await pg.query('SELECT count(*)::int AS n FROM zz.post'))[0].n >= 0, 'an odd acknowledgement is just a number');
   eq((await room({ a: 'x', code: rc, key: hostKey, role: 0 }, { method: 'GET' })).status, 405, 'rooms are POST only');
   eq((await room({ a: 'open', key: otherKey }, { headers: { origin: 'https://evil.example' } })).status, 403, 'another site may not use rooms');
   eq((await room({ a: 'dance' })).status, 400, 'unknown room action');
   // a box that nobody empties stops filling
   for (let i = 0; i < 6; i++) await x(hostKey, 0, 1, Array.from({ length: 80 }, (_, k) => ({ n: 100 + i * 80 + k, m: { t: 's' } })));
-  const waiting = (await pg.query('SELECT count(*)::int AS n FROM zz.mail WHERE room = $1 AND dst = 1', [rc]))[0].n;
+  const waiting = (await pg.query('SELECT count(*)::int AS n FROM zz.post WHERE room = $1 AND dst = 1', [rc]))[0].n;
   ok(waiting >= 400 && waiting < 480, 'unread letters are capped', waiting);
   // closing
   ok((await room({ a: 'close', code: rc, key: guestKey })).json.ok && (await x(hostKey, 0, 1, [])).json.ok, 'only the host can close the room');
   ok((await room({ a: 'close', code: rc, key: hostKey })).json.ok, 'the host closes it');
   eq([(await x(guestKey, 1, 2, [])).status, (await x(hostKey, 0, 1, [])).status, (await room({ a: 'join', code: rc, key: otherKey })).status], [404, 404, 404], 'a closed room is gone for everyone');
-  eq((await pg.query('SELECT count(*)::int AS n FROM zz.mail WHERE room = $1', [rc]))[0].n, 0, 'with everything that was waiting in it');
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.post WHERE room = $1', [rc]))[0].n, 0, 'with everything that was waiting in it');
+
+// ---------- rooms with more than two seats ----------
+{
+  const K = n => ('seat-key-number-' + n + '-xxxxxxxxxxxxxxxxxxxx').slice(0, 32);
+  const opened = await room({ a: 'open', key: K(0), cap: 4 });
+  ok(opened.status === 200 && opened.json.seat === 0 && opened.json.cap === 4, 'a room for four opens', opened.json);
+  const c4 = opened.json.code;
+  eq((await room({ a: 'open', key: K(9), cap: 5 })).status, 400, 'no room is bigger than four');
+  eq((await room({ a: 'open', key: K(9), cap: 1 })).status, 400, 'or smaller than two');
+  const j1 = await room({ a: 'join', code: c4, key: K(1) }), j2 = await room({ a: 'join', code: c4, key: K(2) });
+  ok(j1.json.seat === 1 && j2.json.seat === 2, 'guests take seats in order', [j1.json, j2.json]);
+  eq((await room({ a: 'join', code: c4, key: K(1) })).json.seat, 1, 'a repeated join keeps its seat');
+  const X = (n, out, acks) => room({ a: 'x', code: c4, key: K(n), seat: n, out: out || [], acks: acks || [] });
+  // seat 0 speaks to everyone, seat 2 speaks to seat 1 only; both use the number 1
+  await X(0, [{ n: 1, m: { t: 'all' } }]);
+  await X(2, [{ n: 1, m: { t: 'one' }, to: 1 }]);
+  const in1 = (await X(1)).json.in, in2 = (await X(2)).json.in, in0 = (await X(0)).json.in;
+  ok(in1.length === 2 && in1[0].f === 0 && in1[0].m.t === 'all' && in1[1].f === 2 && in1[1].m.t === 'one', 'seat 1 hears both, and who said what', in1);
+  ok(in2.length === 1 && in2[0].f === 0, 'seat 2 hears only the broadcast', in2);
+  eq(in0.length, 0, 'the speaker does not hear itself');
+  await X(0, [{ n: 1, m: { t: 'all' } }]);
+  eq((await X(1)).json.in.length, 2, 'the same number twice is kept once');
+  // reading is acknowledged per speaker
+  eq((await X(1, [], [1, 0, 0, 0])).json.in.length, 1, 'acknowledging seat 0 leaves seat 2 waiting');
+  eq((await X(1, [], [1, 0, 1, 0])).json.in.length, 0, 'acknowledging both empties the box');
+  eq((await X(1, [], [])).json.in.length, 0, 'and what was read is gone');
+  eq((await room({ a: 'x', code: c4, key: K(1), seat: 2 })).status, 404, 'a key only opens its own seat');
+  eq((await room({ a: 'x', code: c4, key: K(1), seat: 7 })).status, 404, 'there is no seat 7');
+  eq((await X(0, [{ n: 5, m: { t: 'x' }, to: 9 }])).status, 400, 'a letter to a seat that cannot exist is refused');
+  ok((await X(0)).json.seats === 3 && (await X(0)).json.cap === 4, 'everyone is told how many are seated');
+  eq((await room({ a: 'lock', code: c4, key: K(1) })).status, 404, 'only the host shuts the door');
+  ok((await room({ a: 'lock', code: c4, key: K(0) })).json.seats === 3, 'the host shuts the door at three');
+  eq((await room({ a: 'join', code: c4, key: K(3) })).status, 409, 'and a fourth can no longer come in');
+  eq((await room({ a: 'join', code: c4, key: K(2) })).json.seat, 2, 'while those inside still find their seats');
+  // a late broadcast reaches every seat that exists now
+  await X(1, [{ n: 2, m: { t: 'hi' } }]);
+  ok((await X(0)).json.in.some(l => l.f === 1 && l.m.t === 'hi') && (await X(2, [], [1])).json.in.some(l => l.f === 1), 'a guest can speak to all');
+  // pages from before this change still work in a room for two
+  const old = await room({ a: 'open', key: K(5) }), oc = old.json.code;
+  await room({ a: 'join', code: oc, key: K(6) });
+  await room({ a: 'x', code: oc, key: K(5), role: 0, ack: 0, out: [{ n: 1, m: { t: 'old' } }] });
+  const o1 = await room({ a: 'x', code: oc, key: K(6), role: 1, ack: 0, out: [] });
+  ok(o1.json.paired === true && o1.json.in.length === 1 && o1.json.in[0].n === 1, 'the old two-seat way of talking still works', o1.json);
+  eq((await room({ a: 'x', code: oc, key: K(6), role: 1, ack: 1, out: [] })).json.in.length, 0, 'with its single acknowledgement');
+}
   // the host leaves: a goodbye sent together with "this is my last word"
   const last = (key, role, code, out) => room({ a: 'x', code, key, role, ack: 0, out: out || [], end: true });
   r = await room({ a: 'open', key: hostKey }, { ip: '198.51.100.210' }); const rc3 = r.json.code;
@@ -411,6 +456,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok((await rpc({ a: 'hello' }, null, { ip: '192.0.2.77' })).json.ok, 'a missing table is put back on the next request that needs it');
 
   await pg.close();
-  console.log('api tests: ' + pass + ' passed, ' + fail + ' failed');
+  
+console.log('api tests: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('CRASH', e); process.exit(1); });

@@ -8,7 +8,8 @@ const path = require('path');
 const RELAY = !!process.env.ZZ_RELAY, PORT = 8773;
 const BASE = RELAY ? 'http://127.0.0.1:' + PORT + '/index.html' : process.env.ZZ_URL || 'http://127.0.0.1:8765/index.html';
 const PEER = process.env.ZZ_PEER || '';
-const Q = RELAY ? '' : PEER ? '?peer=' + encodeURIComponent(PEER) : '?net=bc&code=TEST2';
+const NOWS = process.env.ZZ_WS === 'off';      // ZZ_WS=off: the relay without its WebSocket lane, plain requests only
+const Q = RELAY ? (NOWS ? '?ws=off' : '') : PEER ? '?peer=' + encodeURIComponent(PEER) : '?net=bc&code=TEST2';
 const W = RELAY ? 2.2 : 1;      // the relay needs a round trip or two more than a direct channel
 const OUT = path.join(__dirname, '..', 'shots');
 const nap = ms => new Promise(r => setTimeout(r, ms));
@@ -20,13 +21,14 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
   let srv = null;
   if (RELAY) { srv = spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'dev-server.js'), String(PORT)], { stdio: ['ignore', 'pipe', 'inherit'] }); await new Promise(r => srv.stdout.once('data', r)); }
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required', '--disable-features=WebRtcHideLocalIpsWithMdns', '--allow-loopback-in-peer-connection'] });
-  const problems = [], reqs = [];
+  const problems = [], reqs = [], socks = [];
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 760 }, deviceScaleFactor: 1, locale: 'zh-TW' });
   async function open(name) {
     const page = await ctx.newPage();
     page.on('pageerror', e => problems.push(name + ' pageerror: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 5).join('\n')));
     page.on('console', m => { if (m.type() === 'error' && !/fonts\.g|ERR_|Failed to load resource/.test(m.text())) problems.push(name + ' console: ' + m.text()); });
     page.on('request', r => { if (!/^data:/.test(r.url())) reqs.push(r.url()); });
+    page.on('websocket', w => { const one = { url: w.url(), sent: 0, got: 0 }; socks.push(one); w.on('framesent', () => one.sent++); w.on('framereceived', () => one.got++); });
     await page.goto(BASE + Q);
     await sleep(600);
     if (RELAY) for (let i = 0; i < 40 && !(await page.evaluate(() => ZZ.Cloud.on)); i++) await nap(150);
@@ -162,7 +164,9 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
 
     // what the relay asked of the server during all that
     const rooms = reqs.filter(u => /\/api\/room$/.test(u)).length;
-    ok(rooms > 20 && reqs.every(u => /^http:\/\/127\.0\.0\.1:/.test(u) || /fonts\.(googleapis|gstatic)\.com/.test(u)), 'everything went through this site, nothing through a public broker', [rooms, reqs.filter(u => !/^http:\/\/127\.0\.0\.1:/.test(u) && !/fonts\./.test(u)).slice(0, 5)]);
+    if (NOWS) ok(socks.length === 0, 'with the socket lane switched off no socket is opened', socks);
+    else ok(socks.length >= 2 && socks.every(w => /^ws:\/\/127\.0\.0\.1:\d+\/api\/ws$/.test(w.url)) && socks.reduce((a, w) => a + w.sent, 0) > 20 && socks.reduce((a, w) => a + w.got, 0) > 20, 'the match itself ran over this site\'s own sockets', socks);
+    ok(rooms > (NOWS ? 20 : 5) && reqs.every(u => /^http:\/\/127\.0\.0\.1:/.test(u) || /fonts\.(googleapis|gstatic)\.com/.test(u)), 'everything went through this site, nothing through a public broker', [rooms, reqs.filter(u => !/^http:\/\/127\.0\.0\.1:/.test(u) && !/fonts\./.test(u)).slice(0, 5)]);
     ok(await ev(A, 'return !window.Peer'), 'the PeerJS library was never loaded');
   }
   await browser.close();

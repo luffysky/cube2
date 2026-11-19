@@ -189,6 +189,7 @@ const ROOM = {
   OPEN_PER_HOUR: 40, JOIN_TRIES: 60, JOIN_WINDOW: 10 * 60000,
   MAIL_MAX: 400,             // letters that may wait unread in one box
   BATCH: 80, MSG_BYTES: 4096, INBOX: 120,
+  SEATS: 4,                  // the most players one room holds
   LINGER: 15000              // after the host has left, a guest still has this long to collect the last letters
 };
 const SEAT = /^[A-Za-z0-9_-]{20,64}$/;
@@ -199,15 +200,17 @@ function readRoom(v) {
 }
 async function roomOpen(db, body, ip, now) {
   if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
+  const cap = body.cap === undefined ? 2 : Math.floor(+body.cap);
+  if (!(cap >= 2 && cap <= ROOM.SEATS)) return fail(400, 'cap');
   if (await bump(db, 'room', ip, 3600000, now) > ROOM.OPEN_PER_HOUR) return fail(429, 'slow');
   for (let tries = 0; ; tries++) {
     const code = pick(CODE_ABC, 5);
     try {
       await db.batch([
         ['DELETE FROM zz.rooms WHERE exp < $1', [now]],
-        ['INSERT INTO zz.rooms (code, hk, exp) VALUES ($1, $2, $3)', [code, sha(body.key), now + ROOM.TTL]]
+        ['INSERT INTO zz.rooms (code, hk, exp, ks, cap) VALUES ($1, $2, $3, ARRAY[$2], $4)', [code, sha(body.key), now + ROOM.TTL, cap]]
       ]);
-      return good({ code, now });
+      return good({ code, seat: 0, cap, now });
     } catch (e) {
       if (e && e.code === '23505' && tries < 6) continue;   // that code is in use: draw another
       throw e;
@@ -220,11 +223,19 @@ async function roomJoin(db, body, ip, now) {
   if (await bump(db, 'join', ip, ROOM.JOIN_WINDOW, now) > ROOM.JOIN_TRIES) return fail(429, 'slow');
   if (!code) return fail(404, 'room');
   const hash = sha(body.key);
-  // taking the free seat; asking again with the same key (a retry) is fine
-  const got = await db.query('UPDATE zz.rooms SET jk = $2 WHERE code = $1 AND exp > $3 AND hk <> $2 AND (jk IS NULL OR jk = $2) RETURNING code', [code, hash, now]);
-  if (got[0]) return good({ code, now });
-  const there = await db.query('SELECT 1 AS x FROM zz.rooms WHERE code = $1 AND exp > $2', [code, now]);
-  return there[0] ? fail(409, 'full') : fail(404, 'room');
+  // taking the next free seat; asking again with the same key (a retry) gets the seat it already has
+  const got = await db.query('UPDATE zz.rooms SET ks = ks || $2::text WHERE code = $1 AND exp > $3 AND NOT ($2 = ANY(ks)) AND cardinality(ks) < cap RETURNING cardinality(ks) - 1 AS seat, cap', [code, hash, now]);
+  if (got[0]) return good({ code, seat: got[0].seat, cap: got[0].cap, now });
+  const there = await db.query('SELECT array_position(ks, $2) - 1 AS seat, cap FROM zz.rooms WHERE code = $1 AND exp > $3', [code, hash, now]);
+  if (!there[0]) return fail(404, 'room');
+  return there[0].seat === null || there[0].seat === undefined ? fail(409, 'full') : good({ code, seat: there[0].seat, cap: there[0].cap, now });
+}
+// The host shuts the door: nobody else can take a seat (the match is starting with whoever is here).
+async function roomLock(db, body, now) {
+  const code = readRoom(body.code);
+  if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
+  const got = await db.query('UPDATE zz.rooms SET cap = cardinality(ks) WHERE code = $1 AND exp > $3 AND ks[1] = $2 RETURNING cap', [code, sha(body.key), now]);
+  return got[0] ? good({ seats: got[0].cap, now }) : fail(404, 'room');
 }
 function cleanMail(v) {
   if (v == null) return [];
@@ -233,49 +244,63 @@ function cleanMail(v) {
   for (const x of v) {
     if (!x || typeof x !== 'object' || typeof x.n !== 'number' || x.n !== Math.floor(x.n) || x.n < 1 || x.n > 2e9 || !x.m || typeof x.m !== 'object' || Array.isArray(x.m)) return null;
     if (JSON.stringify(x.m).length > ROOM.MSG_BYTES) return null;
-    out.push({ n: x.n, m: x.m });
+    const o = { n: x.n, m: x.m };
+    if (x.to !== undefined) { if (typeof x.to !== 'number' || x.to !== Math.floor(x.to) || x.to < 0 || x.to >= ROOM.SEATS) return null; o.to = x.to; }
+    out.push(o);
   }
   return out;
 }
+// $1 code · $2 my seat · $3 my key's hash · $4 what I say · $5 how far I have read from each seat · $6 now · $7 box limit
 const EXCHANGE = `
-  WITH seat AS (
-    SELECT code, (jk IS NOT NULL) AS paired FROM zz.rooms
-    WHERE code = $1 AND exp > $7 AND (CASE WHEN $2::int = 0 THEN hk ELSE jk END) = $3
+  WITH room AS (
+    SELECT code, cardinality(ks) AS seats, cap FROM zz.rooms WHERE code = $1 AND exp > $6 AND ks[$2::int + 1] = $3
   ), put AS (
-    INSERT INTO zz.mail (room, dst, n, body)
-    SELECT seat.code, $4::int, (x->>'n')::int, x->'m' FROM seat, jsonb_array_elements($5::jsonb) AS x
-    WHERE (SELECT count(*) FROM zz.mail q WHERE q.room = seat.code AND q.dst = $4::int) < $8::int
-    ON CONFLICT (room, dst, n) DO NOTHING
+    INSERT INTO zz.post (room, dst, src, n, body)
+    SELECT room.code, d, $2::int, (x->>'n')::int, x->'m'
+    FROM room, jsonb_array_elements($4::jsonb) AS x, generate_series(0, ${ROOM.SEATS - 1}) AS d
+    WHERE d < room.seats AND d <> $2::int AND (x->'to' IS NULL OR (x->>'to')::int = d)
+      AND (SELECT count(*) FROM zz.post q WHERE q.room = room.code AND q.dst = d) < $7::int
+    ON CONFLICT (room, dst, src, n) DO NOTHING
     RETURNING 1
   ), del AS (
-    DELETE FROM zz.mail m USING seat WHERE m.room = seat.code AND m.dst = $2::int AND m.n <= $6::int RETURNING 1
+    DELETE FROM zz.post p USING room WHERE p.room = room.code AND p.dst = $2::int AND p.n <= COALESCE(($5::int[])[p.src + 1], 0) RETURNING 1
   )
-  SELECT (SELECT count(*)::int FROM seat) AS ok, (SELECT paired FROM seat) AS paired,
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('n', w.n, 'm', w.body) ORDER BY w.n)
-              FROM (SELECT m.n, m.body FROM zz.mail m, seat WHERE m.room = seat.code AND m.dst = $2::int AND m.n > $6::int ORDER BY m.n LIMIT ${ROOM.INBOX}) w), '[]'::jsonb) AS inbox`;
+  SELECT (SELECT count(*)::int FROM room) AS ok, (SELECT seats FROM room) AS seats, (SELECT cap FROM room) AS cap,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('n', w.n, 'm', w.body, 'f', w.src) ORDER BY w.src, w.n)
+              FROM (SELECT p.n, p.body, p.src FROM zz.post p, room WHERE p.room = room.code AND p.dst = $2::int AND p.n > COALESCE(($5::int[])[p.src + 1], 0) ORDER BY p.src, p.n LIMIT ${ROOM.INBOX}) w), '[]'::jsonb) AS inbox`;
+function readSeat(body) {
+  const s = body.seat === undefined ? (body.role === 1 ? 1 : 0) : Math.floor(+body.seat);    // pages from before rooms had more than two seats say "role"
+  return s >= 0 && s < ROOM.SEATS ? s : -1;
+}
+function readAcks(body, seat) {
+  const acks = [0, 0, 0, 0, 0, 0, 0, 0], num = v => Math.max(0, Math.min(2e9, Math.floor(+v || 0)));
+  if (Array.isArray(body.acks)) for (let i = 0; i < ROOM.SEATS && i < body.acks.length; i++) acks[i] = num(body.acks[i]);
+  else if (seat < 2) acks[1 - seat] = num(body.ack);
+  return acks;
+}
 // One round of the conversation: hand over what I have to say, say how far I have read, collect what is waiting for me.
 async function roomExchange(db, body, now) {
-  const code = readRoom(body.code), role = body.role === 1 ? 1 : 0;
-  if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
-  const out = cleanMail(body.out), ack = Math.max(0, Math.min(2e9, Math.floor(+body.ack || 0)));
+  const code = readRoom(body.code), seat = readSeat(body);
+  if (!code || seat < 0 || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
+  const out = cleanMail(body.out);
   if (!out) return fail(400, 'mail');
-  const rows = await db.query(EXCHANGE, [code, role, sha(body.key), 1 - role, JSON.stringify(out), ack, now, ROOM.MAIL_MAX]);
+  const rows = await db.query(EXCHANGE, [code, seat, sha(body.key), JSON.stringify(out), readAcks(body, seat), now, ROOM.MAIL_MAX]);
   const r = rows[0];
   if (!r || !r.ok) return fail(404, 'room');
-  if (body.end === true && role === 0) await db.query(LEAVE, [code, sha(body.key), now + ROOM.LINGER]);   // the host's last word
-  return good({ paired: !!r.paired, in: r.inbox || [], now });
+  if (body.end === true && seat === 0) await db.query(LEAVE, [code, sha(body.key), now + ROOM.LINGER]);   // the host's last word
+  return good({ paired: r.seats > 1, seats: r.seats, cap: r.cap, in: r.inbox || [], now });
 }
-// The host leaves. With nobody else in the room it is gone at once and its code stops working. With a guest in it,
+// The host leaves. With nobody else in the room it is gone at once and its code stops working. With guests in it,
 // the room lasts a few seconds more so that the goodbye (and a final score) still reaches them; nobody new can get in.
 const LEAVE = `
-  WITH empty AS (DELETE FROM zz.rooms WHERE code = $1 AND hk = $2 AND jk IS NULL RETURNING 1)
-  UPDATE zz.rooms SET exp = LEAST(exp, $3::float8) WHERE code = $1 AND hk = $2 AND jk IS NOT NULL`;
+  WITH empty AS (DELETE FROM zz.rooms WHERE code = $1 AND ks[1] = $2 AND cardinality(ks) = 1 RETURNING 1)
+  UPDATE zz.rooms SET exp = LEAST(exp, $3::float8), cap = cardinality(ks) WHERE code = $1 AND ks[1] = $2 AND cardinality(ks) > 1`;
 // The host closes the room outright: the code stops working at once and anything still waiting is dropped.
 async function roomClose(db, body) {
   const code = readRoom(body.code);
   if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
-  await db.query('DELETE FROM zz.rooms WHERE code = $1 AND hk = $2', [code, sha(body.key)]);
+  await db.query('DELETE FROM zz.rooms WHERE code = $1 AND ks[1] = $2', [code, sha(body.key)]);
   return good({});
 }
 
-module.exports = { LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomExchange, roomClose };
+module.exports = { readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomLock, roomExchange, roomClose };

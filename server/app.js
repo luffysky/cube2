@@ -94,6 +94,7 @@ const routes = {
       case 'open': out = await db.run(d => core.roomOpen(d, body, ipTag(req), now)); break;
       case 'join': out = await db.run(d => core.roomJoin(d, body, ipTag(req), now)); break;
       case 'close': out = await db.run(d => core.roomClose(d, body)); break;
+      case 'lock': out = await db.run(d => core.roomLock(d, body, now)); break;
       default: return send(res, 400, { ok: false, why: 'action' });
     }
     send(res, out.status, out.body);

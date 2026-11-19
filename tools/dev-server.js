@@ -13,6 +13,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   const m = /^\/api\/([a-z]+)$/.exec(url.pathname);
+  if (m && m[1] === 'ws') { res.statusCode = 426; return res.end('websocket'); }
   if (m) {
     if (app.routes.indexOf(m[1]) < 0) { res.statusCode = 404; return res.end('not found'); }
     return app.handle(m[1], req, res);
@@ -22,8 +23,8 @@ const server = http.createServer((req, res) => {
     const rows = sql => db.get().query(sql).then(r => r, () => []);
     return Promise.all([
       rows("SELECT id, name, ver, (state->>'coins')::int AS coins, (state->'tot'->>'games')::int AS games FROM zz.players ORDER BY made, id"),
-      rows('SELECT code, jk IS NOT NULL AS paired, exp FROM zz.rooms ORDER BY code'),
-      rows('SELECT room, dst, n, body FROM zz.mail ORDER BY room, dst, n')
+      rows('SELECT code, cardinality(ks) > 1 AS paired, cardinality(ks) AS seats, cap, exp FROM zz.rooms ORDER BY code'),
+      rows('SELECT room, dst, src, n, body FROM zz.post ORDER BY room, dst, src, n')
     ]).then(([players, rooms, mail]) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ players, rooms, mail })); });
   }
   let rel = decodeURIComponent(url.pathname);
@@ -39,5 +40,6 @@ const server = http.createServer((req, res) => {
     res.end(buf);
   });
 });
+require('../server/ws.js').attach(server, { path: '/api/ws' });      // the WebSocket lane for online matches
 const port = +process.argv[2] || +process.env.PORT || 8770;
 server.listen(port, '127.0.0.1', () => console.log('轉磚 dev server: http://127.0.0.1:' + port + '/  (API with an in-memory database)'));

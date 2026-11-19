@@ -91,6 +91,19 @@ const SCHEMA = [
      n integer NOT NULL,
      body jsonb NOT NULL,
      PRIMARY KEY (room, dst, n)
+   )`,
+  // rooms for more than two: ks holds the hash of every seat's key in seat order (the host is first), cap is how
+  // many seats there are. Letters now say who wrote them, so each writer keeps its own numbering (zz.post replaces zz.mail).
+  "ALTER TABLE zz.rooms ADD COLUMN IF NOT EXISTS ks text[] NOT NULL DEFAULT '{}'",
+  'ALTER TABLE zz.rooms ADD COLUMN IF NOT EXISTS cap smallint NOT NULL DEFAULT 2',
+  "UPDATE zz.rooms SET ks = CASE WHEN jk IS NULL THEN ARRAY[hk] ELSE ARRAY[hk, jk] END WHERE ks = '{}'",
+  `CREATE TABLE IF NOT EXISTS zz.post (
+     room text NOT NULL REFERENCES zz.rooms(code) ON DELETE CASCADE,
+     dst smallint NOT NULL,
+     src smallint NOT NULL,
+     n integer NOT NULL,
+     body jsonb NOT NULL,
+     PRIMARY KEY (room, dst, src, n)
    )`
 ];
 let migrating = null;

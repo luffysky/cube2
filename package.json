@@ -9,7 +9,8 @@
     "test": "node test/run.js"
   },
   "dependencies": {
-    "@neondatabase/serverless": "1.2.1"
+    "@neondatabase/serverless": "1.2.1",
+    "ws": "^8.23.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16"

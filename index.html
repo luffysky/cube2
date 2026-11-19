@@ -6001,9 +6001,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   // One seat in a room. Looks like a data connection to the rest of this file: on('open' | 'data' | 'close'), send, close.
   // Every message gets a number. A batch is offered again until the server has confirmed it, the server keeps each
   // number once, and what comes back is only taken in order, so nothing is lost or doubled when a request goes missing.
-  function Relay(code, key, role) {
-    this.code = code; this.key = key; this.role = role;
-    this.h = {}; this.out = []; this.nOut = 0; this.ack = 0;
+  function Relay(code, key, seat) {
+    this.code = code; this.key = key; this.seat = seat;
+    this.h = {}; this.out = []; this.nOut = 0; this.acks = [0, 0, 0, 0]; this.ack = 0;      // ack: has anybody said anything yet
+    this.seats = 1; this.near = 0;
+    this.ws = null; this.wsUp = false; this.wsTries = 0; this.wsT = 0; this.wsWait = {}; this.wsN = 0;
     this.open = false; this.dead = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
     this.heard = Date.now(); this.said = Date.now(); this.born = Date.now();
     this.pump(0);
@@ -6012,22 +6014,80 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   // where the code was sent. That gets more patience than silence from someone who was talking a moment ago.
   var QUIET = Net.QUIET = { play: 15000, lobby: 70000, first: 150000 };
   Relay.prototype.on = function (ev, fn) { this.h[ev] = fn; };
-  Relay.prototype.fire = function (ev, d) { if (this.h[ev]) this.h[ev](d); };
+  Relay.prototype.fire = function (ev, d, from) { if (this.h[ev]) this.h[ev](d, from); };
   // how long to wait between rounds: quick while a match is on, relaxed in the lobby, slow while waiting alone
   Relay.prototype.pace = function () {
-    if (Net.state === 'playing') return 110;
+    // with everyone else on the same machine as this socket, their letters are pushed here the moment they are
+    // written, and the rounds are only a safety net
+    if (Net.state === 'playing') return this.wsUp && this.near >= this.seats - 1 ? 450 : 110;
     if (this.open) return this.ack || Date.now() - this.heard < 10000 ? 500 : 1500;
     var waited = Date.now() - this.born;      // nobody has joined yet: look less often the longer the room sits open
     return waited < 120000 ? 1300 : waited < 600000 ? 2500 : 5000;
   };
-  Relay.prototype.send = function (m) {
+  // to: one seat, or nothing for everybody else in the room
+  Relay.prototype.send = function (m, to) {
     if (this.dead) return;
-    var last = this.out[this.out.length - 1];
+    var last = this.out[this.out.length - 1], one = { n: 0, m: m };
+    if (typeof to === 'number') one.to = to;
     // only the newest picture of the wall is worth sending
-    if (m && m.t === 's' && last && !last.s && last.m.t === 's') last.m = m;
-    else this.out.push({ n: ++this.nOut, m: m });
+    if (m && m.t === 's' && last && !last.s && last.m.t === 's' && last.to === one.to) last.m = m;
+    else { one.n = ++this.nOut; this.out.push(one); }
     this.said = Date.now();
-    this.pump(m && (m.t === 's' || m.t === 'e') ? 90 : 0);
+    this.pump(m && (m.t === 's' || m.t === 'e') ? (this.wsUp ? 30 : 90) : 0);
+  };
+  // ---------- the open socket (when the server offers one): the same rounds without a new request each time ----------
+  Relay.prototype.wsOpen = function () {
+    var self = this, loc = window.location, sock;
+    if (this.dead || this.ws || this.wsTries > 4 || typeof window.WebSocket !== 'function' || qs.get('ws') === 'off' || !/^https?:$/.test(loc.protocol)) return;
+    try { sock = new window.WebSocket((loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + loc.pathname.replace(/[^\/]*$/, '') + 'api/ws'); } catch (e) { this.wsTries = 9; return; }
+    this.ws = sock; this.wsTries++;
+    sock.onopen = function () { if (self.ws !== sock) return; self.wsUp = true; self.wsTries = 0; self.pump(0); };
+    sock.onmessage = function (ev) {
+      var f = null, w, k, it;
+      if (self.ws !== sock || self.dead) return;
+      try { f = JSON.parse(ev.data); } catch (e) { return; }
+      if (!f || typeof f !== 'object') return;
+      if (f.i && (w = self.wsWait[f.i])) { delete self.wsWait[f.i]; clearTimeout(w.t); w.yes({ status: f.s, body: f.b && typeof f.b === 'object' ? f.b : null }); }
+      else if (Array.isArray(f.p)) {
+        // handed over directly: fine if it is the very next letter from that seat, otherwise fetch the usual way
+        for (k = 0; k < f.p.length && !self.dead; k++) {
+          it = f.p[k];
+          if (!it || typeof it.n !== 'number' || !(it.f >= 0 && it.f < 4) || it.f === self.seat) continue;
+          if (it.n === self.acks[it.f] + 1) self.take(it); else if (it.n > self.acks[it.f]) self.pump(0);
+        }
+      }
+    };
+    sock.onclose = sock.onerror = function () {
+      if (self.ws !== sock) return;
+      self.ws = null; self.wsUp = false;
+      for (var i in self.wsWait) { clearTimeout(self.wsWait[i].t); self.wsWait[i].no(new Error('socket')); }
+      self.wsWait = {};
+      try { sock.close(); } catch (e) { /* closed */ }
+      if (self.dead) return;
+      // sockets are cut every few minutes by design; plain requests carry the match meanwhile
+      clearTimeout(self.wsT);
+      self.wsT = setTimeout(function () { self.wsOpen(); }, Math.min(15000, 400 * Math.pow(2, self.wsTries)));
+    };
+  };
+  Relay.prototype.wsShut = function () {
+    var sock = this.ws;
+    clearTimeout(this.wsT); this.ws = null; this.wsUp = false;
+    if (sock) { sock.onclose = sock.onerror = sock.onmessage = null; try { sock.close(); } catch (e) { /* closed */ } }
+  };
+  Relay.prototype.take = function (it) {
+    this.acks[it.f] = it.n; this.ack = 1; this.heard = Date.now();
+    this.fire('data', it.m, it.f);
+  };
+  // one round, over the socket when it is up
+  Relay.prototype.xchg = function (body, last) {
+    var self = this, sock = this.ws;
+    if (last || !this.wsUp || !sock || sock.readyState !== 1) return rpc(body, last);
+    return new Promise(function (yes, no) {
+      var i = ++self.wsN;
+      body.i = i;
+      self.wsWait[i] = { yes: yes, no: no, t: setTimeout(function () { delete self.wsWait[i]; no(new Error('slow')); if (self.ws === sock) { try { sock.close(); } catch (e) { /* closed */ } sock.onclose(); } }, 4000) };
+      try { sock.send(JSON.stringify(body)); } catch (e) { clearTimeout(self.wsWait[i].t); delete self.wsWait[i]; no(e); }
+    });
   };
   Relay.prototype.pump = function (ms) {
     var self = this, at = Date.now() + ms;
@@ -6052,30 +6112,36 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       var len = JSON.stringify(this.out[i].m).length;
       if (batch.length && size + len > 16000) break;
       size += len; this.out[i].s = 1;
-      batch.push({ n: this.out[i].n, m: this.out[i].m });
+      var one = { n: this.out[i].n, m: this.out[i].m };
+      if (this.out[i].to !== undefined) one.to = this.out[i].to;
+      batch.push(one);
     }
     var top = batch.length ? batch[batch.length - 1].n : 0, retry = function () {
       self.busy = false;
       if (self.dead) return;
       for (var k = 0; k < self.out.length; k++) delete self.out[k].s;
-      if (++self.fails > 14) { self.dead = true; return self.fire('close'); }
+      if (++self.fails > 14) { self.dead = true; self.wsShut(); return self.fire('close'); }
       self.pump(Math.min(3000, 250 * self.fails));
     };
     this.busy = true;
-    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: batch }, last).then(function (r) {
+    this.xchg({ a: 'x', code: this.code, key: this.key, seat: this.seat, acks: this.acks.slice(), out: batch }, last).then(function (r) {
       var b = r.body;
       if (self.dead) return;
-      if (r.status === 404) { self.dead = true; return self.fire('close'); }      // the room is gone
+      if (r.status === 404) { self.dead = true; self.wsShut(); return self.fire('close'); }      // the room is gone
       if (r.status !== 200 || !b || !b.ok) return retry();
       self.busy = false; self.fails = 0;
       self.out = self.out.filter(function (o) { return o.n > top; });
-      if (b.paired && !self.open) { self.open = true; self.heard = Date.now(); self.fire('open'); }
+      self.near = b.near || 0;
+      var seats = b.seats || (b.paired ? 2 : 1), grew = seats !== self.seats;
+      self.seats = seats;
+      if (seats > 1 && !self.open) { self.open = true; self.heard = Date.now(); self.wsOpen(); self.fire('open'); }
+      else if (grew) self.fire('seats', seats);
       var got = Array.isArray(b.in) ? b.in : [], any = false;
       for (var k = 0; k < got.length && !self.dead; k++) {
-        var it = got[k];
-        if (!it || typeof it.n !== 'number' || it.n <= self.ack) continue;
-        self.ack = it.n; self.heard = Date.now(); any = true;
-        self.fire('data', it.m);
+        var it = got[k], f = it && typeof it.f === 'number' ? it.f : 1 - self.seat;
+        if (!it || typeof it.n !== 'number' || !(f >= 0 && f < 4) || it.n <= self.acks[f]) continue;
+        it.f = f; any = true;
+        self.take(it);
       }
       if (self.dead) return;
       self.pump(self.out.length || any ? Math.min(110, self.pace()) : self.pace());
@@ -6091,12 +6157,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
       len = JSON.stringify(this.out[i].m).length;
       if (rest.length && size + len > 16000) break;
       size += len;
-      rest.unshift({ n: this.out[i].n, m: this.out[i].m });
+      var o = { n: this.out[i].n, m: this.out[i].m };
+      if (this.out[i].to !== undefined) o.to = this.out[i].to;
+      rest.unshift(o);
     }
     this.dead = true; this.out = [];
     clearTimeout(this.t); this.t = 0;
-    if (!rest.length && this.role !== 0) return;
-    rpc({ a: 'x', code: this.code, key: this.key, role: this.role, ack: this.ack, out: rest, end: true }, true).then(null, function () { /* the room runs out by itself */ });
+    this.wsShut();
+    if (!rest.length && this.seat !== 0) return;
+    rpc({ a: 'x', code: this.code, key: this.key, seat: this.seat, acks: this.acks.slice(), out: rest, end: true }, true).then(null, function () { /* the room runs out by itself */ });
   };
   function transport(cb) {
     var mode = qs.get('net'), C = ZZ.Cloud;
