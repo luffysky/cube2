@@ -9,7 +9,9 @@ Kenney（kenney.nl），《Interface Sounds》與《UI Audio》，CC0 1.0。
 挑出 25 個音效內嵌在 `src/sfxdata.js`。
 
 勝利時的群眾歡呼（`cheer`）：專案擁有者提供的音檔，下載自愛給網（aigei.com），檔案內的說明是 "crowd cheer with claps, woo, a little talk at the end"。取前 3.7 秒、淡出、轉成單聲道後內嵌。
-**這一個音效的原始作者和授權條款還沒有確認。** 愛給網上的素材有的是 CC0，有的要標示作者，有的商用要另外授權；收費或上架之前，請回到下載頁確認，必要時換掉（`python3 -I tools/add_clip.py cheer <新的音檔> 3.7 1.1` 就能換）。
+輸掉時的哭聲（`lose`）：用 `tools/make_cry.py` 從零合成（嗡鳴聲源加上「嗚」的母音共振），沒有使用任何外部素材，跟遊戲一起授權。
+
+**歡呼這一個音效的原始作者和授權條款還沒有確認。** 愛給網上的素材有的是 CC0，有的要標示作者，有的商用要另外授權；收費或上架之前，請回到下載頁確認，必要時換掉（`python3 -I tools/add_clip.py cheer <新的音檔> 3.7 1.1` 就能換）。
 
 ## 程式
 - PeerJS（`vendor/peerjs.min.js`），MIT 授權，授權全文在 `vendor/peerjs.LICENSE`。連線對戰用。

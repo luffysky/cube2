@@ -932,6 +932,11 @@
   // ---------- sheets ----------
   var pick = { level: 1, minutes: 2, items: true };
   function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
+  // the big centred win / lose line at the top of a battle result
+  function verdict() {
+    var k = S.result > 0 ? 'win' : S.result < 0 ? 'lose' : 'draw';
+    return '<h2 class="verdict ' + k + '">' + t('r.' + k) + '</h2>';
+  }
   function rewardHtml(rw) {
     if (!rw) return '';
     var h = '', i;
@@ -981,7 +986,7 @@
         btn('again', S && S.kind === 'battle' ? 'rematch' : 'restart') + btn('settings', 'm.settings') + btn('help', 'm.help') + btn('menu', 'toMenu') + '</div>';
     } else if (name === 'battleEnd' && S.multi && S.stand) {
       var sd = S.stand, M = S.multi;
-      h = '<h2>' + t(S.result > 0 ? 'r.win' : S.result < 0 ? 'r.lose' : 'r.draw') + '</h2>';
+      h = verdict();
       if (sd.teams) h += '<div class="score"><div><b>' + sd.teams[M.myTeam].downs + '</b><span>' + t('mp.usDown') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + sd.teams[1 - M.myTeam].downs + '</b><span>' + t('mp.themDown') + '</span></div></div>';
       h += '<p class="note">' + t(sd.teams ? 'mp.ruleTeam' : 'mp.rule') + '</p>' + rewardHtml(S.reward) +
         '<table class="cmp"><thead><tr><th></th><th>' + t('mp.player') + '</th><th>' + t('mp.down') + '</th><th>' + t('sent') + '</th><th>' + t('score') + '</th></tr></thead><tbody>';
@@ -1002,7 +1007,7 @@
         [t('st.quad'), me.quads, S.remote ? '—' : op.quads],
         [t('st.combo'), me.maxCombo, S.remote ? '—' : op.maxCombo]
       ];
-      h = '<h2>' + t(S.result > 0 ? 'r.win' : S.result < 0 ? 'r.lose' : 'r.draw') + '</h2>' +
+      h = verdict() +
         (S.why === 'left' ? '<p>' + t('net.foeLeft') + '</p>' : '') +
         '<div class="score"><div><b>' + S.ko.me + '</b><span>' + t('r.yourKo') + '</span></div><i>' + t('r.vs') + '</i><div><b>' + S.ko.opp + '</b><span>' + t('r.foeKo', foe) + '</span></div></div>' +
         (S.ko.me === S.ko.opp && S.result !== 0 && !S.why ? '<p>' + t('r.tie') + '</p>' : '') + rewardHtml(S.reward) +

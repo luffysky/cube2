@@ -710,3 +710,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .legal a { color: var(--muted); }
 .cn-notice b { color: var(--ink); }
 .seg button[data-age] { min-width: 0; }
+/* battle verdict: big and centred, gold for a win, muted for a loss */
+#sheetCard h2.verdict { font-family: var(--display); font-size: clamp(40px, 12vw, 60px); line-height: 1.1; text-align: center; margin: 4px 0 14px; letter-spacing: .04em; }
+#sheetCard h2.verdict.win { color: var(--gold-ink); animation: verdictIn .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+#sheetCard h2.verdict.lose { color: var(--muted); animation: verdictSag .7s ease-out both; }
+@keyframes verdictIn { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes verdictSag { from { transform: translateY(-10px); opacity: 0; } 60% { transform: translateY(3px); } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #sheetCard h2.verdict { animation: none; } }
