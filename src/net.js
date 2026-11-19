@@ -44,7 +44,11 @@
   // ---------- who is in the room ----------
   // peers: everybody else, by seat. A room for more than two only exists through the game's own relay; over a
   // direct link there is exactly one other person, whose seat is simply "the other one".
-  Net.seat = 0; Net.peers = {}; Net.SEATS = 4;
+  Net.seat = 0; Net.peers = {}; Net.SEATS = 8;
+  // the size of room the host picks (4, 6 or 8), and the size of the room we are in
+  Net.size = 4; Net.cap = 4;
+  // a team match needs an even room of four or more: 2 v 2, 3 v 3, 4 v 4
+  Net.teamOk = function (n) { return n >= 4 && n % 2 === 0; };
   function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
   Net.count = function () { return 1 + peerList().length; };
   Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { var p = s === Net.seat ? null : Net.peers[s]; return { seat: s, name: p ? p.name : Net.me, me: !p, lv: p ? p.lv : ZZ.Meta.level().lv, tt: p ? p.tt : ZZ.Meta.titleNow() }; }); };
@@ -117,7 +121,7 @@
   // number once, and what comes back is only taken in order, so nothing is lost or doubled when a request goes missing.
   function Relay(code, key, seat) {
     this.code = code; this.key = key; this.seat = seat;
-    this.h = {}; this.out = []; this.nOut = 0; this.acks = [0, 0, 0, 0]; this.ack = 0;      // ack: has anybody said anything yet
+    this.h = {}; this.out = []; this.nOut = 0; this.acks = [0, 0, 0, 0, 0, 0, 0, 0]; this.ack = 0;      // ack: has anybody said anything yet
     this.seats = 1; this.near = 0;
     this.ws = null; this.wsUp = false; this.wsTries = 0; this.wsT = 0; this.wsWait = {}; this.wsN = 0;
     this.open = false; this.dead = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
@@ -166,7 +170,7 @@
         // handed over directly: fine if it is the very next letter from that seat, otherwise fetch the usual way
         for (k = 0; k < f.p.length && !self.dead; k++) {
           it = f.p[k];
-          if (!it || typeof it.n !== 'number' || !(it.f >= 0 && it.f < 4) || it.f === self.seat) continue;
+          if (!it || typeof it.n !== 'number' || !(it.f >= 0 && it.f < Net.SEATS) || it.f === self.seat) continue;
           if (it.n === self.acks[it.f] + 1) self.take(it); else if (it.n > self.acks[it.f]) self.pump(0);
         }
       }
@@ -254,7 +258,7 @@
       var got = Array.isArray(b.in) ? b.in : [], any = false;
       for (var k = 0; k < got.length && !self.dead; k++) {
         var it = got[k], f = it && typeof it.f === 'number' ? it.f : 1 - self.seat;
-        if (!it || typeof it.n !== 'number' || !(f >= 0 && f < 4) || it.n <= self.acks[f]) continue;
+        if (!it || typeof it.n !== 'number' || !(f >= 0 && f < Net.SEATS) || it.n <= self.acks[f]) continue;
         it.f = f; any = true;
         self.take(it);
       }
@@ -328,10 +332,10 @@
       if (kind === 'relay') {
         var key = seatKey();
         relayed = true;
-        return rpc({ a: 'open', key: key, cap: Net.SEATS }).then(function (r) {
+        return rpc({ a: 'open', key: key, cap: [4, 6, 8].indexOf(Net.size) >= 0 ? Net.size : 4 }).then(function (r) {
           if (run !== epoch || Net.state !== 'opening') return;
           if (r.status !== 200 || !r.body || !r.body.ok || !r.body.code) return fail(r.status === 429 ? 'slow' : 'server');
-          Net.code = String(r.body.code);
+          Net.code = String(r.body.code); Net.cap = r.body.cap >= 2 && r.body.cap <= Net.SEATS ? r.body.cap : Net.size;
           wire(new Relay(Net.code, key, 0));
           setState('waiting');
         }, function () { if (run === epoch && Net.state === 'opening') fail('server'); });
@@ -381,6 +385,7 @@
           if (run !== epoch || Net.state !== 'joining') return;
           if (r.status !== 200 || !r.body || !r.body.ok) return fail(r.status === 404 ? 'room' : r.status === 409 ? 'full' : r.status === 429 ? 'slow' : 'server');
           Net.seat = r.body.seat >= 1 && r.body.seat < Net.SEATS ? r.body.seat : 1;
+          if (r.body.cap >= 2 && r.body.cap <= Net.SEATS) Net.cap = r.body.cap;
           wire(new Relay(code, key, Net.seat));
         }, function () { if (run === epoch && Net.state === 'joining') fail('server'); });
       }
@@ -470,7 +475,7 @@
     if (roster.length >= 3) {
       var names = {}, teams = null;
       roster.forEach(function (r) { names[r.seat] = r.name; });
-      if (Net.cfg.team && roster.length === 4) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
+      if (Net.cfg.team && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
       multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
     }
     send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi });
@@ -630,7 +635,7 @@
     for (i = 0; i < v.roster.length && i < Net.SEATS; i++) { s = v.roster[i]; if (s === Math.floor(s) && s >= 0 && s < Net.SEATS && roster.indexOf(s) < 0) roster.push(s); }
     if (roster.length < 3 || roster.indexOf(Net.seat) < 0) return null;
     roster.forEach(function (r) { names[r] = String((v.names && v.names[r]) || '').replace(/[<>&"]/g, '').slice(0, 12); });
-    if (v.teams && typeof v.teams === 'object' && roster.length === 4) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
+    if (v.teams && typeof v.teams === 'object' && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
     return { roster: roster, names: names, teams: teams };
   }
   function allEnded() { var S = App.S(); return !S || !S.multi || peerList().every(function (s) { return Net.peers[s].end || Net.peers[s].gone || !S.multi.foes[s]; }); }

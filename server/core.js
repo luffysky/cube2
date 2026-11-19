@@ -221,7 +221,7 @@ const ROOM = {
   OPEN_PER_HOUR: 40, JOIN_TRIES: 60, JOIN_WINDOW: 10 * 60000,
   MAIL_MAX: 400,             // letters that may wait unread in one box
   BATCH: 80, MSG_BYTES: 4096, INBOX: 120,
-  SEATS: 4,                  // the most players one room holds
+  SEATS: 8,                  // the most players one room holds (rooms of 4, 6 or 8)
   LINGER: 15000              // after the host has left, a guest still has this long to collect the last letters
 };
 const SEAT = /^[A-Za-z0-9_-]{20,64}$/;

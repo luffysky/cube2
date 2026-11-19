@@ -814,6 +814,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 /* a long item name (a combo) fits inside the board */
 .pop.long .m { font-size: clamp(15px, 4.4vw, 22px); white-space: normal; }
 .pop.long .s { white-space: normal; max-width: 92%; margin-left: auto; margin-right: auto; line-height: 1.3; }
+/* rooms of six or eight: the rivals in two rows of four */
+.foes.many { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.foes.many .foe { min-height: 38px; padding: 4px 6px 6px; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -5593,7 +5596,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         (foe && !f.gone ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(f.name) + '</b><span>' + (f.gone ? t('mp.gone') : foe ? t('mp.downs', f.downs) : t('mp.mate')) +
         '</span><i style="--h:' + Math.round(hi / VIS * 100) + '%"></i></button>';
     });
-    el.strip.innerHTML = '<div class="foes">' + h + '</div>';
+    // up to seven rivals: two rows once there are more than four
+    el.strip.innerHTML = '<div class="foes' + (M.order.length > 4 ? ' many' : '') + '">' + h + '</div>';
   }
   function stackOf(g) {
     for (var r = 0; r < g.grid.length; r++) for (var x = 0; x < g.grid[r].length; x++) if (g.grid[r][x]) return g.grid.length - r;
@@ -6981,7 +6985,11 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   // ---------- who is in the room ----------
   // peers: everybody else, by seat. A room for more than two only exists through the game's own relay; over a
   // direct link there is exactly one other person, whose seat is simply "the other one".
-  Net.seat = 0; Net.peers = {}; Net.SEATS = 4;
+  Net.seat = 0; Net.peers = {}; Net.SEATS = 8;
+  // the size of room the host picks (4, 6 or 8), and the size of the room we are in
+  Net.size = 4; Net.cap = 4;
+  // a team match needs an even room of four or more: 2 v 2, 3 v 3, 4 v 4
+  Net.teamOk = function (n) { return n >= 4 && n % 2 === 0; };
   function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
   Net.count = function () { return 1 + peerList().length; };
   Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { var p = s === Net.seat ? null : Net.peers[s]; return { seat: s, name: p ? p.name : Net.me, me: !p, lv: p ? p.lv : ZZ.Meta.level().lv, tt: p ? p.tt : ZZ.Meta.titleNow() }; }); };
@@ -7054,7 +7062,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   // number once, and what comes back is only taken in order, so nothing is lost or doubled when a request goes missing.
   function Relay(code, key, seat) {
     this.code = code; this.key = key; this.seat = seat;
-    this.h = {}; this.out = []; this.nOut = 0; this.acks = [0, 0, 0, 0]; this.ack = 0;      // ack: has anybody said anything yet
+    this.h = {}; this.out = []; this.nOut = 0; this.acks = [0, 0, 0, 0, 0, 0, 0, 0]; this.ack = 0;      // ack: has anybody said anything yet
     this.seats = 1; this.near = 0;
     this.ws = null; this.wsUp = false; this.wsTries = 0; this.wsT = 0; this.wsWait = {}; this.wsN = 0;
     this.open = false; this.dead = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
@@ -7103,7 +7111,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         // handed over directly: fine if it is the very next letter from that seat, otherwise fetch the usual way
         for (k = 0; k < f.p.length && !self.dead; k++) {
           it = f.p[k];
-          if (!it || typeof it.n !== 'number' || !(it.f >= 0 && it.f < 4) || it.f === self.seat) continue;
+          if (!it || typeof it.n !== 'number' || !(it.f >= 0 && it.f < Net.SEATS) || it.f === self.seat) continue;
           if (it.n === self.acks[it.f] + 1) self.take(it); else if (it.n > self.acks[it.f]) self.pump(0);
         }
       }
@@ -7191,7 +7199,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       var got = Array.isArray(b.in) ? b.in : [], any = false;
       for (var k = 0; k < got.length && !self.dead; k++) {
         var it = got[k], f = it && typeof it.f === 'number' ? it.f : 1 - self.seat;
-        if (!it || typeof it.n !== 'number' || !(f >= 0 && f < 4) || it.n <= self.acks[f]) continue;
+        if (!it || typeof it.n !== 'number' || !(f >= 0 && f < Net.SEATS) || it.n <= self.acks[f]) continue;
         it.f = f; any = true;
         self.take(it);
       }
@@ -7265,10 +7273,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       if (kind === 'relay') {
         var key = seatKey();
         relayed = true;
-        return rpc({ a: 'open', key: key, cap: Net.SEATS }).then(function (r) {
+        return rpc({ a: 'open', key: key, cap: [4, 6, 8].indexOf(Net.size) >= 0 ? Net.size : 4 }).then(function (r) {
           if (run !== epoch || Net.state !== 'opening') return;
           if (r.status !== 200 || !r.body || !r.body.ok || !r.body.code) return fail(r.status === 429 ? 'slow' : 'server');
-          Net.code = String(r.body.code);
+          Net.code = String(r.body.code); Net.cap = r.body.cap >= 2 && r.body.cap <= Net.SEATS ? r.body.cap : Net.size;
           wire(new Relay(Net.code, key, 0));
           setState('waiting');
         }, function () { if (run === epoch && Net.state === 'opening') fail('server'); });
@@ -7318,6 +7326,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
           if (run !== epoch || Net.state !== 'joining') return;
           if (r.status !== 200 || !r.body || !r.body.ok) return fail(r.status === 404 ? 'room' : r.status === 409 ? 'full' : r.status === 429 ? 'slow' : 'server');
           Net.seat = r.body.seat >= 1 && r.body.seat < Net.SEATS ? r.body.seat : 1;
+          if (r.body.cap >= 2 && r.body.cap <= Net.SEATS) Net.cap = r.body.cap;
           wire(new Relay(code, key, Net.seat));
         }, function () { if (run === epoch && Net.state === 'joining') fail('server'); });
       }
@@ -7407,7 +7416,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (roster.length >= 3) {
       var names = {}, teams = null;
       roster.forEach(function (r) { names[r.seat] = r.name; });
-      if (Net.cfg.team && roster.length === 4) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
+      if (Net.cfg.team && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
       multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
     }
     send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi });
@@ -7567,7 +7576,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     for (i = 0; i < v.roster.length && i < Net.SEATS; i++) { s = v.roster[i]; if (s === Math.floor(s) && s >= 0 && s < Net.SEATS && roster.indexOf(s) < 0) roster.push(s); }
     if (roster.length < 3 || roster.indexOf(Net.seat) < 0) return null;
     roster.forEach(function (r) { names[r] = String((v.names && v.names[r]) || '').replace(/[<>&"]/g, '').slice(0, 12); });
-    if (v.teams && typeof v.teams === 'object' && roster.length === 4) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
+    if (v.teams && typeof v.teams === 'object' && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
     return { roster: roster, names: names, teams: teams };
   }
   function allEnded() { var S = App.S(); return !S || !S.multi || peerList().every(function (s) { return Net.peers[s].end || Net.peers[s].gone || !S.multi.foes[s]; }); }
@@ -7728,7 +7737,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'mp.code': ['房間代碼：{0}', 'Room code: {0}', '部屋コード：{0}', '방 코드: {0}'],
     'mp.inRoom': ['房間裡 {0}／{1} 人', '{0} of {1} in the room', '部屋に {0}／{1} 人', '방 인원 {0}/{1}명'],
     'mp.host': ['房主', 'host', 'ホスト', '방장'],
-    'mp.teamMode': ['2 對 2 分組', '2 vs 2 teams', '2 対 2 のチーム戦', '2 대 2 팀전'],
+    'mp.teamMode': ['{0} 對 {0} 分組', '{0} vs {0} teams', '{0} 対 {0} のチーム戦', '{0} 대 {0} 팀전'],
+    'mp.size': ['房間大小', 'Room size', '部屋の人数', '방 크기'],
+    'mp.sizeN': ['{0} 人房', '{0} players', '{0} 人部屋', '{0}인 방'],
     'mp.teamA': ['紅隊', 'Red', '赤チーム', '레드 팀'],
     'mp.teamB': ['藍隊', 'Blue', '青チーム', '블루 팀'],
     'mp.noItems': ['三人以上的房間不開道具。', 'Rooms of three or more play without items.', '3 人以上の部屋ではアイテムなしです。', '3명 이상인 방은 아이템 없이 진행합니다.'],
@@ -7989,8 +8000,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b></p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.relayed() && !Net.matched) {
       // the game's own relay: up to four in a room
-      var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && n === 4;
-      h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.SEATS) + '</h3><ul class="roster">';
+      var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && Net.teamOk(n);
+      h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.cap) + '</h3><ul class="roster">';
       ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
@@ -8001,10 +8012,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         h += '</div>';
         if (n === 2) h += App.toggle('nItems', t('itemsMode'));
         else h += '<p class="note">' + t('mp.noItems') + '</p>';
-        if (n === 4) h += App.toggle('nTeam', t('mp.teamMode'));
+        if (Net.teamOk(n)) h += App.toggle('nTeam', t('mp.teamMode', n / 2));
         h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
       } else {
-        h += '<p>' + esc(rulesText()) + (n === 4 && Net.cfg.team ? '　' + t('mp.teamMode') : '') + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+        h += '<p>' + esc(rulesText()) + (Net.teamOk(n) && Net.cfg.team ? '　' + t('mp.teamMode', n / 2) : '') + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
@@ -8022,6 +8033,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       // arriving through a friend's invite link, joining is the main thing to do
       var hosted = ZZ.Cloud && ZZ.Cloud.hosted();
       if (hosted) h += '<div class="row">' + btn('netQuick', 'net.quick', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
+      // a room of the game's own server holds 4, 6 or 8
+      if (hosted) { h += '<h3>' + t('mp.size') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('mp.size')) + '">'; [4, 6, 8].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (Net.size === k) + '" data-nsize="' + k + '">' + t('mp.sizeN', k) + '</button>'; }); h += '</div>'; }
       h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode && !hosted) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
         btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
@@ -8083,6 +8096,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (d.ghost != null) { startGhost(+d.ghost); return true; }
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
+    if (d.nsize != null && [4, 6, 8].indexOf(+d.nsize) >= 0) { Net.size = +d.nsize; App.openSheet('online'); return true; }
     if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team }); return true; }
     return false;
   });
@@ -9449,8 +9463,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   'use strict';
   var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta, esc = App.esc, btn = App.btn;
   var KEY = 'zhuanzhuan.consent.v1', VERSION = 2, AGE_MARK = '8+';
-  // the same lists as SPINREALM (cube1 dist/region-policies.mjs)
-  var REGIONS = ['tw', 'cn', 'jp', 'kr', 'my', 'sg', 'au', 'us', 'uk', 'other'];
+  // the same lists as SPINREALM (cube1 dist/region-policies.mjs), plus Hong Kong and Macau (asked for 2026-11-20)
+  var REGIONS = ['tw', 'hk', 'mo', 'cn', 'jp', 'kr', 'my', 'sg', 'au', 'us', 'uk', 'other'];
   var AGES = ['u13', 'a13', 'a14', 'a16', 'adult'];
   var C = { v: 0, at: 0, fonts: false, age: '', region: '' };
 
@@ -9518,6 +9532,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'cs.lang': ['語言', 'Language', '言語', '언어'],
     'cs.region': ['你住在哪裡？', 'Where do you live?', 'お住まいの地域', '거주 지역'],
     'rg.tw': ['臺灣', 'Taiwan', '台湾', '대만'],
+    'rg.hk': ['香港', 'Hong Kong', '香港', '홍콩'],
+    'rg.mo': ['澳門', 'Macau', 'マカオ', '마카오'],
     'rg.cn': ['中國大陸', 'Mainland China', '中国本土', '중국 본토'],
     'rg.jp': ['日本', 'Japan', '日本', '일본'],
     'rg.kr': ['韓國', 'South Korea', '韓国', '대한민국'],

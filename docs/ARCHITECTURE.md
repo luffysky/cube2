@@ -326,7 +326,7 @@ node test/levels.js          # 七個電腦等級、設定裡的「電腦難度�
 
 ## 同意畫面與隱私（consent.js）
 
-第一次進來會跳「開始之前」：先選語言，再自選居住地區（10 個，跟 cube1 `region-policies.mjs` 一樣）和年齡（未滿 13／13／14–15／16–17／18+），不用網路位置推測；兩顆一樣大的按鈕選要不要用 Google 字型（不預先打勾）。選擇存在 `zhuanzhuan.consent.v1`（v2 格式：region、age、fonts），只在裝置上。舊版三段年齡：18+ 與未滿 13 沿用，13–17 重問。不用 cookie；localStorage 是遊戲必要的，只說明不詢問。
+第一次進來會跳「開始之前」：先選語言，再自選居住地區（12 個：cube1 `region-policies.mjs` 的 10 個加香港、澳門）和年齡（未滿 13／13／14–15／16–17／18+），不用網路位置推測；兩顆一樣大的按鈕選要不要用 Google 字型（不預先打勾）。選擇存在 `zhuanzhuan.consent.v1`（v2 格式：region、age、fonts），只在裝置上。舊版三段年齡：18+ 與未滿 13 沿用，13–17 重問。不用 cookie；localStorage 是遊戲必要的，只說明不詢問。
 
 - Google 字型只有同意後才由 `fontsIn()` 載入，模板裡已拿掉 `<link>`。
 - 未滿 13 歲：擋 `App.go.online/quick`、`ZZ.Net.open/join/quick`、`Meta.setName`。

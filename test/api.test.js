@@ -499,7 +499,8 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   const opened = await room({ a: 'open', key: K(0), cap: 4 });
   ok(opened.status === 200 && opened.json.seat === 0 && opened.json.cap === 4, 'a room for four opens', opened.json);
   const c4 = opened.json.code;
-  eq((await room({ a: 'open', key: K(9), cap: 5 })).status, 400, 'no room is bigger than four');
+  eq((await room({ a: 'open', key: K(9), cap: 9 })).status, 400, 'no room is bigger than eight');
+  eq((await room({ a: 'open', key: K(8), cap: 8 })).json.cap, 8, 'a room of eight opens');
   eq((await room({ a: 'open', key: K(9), cap: 1 })).status, 400, 'or smaller than two');
   const j1 = await room({ a: 'join', code: c4, key: K(1) }), j2 = await room({ a: 'join', code: c4, key: K(2) });
   ok(j1.json.seat === 1 && j2.json.seat === 2, 'guests take seats in order', [j1.json, j2.json]);

@@ -18,8 +18,8 @@
   'use strict';
   var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta, esc = App.esc, btn = App.btn;
   var KEY = 'zhuanzhuan.consent.v1', VERSION = 2, AGE_MARK = '8+';
-  // the same lists as SPINREALM (cube1 dist/region-policies.mjs)
-  var REGIONS = ['tw', 'cn', 'jp', 'kr', 'my', 'sg', 'au', 'us', 'uk', 'other'];
+  // the same lists as SPINREALM (cube1 dist/region-policies.mjs), plus Hong Kong and Macau (asked for 2026-11-20)
+  var REGIONS = ['tw', 'hk', 'mo', 'cn', 'jp', 'kr', 'my', 'sg', 'au', 'us', 'uk', 'other'];
   var AGES = ['u13', 'a13', 'a14', 'a16', 'adult'];
   var C = { v: 0, at: 0, fonts: false, age: '', region: '' };
 
@@ -87,6 +87,8 @@
     'cs.lang': ['語言', 'Language', '言語', '언어'],
     'cs.region': ['你住在哪裡？', 'Where do you live?', 'お住まいの地域', '거주 지역'],
     'rg.tw': ['臺灣', 'Taiwan', '台湾', '대만'],
+    'rg.hk': ['香港', 'Hong Kong', '香港', '홍콩'],
+    'rg.mo': ['澳門', 'Macau', 'マカオ', '마카오'],
     'rg.cn': ['中國大陸', 'Mainland China', '中国本土', '중국 본토'],
     'rg.jp': ['日本', 'Japan', '日本', '일본'],
     'rg.kr': ['韓國', 'South Korea', '韓国', '대한민국'],

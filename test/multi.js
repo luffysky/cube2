@@ -120,6 +120,37 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     // rematch: everyone asks, the host starts again
     for (const p of P) await p.evaluate(() => ZZ.Net.again());
     ok(await until(async () => { for (const p of P) { const s = await S(p); if (!s || s.state === 'over') return false; } return true; }, 8000), 'a rematch starts once all four ask for one');
+    for (const p of P) await p.close();
+    // ---------- a room of eight: 4 vs 4 ----------
+    const E = []; for (let i = 0; i < 8; i++) E.push(await open('八' + i, i ? 420 : 1280, i ? 860 : 800));
+    await E[0].evaluate(() => ZZ.App.go.online()); await sleep(200);
+    ok(await E[0].evaluate(() => document.querySelectorAll('[data-nsize]').length === 3), 'the host can pick a room of 4, 6 or 8');
+    await E[0].click('[data-nsize="8"]'); await sleep(150);
+    await E[0].click('[data-do="netOpen"]');
+    await until(() => E[0].evaluate(() => ZZ.Net.state === 'waiting' && !!ZZ.Net.code), 5000);
+    const code8 = await E[0].evaluate(() => ZZ.Net.code);
+    ok(await E[0].evaluate(() => ZZ.Net.cap === 8), 'the room holds eight');
+    for (let i = 1; i < 8; i++) await E[i].evaluate(c => ZZ.Net.join(c, ZZ.Meta.data.name), code8);
+    ok(await until(() => E[0].evaluate(() => ZZ.Net.count() === 8), 20000), 'eight in the room', await E[0].evaluate(() => ZZ.Net.count()));
+    await E[0].evaluate(() => ZZ.App.openSheet('online')); await sleep(300);
+    ok(await E[0].evaluate(() => /8／8/.test(document.getElementById('sheetCard').textContent) && /4 對 4/.test(document.getElementById('sheetCard').textContent)), 'the lobby says 8 of 8 and offers 4 vs 4');
+    await E[0].click('label[for="nTeam"]'); await sleep(300);
+    await E[0].screenshot({ path: path.join(OUT, 'multi-8-lobby.png') });
+    await E[0].click('[data-do="netStart"]');
+    ok(await until(async () => { for (const p of E) { const s = await S(p); if (!s || !s.multi) return false; } return true; }, 12000), '4 vs 4 starts on all eight');
+    const inf8 = await Promise.all(E.map(p => p.evaluate(() => { const M = ZZ.peek().S.multi; return { team: M.myTeam, foes: M.order.length, mates: Object.values(M.foes).filter(f => f.team === M.myTeam).length, rows: !!document.querySelector('#strip .foes.many') }; })));
+    ok(inf8.every(x => x.foes === 7 && x.mates === 3 && x.rows), 'everyone sees seven others, three of them teammates, in two rows', inf8);
+    await until(async () => (await S(E[0])).state === 'play', 6000);
+    await sleep(1500);
+    await E[0].screenshot({ path: path.join(OUT, 'multi-8-play.png') });
+    await E[1].screenshot({ path: path.join(OUT, 'multi-8-phone.png') });
+    const t1 = E.filter((p, i) => inf8[i].team === 1);
+    await t1[0].evaluate(() => ZZ.peek().S.me.topOut('lock'));
+    await sleep(2500);
+    for (const p of E) await p.evaluate(() => { ZZ.peek().S.left = 300; });
+    ok(await until(async () => { for (const p of E) if ((await p.evaluate(() => ZZ.peek().sheet)) !== 'battleEnd') return false; return true; }, 15000), 'all eight get the result card');
+    const res8 = await Promise.all(E.map((p, i) => p.evaluate(() => ZZ.peek().S.result)));
+    ok(res8.every((r, i) => r === (inf8[i].team === 0 ? 1 : -1)), 'the team that went down less wins, on every screen', res8);
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e); }
   await browser.close(); srv.kill();

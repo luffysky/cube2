@@ -59,7 +59,9 @@
     'mp.code': ['房間代碼：{0}', 'Room code: {0}', '部屋コード：{0}', '방 코드: {0}'],
     'mp.inRoom': ['房間裡 {0}／{1} 人', '{0} of {1} in the room', '部屋に {0}／{1} 人', '방 인원 {0}/{1}명'],
     'mp.host': ['房主', 'host', 'ホスト', '방장'],
-    'mp.teamMode': ['2 對 2 分組', '2 vs 2 teams', '2 対 2 のチーム戦', '2 대 2 팀전'],
+    'mp.teamMode': ['{0} 對 {0} 分組', '{0} vs {0} teams', '{0} 対 {0} のチーム戦', '{0} 대 {0} 팀전'],
+    'mp.size': ['房間大小', 'Room size', '部屋の人数', '방 크기'],
+    'mp.sizeN': ['{0} 人房', '{0} players', '{0} 人部屋', '{0}인 방'],
     'mp.teamA': ['紅隊', 'Red', '赤チーム', '레드 팀'],
     'mp.teamB': ['藍隊', 'Blue', '青チーム', '블루 팀'],
     'mp.noItems': ['三人以上的房間不開道具。', 'Rooms of three or more play without items.', '3 人以上の部屋ではアイテムなしです。', '3명 이상인 방은 아이템 없이 진행합니다.'],
@@ -320,8 +322,8 @@
       h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b></p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.relayed() && !Net.matched) {
       // the game's own relay: up to four in a room
-      var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && n === 4;
-      h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.SEATS) + '</h3><ul class="roster">';
+      var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && Net.teamOk(n);
+      h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.cap) + '</h3><ul class="roster">';
       ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
@@ -332,10 +334,10 @@
         h += '</div>';
         if (n === 2) h += App.toggle('nItems', t('itemsMode'));
         else h += '<p class="note">' + t('mp.noItems') + '</p>';
-        if (n === 4) h += App.toggle('nTeam', t('mp.teamMode'));
+        if (Net.teamOk(n)) h += App.toggle('nTeam', t('mp.teamMode', n / 2));
         h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
       } else {
-        h += '<p>' + esc(rulesText()) + (n === 4 && Net.cfg.team ? '　' + t('mp.teamMode') : '') + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+        h += '<p>' + esc(rulesText()) + (Net.teamOk(n) && Net.cfg.team ? '　' + t('mp.teamMode', n / 2) : '') + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
     } else if (st === 'ready' || st === 'playing') {
       h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
@@ -353,6 +355,8 @@
       // arriving through a friend's invite link, joining is the main thing to do
       var hosted = ZZ.Cloud && ZZ.Cloud.hosted();
       if (hosted) h += '<div class="row">' + btn('netQuick', 'net.quick', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
+      // a room of the game's own server holds 4, 6 or 8
+      if (hosted) { h += '<h3>' + t('mp.size') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('mp.size')) + '">'; [4, 6, 8].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (Net.size === k) + '" data-nsize="' + k + '">' + t('mp.sizeN', k) + '</button>'; }); h += '</div>'; }
       h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode && !hosted) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
         btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
@@ -414,6 +418,7 @@
     if (d.ghost != null) { startGhost(+d.ghost); return true; }
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
+    if (d.nsize != null && [4, 6, 8].indexOf(+d.nsize) >= 0) { Net.size = +d.nsize; App.openSheet('online'); return true; }
     if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team }); return true; }
     return false;
   });

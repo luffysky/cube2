@@ -399,7 +399,8 @@
         (foe && !f.gone ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(f.name) + '</b><span>' + (f.gone ? t('mp.gone') : foe ? t('mp.downs', f.downs) : t('mp.mate')) +
         '</span><i style="--h:' + Math.round(hi / VIS * 100) + '%"></i></button>';
     });
-    el.strip.innerHTML = '<div class="foes">' + h + '</div>';
+    // up to seven rivals: two rows once there are more than four
+    el.strip.innerHTML = '<div class="foes' + (M.order.length > 4 ? ' many' : '') + '">' + h + '</div>';
   }
   function stackOf(g) {
     for (var r = 0; r < g.grid.length; r++) for (var x = 0; x < g.grid[r].length; x++) if (g.grid[r][x]) return g.grid.length - r;

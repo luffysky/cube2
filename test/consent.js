@@ -24,7 +24,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !document.querySelector('#sheetCard input[type=checkbox]') && !!document.querySelector('[data-do="consentAll"]') && !!document.querySelector('[data-do="consentMin"]')), 'nothing is ticked in advance: two equal buttons');
     await page.click('[data-do="consentMin"]'); await sleep(200);
     ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && /先選地區和年齡/.test(document.getElementById('sheetCard').textContent)), 'it asks for region and age before going on');
-    ok(await page.evaluate(() => document.querySelectorAll('[data-region]').length === 10 && document.querySelectorAll('[data-age]').length === 5 && document.querySelectorAll('[data-cslang]').length === 5), 'ten regions, five age bands, five languages, as in SPINREALM');
+    ok(await page.evaluate(() => document.querySelectorAll('[data-region]').length === 12 && document.querySelectorAll('[data-age]').length === 5 && document.querySelectorAll('[data-cslang]').length === 5), 'twelve regions, five age bands, five languages, as in SPINREALM');
     ok(await page.evaluate(() => !document.querySelector('[data-region][aria-checked="true"]')), 'no region is picked for the player');
     await page.click('[data-cslang="en"]'); await sleep(200);
     ok(await page.evaluate(() => ZZ.peek().lang === 'en' && /Where do you live/.test(document.getElementById('sheetCard').textContent)), 'the language can be changed right there');
