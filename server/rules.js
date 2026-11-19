@@ -187,6 +187,8 @@ function importState(raw, now) {
   d.daily.login = sd.login === today || sd.login === today - 1 ? sd.login : 0;
   d.daily.streak = d.daily.login ? int(sd.streak, 0, 3650) : 0;
   d.daily.win = sd.win === today ? today : 0;
+  // boxes already opened today come along, or deleting and remaking a cloud save would hand out a fresh day of boxes
+  d.daily.draws = sd.day === today ? int(sd.draws, 0, Meta.DRAWS.sub) : 0;
   const t = obj(src.tot);
   d.tot.games = int(t.games, 0, 1e6); d.tot.wins = int(t.wins, 0, d.tot.games);
   d.tot.best = int(t.best, 0, 600000);
