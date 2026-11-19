@@ -16,7 +16,7 @@
     "api/room.js": {
       "maxDuration": 15
     },
-    "api/ws.js": {
+    "api/ws.mjs": {
       "maxDuration": 300
     }
   },
