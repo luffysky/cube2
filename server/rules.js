@@ -26,6 +26,9 @@ const Meta = ZZ.Meta;
 Meta.store = { getItem() { return null; }, setItem() {} };   // the server keeps records in the database, never in a browser store
 Meta.onChange = null;
 Meta.onOp = null;
+// treasure boxes are opened here, with the operating system's randomness
+Meta.remote = null;
+Meta.rand = () => require('crypto').randomInt(0, 2 ** 32) / 2 ** 32;
 
 const DAY = 86400000;
 const LIMIT = {
@@ -81,7 +84,7 @@ function applyOps(state, srv, ops, now) {
   const d0 = open(state, now);
   srv = readSrv(srv, now);
   if (srv.season !== d0.season) { srv.season = d0.season; srv.rg = 0; }   // a new season: ranked games start from none
-  const seen = new Set(srv.ops), res = [], marks = {};
+  const seen = new Set(srv.ops), res = [], marks = {}, draws = [];
   let applied = 0;
   const mark = (board, val) => { if (!(board in marks) || val > marks[board]) marks[board] = val; };
   for (const op of ops) {
@@ -91,13 +94,14 @@ function applyOps(state, srv, ops, now) {
     let r;
     if (op.k === 'fin') r = finish(op.a, srv, mark);
     else r = Meta.run(op.k, op.a);
+    if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, boxes: r.out.boxes });
     applied++;
     res.push(r && r.ok ? { i: op.i, ok: true } : { i: op.i, ok: false, why: (r && r.why) || 'no' });
   }
   if (srv.ops.length > LIMIT.OP_IDS_KEPT) srv.ops = srv.ops.slice(-LIMIT.OP_IDS_KEPT);
   const d = Meta.data, list = [];
   for (const board in marks) { list.push({ board, season: d.season, val: marks[board] }, { board, season: 'all', val: marks[board] }); }
-  return { state: clone(d), srv, res, marks: list, touched: applied > 0 || res.length > 0 };
+  return { state: clone(d), srv, res, marks: list, draws, touched: applied > 0 || res.length > 0 };
 }
 // Does the tape back up what the match report says? Gives what the tape shows, or null.
 function proven(m, tape, srv) {

@@ -111,7 +111,15 @@ const SCHEMA = [
      made double precision NOT NULL,
      seen double precision NOT NULL
    )`,
-  'CREATE INDEX IF NOT EXISTS queue_made ON zz.queue (made)'
+  'CREATE INDEX IF NOT EXISTS queue_made ON zz.queue (made)',
+  // every treasure box opened, kept so the published odds can be checked against what was really drawn
+  `CREATE TABLE IF NOT EXISTS zz.draws (
+     id bigserial PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     at double precision NOT NULL,
+     boxes jsonb NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS draws_at ON zz.draws (at)'
 ];
 let migrating = null;
 function migrate() {

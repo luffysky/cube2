@@ -94,7 +94,10 @@ async function sync(db, cred, ops, now) {
     if (!ops.length) return good({ st: rules.current(row.state, now), ver: row.ver, pub: row.pub, res: [], now });
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks)]);
-    if (saved[0] && saved[0].saved === 1) return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
+    if (saved[0] && saved[0].saved === 1) {
+      if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, boxes) SELECT $1, (x->>\'at\')::float8, x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
+      return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
+    }
     // another device saved in between: read again and repeat on top of that
   }
   return fail(409, 'busy');

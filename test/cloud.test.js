@@ -355,6 +355,28 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   eq(await C.board('score', 'season'), null, 'no network: the board call says so quietly');
   net.down = false;
 
+  // ---------- treasure boxes: opened by the server, shown on the page ----------
+  {
+    const Y = await open(device('Y')); net.ip = '203.0.113.31';
+    const items0 = M.data.items.reduce((a, b) => a + b, 0), coins0 = M.data.coins;
+    const r = M.draw(2);
+    ok(r.ok && r.pending && !M.data.box.last && M.data.items.reduce((a, b) => a + b, 0) === items0, 'with a cloud save the page does not open the boxes itself', r);
+    await send();
+    const last = M.data.box.last;
+    ok(last && last.boxes.length === 2 && M.data.daily.draws === 2, 'the server opened them and the page shows what was inside', last);
+    const gotItems = last.boxes.reduce((a, b) => a + b.got.filter(g => g.kind === 'item').length, 0), gotCoins = last.boxes.reduce((a, b) => a + b.got.filter(g => g.kind === 'coins').reduce((x, g) => x + g.n, 0), 0);
+    ok(M.data.items.reduce((a, b) => a + b, 0) === items0 + gotItems && M.data.coins === coins0 + gotCoins, 'and the prizes are in the save', [gotItems, gotCoins]);
+    eq(M.drawsLeft(), 3, 'three left today');
+    // no network: the request waits, nothing is opened on the page
+    net.down = true;
+    M.draw(1);
+    await send();
+    ok(M.data.box.last.n === last.n && C.q.some(o => o.k === 'draw'), 'offline: the draw waits for the server');
+    net.down = false;
+    await send();
+    ok(M.data.box.last.n === last.n + 1 && M.data.daily.draws === 3, 'and goes through once it is back');
+  }
+
   await pg.close();
   console.log('cloud tests: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

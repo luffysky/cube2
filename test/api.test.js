@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 9, 'nine tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 10, 'ten tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -163,6 +163,42 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   // minutes just waited, another 180 s used: 888.5 s left. At the 20-second minimum that is 44 more matches, however short.
   const burst = (await sync(A, Array.from({ length: 40 }, () => op('fin', taped(match({ ms: 1 })))))).json.res.concat((await sync(A, Array.from({ length: 40 }, () => op('fin', taped(match({ ms: 1 })))))).json.res);
   eq([burst.filter(x => x.ok).length, burst.filter(x => x.why === 'fast').length], [44, 36], 'even one-millisecond matches use up the allowance');
+
+  // ---------- treasure boxes ----------
+  {
+    const clockWas = now;
+    now += 6 * HOUR;
+    const X = await newPlayer({ name: '抽抽' }, '203.0.113.88');
+    let j = (await sync(X, [op('draw', [3])])).json;
+    const last = j.st.box.last;
+    ok(j.res[0].ok && last && last.boxes.length === 3 && j.st.daily.draws === 3, 'the server opens three boxes', j.json || j.res);
+    ok(last.boxes.every(b => ['wood', 'iron', 'gold', 'gem'].indexOf(b.grade) >= 0 && b.got.length >= 1), 'each with a grade and something in it', last.boxes);
+    const logged = await pg.query('SELECT boxes FROM zz.draws WHERE pid = $1', [X.id]);
+    const flat = b => b.map(x => x.grade + ':' + x.got.map(g => g.kind + (g.id || '') + (g.k || '') + (g.n || '')).join(',')).join('|');
+    ok(logged.length === 1 && flat(logged[0].boxes) === flat(last.boxes), 'and the draw is kept in the log as it was', logged);
+    j = (await sync(X, [op('draw', [3])])).json;
+    ok(j.res[0].ok === false && j.st.daily.draws === 3, 'five a day: three more do not fit after three', j.res);
+    j = (await sync(X, [op('draw', [2])])).json;
+    ok(j.res[0].ok && j.st.daily.draws === 5, 'two more do');
+    j = (await sync(X, [op('draw', [1])])).json;
+    ok(j.res[0].ok === false, 'and then none');
+    now += DAY;
+    j = (await sync(X, [op('draw', [1])])).json;
+    ok(j.res[0].ok && j.st.daily.draws === 1, 'a new day brings new draws');
+    j = (await sync(X, [op('sub'), op('draw', [9])])).json;
+    ok(j.res[1].ok && j.st.daily.draws === 10, 'members get ten', j.res);
+    // a page cannot pick its own prizes: the server ignores anything but the count
+    const coins0 = j.st.coins;
+    j = (await sync(X, [op('draw', [1, { got: [{ kind: 'coins', n: 99999 }] }])])).json;
+    ok(j.res[0].ok === false && j.st.coins === coins0, 'nothing extra comes with a request');
+    // over many draws the grades come out near the published odds
+    const grades = { wood: 0, iron: 0, gold: 0, gem: 0 };
+    for (let d = 0; d < 60; d++) { now += DAY; const r = (await sync(X, [op('sub'), op('draw', [10])])).json; if (r.res[1].ok) r.st.box.last.boxes.forEach(b => grades[b.grade]++); }      // (a membership trial lasts a week: start it again each day)
+    const n = Object.values(grades).reduce((a, b) => a + b, 0);
+    ok(n === 600 && grades.wood > 290 && grades.wood < 430 && grades.iron > 110 && grades.iron < 230 && grades.gem < 40, 'six hundred draws land near 60 / 28 / 10 / 2', grades);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.draws WHERE pid = $1', [X.id]))[0].n, 64, 'every draw request that went through is in the log (4 + 60)');
+    now = clockWas;      // the tests below expect the date they started with
+  }
 
   // ---------- the tape: what a match report has to be backed by ----------
   {

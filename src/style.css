@@ -687,3 +687,22 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 .lvbox b { color: var(--gold-ink); }
 .newtitle { color: var(--gold-ink); font-weight: 700; }
 .lb li b small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* treasure boxes */
+.opened { display: grid; gap: 6px; margin: 8px 0 12px; }
+.bx { display: grid; gap: 3px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--edge); background: var(--floor); animation: bxIn .35s ease-out both; }
+.bx b { font-weight: 900; }
+.bx span { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14px; }
+.bx.g-wood { border-left: 5px solid #A8743F; }
+.bx.g-iron { border-left: 5px solid #7E8A98; }
+.bx.g-gold { border-left: 5px solid var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--floor)); }
+.bx.g-gem { border-left: 5px solid #7C4BD0; background: color-mix(in srgb, #7C4BD0 14%, var(--floor)); }
+.opened .bx:nth-child(2) { animation-delay: .06s } .opened .bx:nth-child(3) { animation-delay: .12s } .opened .bx:nth-child(4) { animation-delay: .18s } .opened .bx:nth-child(n+5) { animation-delay: .24s }
+@keyframes bxIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bx { animation: none; } }
+table.cmp.odds td, table.cmp.odds th { text-align: left; vertical-align: top; font: 400 14px/1.4 inherit; }
+table.cmp.odds thead th { font-size: 12px; font-weight: 700; }
+table.cmp.odds td.og { width: 26%; } table.cmp.odds td.og b { font-weight: 800; }
+table.cmp.odds td.oc, table.cmp.odds th:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.linkish { background: none; border: 0; padding: 0; color: var(--gold-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(--display); }

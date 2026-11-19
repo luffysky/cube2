@@ -322,6 +322,8 @@
     if (!Cloud.cred && !Cloud.base) Cloud.base = snapshot();
     Meta.now = function () { return Cloud.now() + Cloud.skew; };
     Meta.onOp = push;
+    // with a cloud save, treasure boxes are opened by the server (see Meta.draw)
+    Meta.remote = function () { return Cloud.on && !Cloud.dead && !Cloud.gone; };
     if (o.local) { none(); return Promise.resolve(false); }
     return probe();
   };
@@ -648,7 +650,7 @@
     if (look) App.applyLook();
     if (!any) return;
     var sh = App.sheet(), active = document.activeElement;
-    if ((sh === 'shop' || sh === 'jobs' || sh === 'rank' || sh === 'battle') && !(active && /^(INPUT|SELECT)$/.test(active.tagName))) App.openSheet(sh);
+    if ((sh === 'shop' || sh === 'jobs' || sh === 'rank' || sh === 'battle' || sh === 'boxes') && !(active && /^(INPUT|SELECT)$/.test(active.tagName))) App.openSheet(sh);
     else refresh();
     if (App.screen() === 'menu') App.updateMenu();
   };

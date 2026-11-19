@@ -160,7 +160,8 @@
       items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0 },
+      daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0 },
+      box: { n: 0, last: null },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -233,7 +234,7 @@
     // three jobs a day, picked by the date so everyone gets the same set
     var rnd = new ZZ.RNG(day * 2654435761), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
     for (var i = 0; i < 3; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
-    d.day = day; d.jobs = jobs;
+    d.day = day; d.jobs = jobs; d.draws = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -403,6 +404,60 @@
   };
 
   // ---------- items carried into a match ----------
+  // ---------- treasure boxes ----------
+  // Free draws every day: 5, or 10 for members; what is not used is gone at midnight. Each draw opens one box, and the
+  // box's grade is drawn first, then what is inside. All the odds are in BOX and are shown to players as they are.
+  // Where a cloud save is linked, the draw happens on the server only: the page sends
+  // the request and shows what the server's answer says was in the box, so nobody can see a result coming or redo one.
+  var DRAWS = { free: 5, sub: 10 };
+  var BOX = [
+    { id: 'wood', p: 60, prizes: [{ p: 70, kind: 'items', n: 1 }, { p: 30, kind: 'coins', n: 40 }] },
+    { id: 'iron', p: 28, prizes: [{ p: 60, kind: 'items', n: 2 }, { p: 25, kind: 'coins', n: 120 }, { p: 15, kind: 'look', max: 600 }] },
+    { id: 'gold', p: 10, prizes: [{ p: 50, kind: 'items', n: 3, coins: 100 }, { p: 50, kind: 'look', max: 900 }] },
+    { id: 'gem', p: 2, prizes: [{ p: 70, kind: 'look', max: 99999 }, { p: 30, kind: 'items', n: 5, coins: 500 }] }
+  ];
+  Meta.BOX = BOX; Meta.DRAWS = DRAWS;
+  // Meta.remote(): set by the page's cloud code, true while a cloud save is linked (the server does the drawing then)
+  function here() { return !(typeof Meta.remote === 'function' && Meta.remote()); }
+  Meta.rand = function () { return Math.random(); };
+  Meta.drawsLeft = function () { Meta.rollDay(); return Math.max(0, (Meta.isSub() ? DRAWS.sub : DRAWS.free) - Meta.data.daily.draws); };
+  function pick(list, r) { var at = r * 100; for (var i = 0; i < list.length; i++) { at -= list[i].p; if (at < 0) return list[i]; } return list[list.length - 1]; }
+  // what one draw gives: [{ kind: 'item', id } | { kind: 'coins', n } | { kind: 'look', k, id } ]
+  function openBox() {
+    var d = Meta.data, box = pick(BOX, Meta.rand()), prize = pick(box.prizes, Meta.rand()), got = [], i;
+    if (prize.kind === 'look') {
+      var pool = [];
+      KINDS.forEach(function (k) { CATALOG[k].forEach(function (it) { if (it.price > 0 && it.price <= prize.max && !Meta.owns(k, it.id)) pool.push({ k: k, id: it.id, price: it.price }); }); });
+      if (pool.length) { var one = pool[Math.floor(Meta.rand() * pool.length) % pool.length]; d.owned[one.k].push(one.id); got.push({ kind: 'look', k: one.k, id: one.id }); }
+      else got.push({ kind: 'coins', n: Math.round(prize.max >= 99999 ? 800 : prize.max / 2) });      // owns everything that could come: coins instead
+    } else if (prize.kind === 'items') {
+      for (i = 0; i < prize.n; i++) got.push({ kind: 'item', id: 1 + Math.floor(Meta.rand() * 7) % 7 });
+      if (prize.coins) got.push({ kind: 'coins', n: prize.coins });
+    } else got.push({ kind: 'coins', n: prize.n });
+    got.forEach(function (g) {
+      if (g.kind === 'item') d.items[g.id] = Math.min(99, d.items[g.id] + 1);
+      if (g.kind === 'coins') { d.coins += g.n; d.tot.coins += g.n; }
+    });
+    return { grade: box.id, got: got };
+  }
+  // n boxes at once (1 to what is left today). Returns { ok, pending } where the server will do it.
+  Meta.draw = function (n) {
+    n = Math.max(1, Math.min(10, Math.floor(+n || 1)));
+    if (Meta.drawsLeft() < n) return { ok: false, why: 'none' };
+    if (!here()) { emit('draw', [n]); return { ok: true, pending: true }; }
+    var res = drawNow(n);
+    emit('draw', [n]);
+    return res;
+  };
+  function drawNow(n) {
+    var d = Meta.data, out = [];
+    if (Meta.drawsLeft() < n) return { ok: false, why: 'none' };
+    for (var i = 0; i < n; i++) { d.daily.draws++; out.push(openBox()); }
+    d.box.n++; d.box.last = { n: d.box.n, at: Meta.now(), boxes: out };
+    d.tot.draws = (d.tot.draws || 0) + n;
+    Meta.save();
+    return { ok: true, boxes: out };
+  }
   Meta.buyItem = function (id) {
     var p = ITEM_PRICE[id];
     if (!p) return { ok: false, why: 'no' };
@@ -551,6 +606,8 @@
   function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
+    // a draw on the page while the server keeps the cloud save does nothing here: the server's answer brings the boxes
+    draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },

@@ -71,6 +71,31 @@
     'j.score': ['單場拿到 20000 分', 'Score 20,000 in one match', '1戦で20000点', '한 판에 20000점'],
     'j.item': ['用掉 3 個道具', 'Use 3 items', 'アイテム3個使用', '아이템 3개 사용'],
     // profile
+    'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
+    'bx.left': ['今天還能開 {0} 次（每天 {1} 次，半夜十二點重算）', '{0} left today ({1} a day, back at midnight)', '今日はあと {0} 回（1 日 {1} 回、0 時にリセット）', '오늘 {0}회 남음(하루 {1}회, 자정에 초기화)'],
+    'bx.member': ['會員每天 {0} 次。', 'Members get {0} a day.', 'メンバーは 1 日 {0} 回。', '멤버는 하루 {0}회.'],
+    'bx.draw1': ['開一個', 'Open one', '1 回開ける', '1개 열기'],
+    'bx.drawAll': ['全部開（{0} 個）', 'Open all ({0})', '全部開ける（{0} 個）', '모두 열기({0}개)'],
+    'bx.opening': ['開箱中⋯', 'Opening…', '開けています…', '여는 중…'],
+    'bx.slow': ['在等伺服器回應，連上網路就會開。', 'Waiting for the server. The boxes open once you are back online.', 'サーバーの応答を待っています。オンラインに戻ると開きます。', '서버 응답을 기다리는 중입니다. 온라인이 되면 열립니다.'],
+    'bx.none': ['今天的次數用完了，明天再來。', 'No more today. Come back tomorrow.', '今日の分は終わりです。また明日。', '오늘 횟수를 다 썼습니다. 내일 다시 오세요.'],
+    'bx.wood': ['木箱', 'Wooden box', '木箱', '나무 상자'],
+    'bx.iron': ['鐵箱', 'Iron box', '鉄箱', '철 상자'],
+    'bx.gold': ['金箱', 'Gold box', '金箱', '금 상자'],
+    'bx.gem': ['寶石箱', 'Gem box', '宝石箱', '보석 상자'],
+    'bx.look': ['新外觀：{0}', 'New look: {0}', '新しい見た目：{0}', '새 외형: {0}'],
+    'bx.oddsShow': ['看機率', 'See the odds', '確率を見る', '확률 보기'],
+    'bx.oddsHide': ['收起機率', 'Hide the odds', '確率を閉じる', '확률 닫기'],
+    'bx.oddsH': ['每一種結果的機率', 'The odds of every result', 'すべての結果の確率', '모든 결과의 확률'],
+    'bx.oddsP': ['先抽箱子的等級，再抽箱子裡的東西。右邊是兩個相乘的結果，每次開箱都一樣。', 'The grade of the box is drawn first, then what is inside. The right column is the two together, and it is the same every time.', 'まず箱の等級、次に中身を抽選します。右の列は両方をかけ合わせた確率で、毎回同じです。', '먼저 상자 등급을, 다음에 내용물을 뽑습니다. 오른쪽은 두 확률을 곱한 값이며 매번 같습니다.'],
+    'bx.oddsN': ['道具是七種裡隨機一種，機率相同。外觀從你還沒有、而且價格在範圍內的外觀裡隨機挑；全部都有了就改給金幣。每次開箱的結果都記錄在伺服器上。', 'Each item is one of the seven at equal odds. A look is picked at random from those you do not own within the price range; if you own them all you get coins instead. Every box opened is recorded on the server.', 'アイテムは 7 種類から同じ確率で 1 つ。見た目はまだ持っていない、価格が範囲内のものからランダムに選ばれ、すべて持っている場合はコインになります。開けた結果はすべてサーバーに記録されます。', '아이템은 7종 중 하나가 같은 확률로 나옵니다. 외형은 아직 없는 것 중 가격 범위 안에서 무작위로 고르며, 모두 가지고 있으면 코인을 드립니다. 상자를 연 결과는 모두 서버에 기록됩니다.'],
+    'bx.grade': ['箱子', 'Box', '箱', '상자'],
+    'bx.inside': ['裡面', 'Inside', '中身', '내용물'],
+    'bx.chance': ['機率', 'Chance', '確率', '확률'],
+    'bx.items': ['道具 ×{0}', '{0} item(s)', 'アイテム ×{0}', '아이템 ×{0}'],
+    'bx.coins': ['金幣 {0}', '{0} coins', 'コイン {0}', '코인 {0}'],
+    'bx.lookUpTo': ['一件還沒有的外觀（{0} 金幣以內）', 'A look you do not have (up to {0} coins)', '持っていない見た目 1 つ（{0} コイン以内）', '없는 외형 1개({0}코인 이하)'],
+    'bx.anyLook': ['一件還沒有的外觀（不限價格）', 'A look you do not have (any price)', '持っていない見た目 1 つ（価格制限なし）', '없는 외형 1개(가격 제한 없음)'],
     'pf.title': ['個人檔案', 'Profile', 'プロフィール', '프로필'],
     'pf.name': ['名字', 'Name', '名前', '이름'],
     'pf.namePh': ['最多 12 個字', 'Up to 12 characters', '12文字まで', '최대 12자'],
@@ -350,6 +375,73 @@
     if (n) { App.sfx.play('itemGet'); App.toast(t('jb.got', n)); }
     App.openSheet('jobs');
   };
+
+  // ---------- treasure boxes ----------
+  var box = { wait: 0, seen: -1, odds: false, slow: 0 };
+  function prizeText(g) {
+    if (g.kind === 'item') return App.itile(g.id) + ' ' + esc(t('i' + g.id));
+    if (g.kind === 'coins') return App.coin(g.n);
+    if (g.kind === 'look') return '<b>' + esc(t('bx.look', t('c.' + g.k + '.' + g.id))) + '</b>';
+    return '';
+  }
+  function pct(v) { return (Math.round(v * 100) / 100) + '%'; }
+  function oddsHtml() {
+    var h = '<h3>' + t('bx.oddsH') + '</h3><p class="note">' + t('bx.oddsP') + '</p><table class="cmp odds"><thead><tr><th>' + t('bx.grade') + '</th><th>' + t('bx.inside') + '</th><th>' + t('bx.chance') + '</th></tr></thead><tbody>';
+    Meta.BOX.forEach(function (b) {
+      b.prizes.forEach(function (p, i) {
+        var what = p.kind === 'items' ? t('bx.items', p.n) + (p.coins ? ' + ' + t('bx.coins', p.coins) : '') : p.kind === 'coins' ? t('bx.coins', p.n) : p.max >= 99999 ? t('bx.anyLook') : t('bx.lookUpTo', p.max);
+        h += '<tr>' + (i ? '' : '<td class="og" rowspan="' + b.prizes.length + '"><b>' + t('bx.' + b.id) + '</b><br><small>' + pct(b.p) + '</small></td>') + '<td class="ow">' + esc(what) + '</td><td class="oc">' + pct(b.p * p.p / 100) + '</td></tr>';
+      });
+    });
+    return h + '</tbody></table><p class="note">' + t('bx.oddsN') + '</p>';
+  }
+  App.sheets.boxes = function () {
+    var left = Meta.drawsLeft(), d = Meta.data, h = '<h2>' + t('bx.title') + '</h2>';
+    h += '<p>' + t('bx.left', left, Meta.isSub() ? Meta.DRAWS.sub : Meta.DRAWS.free) + '</p>' + (Meta.isSub() ? '' : '<p class="note">' + t('bx.member', Meta.DRAWS.sub) + '</p>');
+    if (box.wait) h += '<p class="note" role="status">' + t(Date.now() - box.wait > 6000 ? 'bx.slow' : 'bx.opening') + '</p>';
+    else if (d.box.last && d.box.last.n !== box.seen && box.seen >= 0) {
+      h += '<div class="opened">';
+      d.box.last.boxes.forEach(function (b) { h += '<div class="bx g-' + b.grade + '"><b>' + t('bx.' + b.grade) + '</b><span>' + b.got.map(prizeText).join('　') + '</span></div>'; });
+      h += '</div>';
+    }
+    h += '<div class="row">' + (left > 1 ? '<button class="btn" type="button" data-draw="' + left + '"' + (box.wait ? ' disabled' : '') + '>' + t('bx.drawAll', left) + '</button>' : '') +
+      '<button class="btn primary" type="button" data-draw="1"' + (left && !box.wait ? '' : ' disabled') + '>' + t('bx.draw1') + '</button></div>';
+    h += '<p class="note"><button class="linkish" type="button" data-do="boxOdds">' + t(box.odds ? 'bx.oddsHide' : 'bx.oddsShow') + '</button></p>' + (box.odds ? oddsHtml() : '');
+    return h + '<div class="row">' + btn('close', 'done') + '</div>';
+  };
+  App.opened.boxes = function () { if (box.seen < 0) box.seen = Meta.data.box.last ? Meta.data.box.last.n : 0; };
+  App.closed.boxes = function () { box.seen = Meta.data.box.last ? Meta.data.box.last.n : 0; };
+  App.acts.boxOdds = function () { box.odds = !box.odds; App.openSheet('boxes'); };
+  function drawn() {
+    var last = Meta.data.box.last;
+    if (!box.wait || !last || last.n === box.before) return false;
+    box.wait = 0;
+    var best = last.boxes.some(function (b) { return b.grade === 'gem' || b.grade === 'gold'; });
+    App.sfx.play(best ? 'cheer' : 'itemGet');
+    App.buzz(best ? [30, 40, 60] : 18);
+    return true;
+  }
+  App.clicks.push(function (d) {
+    if (d.draw == null) return false;
+    var n = +d.draw;
+    box.before = Meta.data.box.last ? Meta.data.box.last.n : 0;
+    box.seen = box.before;
+    var r = Meta.draw(n);
+    if (!r.ok) { App.toast(t('bx.none')); return true; }
+    box.wait = Date.now();
+    if (!r.pending) drawn();
+    else {
+      // the server opens them; its answer comes with the next sync (asked for at once)
+      if (ZZ.Cloud && ZZ.Cloud.flush) ZZ.Cloud.flush();
+      var check = setInterval(function () {
+        if (drawn() || !box.wait) { clearInterval(check); if (App.sheet() === 'boxes') App.openSheet('boxes'); App.updateMenu(); return; }
+        if (App.sheet() === 'boxes' && Date.now() - box.wait > 6000 && !box.slow) { box.slow = 1; App.openSheet('boxes'); }
+      }, 250);
+    }
+    App.openSheet('boxes');
+    App.updateMenu();
+    return true;
+  });
 
   // ---------- profile ----------
   App.sheets.profile = function () {
