@@ -323,3 +323,14 @@ node test/levels.js          # 七個電腦等級、設定裡的「電腦難度�
 - 音效是照檔名和波形挑的，沒有人實際聽過一輪。
 - 手機橫放時選單有專屬版面，但對局還是會請玩家轉直（高度不夠放牆和按鍵）。
 - 勝利的歡呼音效是專案擁有者提供的檔案，原始授權還沒確認（見 `CREDITS.md`）。
+
+## 同意畫面與隱私（consent.js）
+
+第一次進來會跳「開始之前」：問年齡（18+／13–17／未滿 13），兩顆一樣大的按鈕選要不要用 Google 字型（不預先打勾）。選擇存在 `zhuanzhuan.consent.v1`，只在裝置上。不用 cookie；localStorage 是遊戲必要的，只說明不詢問。
+
+- Google 字型只有同意後才由 `fontsIn()` 載入，模板裡已拿掉 `<link>`。
+- 未滿 13 歲：擋 `App.go.online/quick`、`ZZ.Net.open/join/quick`、`Meta.setName`。
+- 設定 → 隱私與資料：切換字型、改年齡、下載我的資料（JSON）。
+- 簡體中文介面在主畫面顯示适龄提示 8+ 與健康游戏忠告（`#cnNotice`）。中國大陸的版號、ICP、實名與防沉迷需要當地持證營運方，我們做不到。
+- 自動測試（`navigator.webdriver`）略過這個畫面，除非設 `window.__zzAskConsent`。測試：`test/consent.js`。
+- 條款與政策：`terms.html`、`privacy.html`（中英，需律師過目）。

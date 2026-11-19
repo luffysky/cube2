@@ -1,0 +1,165 @@
+/* 轉磚 consent: the first-visit screen (terms, privacy, age), the storage and font choices, and the notices some
+   regions ask for.
+
+   What is kept and why:
+   - Game progress and settings in the browser's storage are needed for the game to work at all, so they are not
+     asked about (they are explained). There are no cookies, no ads and no trackers.
+   - Fonts come from Google Fonts, which means the browser contacts Google. That is optional: until the player
+     allows it, the page uses the fonts already on the device.
+   - Age: under 13 plays without a public name and without online play (rooms, quick match), which are the only
+     places strangers meet. 13 to 17 plays everything. The answer stays on this device.
+   - In Simplified Chinese the menu carries an age-suitability notice and the standard healthy-gaming advice. That is
+     not the mainland's real-name system, which only a licensed operator there can connect to. */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta, esc = App.esc, btn = App.btn;
+  var KEY = 'zhuanzhuan.consent.v1', VERSION = 1, AGE_MARK = '8+';
+  var C = { v: 0, at: 0, fonts: false, age: '' };
+
+  function load() {
+    try {
+      var d = JSON.parse(window.localStorage.getItem(KEY) || 'null');
+      if (d && typeof d === 'object') { C.v = +d.v || 0; C.at = +d.at || 0; C.fonts = !!d.fonts; C.age = d.age === 'adult' || d.age === 'teen' || d.age === 'child' ? d.age : ''; }
+    } catch (e) { /* asked again */ }
+  }
+  function keep() { try { window.localStorage.setItem(KEY, JSON.stringify({ v: VERSION, at: Date.now(), fonts: C.fonts, age: C.age })); } catch (e) { /* asked again next time */ } }
+  var Consent = {
+    done: function () { return C.v >= VERSION && !!C.age; },
+    fonts: function () { return C.fonts; },
+    age: function () { return C.age; },
+    child: function () { return C.age === 'child'; },
+    set: function (o) {
+      if (o.fonts != null) C.fonts = !!o.fonts;
+      if (o.age) C.age = o.age;
+      C.v = VERSION;
+      keep();
+      apply();
+    }
+  };
+  ZZ.Consent = Consent;
+
+  // ---------- fonts ----------
+  var BASE = ['Barlow+Semi+Condensed:ital,wght@0,600;0,700;1,700;1,800', 'Chiron+GoRound+TC:wght@200..900'], based = false;
+  function fontsIn() {
+    if (!C.fonts || based) return;
+    based = true;
+    BASE.forEach(function (f) {
+      var ln = document.createElement('link');
+      ln.rel = 'stylesheet';
+      ln.href = 'https://fonts.googleapis.com/css2?family=' + f + '&display=swap';
+      document.head.appendChild(ln);
+    });
+    if (App.applyLang) App.applyLang();      // the language's own font, now that fonts may load
+  }
+  // ---------- age ----------
+  function apply() {
+    fontsIn();
+    if (C.age === 'child' && Meta.data.name) { Meta.setName(''); if (App.updateMenu) App.updateMenu(); }
+    notice();
+  }
+  // In Simplified Chinese: the age-suitability mark and the healthy-gaming advice, under the menu.
+  function notice() {
+    var el = document.getElementById('cnNotice');
+    if (!el) return;
+    var on = L.lang === 'zh-Hans';
+    el.hidden = !on;
+    if (on) el.innerHTML = '<b>适龄提示：' + AGE_MARK + '</b>　' + esc('抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。');
+  }
+
+  L.add({
+    'cs.title': ['開始之前', 'Before you start', 'はじめる前に', '시작하기 전에'],
+    'cs.p1': ['轉磚不用註冊。遊戲進度存在你的裝置上；第一次打完一場之後，也會存一份匿名的雲端存檔，換裝置不會不見。不用 cookie、沒有廣告、沒有追蹤程式。', 'No sign-up. Your progress is kept on your device and, after your first match, in an anonymous cloud save so it survives a new device. No cookies, no ads, no trackers.', '登録は不要です。進行状況は端末に保存され、最初の対戦のあとは匿名のクラウドセーブにも保存されます。Cookie、広告、トラッカーは使いません。', '가입이 필요 없습니다. 진행 상황은 기기에 저장되고, 첫 대전 후에는 익명 클라우드 저장에도 보관됩니다. 쿠키, 광고, 추적기는 쓰지 않습니다.'],
+    'cs.age': ['你幾歲？', 'How old are you?', '年齢を教えてください', '나이를 알려 주세요'],
+    'cs.adult': ['18 歲以上', '18 or older', '18 歳以上', '18세 이상'],
+    'cs.teen': ['13 到 17 歲', '13 to 17', '13〜17 歳', '13~17세'],
+    'cs.child': ['未滿 13 歲', 'Under 13', '13 歳未満', '13세 미만'],
+    'cs.childNote': ['未滿 13 歲：不開放連線對戰和隨機配對，排行榜上不顯示名字。其他都能玩。', 'Under 13: no online play or quick match, and no name on the leaderboards. Everything else is open.', '13 歳未満：オンライン対戦とランダムマッチは使えず、ランキングに名前は表示されません。ほかはすべて遊べます。', '13세 미만: 온라인 대전과 빠른 매칭은 쓸 수 없고 순위표에 이름이 표시되지 않습니다. 나머지는 모두 즐길 수 있습니다.'],
+    'cs.teenNote': ['未滿 18 歲的朋友，玩之前跟家長說一聲；每天玩一陣子就休息一下。', 'If you are under 18, let a parent know you play, and take breaks.', '18 歳未満の方は、遊ぶことを保護者に伝えて、適度に休憩してください。', '18세 미만이라면 보호자에게 알리고 틈틈이 쉬세요.'],
+    'cs.fontsH': ['字型', 'Fonts', 'フォント', '글꼴'],
+    'cs.fontsP': ['遊戲用的字型放在 Google Fonts。允許的話，你的瀏覽器會連到 Google 下載字型（Google 會看到你的網路位址）；不允許的話就用裝置內建的字型，遊戲一樣能玩。', 'The game\'s fonts are hosted by Google Fonts. If you allow it, your browser fetches them from Google (which sees your network address). If not, the fonts already on your device are used and everything still works.', 'ゲームのフォントは Google Fonts にあります。許可するとブラウザが Google からフォントを取得します（Google にネットワークアドレスが伝わります）。許可しない場合は端末のフォントで遊べます。', '게임 글꼴은 Google Fonts에 있습니다. 허용하면 브라우저가 Google에서 글꼴을 받아옵니다(Google이 네트워크 주소를 봅니다). 허용하지 않으면 기기 글꼴로 똑같이 즐길 수 있습니다.'],
+    'cs.fontsOn': ['使用 Google 字型', 'Use Google Fonts', 'Google フォントを使う', 'Google 글꼴 사용'],
+    'cs.agree': ['按下任一個「開始玩」表示你同意<a href="terms.html" target="_blank" rel="noopener">服務條款</a>，也看過<a href="privacy.html" target="_blank" rel="noopener">隱私政策</a>。', 'By pressing either “Start” you agree to the <a href="terms.html" target="_blank" rel="noopener">terms of service</a> and have read the <a href="privacy.html" target="_blank" rel="noopener">privacy policy</a>.', 'どちらかの「はじめる」を押すと<a href="terms.html" target="_blank" rel="noopener">利用規約</a>に同意し、<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>を確認したものとみなします。', '어느 「시작」이든 누르면 <a href="terms.html" target="_blank" rel="noopener">이용약관</a>에 동의하고 <a href="privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a>을 읽은 것으로 봅니다.'],
+    'cs.startAll': ['開始玩（用 Google 字型）', 'Start, with Google Fonts', 'はじめる（Google フォントを使う）', '시작(Google 글꼴 사용)'],
+    'cs.startMin': ['開始玩（不用）', 'Start, without', 'はじめる（使わない）', '시작(사용 안 함)'],
+    'cs.pickAge': ['先選年齡。', 'Pick an age first.', '先に年齢を選んでください。', '먼저 나이를 선택하세요.'],
+    'cs.settingsH': ['隱私與資料', 'Privacy and data', 'プライバシーとデータ', '개인정보와 데이터'],
+    'cs.ageNow': ['年齡：{0}', 'Age: {0}', '年齢：{0}', '나이: {0}'],
+    'cs.changeAge': ['改年齡', 'Change age', '年齢を変更', '나이 변경'],
+    'cs.export': ['下載我的資料', 'Download my data', '自分のデータをダウンロード', '내 데이터 다운로드'],
+    'cs.links': ['<a href="privacy.html" target="_blank" rel="noopener">隱私政策</a>　<a href="terms.html" target="_blank" rel="noopener">服務條款</a>', '<a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>　<a href="terms.html" target="_blank" rel="noopener">Terms of service</a>', '<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>　<a href="terms.html" target="_blank" rel="noopener">利用規約</a>', '<a href="privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a>　<a href="terms.html" target="_blank" rel="noopener">이용약관</a>'],
+    'cs.childBlock': ['未滿 13 歲不開放連線對戰。可以打電腦、練功、排位和闖關。', 'Online play is not available under 13. You can play the computer, train, play ranked and the levels.', '13 歳未満はオンライン対戦を利用できません。コンピューター対戦、練習、ランク戦は遊べます。', '13세 미만은 온라인 대전을 이용할 수 없습니다. 컴퓨터 대전, 연습, 랭크전은 즐길 수 있습니다.'],
+    'cs.nameChild': ['未滿 13 歲不能設定公開名字。', 'A public name cannot be set under 13.', '13 歳未満は公開する名前を設定できません。', '13세 미만은 공개 이름을 설정할 수 없습니다.']
+  });
+
+  // ---------- the first-visit screen ----------
+  var pick = '', warn = false;
+  App.sheets.consent = function () {
+    var a = pick || C.age, h = '<h2>' + t('cs.title') + '</h2><p>' + t('cs.p1') + '</p><h3>' + t('cs.age') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('cs.age') + '">';
+    ['adult', 'teen', 'child'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (a === k) + '" data-age="' + k + '">' + t('cs.' + k) + '</button>'; });
+    h += '</div>';
+    if (a === 'child') h += '<p class="note">' + t('cs.childNote') + '</p>';
+    if (a === 'teen') h += '<p class="note">' + t('cs.teenNote') + '</p>';
+    if (warn && !a) h += '<p class="warn" role="status">' + t('cs.pickAge') + '</p>';
+    h += '<h3>' + t('cs.fontsH') + '</h3><p class="note">' + t('cs.fontsP') + '</p>';
+    if (L.lang === 'zh-Hans') h += '<p class="note"><b>适龄提示：' + AGE_MARK + '</b></p>';
+    // two equal buttons: nothing is ticked for the player, and saying no is as easy as saying yes
+    return h + '<p class="note">' + t('cs.agree') + '</p><div class="row">' + btn('consentAll', 'cs.startAll') + btn('consentMin', 'cs.startMin') + '</div>';
+  };
+  function go(fonts) {
+    var a = pick || C.age;
+    if (!a) { warn = true; return App.openSheet('consent'); }
+    Consent.set({ age: a, fonts: fonts });
+    App.closeSheet();
+  }
+  App.acts.consentAll = function () { go(true); };
+  App.acts.consentMin = function () { go(false); };
+  App.inputs.push(function (el) {
+    if (el.id === 'sFonts') { Consent.set({ fonts: el.checked }); return true; }
+    return false;
+  });
+  App.clicks.push(function (d) {
+    if (d.age == null) return false;
+    pick = d.age;
+    App.openSheet('consent');
+    return true;
+  });
+  App.acts.changeAge = function () { pick = C.age; App.openSheet('consent'); };
+  // everything the game keeps about this player, as a file
+  App.acts.exportData = function () {
+    var out = { exported: new Date().toISOString(), game: 'zhuanzhuan', record: Meta.data, cloud: ZZ.Cloud ? { tag: ZZ.Cloud.pub || '', linked: !!ZZ.Cloud.cred } : null, consent: { age: C.age, fonts: C.fonts, at: C.at } };
+    var blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'zhuanzhuan-my-data.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  };
+  // in Settings
+  App.settingsExtra = function () {
+    return '<h3>' + t('cs.settingsH') + '</h3>' + App.toggle('sFonts', t('cs.fontsOn')) + '<p class="note">' + esc(t('cs.ageNow', C.age ? t('cs.' + C.age) : '—')) + '</p>' +
+      '<div class="row">' + btn('changeAge', 'cs.changeAge') + btn('exportData', 'cs.export') + '</div><p class="note">' + t('cs.links') + '</p>';
+  };
+  App.settingsOpened = function () { var c = document.getElementById('sFonts'); if (c) c.checked = C.fonts; };
+
+  // under 13: the places where strangers meet stay closed
+  var goOnline = App.go.online, goQuick = App.go.quick;
+  App.go.online = function () { if (Consent.child()) return App.toast(t('cs.childBlock'), 4200); goOnline(); };
+  App.go.quick = function () { if (Consent.child()) return App.toast(t('cs.childBlock'), 4200); goQuick(); };
+  // the same for a room link or anything else that reaches the network play directly
+  ['open', 'join', 'quick'].forEach(function (k) {
+    var f = ZZ.Net && ZZ.Net[k];
+    if (typeof f === 'function') ZZ.Net[k] = function () { if (Consent.child()) { App.toast(t('cs.childBlock'), 4200); return; } return f.apply(ZZ.Net, arguments); };
+  });
+  var setName = Meta.setName;
+  Meta.setName = function (v) { if (Consent.child() && v) { App.toast(t('cs.nameChild')); return false; } return setName(v); };
+
+  load();
+  App.boot.push(function () {
+    apply();
+    var room = /[?&]room=/.test(window.location.search);
+    // automated browser tests skip the first-visit screen (all but the one that tests it, which sets this flag)
+    var robot = navigator.webdriver === true && !window.__zzAskConsent;
+    if (!Consent.done() && !robot) { pick = C.age; setTimeout(function () { if (!App.sheet() || room) App.openSheet('consent'); }, room ? 400 : 80); }
+  });
+  App.langChanged = App.langChanged || [];
+  App.langChanged.push(notice);
+})();

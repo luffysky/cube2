@@ -706,3 +706,7 @@ table.cmp.odds td.og { width: 26%; } table.cmp.odds td.og b { font-weight: 800; 
 table.cmp.odds td.oc, table.cmp.odds th:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .linkish { background: none; border: 0; padding: 0; color: var(--gold-ink); font: inherit; text-decoration: underline; cursor: pointer; }
 table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(--display); }
+
+.legal a { color: var(--muted); }
+.cn-notice b { color: var(--ink); }
+.seg button[data-age] { min-width: 0; }

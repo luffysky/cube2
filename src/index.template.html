@@ -47,10 +47,6 @@
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" sizes="any">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script type="application/ld+json">{{JSONLD}}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,600;0,700;1,700;1,800&amp;display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Chiron+GoRound+TC:wght@200..900&amp;display=swap" rel="stylesheet">
 <style>
 /*__CSS__*/
 </style>
@@ -94,6 +90,8 @@
         <button class="link" type="button" data-t="pwa.install" id="mInstall" hidden></button>
       </footer>
       <p class="about" data-t="seo.about"></p>
+      <p class="about cn-notice" id="cnNotice" hidden></p>
+      <p class="about legal"><a href="privacy.html" data-t="lg.privacy"></a>　<a href="terms.html" data-t="lg.terms"></a></p>
     </div>
   </section>
 
@@ -192,6 +190,9 @@
 </script>
 <script>
 /*__CLOUD__*/
+</script>
+<script>
+/*__CONSENT__*/
 </script>
 <script>
 window.ZZ.start();

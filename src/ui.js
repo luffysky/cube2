@@ -1050,6 +1050,7 @@
         toggle('sSwap', t('s.swap')) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
         (env.touch ? '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>' : '') +
         '<h3>' + t('s.sound') + '</h3>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
+        (App.settingsExtra ? App.settingsExtra() : '') +
         '<div class="row">' + btn('defaults', 's.defaults') + btn('close', 'done', true) + '</div>';
     } else if (name === 'keys') {
       h = '<h2>' + t('kb.title') + '</h2><p>' + t('kb.hint') + '</p><div class="binds">';
@@ -1133,7 +1134,8 @@
     // each language's own address is the one to index for that language
     if (can) can.setAttribute('href', can.getAttribute('href').split('?')[0] + (urlLang && urlLang !== 'zh-Hant' ? '?lang=' + urlLang : ''));
     var f = FONT[L.lang];
-    if (f && !fontDone[L.lang]) {
+    // fonts come from Google only once the player has allowed it (see consent.js); until then the device's own are used
+    if (f && !fontDone[L.lang] && ZZ.Consent && ZZ.Consent.fonts()) {
       fontDone[L.lang] = 1;
       var ln = document.createElement('link');
       ln.rel = 'stylesheet';
@@ -1149,6 +1151,7 @@
     env.font = '';
     if (S) { setupHud(); if (S.kind === 'dojo' && S.d) loadDrill(S.drill); layout(); }
     updateMenu();
+    (App.langChanged || []).forEach(function (f) { f(); });
   }
 
   // ---------- key binding sheet ----------
@@ -1181,7 +1184,7 @@
     el.sheetCard.innerHTML = sheetHtml(name);
     el.sheet.hidden = false;
     el.sheetCard.scrollTop = keep;
-    if (name === 'settings') syncSettings();
+    if (name === 'settings') { syncSettings(); if (App.settingsOpened) App.settingsOpened(); }
     if (name === 'battle') $('bItems').checked = pick.items;
     if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
@@ -1683,7 +1686,7 @@
   App.begin = begin; App.foeGone = function (s) { if (S && S.multi) foeGone(s); }; App.setTarget = function (s) { if (S && S.multi) setTarget(s); }; App.openSheet = openSheet; App.closeSheet = closeSheet; App.sheetDo = sheetDo; App.toast = toast; App.banner = banner; App.popRaw = popRaw;
   App.txt = txt; App.stat = stat; App.esc = esc; App.btn = btn; App.coin = coin; App.itile = itile; App.ul = ul; App.field = field; App.toggle = toggle;
   App.fmtClock = fmtClock; App.fmtTime = fmtTime; App.saveStore = saveStore; App.applySettings = applySettings; App.applyLook = applyLook; App.applyLang = applyLang;
-  App.toMenu = toMenu; App.layout = layout; App.updateMenu = updateMenu; App.rankName = rankName; App.stepCells = stepCells; App.stepDemo = stepDemo;
+  App.applyLang = applyLang; App.toMenu = toMenu; App.layout = layout; App.updateMenu = updateMenu; App.rankName = rankName; App.stepCells = stepCells; App.stepDemo = stepDemo;
   App.actName = actName; App.clearName = clearName; App.key1 = key1; App.sdfVal = sdfVal; App.foeItem = foeItem; App.endBattle = endBattle; App.setTools = setTools;
   App.tool = tool; App.buzz = buzz; App.resume = resume; App.openBattle = openBattle; App.rewardHtml = rewardHtml;
 
