@@ -43,5 +43,18 @@ M.SLOT.outs.forEach(o => { const got = (outs[o.id] || 0) / N * 100; ok(Math.abs(
 const rtp = (back + items * 50) / spent;      // an item counted at about what one costs in the shop
 ok(rtp > 0.8 && rtp < 0.95, 'the slot pays back a little less than it takes (' + (rtp * 100).toFixed(1) + '%)');
 
+// ---------- the 200 items ----------
+const I = ZZ.ITEMS;
+ok(I.length === 201 && I.slice(1).every((d, i) => d.id === i + 1), '200 items, numbered 1 to 200');
+ok(new Set(I.slice(1).map(d => JSON.stringify(d.fx))).size === 200, 'no two items do the same thing');
+ok(JSON.stringify(I.slice(1, 8).map(d => d.fx)) === JSON.stringify([[['chisel', 3]], [['grout', 3]], [['shield', 8000]], [['goldT', 2]], [['trowel', 1]], [['freeze', 3000]], [['boost', 8000, 2]]]), 'the first seven are the classic ones');
+ok(JSON.stringify(M.ITEM_PRICE.slice(0, 8)) === JSON.stringify([0, 40, 50, 40, 60, 50, 60, 60]), 'and keep their prices');
+ok(I.slice(1).every(d => d.price >= 30 && d.price <= 150 && d.tier >= 1 && d.tier <= 5 && d.fx.every(f => ZZ.FX_KIND[f[0]])), 'every item has a price, a rarity and known effects');
+ok(I.slice(1).every(d => d.fx.length < 2 || d.fx[0][0] !== d.fx[1][0]), 'a combo never doubles one effect');
+const pool = ZZ.ITEM_POOL, c1 = pool.filter(x => x === 1).length, c200 = pool.filter(x => x === 200).length;
+ok(pool.every(x => x >= 1 && x <= 200) && c1 > c200 && new Set(pool).size === 200, 'every item can show up on the board, the classic ones most');
+M.data.coins = 1000;
+const had150 = M.data.items[150]; ok(M.buyItem(150).ok && M.data.items[150] === had150 + 1, 'item 150 can be bought');
+ok(M.run('item', [201]).ok === false && M.run('item', [1.5]).ok === false && M.run('bring', ['3']).ok === false, 'an item number out of range is refused, not rounded');
 console.log('luck tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

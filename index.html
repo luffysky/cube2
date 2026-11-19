@@ -807,6 +807,13 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 @media (prefers-reduced-motion: reduce) { #wheelRot { transition: none !important; } }
 /* a button that cannot be used right now looks it */
 .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+/* item rarity stars */
+.tier { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: -1px; }
+.tier.t3, .tier.t4 { color: var(--gold-ink); }
+.tier.t5 { color: var(--alarm); }
+/* a long item name (a combo) fits inside the board */
+.pop.long .m { font-size: clamp(15px, 4.4vw, 22px); white-space: normal; }
+.pop.long .s { white-space: normal; max-width: 92%; margin-left: auto; margin-right: auto; line-height: 1.3; }
 </style>
 </head>
 <body>
@@ -922,6 +929,54 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     { id: 6, color: '#1C8DBF' },   // freeze: the rival cannot move for 3 s
     { id: 7, color: '#7C4BD0' }    // double: lines sent count twice for 8 s
   ];
+  // ---------- all 200 items ----------
+  // Every item is a list of effects. Twelve kinds of effect, each at a few strengths, make the single items; the rest
+  // pair one effect for yourself with one against the rival (or two of one side). Items 1 to 7 are the first seven and
+  // never change, so old saves, recordings and online play keep working.
+  //   self: chisel n (remove your bottom n rows), shield ms, goldT n / goldI n (your next n pieces), trowel (fill
+  //         holes), boost ms x (lines sent count x times), cleanse (drop incoming cement), score n (points)
+  //   rival: grout n (n cement rows), freeze ms, curse n (their next n pieces are S or Z), blind ms (their next
+  //          pieces hidden)
+  var FX_KIND = {
+    chisel: { side: 'self', color: '#D9432F', w: 6 }, grout: { side: 'foe', color: '#59636F', w: 7 }, shield: { side: 'self', color: '#2F7FD9', w: 0.6 },
+    goldT: { side: 'self', color: '#A8700A', w: 6 }, goldI: { side: 'self', color: '#C9921A', w: 5 }, trowel: { side: 'self', color: '#168A63', w: 14 },
+    freeze: { side: 'foe', color: '#1C8DBF', w: 4 }, boost: { side: 'self', color: '#7C4BD0', w: 1.2 }, cleanse: { side: 'self', color: '#3BA8A0', w: 9 },
+    curse: { side: 'foe', color: '#8E3B6E', w: 5 }, blind: { side: 'foe', color: '#444B57', w: 1 }, score: { side: 'self', color: '#C79A1A', w: 0.005 }
+  };
+  function fxPower(f) { var k = FX_KIND[f[0]], v = f[1] || 1; return f[0] === 'shield' || f[0] === 'freeze' || f[0] === 'blind' ? k.w * v / 1000 : f[0] === 'boost' ? k.w * (v / 1000) * (f[2] - 1) : k.w * v; }
+  (function () {
+    var first = [[['chisel', 3]], [['grout', 3]], [['shield', 8000]], [['goldT', 2]], [['trowel', 1]], [['freeze', 3000]], [['boost', 8000, 2]]], list = first.slice(), i, j;
+    var singles = [];
+    [1, 2, 4, 5].forEach(function (n) { singles.push([['chisel', n]]); });
+    [1, 2, 4, 5, 6].forEach(function (n) { singles.push([['grout', n]]); });
+    [3000, 5000, 10000, 12000, 15000].forEach(function (n) { singles.push([['shield', n]]); });
+    [1, 3].forEach(function (n) { singles.push([['goldT', n]]); });
+    [1, 2, 3].forEach(function (n) { singles.push([['goldI', n]]); });
+    [1000, 1500, 2000, 2500, 4000, 5000].forEach(function (n) { singles.push([['freeze', n]]); });
+    [4000, 6000, 10000, 12000].forEach(function (n) { singles.push([['boost', n, 2]]); });
+    [4000, 6000, 8000].forEach(function (n) { singles.push([['boost', n, 3]]); });
+    singles.push([['cleanse', 1]]);
+    [1, 2, 3].forEach(function (n) { singles.push([['curse', n]]); });
+    [3000, 5000, 8000, 10000].forEach(function (n) { singles.push([['blind', n]]); });
+    [500, 1000, 2000, 3000, 5000].forEach(function (n) { singles.push([['score', n]]); });
+    list = list.concat(singles);
+    var S = [['chisel', 1], ['chisel', 2], ['shield', 3000], ['shield', 5000], ['goldT', 1], ['goldI', 1], ['trowel', 1], ['boost', 4000, 2], ['cleanse', 1], ['score', 1000]];
+    var F = [['grout', 1], ['grout', 2], ['grout', 3], ['freeze', 1000], ['freeze', 2000], ['curse', 1], ['curse', 2], ['blind', 3000], ['blind', 5000]];
+    for (i = 0; i < S.length; i++) for (j = 0; j < F.length; j++) list.push([S[i], F[j]]);
+    for (i = 0; i < S.length && list.length < 200; i++) for (j = i + 1; j < S.length && list.length < 200; j++) if (S[i][0] !== S[j][0]) list.push([S[i], S[j]]);
+    for (i = 0; i < F.length && list.length < 200; i++) for (j = i + 1; j < F.length && list.length < 200; j++) if (F[i][0] !== F[j][0]) list.push([F[i], F[j]]);
+    for (i = 0; i < 200; i++) {
+      var fx = list[i], power = 0;
+      fx.forEach(function (f) { power += fxPower(f); });
+      var tier = power < 10 ? 1 : power < 18 ? 2 : power < 26 ? 3 : power < 36 ? 4 : 5;
+      var def = { id: i + 1, fx: fx, power: Math.round(power * 10) / 10, tier: tier, color: FX_KIND[fx[0][0]].color, color2: fx[1] ? FX_KIND[fx[1][0]].color : null,
+        price: [0, 40, 50, 40, 60, 50, 60, 60][i + 1] || Math.round((25 + power * 2.2) / 5) * 5 };
+      if (i < 7) { def.color = ITEMS[i + 1].color; ITEMS[i + 1] = def; } else ITEMS.push(def);
+    }
+  })();
+  // How often each item shows up on the board: the first seven most, weaker ones more than strong ones.
+  var ITEM_POOL = [];
+  ITEMS.forEach(function (d) { if (!d) return; var n = d.id <= 7 ? 12 : [0, 4, 3, 2, 1, 1][d.tier]; for (var k = 0; k < n; k++) ITEM_POOL.push(d.id); });
 
   // Spawn-state cells inside an n*n box; the other three states come from rotating the box clockwise.
   var BOX = { I: 4, O: 2, T: 3, S: 3, Z: 3, J: 3, L: 3 };
@@ -1045,7 +1100,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     this.onAttack = o.onAttack || null;
     this.itemsOn = !!o.items;
     this.itemEvery = o.itemEvery || 8;
-    this.itemPool = o.itemPool || [1, 2, 3, 4, 5, 6, 7];
+    this.itemPool = o.itemPool || ITEM_POOL;
     this.bring = o.bring ? o.bring.slice(0, 3) : [];              // items carried in from outside the match
     this.reset(o.board);
   }
@@ -1067,7 +1122,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     this.lockTimer = 0; this.resets = 0; this.lowest = 0; this.touched = false;
     this.lastMove = ''; this.lastKick = -1; this.gravAcc = 0;
     this.stats = { pieces: 0, lines: 0, attack: 0, sent: 0, spins: 0, tsd: 0, tst: 0, minis: 0, xspins: 0, quads: 0, maxCombo: 0, perfects: 0, b2bMax: 0, kos: 0, items: 0, score: 0 };
-    this.inv = this.bring.slice(); this.itemCount = 0; this.shield = 0; this.boost = 0;
+    this.inv = this.bring.slice(); this.itemCount = 0; this.shield = 0; this.boost = 0; this.boostX = 2;
     this.events = [];
     this.fill();
   };
@@ -1360,7 +1415,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       var hard = lines === 4 || tspin !== 'none';
       b2b = hard && this.b2b >= 0;
       atk = calcAttack(lines, tspin, b2b, this.combo, perfect);
-      if (this.boost > 0) atk *= 2;
+      if (this.boost > 0) atk *= this.boostX || 2;
       if (hard) this.b2b++; else this.b2b = -1;
       var st = this.stats;
       st.lines += lines; st.attack += atk;
@@ -1544,7 +1599,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   };
 
   var ZZ = {
-    COLS: COLS, ROWS: ROWS, VIS: VIS, TOP: TOP, TYPES: TYPES, TID: TID, GARBAGE: GARBAGE, ITEMS: ITEMS,
+    COLS: COLS, ROWS: ROWS, VIS: VIS, TOP: TOP, TYPES: TYPES, TID: TID, GARBAGE: GARBAGE, ITEMS: ITEMS, FX_KIND: FX_KIND, ITEM_POOL: ITEM_POOL,
     BOX: BOX, SHAPES: SHAPES, kicksFor: kicksFor, tspinType: tspinType, calcAttack: calcAttack, calcScore: calcScore,
     RNG: RNG, Game: Game
   };
@@ -1987,6 +2042,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'h.credits': ['素材出處', 'Credits', 'クレジット', '크레딧'],
     'h.creditsP': ['音樂：Juhani Junkala《5 Chiptunes (Action)》。音效：Kenney《Interface Sounds》《UI Audio》。全部是 CC0 授權。連線元件：PeerJS（MIT 授權）。', 'Music: Juhani Junkala, "5 Chiptunes (Action)". Sound effects: Kenney, "Interface Sounds" and "UI Audio". All CC0. Networking: PeerJS (MIT).', 'BGM：Juhani Junkala「5 Chiptunes (Action)」。効果音：Kenney「Interface Sounds」「UI Audio」。すべてCC0。通信：PeerJS（MIT）。', '음악: Juhani Junkala 「5 Chiptunes (Action)」. 효과음: Kenney 「Interface Sounds」 「UI Audio」. 모두 CC0. 통신: PeerJS (MIT).'],
     // items
+    'h.itemsMore': ['上面是最常見的 7 種。道具一共 {0} 種，全部可以在商店的「道具」看。', 'These are the 7 most common. There are {0} items in all; see them under Items in the shop.', 'よく出る 7 種類です。アイテムは全部で {0} 種類、ショップの「アイテム」で見られます。', '가장 흔한 7종입니다. 아이템은 모두 {0}종이며 상점의 「아이템」에서 볼 수 있습니다.'],
     'i1': ['拆牆', 'Knock down', '壁こわし', '벽 허물기'],
     'i1t': ['敲掉自己最下面 3 排', 'Removes your bottom 3 rows', '自分の下3段を取り除く', '내 아래 3줄 제거'],
     'i2': ['灌漿', 'Grout', 'セメント流し', '시멘트 붓기'],
@@ -2002,6 +2058,43 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'i7': ['加倍', 'Double', '2倍', '2배'],
     'i7t': ['8 秒內送出的行數變兩倍', 'Lines you send are doubled for 8 s', '8秒間、送るラインが2倍', '8초간 보내는 줄 2배']
   });
+
+  // ---------- names and descriptions of items 8 to 200, built from what each one does ----------
+  (function () {
+    if (!ZZ.ITEMS) return;
+    // per effect: [short name, what it does]; {0} the amount, {1} the multiplier. Four languages each.
+    var W = {
+      chisel: [['拆牆', '拆掉自己最下面 {0} 排'], ['Knock down', 'Removes your bottom {0} row(s)'], ['壁こわし', '自分の下{0}段を取り除く'], ['벽 허물기', '내 아래 {0}줄 제거']],
+      grout: [['灌漿', '灌給對手 {0} 排水泥'], ['Grout', 'Sends {0} cement row(s) to your rival'], ['セメント流し', '相手にセメント{0}段'], ['시멘트 붓기', '상대에게 시멘트 {0}줄']],
+      shield: [['防水布', '{0} 秒內擋掉所有水泥'], ['Tarp', 'Blocks all cement for {0} s'], ['防水シート', '{0}秒間セメントを防ぐ'], ['방수포', '{0}초간 시멘트 차단']],
+      goldT: [['金磚', '接下來 {0} 塊都是 T'], ['Gold tiles', 'Your next {0} piece(s) are T'], ['金のタイル', '次の{0}個がT'], ['금 타일', '다음 {0}개가 T']],
+      goldI: [['長條磚', '接下來 {0} 塊都是長條'], ['Long bars', 'Your next {0} piece(s) are I'], ['長い棒', '次の{0}個がI'], ['긴 막대', '다음 {0}개가 I']],
+      trowel: [['抹平', '牆裡的洞全部補平'], ['Level', 'Fills every hole in your wall'], ['ならし', '壁の穴をすべて埋める'], ['미장', '벽의 구멍을 모두 메움']],
+      freeze: [['結冰', '對手 {0} 秒動不了'], ['Freeze', 'Rival cannot move for {0} s'], ['凍結', '相手が{0}秒動けない'], ['빙결', '상대 {0}초 정지']],
+      boost: [['加倍', '{0} 秒內送出的行數變 {1} 倍'], ['Multiply', 'Lines you send count {1}× for {0} s'], ['倍増', '{0}秒間、送るラインが{1}倍'], ['배가', '{0}초간 보내는 줄 {1}배']],
+      cleanse: [['清洗', '清掉正要打過來的水泥'], ['Rinse', 'Clears the cement on its way to you'], ['洗い流し', '届く前のセメントを消す'], ['세척', '오고 있는 시멘트 제거']],
+      curse: [['歪磚', '對手接下來 {0} 塊是 S 或 Z'], ['Crooked', 'Rival\'s next {0} piece(s) are S or Z'], ['いびつブロック', '相手の次の{0}個がSかZ'], ['비뚤 블록', '상대의 다음 {0}개가 S나 Z']],
+      blind: [['遮眼', '對手 {0} 秒看不到下一塊'], ['Blindfold', 'Rival cannot see what comes next for {0} s'], ['目かくし', '相手が{0}秒間ネクストを見られない'], ['눈가리개', '상대가 {0}초간 다음 블록을 못 봄']],
+      score: [['賞金', '分數 +{0}'], ['Bounty', '+{0} points'], ['ボーナス', 'スコア+{0}'], ['보너스', '점수 +{0}']]
+    };
+    var TIMED = { shield: 1, freeze: 1, boost: 1, blind: 1 }, SEP = ['＋', ' + ', '＋', ' + '], JOIN = ['；', '; ', '。', '; '];
+    function amt(f) { return TIMED[f[0]] ? String(f[1] / 1000) : String(f[1]); }
+    function fill(s, f) { return s.replace('{0}', amt(f)).replace('{1}', f[2] || 2); }
+    // a short name: the effect's name and its amount; "×3" for a triple boost
+    function short(f, li) {
+      var n = W[f[0]][li][0];
+      if (f[0] === 'trowel' || f[0] === 'cleanse') return n;
+      if (f[0] === 'boost') return n + ' ×' + f[2] + ' ' + amt(f) + (li === 1 ? 's' : li === 0 ? '秒' : li === 2 ? '秒' : '초');
+      return n + ' ' + amt(f) + (TIMED[f[0]] ? (li === 1 ? 's' : li === 0 ? '秒' : li === 2 ? '秒' : '초') : '');
+    }
+    var add = {};
+    ZZ.ITEMS.forEach(function (d) {
+      if (!d || d.id <= 7) return;
+      add['i' + d.id] = [0, 1, 2, 3].map(function (li) { return d.fx.map(function (f) { return short(f, li); }).join(SEP[li]); });
+      add['i' + d.id + 't'] = [0, 1, 2, 3].map(function (li) { return d.fx.map(function (f) { return fill(W[f[0]][li][1], f); }).join(JOIN[li]); });
+    });
+    L.add(add);
+  })();
 
   ZZ.L = L;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
@@ -2755,7 +2848,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   };
   var KINDS = ['tile', 'bg', 'theme', 'fx'];
   var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
-  var ITEM_PRICE = [0, 40, 50, 40, 60, 50, 60, 60];
+  // what each of the 200 items costs in the shop (engine.js ITEMS; the first seven keep their old prices)
+  var ITEM_PRICE = ZZ.ITEMS.map(function (d) { return d ? d.price : 0; });
   var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30;
   var PLAN = { name: '轉磚會員', month: 90, year: 890 };   // planned prices in NT$, shown in the shop; nothing is charged yet
   function find(kind, id) {
@@ -2816,7 +2910,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       xp: 0, titles: [], title: '',
       owned: { tile: [], bg: [], theme: [], fx: [] },
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
-      items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
+      items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
@@ -2858,7 +2952,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   Meta.use = function (obj) {
     var d = blank();
     if (obj && typeof obj === 'object') merge(d, obj);
-    while (d.items.length < 8) d.items.push(0);
+    while (d.items.length < ITEM_PRICE.length) d.items.push(0);
     Meta.data = d;
     Meta.rollSeason();
     Meta.rollDay();
@@ -3059,7 +3153,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   Meta.tidy = function () {
     var d = Meta.data, def = blank().equip;
     KINDS.forEach(function (k) { if (!Meta.canUse(k, d.equip[k])) d.equip[k] = def[k]; });
-    d.bring = d.bring.filter(function (id) { return id >= 1 && id <= 7; }).slice(0, BRING_MAX);
+    d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
   };
 
   // ---------- items carried into a match ----------
@@ -3358,6 +3452,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   // ---------- one change, by name ----------
   // The cloud copy is kept in step by repeating each change there: kind 'buy' with ['tile', 'neon'], and so on.
   // Everything arriving here may come from outside, so each argument is checked before it is used.
+  // an item number exactly as it should be: a whole number for one of the items, nothing clamped into range
+  function itemId(v) { return typeof v === 'number' && v === Math.floor(v) && v >= 1 && v < ITEM_PRICE.length; }
   function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
@@ -3370,10 +3466,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
     set: function (a) { return Meta.buySet(str(a[0])); },
-    item: function (a) { return Meta.buyItem(int(a[0], 0, 99)); },
+    item: function (a) { return itemId(a[0]) ? Meta.buyItem(a[0]) : yes(0); },
     wear: function (a) { return yes(Meta.equip(a[0], str(a[1]))); },
     wset: function (a) { return yes(Meta.equipSet(str(a[0]))); },
-    bring: function (a) { return yes(Meta.toggleBring(int(a[0], 0, 99))); },
+    bring: function (a) { return yes(itemId(a[0]) && Meta.toggleBring(a[0])); },
     take: function () { Meta.takeBring(); return yes(1); },
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
@@ -4085,6 +4181,16 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     { d: 'M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9', stroke: true },
     { txt: '\u00D72' }
   ];
+  // items 8 to 200: the mark of the first effect (and, on the tile, a corner in the second effect's colour)
+  (function () {
+    var D = { shield: ITEM_MARK[3], goldT: ITEM_MARK[4], trowel: ITEM_MARK[5], freeze: ITEM_MARK[6],
+      cleanse: { d: 'M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z' },
+      blind: { d: 'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6zM4 20 20 4', stroke: true } };
+    for (var i = 8; i < ZZ.ITEMS.length; i++) {
+      var f = ZZ.ITEMS[i].fx[0], k = f[0];
+      ITEM_MARK[i] = D[k] || { txt: k === 'chisel' ? '\u2212' + f[1] : k === 'grout' ? '+' + f[1] : k === 'goldI' ? 'I' + f[1] : k === 'boost' ? '\u00D7' + f[2] : k === 'curse' ? 'SZ' : k === 'score' ? '\u2605' : '?' };
+    }
+  })();
   var NUMFONT = '"Barlow Semi Condensed", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
   function itemMark(x, id, cx, cy, size, color) {
     var m = ITEM_MARK[id];
@@ -4092,7 +4198,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     x.save();
     if (m.txt) {
       x.fillStyle = color;
-      x.font = 'italic 800 ' + Math.round(size * 0.74) + 'px ' + NUMFONT;
+      x.font = 'italic 800 ' + Math.round(size * (m.txt.length > 2 ? 0.55 : 0.74)) + 'px ' + NUMFONT;
       x.textAlign = 'center';
       x.textBaseline = 'middle';
       x.fillText(m.txt, cx - size * 0.02, cy + size * 0.05);
@@ -4108,8 +4214,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   function itemSvg(id) {
     var m = ITEM_MARK[id];
     if (!m) return '';
-    if (m.txt) return '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="16" font-weight="800" font-style="italic" fill="currentColor" style="font-family:var(--num)">' + m.txt + '</text></svg>';
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + m.d + '" ' + (m.stroke ? 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"' : 'fill="currentColor"') + '/></svg>';
+    var it = ZZ.ITEMS[id], corner = it && it.color2 ? '<path d="M24 14V24H14Z" fill="' + it.color2 + '"/>' : '';
+    if (m.txt) return '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="' + (m.txt.length > 2 ? 12 : 16) + '" font-weight="800" font-style="italic" fill="currentColor" style="font-family:var(--num)">' + m.txt + '</text>' + corner + '</svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + m.d + '" ' + (m.stroke ? 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"' : 'fill="currentColor"') + '/>' + corner + '</svg>';
   }
 
   // Item tile: a white glazed tile with its mark fired onto it.
@@ -4134,14 +4241,16 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     rr(x, g + x.lineWidth / 2, g + x.lineWidth / 2, w - x.lineWidth, w - x.lineWidth, r * 0.8);
     x.stroke();
     itemMark(x, id, px / 2, px / 2, px * 0.62, it.color);
+    if (it.color2) { x.fillStyle = it.color2; x.beginPath(); x.moveTo(px - g, px * 0.58); x.lineTo(px - g, px - g - r * 0.3); x.lineTo(px * 0.58, px - g); x.closePath(); x.fill(); }
     return c;
   }
   function fontFamily() { return env.font || (env.font = getComputedStyle(document.body).fontFamily || 'sans-serif'); }
   var itemCache = {};
   function itemSprites(px) {
     if (!itemCache[px]) {
+      // 200 kinds: each tile is drawn the first time it is needed
       var t = [null];
-      for (var i = 1; i < ZZ.ITEMS.length; i++) t.push(makeItemTile(px, i));
+      for (var i = 1; i < ZZ.ITEMS.length; i++) (function (id) { var made = null; Object.defineProperty(t, id, { get: function () { return made || (made = makeItemTile(px, id)); }, enumerable: true }); })(i);
       itemCache[px] = t;
     }
     return itemCache[px];
@@ -5334,7 +5443,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   }
   function popRaw(main, tags, atk, gold, pts) {
     var d = document.createElement('div');
-    d.className = 'pop' + (gold ? ' gold' : '');
+    d.className = 'pop' + (gold ? ' gold' : '') + (main && main.length > 9 ? ' long' : '');
     var h = '';
     if (main) h += '<span class="m">' + esc(main) + '</span>';
     if (tags && tags.length) h += '<span class="s">' + esc(tags.join('　')) + '</span>';
@@ -5379,7 +5488,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var seed = o.seed != null ? o.seed >>> 0 : (Math.random() * 4294967296) >>> 0, K = App.kinds[kind];
     S = {
       kind: kind, o: o, state: 'count', countT: 0, shown: 9, time: 0, hist: [], target: null, wait: 0, after: null, prev: 'play',
-      flip: false, freeze: { me: 0, opp: 0 }, botItemT: 0, botChk: 0, botHoles: 0, mode: '', used: 0
+      flip: false, freeze: { me: 0, opp: 0 }, blind: { me: 0, opp: 0 }, botItemT: 0, botChk: 0, botHoles: 0, mode: '', used: 0
     };
     if (kind === 'battle') {
       var mode = o.mode || 'ai';
@@ -5717,33 +5826,54 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   }
 
   // ---------- items ----------
+  // ---------- items: each one is a list of effects (engine.js ITEMS); the first seven are the classic ones ----------
+  var WASH = { grout: '217,67,47', freeze: '190,232,255', curse: '142,59,110', blind: '68,75,87', shield: '88,170,255', goldT: '245,184,46', goldI: '245,184,46', cleanse: '59,168,160' };
+  function fxOf(id) { var d = ITEMS[id]; return d && d.fx ? d.fx : []; }
+  function foeHits(id) { return fxOf(id).some(function (f) { return ZZ.FX_KIND[f[0]].side === 'foe'; }); }
   function itemFx(id, mine, note) {
-    var now = performance.now();
+    var now = performance.now(), fx = fxOf(id);
     if (mine) {
       sfx.play('itemUse');
       buzz(16);
-      popRaw(t('i' + id), [t('i' + id + 't')], 0, id === 4);
-      if (id === 2 || id === 6) V.opp.addWash(now, id === 6 ? '190,232,255' : '217,67,47', 420);
-      if (id === 3) V.me.addWash(now, '88,170,255', 420);
-      if (id === 4) V.me.addWash(now, '245,184,46', 420);
+      popRaw(t('i' + id), [t('i' + id + 't')], 0, fx.some(function (f) { return f[0] === 'goldT' || f[0] === 'goldI'; }));
+      fx.forEach(function (f) { var w = WASH[f[0]]; if (w) (ZZ.FX_KIND[f[0]].side === 'foe' ? V.opp : V.me).addWash(now, w, 420); });
     } else {
-      var hit = id === 2 || id === 6;
-      if (hit) { sfx.play('itemHit'); buzz(30); V.me.addWash(now, id === 6 ? '190,232,255' : '217,67,47', 420); }
-      toast(t('foeUsed', t('i' + id)) + (id === 2 ? t(note ? 'foeUsed.grout' : 'foeUsed.tarp') : id === 6 ? t('foeUsed.ice') : ''), 2000);
+      var hitFx = fx.filter(function (f) { return ZZ.FX_KIND[f[0]].side === 'foe'; });
+      if (hitFx.length) { sfx.play('itemHit'); buzz(30); V.me.addWash(now, WASH[hitFx[0][0]] || '217,67,47', 420); }
+      var extra = id === 2 ? t(note ? 'foeUsed.grout' : 'foeUsed.tarp') : id === 6 ? t('foeUsed.ice') : '';
+      toast(t('foeUsed', t('i' + id)) + extra, 2000);
     }
+  }
+  // what an effect does to its own side's game g (side k)
+  function selfFx(g, k, f) {
+    var p = f[0], v = f[1];
+    if (p === 'chisel') g.chisel(v);
+    else if (p === 'shield') { g.shield = Math.max(g.shield, v); g.pending = []; }
+    else if (p === 'goldT' || p === 'goldI') { for (var i = 0; i < v; i++) g.queue.unshift(p === 'goldT' ? 'T' : 'I'); }
+    else if (p === 'trowel') g.trowel();
+    else if (p === 'boost') { g.boost = Math.max(g.boost, v); g.boostX = f[2] || 2; }
+    else if (p === 'cleanse') g.pending = [];
+    else if (p === 'score') g.stats.score += v;
+  }
+  // what an effect does to the side that is hit (side k, game g). Gives false when a tarp stopped it.
+  function foeFx(g, k, f) {
+    var p = f[0], v = f[1];
+    if (p === 'grout') { var open = !(g.shield > 0); g.receive(v); return open; }
+    if (p === 'freeze') { if (!g.over) S.freeze[k] = Math.max(S.freeze[k], v); if (k === 'me') input.clear(); }
+    else if (p === 'curse') { for (var i = 0; i < v; i++) g.queue.unshift(i % 2 ? 'Z' : 'S'); }
+    else if (p === 'blind') S.blind[k] = Math.max(S.blind[k] || 0, v);
+    return true;
   }
   function useItem(k) {
     if (!itemsOn() || S.state !== 'play') return false;
     var g = S[k], other = k === 'me' ? 'opp' : 'me', og = S[other], mine = k === 'me';
     if (g.over || S.freeze[k] > 0 || !g.inv.length) return false;
     var id = g.takeItem(), note = true;
-    if (id === 1) g.chisel(3);
-    else if (id === 2) { if (!S.remote) { note = !(og.shield > 0); og.receive(3); } }
-    else if (id === 3) { g.shield = 8000; g.pending = []; }
-    else if (id === 4) g.queue.unshift('T', 'T');
-    else if (id === 5) g.trowel();
-    else if (id === 6) { if (!og.over) S.freeze[other] = 3000; if (other === 'me') input.clear(); }
-    else if (id === 7) g.boost = 8000;
+    fxOf(id).forEach(function (f) {
+      if (ZZ.FX_KIND[f[0]].side === 'self') selfFx(g, k, f);
+      // online the rival's own page does this when the id arrives; a freeze or blindfold still shows on our copy of them
+      else if (!S.remote || f[0] === 'freeze' || f[0] === 'blind') note = foeFx(og, other, f) && note;
+    });
     if (!mine && S.bot) S.bot.plan = null;
     sideKey = '';
     if (mine) {
@@ -5758,10 +5888,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   function foeItem(id) {
     if (!S || S.kind !== 'battle' || S.state !== 'play') return;
     var note = true;
-    if (id === 2) { note = !(S.me.shield > 0); S.me.receive(3); }
-    else if (id === 6) { if (!S.me.over) { S.freeze.me = 3000; input.clear(); } }
-    else if (id === 3 && !S.remote) { S.opp.shield = 8000; S.opp.pending = []; }
-    else if (id === 7 && !S.remote) S.opp.boost = 8000;
+    fxOf(id).forEach(function (f) {
+      if (ZZ.FX_KIND[f[0]].side === 'foe') note = foeFx(S.me, 'me', f) && note;
+      else if (!S.remote && (f[0] === 'shield' || f[0] === 'boost')) selfFx(S.opp, 'opp', f);   // a recording: its tarp and boost still count
+    });
     itemFx(id, false, note);
   }
   // The computer holds an item until it is useful, then plays it.
@@ -5771,10 +5901,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     S.botItemT += dt;
     S.botChk -= dt;
     if (S.botChk <= 0) { S.botChk = 300; S.botHoles = Bot.features(Bot.rowsOf(g.grid)).holes; }
-    var id = g.inv[0], tm = S.botItemT, wait = 700 + (6 - Bot.LEVELS[S.level].tier) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false;
-    if (id === 1) go = tm > wait && (g.stackHeight() >= 9 || tm > late);
-    else if (id === 5) go = tm > wait && (S.botHoles >= 3 || tm > late);
-    else if (id === 3) go = tm > 400 && (g.pendingTotal() >= 2 || tm > late);
+    var id = g.inv[0], tm = S.botItemT, wait = 700 + (6 - Bot.LEVELS[S.level].tier) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false, p = fxOf(id)[0] ? fxOf(id)[0][0] : '';
+    if (p === 'chisel') go = tm > wait && (g.stackHeight() >= 9 || tm > late);
+    else if (p === 'trowel') go = tm > wait && (S.botHoles >= 3 || tm > late);
+    else if (p === 'shield' || p === 'cleanse') go = tm > 400 && (g.pendingTotal() >= 2 || tm > late);
     else go = tm > wait;
     if (go) { S.botItemT = 0; useItem('opp'); }
   }
@@ -6162,7 +6292,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
         '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
         '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
-      for (i = 1; i < ITEMS.length; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
+      for (i = 1; i <= 7; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
+      h += '</dl><p class="note">' + t('h.itemsMore', ITEMS.length - 1) + '</p><dl class="keys">';
       h += '</dl><h3>' + t('h.credits') + '</h3><p>' + t('h.creditsP') + '</p><div class="row">' + btn('close', 'ok', true) + '</div>';
     }
     return h;
@@ -6510,7 +6641,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   }
   var lookKey = '';
   function drawSide() {
-    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + pn + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
+    var me = S.me, blind = S.blind && S.blind.me > 0, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + (blind ? '?' : me.queue.slice(0, nextN).join('')) + '|' + pc + '|' + pn + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
     if (key === sideKey) return;
     sideKey = key;
     var dpr = env.dpr, w = side - 8, x = el.holdCv.getContext('2d'), i;
@@ -6521,7 +6652,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     x = el.nextCv.getContext('2d');
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.clearRect(0, 0, w, pn * 3 * nextN);
-    for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pn * 2.9 * (i + 0.5), pn);
+    // a blindfold from the rival: the coming pieces are hidden until it wears off
+    if (blind) { x.fillStyle = 'rgba(68,75,87,0.85)'; x.font = '800 ' + Math.round(pn * 1.6) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; for (i = 0; i < nextN; i++) x.fillText('?', w / 2, pn * 2.9 * (i + 0.5)); }
+    else for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pn * 2.9 * (i + 0.5), pn);
     if (itemsOn()) {
       var inv = me.inv, big = itemH, sm = Math.floor((big - 2) / 2);
       x = el.itemCv.getContext('2d');
@@ -6664,6 +6797,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
           }
         }
         if (fz[k] > 0) fz[k] = Math.max(0, fz[k] - dt);
+        if (S.blind[k] > 0) S.blind[k] = Math.max(0, S.blind[k] - dt);
       }
       if (S.remote) ZZ.Net.tick(dt);
       else if (fz.opp <= 0) {
@@ -7321,7 +7455,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     }
     if (Array.isArray(m.it)) for (i = 0; i < m.it.length && i < 40; i++) {
       var it = m.it[i];
-      if (Array.isArray(it) && it[0] >= 0 && it[0] < COLS && it[1] >= 0 && it[1] < ROWS && it[2] >= 1 && it[2] <= 7 && g.grid[it[1] | 0][it[0] | 0]) g.grid[it[1] | 0][it[0] | 0] |= (it[2] | 0) << 4;
+      if (Array.isArray(it) && it[0] >= 0 && it[0] < COLS && it[1] >= 0 && it[1] < ROWS && it[2] >= 1 && it[2] < ZZ.ITEMS.length && g.grid[it[1] | 0][it[0] | 0]) g.grid[it[1] | 0][it[0] | 0] |= (it[2] | 0) << 4;
     }
     var c = m.c;
     g.cur = Array.isArray(c) && TYPES[c[0]] ? { type: TYPES[c[0]], x: int(c[1], -3, COLS), y: int(c[2], 0, ROWS - 1), rot: int(c[3], 0, 3) } : null;
@@ -7404,7 +7538,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
-      case 'i': if (live) App.foeItem(int(m.id, 1, 7)); break;
+      case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
       case 'end':
         var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
         // the rest of the result card (older pages do not send these)
@@ -8096,6 +8230,11 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'j.item': ['用掉 3 個道具', 'Use 3 items', 'アイテム3個使用', '아이템 3개 사용'],
     // profile
     'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
+    'it.filter': ['道具分類', 'Item kinds', 'アイテムの種類', '아이템 종류'],
+    'it.all': ['全部', 'All', 'すべて', '전체'], 'it.self': ['自己用', 'For you', '自分用', '내게 쓰기'], 'it.foe': ['打對手', 'Against rival', '相手に', '상대에게'],
+    'it.combo': ['組合', 'Combos', 'コンボ', '조합'], 'it.owned': ['我有的', 'Mine', '持っている', '보유'],
+    'it.count': ['共 {0} 種', '{0} kinds', '{0} 種類', '{0}종'],
+    'it.more': ['再顯示（還有 {0} 種）', 'Show more ({0} left)', 'もっと見る（あと {0} 種類）', '더 보기({0}종 남음)'],
     'bx.more': ['寶箱 +{0} 次', '+{0} box today', '宝箱 +{0} 回', '보물상자 +{0}회'],
     'bx.left': ['今天還能開 {0} 次（每天 {1} 次，半夜十二點重算）', '{0} left today ({1} a day, back at midnight)', '今日はあと {0} 回（1 日 {1} 回、0 時にリセット）', '오늘 {0}회 남음(하루 {1}회, 자정에 초기화)'],
     'bx.member': ['會員每天 {0} 次。', 'Members get {0} a day.', 'メンバーは 1 日 {0} 回。', '멤버는 하루 {0}회.'],
@@ -8381,14 +8520,35 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     }
     return h + '</div>';
   }
+  // 200 items: filter by what they do, twenty at a time
+  var itemView = { cat: 'all', shown: 20 };
+  var ITEM_CATS = ['all', 'self', 'foe', 'combo', 'owned'];
+  function itemCat(d) { var sides = d.fx.map(function (f) { return ZZ.FX_KIND[f[0]].side; }); return d.fx.length > 1 ? 'combo' : sides[0]; }
   function itemsHtml() {
-    var h = '<p>' + t('sh.itemsP', Meta.BRING_MAX) + '</p><div class="levels">', i;
+    var h = '<p>' + t('sh.itemsP', Meta.BRING_MAX) + '</p><div class="seg" role="radiogroup" aria-label="' + esc(t('it.filter')) + '">', i, list = [];
+    ITEM_CATS.forEach(function (c) { h += '<button type="button" role="radio" aria-checked="' + (itemView.cat === c) + '" data-icat="' + c + '">' + t('it.' + c) + '</button>'; });
+    h += '</div>';
     for (i = 1; i < ITEMS.length; i++) {
-      h += '<div class="rep"><div class="rep-t item">' + App.itile(i) + '<div><b>' + t('i' + i) + '</b><span>' + t('i' + i + 't') + '　' + t('sh.stock', Meta.data.items[i] || 0) + '</span></div></div>' +
-        '<button class="btn sm buy" type="button" data-buyitem="' + i + '">' + coin(Meta.ITEM_PRICE[i]) + '</button></div>';
+      var d = ITEMS[i], c = itemView.cat;
+      if (c === 'owned' ? (Meta.data.items[i] || 0) > 0 : c === 'all' || itemCat(d) === c) list.push(d);
     }
-    return h + '</div>';
+    h += '<p class="note">' + t('it.count', list.length) + '</p><div class="levels">';
+    list.slice(0, itemView.shown).forEach(function (d) {
+      var id = d.id;
+      h += '<div class="rep"><div class="rep-t item">' + App.itile(id) + '<div><b>' + esc(t('i' + id)) + ' <small class="tier t' + d.tier + '">' + '★'.repeat(d.tier) + '</small></b><span>' + esc(t('i' + id + 't')) + '　' + t('sh.stock', Meta.data.items[id] || 0) + '</span></div></div>' +
+        '<button class="btn sm buy" type="button" data-buyitem="' + id + '">' + coin(Meta.ITEM_PRICE[id]) + '</button></div>';
+    });
+    h += '</div>';
+    if (list.length > itemView.shown) h += '<div class="row"><button class="btn" type="button" data-do="itemsMore">' + t('it.more', list.length - itemView.shown) + '</button></div>';
+    return h;
   }
+  App.acts.itemsMore = function () { itemView.shown += 40; App.openSheet('shop'); };
+  App.clicks.push(function (d) {
+    if (d.icat == null || ITEM_CATS.indexOf(d.icat) < 0) return false;
+    itemView.cat = d.icat; itemView.shown = 20;
+    App.openSheet('shop');
+    return true;
+  });
   function picRow(key, label) {
     var has = !!Meta.data.custom[key];
     return '<div class="rep"><div class="rep-t"><b>' + t(label) + '</b><span>' + t(has ? 'mb.set' : 'mb.none') + '</span></div>' +

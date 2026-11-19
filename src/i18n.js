@@ -425,6 +425,7 @@
     'h.credits': ['素材出處', 'Credits', 'クレジット', '크레딧'],
     'h.creditsP': ['音樂：Juhani Junkala《5 Chiptunes (Action)》。音效：Kenney《Interface Sounds》《UI Audio》。全部是 CC0 授權。連線元件：PeerJS（MIT 授權）。', 'Music: Juhani Junkala, "5 Chiptunes (Action)". Sound effects: Kenney, "Interface Sounds" and "UI Audio". All CC0. Networking: PeerJS (MIT).', 'BGM：Juhani Junkala「5 Chiptunes (Action)」。効果音：Kenney「Interface Sounds」「UI Audio」。すべてCC0。通信：PeerJS（MIT）。', '음악: Juhani Junkala 「5 Chiptunes (Action)」. 효과음: Kenney 「Interface Sounds」 「UI Audio」. 모두 CC0. 통신: PeerJS (MIT).'],
     // items
+    'h.itemsMore': ['上面是最常見的 7 種。道具一共 {0} 種，全部可以在商店的「道具」看。', 'These are the 7 most common. There are {0} items in all; see them under Items in the shop.', 'よく出る 7 種類です。アイテムは全部で {0} 種類、ショップの「アイテム」で見られます。', '가장 흔한 7종입니다. 아이템은 모두 {0}종이며 상점의 「아이템」에서 볼 수 있습니다.'],
     'i1': ['拆牆', 'Knock down', '壁こわし', '벽 허물기'],
     'i1t': ['敲掉自己最下面 3 排', 'Removes your bottom 3 rows', '自分の下3段を取り除く', '내 아래 3줄 제거'],
     'i2': ['灌漿', 'Grout', 'セメント流し', '시멘트 붓기'],
@@ -440,6 +441,43 @@
     'i7': ['加倍', 'Double', '2倍', '2배'],
     'i7t': ['8 秒內送出的行數變兩倍', 'Lines you send are doubled for 8 s', '8秒間、送るラインが2倍', '8초간 보내는 줄 2배']
   });
+
+  // ---------- names and descriptions of items 8 to 200, built from what each one does ----------
+  (function () {
+    if (!ZZ.ITEMS) return;
+    // per effect: [short name, what it does]; {0} the amount, {1} the multiplier. Four languages each.
+    var W = {
+      chisel: [['拆牆', '拆掉自己最下面 {0} 排'], ['Knock down', 'Removes your bottom {0} row(s)'], ['壁こわし', '自分の下{0}段を取り除く'], ['벽 허물기', '내 아래 {0}줄 제거']],
+      grout: [['灌漿', '灌給對手 {0} 排水泥'], ['Grout', 'Sends {0} cement row(s) to your rival'], ['セメント流し', '相手にセメント{0}段'], ['시멘트 붓기', '상대에게 시멘트 {0}줄']],
+      shield: [['防水布', '{0} 秒內擋掉所有水泥'], ['Tarp', 'Blocks all cement for {0} s'], ['防水シート', '{0}秒間セメントを防ぐ'], ['방수포', '{0}초간 시멘트 차단']],
+      goldT: [['金磚', '接下來 {0} 塊都是 T'], ['Gold tiles', 'Your next {0} piece(s) are T'], ['金のタイル', '次の{0}個がT'], ['금 타일', '다음 {0}개가 T']],
+      goldI: [['長條磚', '接下來 {0} 塊都是長條'], ['Long bars', 'Your next {0} piece(s) are I'], ['長い棒', '次の{0}個がI'], ['긴 막대', '다음 {0}개가 I']],
+      trowel: [['抹平', '牆裡的洞全部補平'], ['Level', 'Fills every hole in your wall'], ['ならし', '壁の穴をすべて埋める'], ['미장', '벽의 구멍을 모두 메움']],
+      freeze: [['結冰', '對手 {0} 秒動不了'], ['Freeze', 'Rival cannot move for {0} s'], ['凍結', '相手が{0}秒動けない'], ['빙결', '상대 {0}초 정지']],
+      boost: [['加倍', '{0} 秒內送出的行數變 {1} 倍'], ['Multiply', 'Lines you send count {1}× for {0} s'], ['倍増', '{0}秒間、送るラインが{1}倍'], ['배가', '{0}초간 보내는 줄 {1}배']],
+      cleanse: [['清洗', '清掉正要打過來的水泥'], ['Rinse', 'Clears the cement on its way to you'], ['洗い流し', '届く前のセメントを消す'], ['세척', '오고 있는 시멘트 제거']],
+      curse: [['歪磚', '對手接下來 {0} 塊是 S 或 Z'], ['Crooked', 'Rival\'s next {0} piece(s) are S or Z'], ['いびつブロック', '相手の次の{0}個がSかZ'], ['비뚤 블록', '상대의 다음 {0}개가 S나 Z']],
+      blind: [['遮眼', '對手 {0} 秒看不到下一塊'], ['Blindfold', 'Rival cannot see what comes next for {0} s'], ['目かくし', '相手が{0}秒間ネクストを見られない'], ['눈가리개', '상대가 {0}초간 다음 블록을 못 봄']],
+      score: [['賞金', '分數 +{0}'], ['Bounty', '+{0} points'], ['ボーナス', 'スコア+{0}'], ['보너스', '점수 +{0}']]
+    };
+    var TIMED = { shield: 1, freeze: 1, boost: 1, blind: 1 }, SEP = ['＋', ' + ', '＋', ' + '], JOIN = ['；', '; ', '。', '; '];
+    function amt(f) { return TIMED[f[0]] ? String(f[1] / 1000) : String(f[1]); }
+    function fill(s, f) { return s.replace('{0}', amt(f)).replace('{1}', f[2] || 2); }
+    // a short name: the effect's name and its amount; "×3" for a triple boost
+    function short(f, li) {
+      var n = W[f[0]][li][0];
+      if (f[0] === 'trowel' || f[0] === 'cleanse') return n;
+      if (f[0] === 'boost') return n + ' ×' + f[2] + ' ' + amt(f) + (li === 1 ? 's' : li === 0 ? '秒' : li === 2 ? '秒' : '초');
+      return n + ' ' + amt(f) + (TIMED[f[0]] ? (li === 1 ? 's' : li === 0 ? '秒' : li === 2 ? '秒' : '초') : '');
+    }
+    var add = {};
+    ZZ.ITEMS.forEach(function (d) {
+      if (!d || d.id <= 7) return;
+      add['i' + d.id] = [0, 1, 2, 3].map(function (li) { return d.fx.map(function (f) { return short(f, li); }).join(SEP[li]); });
+      add['i' + d.id + 't'] = [0, 1, 2, 3].map(function (li) { return d.fx.map(function (f) { return fill(W[f[0]][li][1], f); }).join(JOIN[li]); });
+    });
+    L.add(add);
+  })();
 
   ZZ.L = L;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;

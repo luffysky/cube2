@@ -681,6 +681,16 @@
     { d: 'M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9', stroke: true },
     { txt: '\u00D72' }
   ];
+  // items 8 to 200: the mark of the first effect (and, on the tile, a corner in the second effect's colour)
+  (function () {
+    var D = { shield: ITEM_MARK[3], goldT: ITEM_MARK[4], trowel: ITEM_MARK[5], freeze: ITEM_MARK[6],
+      cleanse: { d: 'M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z' },
+      blind: { d: 'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6zM4 20 20 4', stroke: true } };
+    for (var i = 8; i < ZZ.ITEMS.length; i++) {
+      var f = ZZ.ITEMS[i].fx[0], k = f[0];
+      ITEM_MARK[i] = D[k] || { txt: k === 'chisel' ? '\u2212' + f[1] : k === 'grout' ? '+' + f[1] : k === 'goldI' ? 'I' + f[1] : k === 'boost' ? '\u00D7' + f[2] : k === 'curse' ? 'SZ' : k === 'score' ? '\u2605' : '?' };
+    }
+  })();
   var NUMFONT = '"Barlow Semi Condensed", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
   function itemMark(x, id, cx, cy, size, color) {
     var m = ITEM_MARK[id];
@@ -688,7 +698,7 @@
     x.save();
     if (m.txt) {
       x.fillStyle = color;
-      x.font = 'italic 800 ' + Math.round(size * 0.74) + 'px ' + NUMFONT;
+      x.font = 'italic 800 ' + Math.round(size * (m.txt.length > 2 ? 0.55 : 0.74)) + 'px ' + NUMFONT;
       x.textAlign = 'center';
       x.textBaseline = 'middle';
       x.fillText(m.txt, cx - size * 0.02, cy + size * 0.05);
@@ -704,8 +714,9 @@
   function itemSvg(id) {
     var m = ITEM_MARK[id];
     if (!m) return '';
-    if (m.txt) return '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="16" font-weight="800" font-style="italic" fill="currentColor" style="font-family:var(--num)">' + m.txt + '</text></svg>';
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + m.d + '" ' + (m.stroke ? 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"' : 'fill="currentColor"') + '/></svg>';
+    var it = ZZ.ITEMS[id], corner = it && it.color2 ? '<path d="M24 14V24H14Z" fill="' + it.color2 + '"/>' : '';
+    if (m.txt) return '<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="17.5" text-anchor="middle" font-size="' + (m.txt.length > 2 ? 12 : 16) + '" font-weight="800" font-style="italic" fill="currentColor" style="font-family:var(--num)">' + m.txt + '</text>' + corner + '</svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + m.d + '" ' + (m.stroke ? 'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"' : 'fill="currentColor"') + '/>' + corner + '</svg>';
   }
 
   // Item tile: a white glazed tile with its mark fired onto it.
@@ -730,14 +741,16 @@
     rr(x, g + x.lineWidth / 2, g + x.lineWidth / 2, w - x.lineWidth, w - x.lineWidth, r * 0.8);
     x.stroke();
     itemMark(x, id, px / 2, px / 2, px * 0.62, it.color);
+    if (it.color2) { x.fillStyle = it.color2; x.beginPath(); x.moveTo(px - g, px * 0.58); x.lineTo(px - g, px - g - r * 0.3); x.lineTo(px * 0.58, px - g); x.closePath(); x.fill(); }
     return c;
   }
   function fontFamily() { return env.font || (env.font = getComputedStyle(document.body).fontFamily || 'sans-serif'); }
   var itemCache = {};
   function itemSprites(px) {
     if (!itemCache[px]) {
+      // 200 kinds: each tile is drawn the first time it is needed
       var t = [null];
-      for (var i = 1; i < ZZ.ITEMS.length; i++) t.push(makeItemTile(px, i));
+      for (var i = 1; i < ZZ.ITEMS.length; i++) (function (id) { var made = null; Object.defineProperty(t, id, { get: function () { return made || (made = makeItemTile(px, id)); }, enumerable: true }); })(i);
       itemCache[px] = t;
     }
     return itemCache[px];

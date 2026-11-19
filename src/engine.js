@@ -17,6 +17,54 @@
     { id: 6, color: '#1C8DBF' },   // freeze: the rival cannot move for 3 s
     { id: 7, color: '#7C4BD0' }    // double: lines sent count twice for 8 s
   ];
+  // ---------- all 200 items ----------
+  // Every item is a list of effects. Twelve kinds of effect, each at a few strengths, make the single items; the rest
+  // pair one effect for yourself with one against the rival (or two of one side). Items 1 to 7 are the first seven and
+  // never change, so old saves, recordings and online play keep working.
+  //   self: chisel n (remove your bottom n rows), shield ms, goldT n / goldI n (your next n pieces), trowel (fill
+  //         holes), boost ms x (lines sent count x times), cleanse (drop incoming cement), score n (points)
+  //   rival: grout n (n cement rows), freeze ms, curse n (their next n pieces are S or Z), blind ms (their next
+  //          pieces hidden)
+  var FX_KIND = {
+    chisel: { side: 'self', color: '#D9432F', w: 6 }, grout: { side: 'foe', color: '#59636F', w: 7 }, shield: { side: 'self', color: '#2F7FD9', w: 0.6 },
+    goldT: { side: 'self', color: '#A8700A', w: 6 }, goldI: { side: 'self', color: '#C9921A', w: 5 }, trowel: { side: 'self', color: '#168A63', w: 14 },
+    freeze: { side: 'foe', color: '#1C8DBF', w: 4 }, boost: { side: 'self', color: '#7C4BD0', w: 1.2 }, cleanse: { side: 'self', color: '#3BA8A0', w: 9 },
+    curse: { side: 'foe', color: '#8E3B6E', w: 5 }, blind: { side: 'foe', color: '#444B57', w: 1 }, score: { side: 'self', color: '#C79A1A', w: 0.005 }
+  };
+  function fxPower(f) { var k = FX_KIND[f[0]], v = f[1] || 1; return f[0] === 'shield' || f[0] === 'freeze' || f[0] === 'blind' ? k.w * v / 1000 : f[0] === 'boost' ? k.w * (v / 1000) * (f[2] - 1) : k.w * v; }
+  (function () {
+    var first = [[['chisel', 3]], [['grout', 3]], [['shield', 8000]], [['goldT', 2]], [['trowel', 1]], [['freeze', 3000]], [['boost', 8000, 2]]], list = first.slice(), i, j;
+    var singles = [];
+    [1, 2, 4, 5].forEach(function (n) { singles.push([['chisel', n]]); });
+    [1, 2, 4, 5, 6].forEach(function (n) { singles.push([['grout', n]]); });
+    [3000, 5000, 10000, 12000, 15000].forEach(function (n) { singles.push([['shield', n]]); });
+    [1, 3].forEach(function (n) { singles.push([['goldT', n]]); });
+    [1, 2, 3].forEach(function (n) { singles.push([['goldI', n]]); });
+    [1000, 1500, 2000, 2500, 4000, 5000].forEach(function (n) { singles.push([['freeze', n]]); });
+    [4000, 6000, 10000, 12000].forEach(function (n) { singles.push([['boost', n, 2]]); });
+    [4000, 6000, 8000].forEach(function (n) { singles.push([['boost', n, 3]]); });
+    singles.push([['cleanse', 1]]);
+    [1, 2, 3].forEach(function (n) { singles.push([['curse', n]]); });
+    [3000, 5000, 8000, 10000].forEach(function (n) { singles.push([['blind', n]]); });
+    [500, 1000, 2000, 3000, 5000].forEach(function (n) { singles.push([['score', n]]); });
+    list = list.concat(singles);
+    var S = [['chisel', 1], ['chisel', 2], ['shield', 3000], ['shield', 5000], ['goldT', 1], ['goldI', 1], ['trowel', 1], ['boost', 4000, 2], ['cleanse', 1], ['score', 1000]];
+    var F = [['grout', 1], ['grout', 2], ['grout', 3], ['freeze', 1000], ['freeze', 2000], ['curse', 1], ['curse', 2], ['blind', 3000], ['blind', 5000]];
+    for (i = 0; i < S.length; i++) for (j = 0; j < F.length; j++) list.push([S[i], F[j]]);
+    for (i = 0; i < S.length && list.length < 200; i++) for (j = i + 1; j < S.length && list.length < 200; j++) if (S[i][0] !== S[j][0]) list.push([S[i], S[j]]);
+    for (i = 0; i < F.length && list.length < 200; i++) for (j = i + 1; j < F.length && list.length < 200; j++) if (F[i][0] !== F[j][0]) list.push([F[i], F[j]]);
+    for (i = 0; i < 200; i++) {
+      var fx = list[i], power = 0;
+      fx.forEach(function (f) { power += fxPower(f); });
+      var tier = power < 10 ? 1 : power < 18 ? 2 : power < 26 ? 3 : power < 36 ? 4 : 5;
+      var def = { id: i + 1, fx: fx, power: Math.round(power * 10) / 10, tier: tier, color: FX_KIND[fx[0][0]].color, color2: fx[1] ? FX_KIND[fx[1][0]].color : null,
+        price: [0, 40, 50, 40, 60, 50, 60, 60][i + 1] || Math.round((25 + power * 2.2) / 5) * 5 };
+      if (i < 7) { def.color = ITEMS[i + 1].color; ITEMS[i + 1] = def; } else ITEMS.push(def);
+    }
+  })();
+  // How often each item shows up on the board: the first seven most, weaker ones more than strong ones.
+  var ITEM_POOL = [];
+  ITEMS.forEach(function (d) { if (!d) return; var n = d.id <= 7 ? 12 : [0, 4, 3, 2, 1, 1][d.tier]; for (var k = 0; k < n; k++) ITEM_POOL.push(d.id); });
 
   // Spawn-state cells inside an n*n box; the other three states come from rotating the box clockwise.
   var BOX = { I: 4, O: 2, T: 3, S: 3, Z: 3, J: 3, L: 3 };
@@ -140,7 +188,7 @@
     this.onAttack = o.onAttack || null;
     this.itemsOn = !!o.items;
     this.itemEvery = o.itemEvery || 8;
-    this.itemPool = o.itemPool || [1, 2, 3, 4, 5, 6, 7];
+    this.itemPool = o.itemPool || ITEM_POOL;
     this.bring = o.bring ? o.bring.slice(0, 3) : [];              // items carried in from outside the match
     this.reset(o.board);
   }
@@ -162,7 +210,7 @@
     this.lockTimer = 0; this.resets = 0; this.lowest = 0; this.touched = false;
     this.lastMove = ''; this.lastKick = -1; this.gravAcc = 0;
     this.stats = { pieces: 0, lines: 0, attack: 0, sent: 0, spins: 0, tsd: 0, tst: 0, minis: 0, xspins: 0, quads: 0, maxCombo: 0, perfects: 0, b2bMax: 0, kos: 0, items: 0, score: 0 };
-    this.inv = this.bring.slice(); this.itemCount = 0; this.shield = 0; this.boost = 0;
+    this.inv = this.bring.slice(); this.itemCount = 0; this.shield = 0; this.boost = 0; this.boostX = 2;
     this.events = [];
     this.fill();
   };
@@ -455,7 +503,7 @@
       var hard = lines === 4 || tspin !== 'none';
       b2b = hard && this.b2b >= 0;
       atk = calcAttack(lines, tspin, b2b, this.combo, perfect);
-      if (this.boost > 0) atk *= 2;
+      if (this.boost > 0) atk *= this.boostX || 2;
       if (hard) this.b2b++; else this.b2b = -1;
       var st = this.stats;
       st.lines += lines; st.attack += atk;
@@ -639,7 +687,7 @@
   };
 
   var ZZ = {
-    COLS: COLS, ROWS: ROWS, VIS: VIS, TOP: TOP, TYPES: TYPES, TID: TID, GARBAGE: GARBAGE, ITEMS: ITEMS,
+    COLS: COLS, ROWS: ROWS, VIS: VIS, TOP: TOP, TYPES: TYPES, TID: TID, GARBAGE: GARBAGE, ITEMS: ITEMS, FX_KIND: FX_KIND, ITEM_POOL: ITEM_POOL,
     BOX: BOX, SHAPES: SHAPES, kicksFor: kicksFor, tspinType: tspinType, calcAttack: calcAttack, calcScore: calcScore,
     RNG: RNG, Game: Game
   };

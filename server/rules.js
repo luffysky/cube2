@@ -42,7 +42,7 @@ const LIMIT = {
   TAPE_BYTES: 20000,         // the longest tape accepted with one match
   SEEDS_KEPT: 80,            // recent matches remembered, so the same tape cannot be handed in twice
   SPRINT_MIN: 15000,         // a 40-line sprint faster than this is not believed
-  IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20, IMPORT_XP: 5000
+  IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20, IMPORT_ITEMS: 80, IMPORT_XP: 5000
 };
 
 function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
@@ -181,10 +181,12 @@ function importState(raw, now) {
     const worn = obj(src.equip)[kind];
     if (typeof worn === 'string' && Meta.find(kind, worn)) d.equip[kind] = worn;
   });
-  for (let i = 1; i < 8; i++) d.items[i] = int(list(src.items)[i], 0, LIMIT.IMPORT_ITEM);
+  // each kind held to IMPORT_ITEM, and all of them together to IMPORT_ITEMS (there are 200 kinds)
+  let itemsLeft = LIMIT.IMPORT_ITEMS;
+  for (let i = 1; i < Meta.ITEM_PRICE.length; i++) { const n = Math.min(int(list(src.items)[i], 0, LIMIT.IMPORT_ITEM), itemsLeft); d.items[i] = n; itemsLeft -= n; }
   d.items[0] = 0;
   d.bring = [];
-  list(src.bring).forEach(id => { if (id === Math.floor(id) && id >= 1 && id <= 7 && d.items[id] > 0 && d.bring.indexOf(id) < 0 && d.bring.length < Meta.BRING_MAX) d.bring.push(id); });
+  list(src.bring).forEach(id => { if (id === Math.floor(id) && id >= 1 && id < Meta.ITEM_PRICE.length && d.items[id] > 0 && d.bring.indexOf(id) < 0 && d.bring.length < Meta.BRING_MAX) d.bring.push(id); });
   const until = +obj(src.sub).until || 0;
   d.sub = { until: until > now ? Math.min(until, now + 30 * DAY) : 0, demo: true };
   const sd = obj(src.daily);

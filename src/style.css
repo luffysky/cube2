@@ -757,3 +757,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 @media (prefers-reduced-motion: reduce) { #wheelRot { transition: none !important; } }
 /* a button that cannot be used right now looks it */
 .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+/* item rarity stars */
+.tier { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: -1px; }
+.tier.t3, .tier.t4 { color: var(--gold-ink); }
+.tier.t5 { color: var(--alarm); }
+/* a long item name (a combo) fits inside the board */
+.pop.long .m { font-size: clamp(15px, 4.4vw, 22px); white-space: normal; }
+.pop.long .s { white-space: normal; max-width: 92%; margin-left: auto; margin-right: auto; line-height: 1.3; }

@@ -175,7 +175,7 @@ ok(M.data.coins > 0 && M.data.rp > 0 && M.data.tot.sprint === 71000 && M.data.to
 // ---------- nothing odd gets through the by-name door ----------
 const before2 = JSON.stringify(M.data);
 const junk = [['hack', []], ['buy', 'tile'], ['buy', ['__proto__', 'x']], ['buy', ['constructor', 'length']], ['buy', [{}, {}]], ['buy', ['tile', 'gem']], ['buy', ['tile', 'custom']], ['buy', ['tile', 'x'.repeat(5000)]],
-  ['wear', ['__proto__', 'polluted']], ['wear', ['tile', 'gem']], ['wear', [null, null]], ['set', [42]], ['set', ['nope']], ['wset', [{ toString() { return 'market'; } }]], ['item', [0]], ['item', [8]], ['item', ['x']], ['item', [-1]],
+  ['wear', ['__proto__', 'polluted']], ['wear', ['tile', 'gem']], ['wear', [null, null]], ['set', [42]], ['set', ['nope']], ['wset', [{ toString() { return 'market'; } }]], ['item', [0]], ['item', [201]], ['item', ['x']], ['item', [-1]],
   ['bring', [7]], ['bring', [99]], ['job', ['nope']], ['job', [0]], ['first', ['drills', 4096]], ['first', ['__proto__', 0]], ['first', ['openers', { id: 'dt' }]], ['toString', []], ['constructor', []], [null, []], [5, []], ['fin', null]];
 const jr = junk.map(j => { try { return M.run(j[0], j[1]); } catch (e) { return { threw: String(e) }; } });
 ok(jr.every(x => x && x.ok === false && !x.threw), 'junk is refused without throwing', jr.map((x, i) => x.ok === false && !x.threw ? null : [junk[i][0], x]).filter(Boolean));
@@ -194,7 +194,7 @@ for (const n of ['小明', 'Luffy', 'class', 'gmail', 'assassin', '鶯歌磚王'
 
 // ---------- a saved record with holes in it is filled in ----------
 M.use({ coins: 12, owned: { tile: ['neon'] }, tot: { wins: 3 }, items: [0, 1], bogus: 1 });
-ok(M.data.coins === 12 && M.data.owned.bg.length === 0 && M.data.tot.wins === 3 && M.data.tot.sprint === 0 && M.data.items.length === 8 && M.data.bogus === undefined && M.data.daily.jobs.length === 3, 'use() fills gaps and drops unknown fields', M.data);
+ok(M.data.coins === 12 && M.data.owned.bg.length === 0 && M.data.tot.wins === 3 && M.data.tot.sprint === 0 && M.data.items.length === 201 && M.data.bogus === undefined && M.data.daily.jobs.length === 3, 'use() fills gaps and drops unknown fields', M.data);
 M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
 
 // ---------- level and titles ----------

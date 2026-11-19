@@ -185,7 +185,8 @@
   };
   var KINDS = ['tile', 'bg', 'theme', 'fx'];
   var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
-  var ITEM_PRICE = [0, 40, 50, 40, 60, 50, 60, 60];
+  // what each of the 200 items costs in the shop (engine.js ITEMS; the first seven keep their old prices)
+  var ITEM_PRICE = ZZ.ITEMS.map(function (d) { return d ? d.price : 0; });
   var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30;
   var PLAN = { name: '轉磚會員', month: 90, year: 890 };   // planned prices in NT$, shown in the shop; nothing is charged yet
   function find(kind, id) {
@@ -246,7 +247,7 @@
       xp: 0, titles: [], title: '',
       owned: { tile: [], bg: [], theme: [], fx: [] },
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
-      items: [0, 0, 0, 0, 0, 0, 0, 0], bring: [],
+      items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
@@ -288,7 +289,7 @@
   Meta.use = function (obj) {
     var d = blank();
     if (obj && typeof obj === 'object') merge(d, obj);
-    while (d.items.length < 8) d.items.push(0);
+    while (d.items.length < ITEM_PRICE.length) d.items.push(0);
     Meta.data = d;
     Meta.rollSeason();
     Meta.rollDay();
@@ -489,7 +490,7 @@
   Meta.tidy = function () {
     var d = Meta.data, def = blank().equip;
     KINDS.forEach(function (k) { if (!Meta.canUse(k, d.equip[k])) d.equip[k] = def[k]; });
-    d.bring = d.bring.filter(function (id) { return id >= 1 && id <= 7; }).slice(0, BRING_MAX);
+    d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
   };
 
   // ---------- items carried into a match ----------
@@ -788,6 +789,8 @@
   // ---------- one change, by name ----------
   // The cloud copy is kept in step by repeating each change there: kind 'buy' with ['tile', 'neon'], and so on.
   // Everything arriving here may come from outside, so each argument is checked before it is used.
+  // an item number exactly as it should be: a whole number for one of the items, nothing clamped into range
+  function itemId(v) { return typeof v === 'number' && v === Math.floor(v) && v >= 1 && v < ITEM_PRICE.length; }
   function yes(v) { return v ? { ok: true } : { ok: false, why: 'no' }; }
   function str(v) { return typeof v === 'string' && v.length <= 24 ? v : ''; }
   var RUN = {
@@ -800,10 +803,10 @@
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
     set: function (a) { return Meta.buySet(str(a[0])); },
-    item: function (a) { return Meta.buyItem(int(a[0], 0, 99)); },
+    item: function (a) { return itemId(a[0]) ? Meta.buyItem(a[0]) : yes(0); },
     wear: function (a) { return yes(Meta.equip(a[0], str(a[1]))); },
     wset: function (a) { return yes(Meta.equipSet(str(a[0]))); },
-    bring: function (a) { return yes(Meta.toggleBring(int(a[0], 0, 99))); },
+    bring: function (a) { return yes(itemId(a[0]) && Meta.toggleBring(a[0])); },
     take: function () { Meta.takeBring(); return yes(1); },
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },

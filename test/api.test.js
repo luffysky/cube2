@@ -81,6 +81,9 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq(B.st.equip, { tile: 'neon', bg: 'night', theme: 'auto', fx: 'shard' }, 'a look that is not owned comes off');
   ok(B.st.items[1] === 20 && B.st.items[2] === 3 && B.st.items[0] === 0 && B.st.tot.wins === 12 && B.st.tot.sprint === 0 && B.st.note === null, 'items and totals clamped', B.st);
   eq(B.st.first, { drills: [0, 1], openers: ['tsd'] }, 'first clears: real ones only, once each');
+  const many = []; for (let i = 0; i <= 200; i++) many.push(99);
+  const Bi = await newPlayer({ items: many }, '203.0.113.8');
+  ok(Bi.st.items.reduce((a, b) => a + b, 0) === 80 && Bi.st.items[1] === 20, 'imported items are capped per kind and in total', Bi.st.items.slice(0, 6));
   // boxes already opened today on the device are not handed out again by a new cloud save
   const today = Math.floor((now + 8 * 3600000) / 86400000);
   const Bx = await newPlayer({ daily: { day: today, jobs: [{ id: 'tspin', n: 0, paid: false }], draws: 5 } }, '203.0.113.8');
@@ -127,7 +130,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await rpc({ a: 'sync', ops: 'take' }, A)).status, 400, 'changes must be a list');
   eq((await rpc({ a: 'sync', ops: Array.from({ length: 41 }, () => op('take')) }, A)).status, 400, 'too many changes in one request');
   r = await sync(A, [op('name', ["Robert'); DROP TABLE zz.players;--"])]);
-  ok(r.json.ok && r.json.st.name === 'Robert); DRO' && (await pg.query('SELECT count(*)::int AS n FROM zz.players'))[0].n === 5, 'a name is just text', r.json.st.name);
+  ok(r.json.ok && r.json.st.name === 'Robert); DRO' && (await pg.query('SELECT count(*)::int AS n FROM zz.players'))[0].n === 6, 'a name is just text', r.json.st.name);
   await sync(A, [op('name', ['阿明'])]);
 
   // ---------- matches ----------

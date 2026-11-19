@@ -518,7 +518,7 @@
     }
     if (Array.isArray(m.it)) for (i = 0; i < m.it.length && i < 40; i++) {
       var it = m.it[i];
-      if (Array.isArray(it) && it[0] >= 0 && it[0] < COLS && it[1] >= 0 && it[1] < ROWS && it[2] >= 1 && it[2] <= 7 && g.grid[it[1] | 0][it[0] | 0]) g.grid[it[1] | 0][it[0] | 0] |= (it[2] | 0) << 4;
+      if (Array.isArray(it) && it[0] >= 0 && it[0] < COLS && it[1] >= 0 && it[1] < ROWS && it[2] >= 1 && it[2] < ZZ.ITEMS.length && g.grid[it[1] | 0][it[0] | 0]) g.grid[it[1] | 0][it[0] | 0] |= (it[2] | 0) << 4;
     }
     var c = m.c;
     g.cur = Array.isArray(c) && TYPES[c[0]] ? { type: TYPES[c[0]], x: int(c[1], -3, COLS), y: int(c[2], 0, ROWS - 1), rot: int(c[3], 0, 3) } : null;
@@ -601,7 +601,7 @@
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
-      case 'i': if (live) App.foeItem(int(m.id, 1, 7)); break;
+      case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
       case 'end':
         var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
         // the rest of the result card (older pages do not send these)

@@ -72,6 +72,11 @@
     'j.item': ['用掉 3 個道具', 'Use 3 items', 'アイテム3個使用', '아이템 3개 사용'],
     // profile
     'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
+    'it.filter': ['道具分類', 'Item kinds', 'アイテムの種類', '아이템 종류'],
+    'it.all': ['全部', 'All', 'すべて', '전체'], 'it.self': ['自己用', 'For you', '自分用', '내게 쓰기'], 'it.foe': ['打對手', 'Against rival', '相手に', '상대에게'],
+    'it.combo': ['組合', 'Combos', 'コンボ', '조합'], 'it.owned': ['我有的', 'Mine', '持っている', '보유'],
+    'it.count': ['共 {0} 種', '{0} kinds', '{0} 種類', '{0}종'],
+    'it.more': ['再顯示（還有 {0} 種）', 'Show more ({0} left)', 'もっと見る（あと {0} 種類）', '더 보기({0}종 남음)'],
     'bx.more': ['寶箱 +{0} 次', '+{0} box today', '宝箱 +{0} 回', '보물상자 +{0}회'],
     'bx.left': ['今天還能開 {0} 次（每天 {1} 次，半夜十二點重算）', '{0} left today ({1} a day, back at midnight)', '今日はあと {0} 回（1 日 {1} 回、0 時にリセット）', '오늘 {0}회 남음(하루 {1}회, 자정에 초기화)'],
     'bx.member': ['會員每天 {0} 次。', 'Members get {0} a day.', 'メンバーは 1 日 {0} 回。', '멤버는 하루 {0}회.'],
@@ -357,14 +362,35 @@
     }
     return h + '</div>';
   }
+  // 200 items: filter by what they do, twenty at a time
+  var itemView = { cat: 'all', shown: 20 };
+  var ITEM_CATS = ['all', 'self', 'foe', 'combo', 'owned'];
+  function itemCat(d) { var sides = d.fx.map(function (f) { return ZZ.FX_KIND[f[0]].side; }); return d.fx.length > 1 ? 'combo' : sides[0]; }
   function itemsHtml() {
-    var h = '<p>' + t('sh.itemsP', Meta.BRING_MAX) + '</p><div class="levels">', i;
+    var h = '<p>' + t('sh.itemsP', Meta.BRING_MAX) + '</p><div class="seg" role="radiogroup" aria-label="' + esc(t('it.filter')) + '">', i, list = [];
+    ITEM_CATS.forEach(function (c) { h += '<button type="button" role="radio" aria-checked="' + (itemView.cat === c) + '" data-icat="' + c + '">' + t('it.' + c) + '</button>'; });
+    h += '</div>';
     for (i = 1; i < ITEMS.length; i++) {
-      h += '<div class="rep"><div class="rep-t item">' + App.itile(i) + '<div><b>' + t('i' + i) + '</b><span>' + t('i' + i + 't') + '　' + t('sh.stock', Meta.data.items[i] || 0) + '</span></div></div>' +
-        '<button class="btn sm buy" type="button" data-buyitem="' + i + '">' + coin(Meta.ITEM_PRICE[i]) + '</button></div>';
+      var d = ITEMS[i], c = itemView.cat;
+      if (c === 'owned' ? (Meta.data.items[i] || 0) > 0 : c === 'all' || itemCat(d) === c) list.push(d);
     }
-    return h + '</div>';
+    h += '<p class="note">' + t('it.count', list.length) + '</p><div class="levels">';
+    list.slice(0, itemView.shown).forEach(function (d) {
+      var id = d.id;
+      h += '<div class="rep"><div class="rep-t item">' + App.itile(id) + '<div><b>' + esc(t('i' + id)) + ' <small class="tier t' + d.tier + '">' + '★'.repeat(d.tier) + '</small></b><span>' + esc(t('i' + id + 't')) + '　' + t('sh.stock', Meta.data.items[id] || 0) + '</span></div></div>' +
+        '<button class="btn sm buy" type="button" data-buyitem="' + id + '">' + coin(Meta.ITEM_PRICE[id]) + '</button></div>';
+    });
+    h += '</div>';
+    if (list.length > itemView.shown) h += '<div class="row"><button class="btn" type="button" data-do="itemsMore">' + t('it.more', list.length - itemView.shown) + '</button></div>';
+    return h;
   }
+  App.acts.itemsMore = function () { itemView.shown += 40; App.openSheet('shop'); };
+  App.clicks.push(function (d) {
+    if (d.icat == null || ITEM_CATS.indexOf(d.icat) < 0) return false;
+    itemView.cat = d.icat; itemView.shown = 20;
+    App.openSheet('shop');
+    return true;
+  });
   function picRow(key, label) {
     var has = !!Meta.data.custom[key];
     return '<div class="rep"><div class="rep-t"><b>' + t(label) + '</b><span>' + t(has ? 'mb.set' : 'mb.none') + '</span></div>' +

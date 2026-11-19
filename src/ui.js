@@ -249,7 +249,7 @@
   }
   function popRaw(main, tags, atk, gold, pts) {
     var d = document.createElement('div');
-    d.className = 'pop' + (gold ? ' gold' : '');
+    d.className = 'pop' + (gold ? ' gold' : '') + (main && main.length > 9 ? ' long' : '');
     var h = '';
     if (main) h += '<span class="m">' + esc(main) + '</span>';
     if (tags && tags.length) h += '<span class="s">' + esc(tags.join('　')) + '</span>';
@@ -294,7 +294,7 @@
     var seed = o.seed != null ? o.seed >>> 0 : (Math.random() * 4294967296) >>> 0, K = App.kinds[kind];
     S = {
       kind: kind, o: o, state: 'count', countT: 0, shown: 9, time: 0, hist: [], target: null, wait: 0, after: null, prev: 'play',
-      flip: false, freeze: { me: 0, opp: 0 }, botItemT: 0, botChk: 0, botHoles: 0, mode: '', used: 0
+      flip: false, freeze: { me: 0, opp: 0 }, blind: { me: 0, opp: 0 }, botItemT: 0, botChk: 0, botHoles: 0, mode: '', used: 0
     };
     if (kind === 'battle') {
       var mode = o.mode || 'ai';
@@ -632,33 +632,54 @@
   }
 
   // ---------- items ----------
+  // ---------- items: each one is a list of effects (engine.js ITEMS); the first seven are the classic ones ----------
+  var WASH = { grout: '217,67,47', freeze: '190,232,255', curse: '142,59,110', blind: '68,75,87', shield: '88,170,255', goldT: '245,184,46', goldI: '245,184,46', cleanse: '59,168,160' };
+  function fxOf(id) { var d = ITEMS[id]; return d && d.fx ? d.fx : []; }
+  function foeHits(id) { return fxOf(id).some(function (f) { return ZZ.FX_KIND[f[0]].side === 'foe'; }); }
   function itemFx(id, mine, note) {
-    var now = performance.now();
+    var now = performance.now(), fx = fxOf(id);
     if (mine) {
       sfx.play('itemUse');
       buzz(16);
-      popRaw(t('i' + id), [t('i' + id + 't')], 0, id === 4);
-      if (id === 2 || id === 6) V.opp.addWash(now, id === 6 ? '190,232,255' : '217,67,47', 420);
-      if (id === 3) V.me.addWash(now, '88,170,255', 420);
-      if (id === 4) V.me.addWash(now, '245,184,46', 420);
+      popRaw(t('i' + id), [t('i' + id + 't')], 0, fx.some(function (f) { return f[0] === 'goldT' || f[0] === 'goldI'; }));
+      fx.forEach(function (f) { var w = WASH[f[0]]; if (w) (ZZ.FX_KIND[f[0]].side === 'foe' ? V.opp : V.me).addWash(now, w, 420); });
     } else {
-      var hit = id === 2 || id === 6;
-      if (hit) { sfx.play('itemHit'); buzz(30); V.me.addWash(now, id === 6 ? '190,232,255' : '217,67,47', 420); }
-      toast(t('foeUsed', t('i' + id)) + (id === 2 ? t(note ? 'foeUsed.grout' : 'foeUsed.tarp') : id === 6 ? t('foeUsed.ice') : ''), 2000);
+      var hitFx = fx.filter(function (f) { return ZZ.FX_KIND[f[0]].side === 'foe'; });
+      if (hitFx.length) { sfx.play('itemHit'); buzz(30); V.me.addWash(now, WASH[hitFx[0][0]] || '217,67,47', 420); }
+      var extra = id === 2 ? t(note ? 'foeUsed.grout' : 'foeUsed.tarp') : id === 6 ? t('foeUsed.ice') : '';
+      toast(t('foeUsed', t('i' + id)) + extra, 2000);
     }
+  }
+  // what an effect does to its own side's game g (side k)
+  function selfFx(g, k, f) {
+    var p = f[0], v = f[1];
+    if (p === 'chisel') g.chisel(v);
+    else if (p === 'shield') { g.shield = Math.max(g.shield, v); g.pending = []; }
+    else if (p === 'goldT' || p === 'goldI') { for (var i = 0; i < v; i++) g.queue.unshift(p === 'goldT' ? 'T' : 'I'); }
+    else if (p === 'trowel') g.trowel();
+    else if (p === 'boost') { g.boost = Math.max(g.boost, v); g.boostX = f[2] || 2; }
+    else if (p === 'cleanse') g.pending = [];
+    else if (p === 'score') g.stats.score += v;
+  }
+  // what an effect does to the side that is hit (side k, game g). Gives false when a tarp stopped it.
+  function foeFx(g, k, f) {
+    var p = f[0], v = f[1];
+    if (p === 'grout') { var open = !(g.shield > 0); g.receive(v); return open; }
+    if (p === 'freeze') { if (!g.over) S.freeze[k] = Math.max(S.freeze[k], v); if (k === 'me') input.clear(); }
+    else if (p === 'curse') { for (var i = 0; i < v; i++) g.queue.unshift(i % 2 ? 'Z' : 'S'); }
+    else if (p === 'blind') S.blind[k] = Math.max(S.blind[k] || 0, v);
+    return true;
   }
   function useItem(k) {
     if (!itemsOn() || S.state !== 'play') return false;
     var g = S[k], other = k === 'me' ? 'opp' : 'me', og = S[other], mine = k === 'me';
     if (g.over || S.freeze[k] > 0 || !g.inv.length) return false;
     var id = g.takeItem(), note = true;
-    if (id === 1) g.chisel(3);
-    else if (id === 2) { if (!S.remote) { note = !(og.shield > 0); og.receive(3); } }
-    else if (id === 3) { g.shield = 8000; g.pending = []; }
-    else if (id === 4) g.queue.unshift('T', 'T');
-    else if (id === 5) g.trowel();
-    else if (id === 6) { if (!og.over) S.freeze[other] = 3000; if (other === 'me') input.clear(); }
-    else if (id === 7) g.boost = 8000;
+    fxOf(id).forEach(function (f) {
+      if (ZZ.FX_KIND[f[0]].side === 'self') selfFx(g, k, f);
+      // online the rival's own page does this when the id arrives; a freeze or blindfold still shows on our copy of them
+      else if (!S.remote || f[0] === 'freeze' || f[0] === 'blind') note = foeFx(og, other, f) && note;
+    });
     if (!mine && S.bot) S.bot.plan = null;
     sideKey = '';
     if (mine) {
@@ -673,10 +694,10 @@
   function foeItem(id) {
     if (!S || S.kind !== 'battle' || S.state !== 'play') return;
     var note = true;
-    if (id === 2) { note = !(S.me.shield > 0); S.me.receive(3); }
-    else if (id === 6) { if (!S.me.over) { S.freeze.me = 3000; input.clear(); } }
-    else if (id === 3 && !S.remote) { S.opp.shield = 8000; S.opp.pending = []; }
-    else if (id === 7 && !S.remote) S.opp.boost = 8000;
+    fxOf(id).forEach(function (f) {
+      if (ZZ.FX_KIND[f[0]].side === 'foe') note = foeFx(S.me, 'me', f) && note;
+      else if (!S.remote && (f[0] === 'shield' || f[0] === 'boost')) selfFx(S.opp, 'opp', f);   // a recording: its tarp and boost still count
+    });
     itemFx(id, false, note);
   }
   // The computer holds an item until it is useful, then plays it.
@@ -686,10 +707,10 @@
     S.botItemT += dt;
     S.botChk -= dt;
     if (S.botChk <= 0) { S.botChk = 300; S.botHoles = Bot.features(Bot.rowsOf(g.grid)).holes; }
-    var id = g.inv[0], tm = S.botItemT, wait = 700 + (6 - Bot.LEVELS[S.level].tier) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false;
-    if (id === 1) go = tm > wait && (g.stackHeight() >= 9 || tm > late);
-    else if (id === 5) go = tm > wait && (S.botHoles >= 3 || tm > late);
-    else if (id === 3) go = tm > 400 && (g.pendingTotal() >= 2 || tm > late);
+    var id = g.inv[0], tm = S.botItemT, wait = 700 + (6 - Bot.LEVELS[S.level].tier) * 450, late = g.inv.length >= 3 ? wait : wait + 4000, go = false, p = fxOf(id)[0] ? fxOf(id)[0][0] : '';
+    if (p === 'chisel') go = tm > wait && (g.stackHeight() >= 9 || tm > late);
+    else if (p === 'trowel') go = tm > wait && (S.botHoles >= 3 || tm > late);
+    else if (p === 'shield' || p === 'cleanse') go = tm > 400 && (g.pendingTotal() >= 2 || tm > late);
     else go = tm > wait;
     if (go) { S.botItemT = 0; useItem('opp'); }
   }
@@ -1077,7 +1098,8 @@
         '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
         '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
         '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
-      for (i = 1; i < ITEMS.length; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
+      for (i = 1; i <= 7; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
+      h += '</dl><p class="note">' + t('h.itemsMore', ITEMS.length - 1) + '</p><dl class="keys">';
       h += '</dl><h3>' + t('h.credits') + '</h3><p>' + t('h.creditsP') + '</p><div class="row">' + btn('close', 'ok', true) + '</div>';
     }
     return h;
@@ -1425,7 +1447,7 @@
   }
   var lookKey = '';
   function drawSide() {
-    var me = S.me, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + me.queue.slice(0, nextN).join('') + '|' + pc + '|' + pn + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
+    var me = S.me, blind = S.blind && S.blind.me > 0, key = (me.holdType || '-') + (me.holdUsed ? '!' : '') + '|' + (blind ? '?' : me.queue.slice(0, nextN).join('')) + '|' + pc + '|' + pn + '|' + nextN + '|' + me.inv.join('') + '|' + lookKey + L.lang;
     if (key === sideKey) return;
     sideKey = key;
     var dpr = env.dpr, w = side - 8, x = el.holdCv.getContext('2d'), i;
@@ -1436,7 +1458,9 @@
     x = el.nextCv.getContext('2d');
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.clearRect(0, 0, w, pn * 3 * nextN);
-    for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pn * 2.9 * (i + 0.5), pn);
+    // a blindfold from the rival: the coming pieces are hidden until it wears off
+    if (blind) { x.fillStyle = 'rgba(68,75,87,0.85)'; x.font = '800 ' + Math.round(pn * 1.6) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; for (i = 0; i < nextN; i++) x.fillText('?', w / 2, pn * 2.9 * (i + 0.5)); }
+    else for (i = 0; i < nextN && i < me.queue.length; i++) View.drawPiece(x, me.queue[i], w / 2, pn * 2.9 * (i + 0.5), pn);
     if (itemsOn()) {
       var inv = me.inv, big = itemH, sm = Math.floor((big - 2) / 2);
       x = el.itemCv.getContext('2d');
@@ -1579,6 +1603,7 @@
           }
         }
         if (fz[k] > 0) fz[k] = Math.max(0, fz[k] - dt);
+        if (S.blind[k] > 0) S.blind[k] = Math.max(0, S.blind[k] - dt);
       }
       if (S.remote) ZZ.Net.tick(dt);
       else if (fz.opp <= 0) {
