@@ -440,3 +440,14 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過（meta 194：新擋 9 個、不該擋的 11 個如 Luffysky、Spicy、Peacock、幹部、ちょんまげ）；瀏覽器 `wxnet` 19。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`c1bc752`](https://github.com/luffysky/cube2/commit/c1bc752)。
+
+## 2026-11-21 01:10（Asia/Taipei）｜房間加 40 行競速
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（待辦 17）
+- 實際變更：開房間的模式多一個「40 行競速」（只限兩人）：不互相送水泥、不能用道具；先消完 40 行的人贏，時間到還沒人完成就比誰消得多；畫面上方顯示雙方「幾 / 40 行」，結算顯示各自完成的時間或停在幾行。`end` 訊息多帶 `race`、`lines`（舊版頁面不帶也能結算）。
+- 檔案：`src/net.js`、`src/modes.js`、`src/ui.js`、`test/wxnet.js`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `wxnet` 22（四種房間模式、競速雙方都開始、不送水泥、先到 40 行的贏）、`flow` 60。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

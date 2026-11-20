@@ -79,7 +79,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await until(() => A.evaluate(() => ZZ.Net.state === 'waiting' && !!ZZ.Net.code), 6000), 'A opens a room');
     const code = await A.evaluate(() => ZZ.Net.code);
     await B.evaluate(c => ZZ.Net.join(c, '小瓦'), code);
-    ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && document.querySelectorAll('[data-nmode]').length === 3), 10000), 'the host sees the three room modes with two in the room');
+    ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && document.querySelectorAll('[data-nmode]').length === 4), 10000), 'the host sees the four room modes with two in the room');
     await A.click('[data-nmode="lv"]');
     ok(await until(() => B.evaluate(() => ZZ.Net.cfg.mode === 'lv' && /關卡地形/.test(document.getElementById('sheet').textContent)), 5000), 'the guest is told the room plays on a level wall');
     await A.click('[data-nmode="wx"]');
@@ -90,6 +90,12 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await A.evaluate(() => { ZZ.Net.setCfg({ minutes: 1, items: false, team: false, mode: 'lv' }); ZZ.Net.start(); });
     const wall = P => P.evaluate(() => { const S = ZZ.App.S(); return S && S.kind === 'battle' ? { lv: S.lvNo || 0, sky: !!S.sky, cells: S.me.grid.reduce((n, r) => n + r.filter(c => c).length, 0) } : null; });
     ok(await until(async () => { const a = await wall(A), b = await wall(B); return a && b && a.lv > 0 && a.lv === b.lv && !a.sky && !b.sky && a.cells > 0; }, 8000), 'a level-wall room starts both on the same level', [await wall(A), await wall(B)]);
+    // a 40-line race: no cement goes across, the first to 40 lines wins
+    await A.evaluate(() => { ZZ.Net.setCfg({ minutes: 2, items: false, team: false, mode: 'race' }); ZZ.Net.start(); });
+    ok(await until(async () => (await A.evaluate(() => { const S = ZZ.App.S(); return !!(S && S.race && S.state === 'play'); })) && (await B.evaluate(() => { const S = ZZ.App.S(); return !!(S && S.race && S.state === 'play'); })), 8000), 'both play a race');
+    ok(await B.evaluate(() => { const S = ZZ.App.S(); const before = ZZ.Net.cfg; S.me.onAttack(4); return S.me.pendingTotal() === 0 && /\/ 40/.test(document.getElementById('hud').textContent); }), 'nobody sends cement, and the bar shows lines out of 40');
+    await B.evaluate(() => { const S = ZZ.App.S(); S.me.stats.lines = 39; S.me.stats.lines = 40; S.me.hardDrop(); });
+    ok(await until(async () => (await A.evaluate(() => ZZ.App.S().result)) === -1 && (await B.evaluate(() => ZZ.App.S().result)) === 1, 10000), 'the one who reached 40 first wins, the other loses', [await A.evaluate(() => ZZ.App.S().result), await B.evaluate(() => ZZ.App.S().result)]);
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();

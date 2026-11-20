@@ -101,7 +101,12 @@
     'net.m.battleP': ['空場地開打，誰先把對手壓到頂就贏。', 'An empty well; push your rival to the top.', '空のフィールドから。相手を上まで押し上げよう。', '빈 필드에서 시작. 상대를 꼭대기까지 밀어 올리세요.'],
     'net.m.wxP': ['兩人頭上同一片天：風、雨、雪、霧，偶爾還有洪水、龍捲風、地震。只限兩人房。', 'One sky over both walls: wind, rain, snow, fog, and now and then a flood, tornado or quake. Two players only.', '二人の上に同じ空。風・雨・雪・霧、ときどき洪水・竜巻・地震も。二人部屋のみ。', '두 사람 위에 같은 하늘: 바람, 비, 눈, 안개, 가끔 홍수, 토네이도, 지진까지. 2인 방 전용.'],
     'net.m.lvP': ['開打時從 1000 關裡抽一關，大家從同一面地形開始。', 'One of the 1000 levels is drawn at the start; everyone begins on the same wall.', '開始時に1000ステージから1つ抽選、全員同じ地形からスタート。', '시작할 때 1000개 스테이지 중 하나를 뽑아 모두 같은 지형에서 시작해요.'],
-    'net.m.only2': ['挑戰大自然只限兩人，這房間會用普通對戰。', 'Nature is for two players; this room plays an ordinary battle.', '大自然は二人用。この部屋は通常バトルになります。', '대자연은 2인 전용이라 이 방은 일반 대전으로 해요.'],
+    'net.m.only2': ['挑戰大自然和競速只限兩人，這房間會用普通對戰。', 'Nature and the race are for two players; this room plays an ordinary battle.', '大自然とレースは二人用。この部屋は通常バトルになります。', '대자연과 레이스는 2인 전용이라 이 방은 일반 대전으로 해요.'],
+    'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
+    'net.m.raceP': ['不互相攻擊，誰先消完 40 行誰贏；時間到了還沒人消完，就比誰消得多。只限兩人房。', 'No attacks: first to clear 40 lines wins; if time runs out first, most lines wins. Two players only.', '攻撃なし。先に40ライン消した方の勝ち。時間切れならライン数が多い方。二人部屋のみ。', '공격 없음. 먼저 40줄을 지우면 승리, 시간이 다 되면 더 많이 지운 쪽이 이겨요. 2인 방 전용.'],
+    'net.raceOn': ['40 行競速：先消完 {0} 行的人贏', 'Race: first to {0} lines wins', 'レース：先に{0}ラインで勝ち', '레이스: 먼저 {0}줄이면 승리'],
+    'net.raceNot': ['沒消完（{0} 行）', 'not done ({0} lines)', '未完了（{0}ライン）', '미완료 ({0}줄)'],
+    'net.raceLines': ['/ {0} 行', '/ {0}', '/ {0}', '/ {0}줄'],
     'net.lvOn': ['關卡地形：第 {0} 關', 'Level wall: level {0}', 'ステージ地形：{0}', '스테이지 지형: {0}단계'],
     'net.itemsOn': ['有道具', 'items on', 'アイテムあり', '아이템 있음'],
     'net.itemsOff': ['沒有道具', 'no items', 'アイテムなし', '아이템 없음'],
@@ -313,13 +318,13 @@
   App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
-  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return m === 'wx' && n > 2 ? 'battle' : m; }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race') && n > 2 ? 'battle' : m; }
   function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (k === 'wx' && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
-    h += '</div><p class="note" id="netModeP">' + t(cur === 'wx' && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    ['battle', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + ((k === 'wx' || k === 'race') && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race') && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
   App.sheets.online = function () {
@@ -423,6 +428,15 @@
     var S = App.S();
     if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return '';
+    var rc = '';
+    // a race: each side's time to 40 lines, or how far they got
+    if (S.race) {
+      var one = function (who, ms, lines) { return '<b>' + esc(who) + '</b> ' + (ms ? App.fmtTime(ms) : t('net.raceNot', Math.min(S.race, lines))); };
+      rc = '<p class="note">' + one(t('you'), S.raceMs, S.me.stats.lines) + '　' + one(S.oppName, S.foeRace, S.opp.stats.lines) + '</p>';
+    }
+    return rc + againNote();
+  };
+  function againNote() {
     if (Net.wantAgain && !Net.foeAgain) return '<p class="note">' + t('net.waitAgain') + '</p>';
     if (Net.foeAgain && !Net.wantAgain) return '<p class="note">' + t('net.foeWants') + '</p>';
     return '';

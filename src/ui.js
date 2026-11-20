@@ -343,6 +343,13 @@
       S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
       // a replay starts from an empty wall, so a level-wall room keeps none
       if (S.lvNo) { S.rec = null; S.tape = null; toast(t('net.lvOn', S.lvNo), 3000); }
+      // a 40-line race (競速): nobody sends cement, the first to clear 40 lines wins; no replay
+      if (o.race && mode === 'net') {
+        S.race = 40; S.raceMs = 0; S.foeRace = 0;
+        S.me.onAttack = function () {};
+        S.rec = null; S.tape = null;
+        toast(t('net.raceOn', S.race), 3000);
+      }
       // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
       if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
         S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
@@ -474,6 +481,7 @@
         el.hudR.innerHTML = stat('sentOpp', t('sent')) + stat('koOpp', t('ko')) + name;
       }
       el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
+      if (S.race) { el.hudL.innerHTML = you + stat('sentMe', t('net.raceLines', S.race)); el.hudR.innerHTML = stat('sentOpp', t('net.raceLines', S.race)) + name; }
       el.oppName.textContent = S.oppName;
       el.oppNameW.textContent = S.oppName;
     } else if (k === 'sprint') {
@@ -867,6 +875,7 @@
     if (K && K.lock) K.lock(e);
     else if (S.kind === 'dojo') drillLock(e);
     else if (S.kind === 'sprint' && S.me.stats.lines >= S.goal) endSprint();
+    else if (S.kind === 'battle' && S.race && S.state === 'play' && S.me.stats.lines >= S.race) { S.raceMs = S.total - S.left; endBattle(''); }
   }
   function onTopOut(g, v, mine, now) {
     var K = kindOf();
@@ -920,7 +929,8 @@
     var settle = function () {
       if (S !== st) return;
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
-      var r = why === 'left' ? 1 : why === 'quit' ? -1 : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
+      var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
+      var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
@@ -1533,7 +1543,8 @@
     if (S.kind === 'battle') {
       txt('koMe', String(S.ko.me)); txt('koOpp', String(S.ko.opp));
       if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
-      txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent));
+      if (S.race) { txt('sentMe', String(Math.min(S.race, st.lines))); txt('sentOpp', String(Math.min(S.race, S.opp.stats.lines))); }
+      else { txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent)); }
       txt('ptsMe', t('pts', L.num(st.score)));
       var c = $('clock');
       txt('clock', fmtClock(S.left));

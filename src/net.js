@@ -460,7 +460,7 @@
 
   // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
   // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
-  var ROOM_MODES = ['battle', 'wx', 'lv'];
+  var ROOM_MODES = ['battle', 'wx', 'lv', 'race'];
   Net.ROOM_MODES = ROOM_MODES;
   function readCfg(c) {
     var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
@@ -471,13 +471,14 @@
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx, lv) {
+  function startMatch(seed, minutes, items, multi, wx, lv, race) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
     var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
     if (wx && !multi) o.wx = wx >>> 0;
     if (lv) o.lv = lv;
+    if (race && !multi) { o.race = 1; o.items = false; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -496,8 +497,9 @@
     var mode = Net.modeOf();
     var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
     var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv);
+    var race = mode === 'race' && !multi ? 1 : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -622,14 +624,14 @@
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0); break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
       case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
       case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.concat(ZZ.Weather.DISASTERS).indexOf(m.k) >= 0) App.wxHit(m.k); break;
       case 'end':
-        var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
+        var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999), race: int(m.race, 0, 3600000), lines: int(m.lines, 0, 99999) };
         // the rest of the result card (older pages do not send these)
         if (m.x && typeof m.x === 'object') tally.x = { attack: int(m.x.attack, 0, 99999), spins: int(m.x.spins, 0, 9999), minis: int(m.x.minis, 0, 9999), xspins: int(m.x.xspins, 0, 9999), quads: int(m.x.quads, 0, 9999), maxCombo: int(m.x.maxCombo, 0, 99), pieces: int(m.x.pieces, 0, 99999) };
         if (who) who.end = tally;
@@ -677,6 +679,7 @@
     if (S && S.multi) return cb();
     if (S && S.remote && foeEnd) {
       S.ko.me = foeEnd.downs; S.opp.stats.sent = foeEnd.sent; S.opp.stats.score = foeEnd.score;
+      if (S.race) { S.foeRace = foeEnd.race; S.opp.stats.lines = foeEnd.lines; }
       if (foeEnd.x) { for (var k in foeEnd.x) S.opp.stats[k] = foeEnd.x[k]; S.oppFull = true; }
     }
     cb();
@@ -687,7 +690,7 @@
     Net.state = 'ready';
     send(pack(S.me));
     var ms = S.me.stats;
-    send({ t: 'end', downs: S.ko.opp, sent: ms.sent, score: ms.score, x: { attack: ms.attack, spins: ms.spins, minis: ms.minis, xspins: ms.xspins, quads: ms.quads, maxCombo: ms.maxCombo, pieces: ms.pieces } });
+    send({ t: 'end', downs: S.ko.opp, sent: ms.sent, score: ms.score, race: S.raceMs || 0, lines: ms.lines, x: { attack: ms.attack, spins: ms.spins, minis: ms.minis, xspins: ms.xspins, quads: ms.quads, maxCombo: ms.maxCombo, pieces: ms.pieces } });
     if (S.multi ? allEnded() : foeEnd) return settle(cb);
     endWait = cb;
     // through the relay the other side's tally takes a little longer to arrive
