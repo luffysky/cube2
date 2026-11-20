@@ -14,6 +14,7 @@
     'dr.games': ['磚塊遊戲', 'Brick games', 'ブロックゲーム', '블록 게임'],
     'dr.allGames': ['全部遊戲', 'All games', 'すべてのゲーム', '모든 게임'],
     'dr.more': ['其他', 'More', 'その他', '기타'],
+    'dr.srHome': ['平台主頁・所有遊戲', 'Platform home · every SnowRealm game', 'プラットフォーム・全ゲーム', '플랫폼 홈 · 모든 게임'],
     'dr.guest': ['訪客・存在這台裝置', 'Guest · saved on this device', 'ゲスト・この端末に保存', '게스트 · 이 기기에 저장'],
     'dr.cloud': ['訪客・雲端存檔', 'Guest · cloud save', 'ゲスト・クラウド保存', '게스트 · 클라우드 저장'],
     'dr.linked': ['已連結 SnowRealm 帳號', 'Linked to SnowRealm', 'SnowRealm と連携済み', 'SnowRealm 연결됨'],
@@ -56,6 +57,7 @@
       '<div class="row">' + App.btn('cloud', 'cl.title') + App.btn('close', 'close', true) + '</div>';
   };
   App.boot.push(function () {
+    if (window.SnowRealmIcons) window.SnowRealmIcons.fill($('drawer'));
     $('mDrawer').addEventListener('click', function () { show(true); });
     $('drClose').addEventListener('click', function () { show(false); });
     $('drawerScrim').addEventListener('click', function () { show(false); });

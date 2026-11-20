@@ -108,39 +108,53 @@
         <div class="dr-row"><span class="dr-coins"><i class="coin"></i><b id="drCoins">0</b></span><span class="dr-acct" id="drAcct"></span></div>
       </div>
       <nav class="dr-body">
-        <h3 data-t="dr.account"></h3>
-        <button type="button" data-sheet="profile"><span data-t="dr.profile"></span></button>
-        <button type="button" data-sheet="srAccount" id="drSignin"><span data-t="sr.menu"></span></button>
-        <button type="button" data-sheet="cloud"><span data-t="cl.title"></span></button>
-        <button type="button" data-sheet="drLogout"><span data-t="dr.logout"></span></button>
-        <h3 data-t="m.battle"></h3>
-        <button type="button" data-go="rank"><span data-t="m.rank"></span></button>
-        <button type="button" data-go="battle"><span data-t="m.battle"></span></button>
-        <button type="button" data-go="online"><span data-t="m.online"></span></button>
-        <button type="button" data-go="ghost"><span data-t="m.ghost"></span></button>
-        <h3 data-t="m.train"></h3>
-        <button type="button" data-go="levels"><span data-t="lv.menuT"></span></button>
-        <button type="button" data-go="weather"><span data-t="wx.menuT"></span></button>
-        <button type="button" data-go="dojo"><span data-t="m.dojo"></span></button>
-        <button type="button" data-go="openers"><span data-t="m.open"></span></button>
-        <button type="button" data-go="practice"><span data-t="m.practice"></span></button>
-        <button type="button" data-go="sprint"><span data-t="m.sprint"></span></button>
-        <h3 data-t="dr.rewards"></h3>
-        <button type="button" data-sheet="shop"><span data-t="m.shop"></span></button>
-        <button type="button" data-sheet="shop" data-sitepick><span data-t="k.site"></span></button>
-        <button type="button" data-sheet="boxes"><span data-t="bx.title"></span><i class="dot" id="drBoxDot" hidden></i></button>
-        <button type="button" data-sheet="bonus"><span data-t="bn.title"></span></button>
-        <button type="button" data-sheet="jobs"><span data-t="m.jobs"></span><i class="dot" id="drJobsDot" hidden></i></button>
-        <button type="button" data-sheet="board" id="drBoard" hidden><span data-t="m.board"></span></button>
-        <h3 data-t="dr.games"></h3>
-        <a href="games/"><span data-t="dr.allGames"></span></a>
-        <a href="games/snake/">磚蛇</a><a href="games/breakout/">打磚塊</a><a href="games/stack/">疊磚塔</a><a href="games/push/">推磚倉庫</a><a href="games/merge/">磚塊合成</a>
-        <a href="games/sort/">分磚</a><a href="games/picross/">磚畫謎</a><a href="games/pipes/">磚道</a><a href="games/sweep/">掃磚</a>
-        <h3 data-t="dr.more"></h3>
-        <button type="button" data-sheet="settings"><span data-t="m.settings"></span></button>
-        <button type="button" data-sheet="help"><span data-t="m.help"></span></button>
-        <a href="privacy.html"><span data-t="lg.privacy"></span></a>
-        <a href="terms.html"><span data-t="lg.terms"></span></a>
+        <a class="dr-sr" href="https://games.snowrealm.pet/" target="_blank" rel="noopener"><i class="ic" data-ic="snow"></i><span><b>SnowRealm Games</b><small data-t="dr.srHome"></small></span><i class="ic go" data-ic="out"></i></a>
+        <section class="dr-grp" data-tone="acct"><h3 data-t="dr.account"></h3><div class="dr-list">
+          <button type="button" data-sheet="profile"><i class="ic" data-ic="user"></i><span data-t="dr.profile"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="srAccount" id="drSignin"><i class="ic" data-ic="key"></i><span data-t="sr.menu"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="cloud"><i class="ic" data-ic="cloud"></i><span data-t="cl.title"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="drLogout"><i class="ic" data-ic="logout"></i><span data-t="dr.logout"></span><i class="ic go" data-ic="chev"></i></button>
+        </div></section>
+        <section class="dr-grp" data-tone="battle"><h3 data-t="m.battle"></h3><div class="dr-list">
+          <button type="button" data-go="rank"><i class="ic" data-ic="trophy"></i><span data-t="m.rank"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="battle"><i class="ic" data-ic="swords"></i><span data-t="m.battle"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="online"><i class="ic" data-ic="globe"></i><span data-t="m.online"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="ghost"><i class="ic" data-ic="ghost"></i><span data-t="m.ghost"></span><i class="ic go" data-ic="chev"></i></button>
+        </div></section>
+        <section class="dr-grp" data-tone="train"><h3 data-t="m.train"></h3><div class="dr-list">
+          <button type="button" data-go="levels"><i class="ic" data-ic="flag"></i><span data-t="lv.menuT"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="weather"><i class="ic" data-ic="sun"></i><span data-t="wx.menuT"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="dojo"><i class="ic" data-ic="rotate"></i><span data-t="m.dojo"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="openers"><i class="ic" data-ic="book"></i><span data-t="m.open"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="practice"><i class="ic" data-ic="target"></i><span data-t="m.practice"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-go="sprint"><i class="ic" data-ic="timer"></i><span data-t="m.sprint"></span><i class="ic go" data-ic="chev"></i></button>
+        </div></section>
+        <section class="dr-grp" data-tone="gold"><h3 data-t="dr.rewards"></h3><div class="dr-list">
+          <button type="button" data-sheet="shop"><i class="ic" data-ic="bag"></i><span data-t="m.shop"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="shop" data-sitepick><i class="ic" data-ic="palette"></i><span data-t="k.site"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="boxes"><i class="ic" data-ic="gift"></i><span data-t="bx.title"></span><i class="dot" id="drBoxDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="bonus"><i class="ic" data-ic="slot"></i><span data-t="bn.title"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="jobs"><i class="ic" data-ic="list"></i><span data-t="m.jobs"></span><i class="dot" id="drJobsDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="board" id="drBoard" hidden><i class="ic" data-ic="chart"></i><span data-t="m.board"></span><i class="ic go" data-ic="chev"></i></button>
+        </div></section>
+        <section class="dr-grp" data-tone="games"><h3 data-t="dr.games"></h3><div class="dr-list">
+          <a href="games/"><i class="ic" data-ic="grid"></i><span data-t="dr.allGames"></span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/snake/"><i class="ic" data-ic="snake"></i><span>磚蛇</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/breakout/"><i class="ic" data-ic="ball"></i><span>打磚塊</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/stack/"><i class="ic" data-ic="layers"></i><span>疊磚塔</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/push/"><i class="ic" data-ic="box"></i><span>推磚倉庫</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/merge/"><i class="ic" data-ic="merge"></i><span>磚塊合成</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/sort/"><i class="ic" data-ic="sort"></i><span>分磚</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/picross/"><i class="ic" data-ic="pixel"></i><span>磚畫謎</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/pipes/"><i class="ic" data-ic="pipe"></i><span>磚道</span><i class="ic go" data-ic="chev"></i></a>
+          <a href="games/sweep/"><i class="ic" data-ic="mine"></i><span>掃磚</span><i class="ic go" data-ic="chev"></i></a>
+        </div></section>
+        <section class="dr-grp" data-tone="more"><h3 data-t="dr.more"></h3><div class="dr-list">
+          <button type="button" data-sheet="settings"><i class="ic" data-ic="gear"></i><span data-t="m.settings"></span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="help"><i class="ic" data-ic="help"></i><span data-t="m.help"></span><i class="ic go" data-ic="chev"></i></button>
+          <a href="privacy.html"><i class="ic" data-ic="shield"></i><span data-t="lg.privacy"></span><i class="ic go" data-ic="chev"></i></a>
+          <a href="terms.html"><i class="ic" data-ic="doc"></i><span data-t="lg.terms"></span><i class="ic go" data-ic="chev"></i></a>
+        </div></section>
       </nav>
     </aside>
   </section>
@@ -220,6 +234,9 @@
 </script>
 <script>
 /*__MINIREWARDS__*/
+</script>
+<script>
+/*__ICONS__*/
 </script>
 <script>
 /*__META__*/

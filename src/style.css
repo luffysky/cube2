@@ -859,9 +859,6 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .dr-coins .coin { width: 16px; height: 16px; }
 .dr-acct { color: var(--muted); font-size: 12px; text-align: right; }
 .dr-body { flex: 1; overflow-y: auto; padding: 6px 8px 20px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-.dr-body h3 { margin: 14px 8px 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
-.dr-body button, .dr-body a { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 10px; border-radius: 10px; border: 0; background: none; color: inherit; font: inherit; font-size: 15px; text-align: left; text-decoration: none; cursor: pointer; }
-.dr-body button:hover, .dr-body a:hover { background: var(--panel); }
 .dr-body button[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
 /* site theme cards: the page in miniature */

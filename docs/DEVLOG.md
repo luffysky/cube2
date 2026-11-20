@@ -239,3 +239,16 @@
 - 檔案：`build.js`、`games/index.html`、`games/*/index.html`。｜資料庫：未異動。｜刪除操作：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `sites` 25、`drawer` 28、`bricks` 73、`minipay` 10、`pwa` 47。手機實機待 Owner 重新整理確認。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`568ae38`](https://github.com/luffysky/cube2/commit/568ae38)，Vercel `dpl_7oqxYi7rZhWUbxhRpmM1yHhoif3W` READY。
+
+## 2026-11-20 19:15（Asia/Taipei）｜側邊選單重新設計＋SnowRealm Games 主頁入口
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-018 追加（側邊欄項目設計太敷衍；加到 SnowRealm Games 主頁的功能）
+- 實際變更：
+  - 每個分組變成一張卡片、各有代表色（帳號藍、對戰紅、練功綠、獎勵金、遊戲紫、其他灰）；每一項有線條圖示方塊、名稱、箭頭，項目間細分隔線；目前所在的小遊戲有色條與底色標示；待領的寶箱／任務紅點放在箭頭前。
+  - 最上方新增「SnowRealm Games」主頁卡片（新分頁開啟 `https://games.snowrealm.pet/`），轉磚與九款小遊戲的側邊選單都有。
+  - 圖示集中在 `games/drawer-icons.js`（轉磚建置時一起打包）；樣式集中在 `src/drawer-items.css`（轉磚打包、小遊戲用 `games/drawer-items.css`），兩邊一致，跟著網站主題變色。
+- 檔案：`games/drawer-icons.js`（新）、`src/drawer-items.css`（新）、`games/drawer-items.css`（建置產生）、`src/index.template.html`、`src/drawer.js`、`src/style.css`、`games/nav.js`、`games/games.css`、`games/*/index.html`、`build.js`。｜資料庫：未異動。｜刪除操作：無（只移除被新樣式取代的舊 CSS 規則）。
+- 測試：`node test/run.js` 全過；瀏覽器 `drawer` 28、`sites` 25、`bricks` 73、`minipay` 10、`pwa` 47；手機深淺色截圖目視檢查。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

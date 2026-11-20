@@ -61,10 +61,10 @@ html = html.replace(/\{\{(\w+)\}\}/g, (all, k) => {
   return esc(words[k]);
 });
 // ---------- the page: scripts and stylesheet go in last, so nothing above can touch their text ----------
-const parts = { MINIREWARDS: '../games/rewards.js', CSS: 'style.css', ENGINE: 'engine.js', HANS: 'hans-map.js', I18N: 'i18n.js', BOT: 'bot.js', DRILLS: 'drills.js', OPENERS: 'openers.js', LEVELS: 'levels.js', WEATHER: 'weather.js', META: 'meta.js',
+const parts = { MINIREWARDS: '../games/rewards.js', ICONS: '../games/drawer-icons.js', CSS: 'style.css', ENGINE: 'engine.js', HANS: 'hans-map.js', I18N: 'i18n.js', BOT: 'bot.js', DRILLS: 'drills.js', OPENERS: 'openers.js', LEVELS: 'levels.js', WEATHER: 'weather.js', META: 'meta.js',
   SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', PWA: 'pwa.js', SHOP: 'shop.js', CLOUD: 'cloud.js', CONSENT: 'consent.js', BONUS: 'bonus.js', LEVELMODE: 'levelmode.js', WXMODE: 'wxmode.js', MINIS: 'minis.js', DRAWER: 'drawer.js' };
 for (const [k, f] of Object.entries(parts)) {
-  const body = src(f) + (k === 'CSS' ? '\n' + src('site-themes.css') : '');      // the site themes go in after the page's own colours
+  const body = src(f) + (k === 'CSS' ? '\n' + src('site-themes.css') + '\n' + src('drawer-items.css') : '');      // the site themes go in after the page's own colours
   if (body.includes('</script')) throw new Error(f + ' contains a closing script tag');
   const mark = '/*__' + k + '__*/';
   if (!html.includes(mark)) throw new Error('missing marker ' + mark);
@@ -72,6 +72,8 @@ for (const [k, f] of Object.entries(parts)) {
 }
 fs.writeFileSync(path.join(root, 'index.html'), html);
 // the brick games' pages share the site themes
+fs.writeFileSync(path.join(root, 'games', 'site-themes.css'), src('site-themes.css'));
+fs.writeFileSync(path.join(root, 'games', 'drawer-items.css'), src('drawer-items.css'));
 // and every brick-game page asks for its shared files by this build, so a phone never keeps an old stylesheet
 {
   const stampOf = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'games', f))).digest('hex').slice(0, 10);
@@ -88,7 +90,6 @@ fs.writeFileSync(path.join(root, 'index.html'), html);
     if (h !== was) fs.writeFileSync(pg, h);
   }
 }
-fs.writeFileSync(path.join(root, 'games', 'site-themes.css'), src('site-themes.css'));
 
 // ---------- which scripts the page may run ----------
 // The page's own scripts are written into it, so the browser is told exactly which ones they are (by their hashes)
