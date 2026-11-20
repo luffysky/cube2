@@ -164,9 +164,9 @@
 - 檔案／API／資料表：上列檔案；`/api/rpc` 三個動作；新表 `zz.identity`、`zz.idjti`。
 - 資料庫：`CREATE TABLE IF NOT EXISTS`（非破壞性，D-007 範圍內），正式資料庫在部署後第一次建表檢查時建立；開關關閉時不寫入。備份：只新增空表。驗證：PGlite 測試資料庫建表成功（13 → 15 張）。
 - 刪除操作：無新增刪除動作。綁定成功時刪除「這台裝置的舊憑證」與「這份存檔的引繼碼」、找回時只保留最近 5 台裝置的憑證——屬於核准書第 4 節要求的憑證輪替，且只在開關打開後才會發生。
-- Git commit：見本條提交（SHA 記在下一條）。
+- Git commit：[`ba249d1`](https://github.com/luffysky/cube2/commit/ba249d1dee97cf423d067e6de611691fe46b9dcf)。
 - 測試：`node test/identity.test.js` 49 通過；`node test/api.test.js` 300 通過；`node test/run.js` 全過。
-- 部署：程式會隨 commit 部署到正式環境，但 `IDENTITY_*` 環境變數未設定 → 功能關閉。沒有真實 Identity 服務，**沒有做跨站端到端驗收，不可宣稱已能綁定**。
+- 部署：正式（Vercel deployment `dpl_EZt2QKdgKBd2vJmWFHJtNPvMLxsS`，READY）。18:00 查 `/api/health?deep=1` 200、資料庫可用；`IDENTITY_*` 環境變數未設定 → 功能關閉。新資料表是否已在 Neon 建立：Claude 不直接連正式資料庫，未驗證；會在第一次 API 建表檢查時建立。沒有真實 Identity 服務，**沒有做跨站端到端驗收，不可宣稱已能綁定**。
 - 風險、回滾：關閉 `IDENTITY_LINK_ENABLED` 即全部停用；移除資料表屬刪除，需 Owner 核准。
 - 未完成／阻塞：BFF（授權碼 + PKCE、callback、HttpOnly 工作階段）等 GPT 提供授權端點與 client 註冊；登入後的「綁定／找回」畫面；排位與開房的登入閘門。
 - 交接對方的事項（GPT）：Identity 正式 issuer／JWKS／audience、授權與 token 端點、允許的 callback（預定 `https://cube2-xi.vercel.app/api/auth/callback`，TBD）、停權查詢方式；平台首頁若能提供直達註冊的網址，轉磚會改連過去。
