@@ -388,6 +388,15 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
     ok(M.data.box.last.n === last.n + 1 && M.data.daily.draws === 3, 'and goes through once it is back');
   }
 
+  // a device's sign-in sheet comes along when a cloud save is made, this month only, and never pays a goal twice
+  {
+    const R = require('../server/rules.js'), now = new Date(2026, 10, 20, 12).getTime();
+    const days = [1, 2, 3, 4, 5, 6, 7, 8, 30];
+    const d = R.importState({ coins: 10, sign: { m: 202611, days, paid: [] }, daily: { login: 0 } }, now);
+    ok(d.sign.m === 202611 && d.sign.days.join() === '1,2,3,4,5,6,7,8' && d.sign.paid.join() === '0', 'this month\'s ticks come along (not a day still to come); the 7-day goal counts as paid', d.sign);
+    const old = R.importState({ coins: 10, sign: { m: 202610, days: [1, 2, 3], paid: [] } }, now);
+    ok(old.sign.days.length === 0, 'last month\'s sheet does not');
+  }
   await pg.close();
   console.log('cloud tests: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

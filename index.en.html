@@ -946,6 +946,25 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .mu-check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-check input { width: 20px; height: 20px; accent-color: var(--gold, #F5B82E); }
 
+/* 簽到表：一個月的日曆，簽過的打勾，今天圈起來 */
+.sg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sg-head b { font-size: 18px; }
+.sg-head span { color: var(--muted); font-size: 13px; }
+.sg-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 8px 0 12px; }
+.sg-wd { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding-bottom: 2px; }
+.sg-d { position: relative; aspect-ratio: 1; max-height: 52px; display: grid; place-items: center; border-radius: 9px; background: var(--floor); border: 1px solid var(--edge); font-variant-numeric: tabular-nums; }
+.sg-d b { font-size: 13px; font-weight: 700; }
+.sg-d.none { background: none; border: 0; }
+.sg-d.miss { opacity: .45; }
+.sg-d.on { background: color-mix(in srgb, var(--gold) 26%, var(--floor)); border-color: var(--gold); }
+.sg-d.on b { position: absolute; top: 3px; left: 5px; font-size: 10px; }
+.sg-d.on i { font-style: normal; font-size: 18px; font-weight: 900; color: var(--gold-ink); }
+.sg-d.now { outline: 2.5px solid var(--ink); outline-offset: 1px; }
+.sg-goals { display: grid; gap: 6px; }
+.sg-goal { display: grid; grid-template-columns: 5em 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--edge); background: var(--floor); }
+.sg-goal.got { border-color: var(--gold); }
+.sg-goal .bar { grid-column: auto; }
+
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
    into 轉磚's page (build.js) and is linked by every brick-game page (games/theme.js puts the attribute on).
@@ -1064,6 +1083,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         <button class="link" type="button" data-sheet="shop" data-t="m.shop">Shop</button>
         <button class="link" type="button" data-sheet="boxes"><span data-t="bx.title">Treasure boxes</span><i class="dot" id="mBoxDot" hidden></i></button>
         <button class="link" type="button" data-sheet="bonus"><span data-t="bn.title">Freebies</span></button>
+        <button class="link" type="button" data-sheet="sign"><span data-t="sg.title">Sign-in sheet</span><i class="dot" id="mSignDot" hidden></i></button>
         <button class="link" type="button" data-sheet="jobs"><span data-t="m.jobs">Daily jobs</span><i class="dot" id="mJobsDot" hidden></i></button>
         <button class="link" type="button" data-sheet="board" data-t="m.board" id="mBoard" hidden>Leaderboards</button>
         <button class="link" type="button" data-sheet="srAccount" data-t="sr.menu">Sign in / Register</button>
@@ -1111,6 +1131,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
           <button type="button" data-sheet="shop" data-sitepick><i class="ic" data-ic="palette"></i><span data-t="k.site">Site theme</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="boxes"><i class="ic" data-ic="gift"></i><span data-t="bx.title">Treasure boxes</span><i class="dot" id="drBoxDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="bonus"><i class="ic" data-ic="slot"></i><span data-t="bn.title">Freebies</span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="sign"><i class="ic" data-ic="cal"></i><span data-t="sg.title">Sign-in sheet</span><i class="dot" id="drSignDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="jobs"><i class="ic" data-ic="list"></i><span data-t="m.jobs">Daily jobs</span><i class="dot" id="drJobsDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="board" id="drBoard" hidden><i class="ic" data-ic="chart"></i><span data-t="m.board">Leaderboards</span><i class="ic go" data-ic="chev"></i></button>
         </div></section>
@@ -3685,6 +3706,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M10 2.5h4M18.5 6.5l1.5-1.5"/>',
     bag: '<path d="M5 8h14l-1 12.5H6z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
     palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.4-1.3-1.6-1.3-2.9 0-1 .8-1.6 1.8-1.6h2.2a3.9 3.9 0 0 0 4-4c0-3.9-3.8-6.8-8.5-6.8z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/>',
+    cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 15l2 2 4-4"/>',
     gift: '<rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8.5h14V12M12 8v12.5M12 8c-1-3-5.5-4-5.5-1.5S10 8 12 8zM12 8c1-3 5.5-4 5.5-1.5S14 8 12 8z"/>',
     slot: '<rect x="3.5" y="5" width="14" height="14" rx="2.5"/><path d="M8 9v6M13 9v6M17.5 9H20V6"/><circle cx="20" cy="5" r="1"/>',
     list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/>',
@@ -4057,6 +4079,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     return jobs;
   }
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
+  // the sign-in sheet: days signed in this calendar month, and coins for 7, 14, 21 days and for every day of it
+  var SIGN_GOALS = [{ n: 7, coins: 150 }, { n: 14, coins: 250 }, { n: 21, coins: 350 }, { n: 0, coins: 600 }];     // n 0: the whole month
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
 
   // ---------- level and titles ----------
@@ -4096,6 +4120,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
+      sign: { m: 0, days: [], paid: [] },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
       // the brick games: best score or time per difficulty, stars per level
       mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
@@ -4172,6 +4197,19 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     // the first wave of the day, picked by the date so everyone gets the same set
     d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0;
   };
+  // a day number as its calendar month: { m: 202611, d: 21, len: 30, first: weekday of the 1st (0 = Sunday) }
+  function monthOf(day) {
+    var dt = new Date(day * DAY), y = dt.getUTCFullYear(), mo = dt.getUTCMonth();
+    return { m: y * 100 + mo + 1, d: dt.getUTCDate(), len: new Date(Date.UTC(y, mo + 1, 0)).getUTCDate(), first: new Date(Date.UTC(y, mo, 1)).getUTCDay(), y: y, mo: mo + 1 };
+  }
+  Meta.monthOf = monthOf;
+  Meta.SIGN_GOALS = SIGN_GOALS;
+  // this month's sheet, started over when the month turns
+  Meta.signMonth = function () {
+    var s = Meta.data.sign, m = monthOf(Meta.dayNo()).m;
+    if (!s || s.m !== m) { s = Meta.data.sign = { m: m, days: [], paid: [] }; }
+    return s;
+  };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
     var d = Meta.data.daily, day = Meta.dayNo();
@@ -4180,6 +4218,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     d.login = day;
     var coins = LOGIN[(d.streak - 1) % LOGIN.length];
     if (Meta.isSub()) coins *= 2;
+    // on the month's sheet: today's day gets its tick, and a goal reached pays at once
+    var s = Meta.signMonth(), dm = monthOf(day);
+    if (dm.d && s.days.indexOf(dm.d) < 0) s.days.push(dm.d);
+    SIGN_GOALS.forEach(function (g, i) {
+      var need = g.n || dm.len;
+      if (s.days.length >= need && s.paid.indexOf(i) < 0) { s.paid.push(i); coins += g.coins; }
+    });
     Meta.earn(coins);
     emit('login', []);
     return coins;
@@ -8028,7 +8073,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');
     txt('mOpen', d.first.openers.length ? d.first.openers.length + '/' + o.length : '');
-    $('mJobsDot').hidden = !(Meta.loginDue() || Meta.jobsReady() > 0);
+    $('mJobsDot').hidden = !(Meta.jobsReady() > 0);
+    if ($('mSignDot')) $('mSignDot').hidden = !Meta.loginDue();
     if ($('mBoxDot')) $('mBoxDot').hidden = !(Meta.drawsLeft && Meta.drawsLeft() > 0);
   }
 
@@ -9770,6 +9816,19 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'mb.none': ['還沒選', 'None yet', '未選択', '선택 안 함'],
     'mb.set': ['已選好', 'Set', '設定済み', '설정됨'],
     // jobs
+    'sg.title': ['簽到表', 'Sign-in sheet', 'ログインカレンダー', '출석부'],
+    'sg.month': ['{0} 年 {1} 月', '{1}/{0}', '{0}年{1}月', '{0}년 {1}월'],
+    'sg.wd': ['日,一,二,三,四,五,六', 'S,M,T,W,T,F,S', '日,月,火,水,木,金,土', '일,월,화,수,목,금,토'],
+    'sg.sign': ['簽到', 'Sign in', 'ログイン', '출석'],
+    'sg.done': ['今天已簽到', 'Signed in today', '本日ログイン済み', '오늘 출석 완료'],
+    'sg.count': ['這個月簽了 {0} / {1} 天', '{0} of {1} days this month', '今月 {0} / {1} 日', '이번 달 {0} / {1}일'],
+    'sg.streak': ['連續 {0} 天', '{0} days in a row', '{0}日連続', '{0}일 연속'],
+    'sg.today': ['今天簽到拿 {0}', 'Today: {0}', '今日の報酬 {0}', '오늘 보상 {0}'],
+    'sg.goals': ['累積獎勵', 'Monthly goals', '累計ボーナス', '누적 보상'],
+    'sg.goalN': ['{0} 天', '{0} days', '{0}日', '{0}일'],
+    'sg.full': ['全勤', 'Every day', '皆勤', '개근'],
+    'sg.got': ['簽到成功，拿到 {0} 金幣', 'Signed in: {0} coins', 'ログイン完了、{0} コイン', '출석 완료, {0}코인'],
+    'sg.p': ['每天打開遊戲按一下就能簽到，連續越多天拿越多（第 7 天最多，之後重新算）。這個月累積 7、14、21 天和全勤各有一份獎勵，每個月 1 日重新開始。會員每天的簽到金幣加倍。', 'Sign in once a day: the longer the run, the bigger the coins (most on day 7, then it starts over). Reaching 7, 14 and 21 days this month, and every day of it, pays extra; the sheet starts over on the 1st. Members get double the daily coins.', '1日1回ログインするだけ。連続日数が長いほどコインが増えます（7日目が最大、その後は最初から）。今月7・14・21日と皆勤でボーナス、毎月1日にリセット。会員は毎日のコインが2倍。', '하루 한 번 출석하면 돼요. 연속일수가 길수록 코인이 늘어요(7일째가 최대, 그다음엔 처음부터). 이번 달 7·14·21일과 개근에 보너스가 있고, 매달 1일에 새로 시작해요. 회원은 매일 코인 두 배.'],
     'jb.login': ['每日簽到', 'Daily check-in', 'デイリーボーナス', '출석 보상'],
     'jb.day': ['連續第 {0} 天', 'Day {0} in a row', '{0}日連続', '{0}일 연속'],
     'jb.claim': ['領取', 'Claim', '受け取る', '받기'],
@@ -10290,12 +10349,42 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     return false;
   });
 
+  // ---------- the sign-in sheet ----------
+  App.sheets.sign = function () {
+    var D = Meta.data.daily, due = Meta.loginDue(), today = Meta.dayNo(), mo = Meta.monthOf(today), s = Meta.signMonth();
+    var run = due ? (D.login === today - 1 ? D.streak + 1 : 1) : D.streak, pay = Meta.LOGIN[(Math.max(1, run) - 1) % Meta.LOGIN.length] * (Meta.isSub() ? 2 : 1);
+    var h = '<div class="shop-top"><h2>' + t('sg.title') + '</h2>' + coin(Meta.data.coins) + '</div>';
+    h += '<div class="sg-head"><b>' + esc(t('sg.month', mo.y, mo.mo)) + '</b><span>' + esc(t('sg.count', s.days.length, mo.len)) + (run ? ' · ' + esc(t('sg.streak', run - (due ? 1 : 0) || 0)) : '') + '</span></div>';
+    // the month as a calendar: ticks on the days signed, today ringed
+    h += '<div class="sg-cal" role="grid" aria-label="' + esc(t('sg.month', mo.y, mo.mo)) + '">';
+    t('sg.wd').split(',').forEach(function (w) { h += '<span class="sg-wd" role="columnheader">' + esc(w) + '</span>'; });
+    for (var i = 0; i < mo.first; i++) h += '<span class="sg-d none"></span>';
+    for (var d = 1; d <= mo.len; d++) {
+      var on = s.days.indexOf(d) >= 0, now = d === mo.d, past = d < mo.d;
+      h += '<span role="gridcell" class="sg-d' + (on ? ' on' : past ? ' miss' : '') + (now ? ' now' : '') + '"' + (on ? ' aria-label="' + d + ' ✓"' : '') + '><b>' + d + '</b>' + (on ? '<i aria-hidden="true">✓</i>' : '') + '</span>';
+    }
+    h += '</div>';
+    h += '<div class="row">' + (due ? '<button class="btn main" type="button" data-do="signIn">' + t('sg.sign') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('sg.done') + '</span>') + '</div>';
+    // the month's goals
+    h += '<h3>' + t('sg.goals') + '</h3><div class="sg-goals">';
+    Meta.SIGN_GOALS.forEach(function (g, gi) {
+      var need = g.n || mo.len, got = s.paid.indexOf(gi) >= 0, pct = Math.min(100, Math.round(s.days.length / need * 100));
+      h += '<div class="sg-goal' + (got ? ' got' : '') + '"><b>' + esc(g.n ? t('sg.goalN', g.n) : t('sg.full')) + '</b><div class="bar"><i style="width:' + pct + '%"></i></div>' + (got ? '<span class="tag on">' + t('jb.claimed') + '</span>' : coin(g.coins)) + '</div>';
+    });
+    return h + '</div><p class="note">' + t('sg.p') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.acts.signIn = function () {
+    var n = Meta.claimLogin();
+    if (n) { App.sfx.play('itemGet'); App.toast(t('sg.got', n)); App.updateMenu(); }
+    App.openSheet('sign');
+  };
+
   // ---------- daily jobs ----------
   App.sheets.jobs = function () {
     var d = Meta.data.daily, due = Meta.loginDue(), jobs = Meta.jobs(), day = due ? (d.login === Meta.dayNo() - 1 ? d.streak + 1 : 1) : d.streak, i;
     var pay = Meta.LOGIN[(day - 1) % Meta.LOGIN.length] * (Meta.isSub() ? 2 : 1);
     var h = '<div class="shop-top"><h2>' + t('m.jobs') + '</h2>' + coin(Meta.data.coins) + '</div><div class="rep"><div class="rep-t"><b>' + t('jb.login') + '</b><span>' + t('jb.day', day) + '</span></div>' +
-      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '</div><h3>' + t('jb.gen') + ' · ' + esc(t('jb.wave', Meta.waveInfo().wave, Meta.WAVE.max)) + '</h3><div class="levels">';
+      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '<button class="btn sm" type="button" data-sheet="sign">' + t('sg.title') + '</button></div><h3>' + t('jb.gen') + ' · ' + esc(t('jb.wave', Meta.waveInfo().wave, Meta.WAVE.max)) + '</h3><div class="levels">';
     function jobRow(j) {
       var pct = Math.round(j.n / j.need * 100);
       return '<div class="rep"><div class="rep-t"><b>' + esc(t('j.' + j.id)) + '</b><div class="bar"><i style="width:' + pct + '%"></i></div><span>' + j.n + ' / ' + j.need + '</span></div>' +
@@ -12427,7 +12516,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     $('drAv').textContent = Array.from(name)[0] || '磚';
     var C = ZZ.Cloud, st = C && C.status ? C.status() : 'none';
     App.txt('drAcct', t(st === 'ok' || st === 'busy' || st === 'wait' ? 'dr.cloud' : 'dr.guest'));
-    $('drJobsDot').hidden = !(Meta.loginDue() || Meta.jobsReady() > 0);
+    $('drJobsDot').hidden = !(Meta.jobsReady() > 0);
+    if ($('drSignDot')) $('drSignDot').hidden = !Meta.loginDue();
     $('drBoxDot').hidden = !(Meta.drawsLeft && Meta.drawsLeft() > 0);
     $('drBoard').hidden = $('mBoard') ? $('mBoard').hidden : true;
   }

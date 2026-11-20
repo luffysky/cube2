@@ -32,7 +32,8 @@
     $('drAv').textContent = Array.from(name)[0] || '磚';
     var C = ZZ.Cloud, st = C && C.status ? C.status() : 'none';
     App.txt('drAcct', t(st === 'ok' || st === 'busy' || st === 'wait' ? 'dr.cloud' : 'dr.guest'));
-    $('drJobsDot').hidden = !(Meta.loginDue() || Meta.jobsReady() > 0);
+    $('drJobsDot').hidden = !(Meta.jobsReady() > 0);
+    if ($('drSignDot')) $('drSignDot').hidden = !Meta.loginDue();
     $('drBoxDot').hidden = !(Meta.drawsLeft && Meta.drawsLeft() > 0);
     $('drBoard').hidden = $('mBoard') ? $('mBoard').hidden : true;
   }

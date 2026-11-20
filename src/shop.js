@@ -61,6 +61,19 @@
     'mb.none': ['還沒選', 'None yet', '未選択', '선택 안 함'],
     'mb.set': ['已選好', 'Set', '設定済み', '설정됨'],
     // jobs
+    'sg.title': ['簽到表', 'Sign-in sheet', 'ログインカレンダー', '출석부'],
+    'sg.month': ['{0} 年 {1} 月', '{1}/{0}', '{0}年{1}月', '{0}년 {1}월'],
+    'sg.wd': ['日,一,二,三,四,五,六', 'S,M,T,W,T,F,S', '日,月,火,水,木,金,土', '일,월,화,수,목,금,토'],
+    'sg.sign': ['簽到', 'Sign in', 'ログイン', '출석'],
+    'sg.done': ['今天已簽到', 'Signed in today', '本日ログイン済み', '오늘 출석 완료'],
+    'sg.count': ['這個月簽了 {0} / {1} 天', '{0} of {1} days this month', '今月 {0} / {1} 日', '이번 달 {0} / {1}일'],
+    'sg.streak': ['連續 {0} 天', '{0} days in a row', '{0}日連続', '{0}일 연속'],
+    'sg.today': ['今天簽到拿 {0}', 'Today: {0}', '今日の報酬 {0}', '오늘 보상 {0}'],
+    'sg.goals': ['累積獎勵', 'Monthly goals', '累計ボーナス', '누적 보상'],
+    'sg.goalN': ['{0} 天', '{0} days', '{0}日', '{0}일'],
+    'sg.full': ['全勤', 'Every day', '皆勤', '개근'],
+    'sg.got': ['簽到成功，拿到 {0} 金幣', 'Signed in: {0} coins', 'ログイン完了、{0} コイン', '출석 완료, {0}코인'],
+    'sg.p': ['每天打開遊戲按一下就能簽到，連續越多天拿越多（第 7 天最多，之後重新算）。這個月累積 7、14、21 天和全勤各有一份獎勵，每個月 1 日重新開始。會員每天的簽到金幣加倍。', 'Sign in once a day: the longer the run, the bigger the coins (most on day 7, then it starts over). Reaching 7, 14 and 21 days this month, and every day of it, pays extra; the sheet starts over on the 1st. Members get double the daily coins.', '1日1回ログインするだけ。連続日数が長いほどコインが増えます（7日目が最大、その後は最初から）。今月7・14・21日と皆勤でボーナス、毎月1日にリセット。会員は毎日のコインが2倍。', '하루 한 번 출석하면 돼요. 연속일수가 길수록 코인이 늘어요(7일째가 최대, 그다음엔 처음부터). 이번 달 7·14·21일과 개근에 보너스가 있고, 매달 1일에 새로 시작해요. 회원은 매일 코인 두 배.'],
     'jb.login': ['每日簽到', 'Daily check-in', 'デイリーボーナス', '출석 보상'],
     'jb.day': ['連續第 {0} 天', 'Day {0} in a row', '{0}日連続', '{0}일 연속'],
     'jb.claim': ['領取', 'Claim', '受け取る', '받기'],
@@ -581,12 +594,42 @@
     return false;
   });
 
+  // ---------- the sign-in sheet ----------
+  App.sheets.sign = function () {
+    var D = Meta.data.daily, due = Meta.loginDue(), today = Meta.dayNo(), mo = Meta.monthOf(today), s = Meta.signMonth();
+    var run = due ? (D.login === today - 1 ? D.streak + 1 : 1) : D.streak, pay = Meta.LOGIN[(Math.max(1, run) - 1) % Meta.LOGIN.length] * (Meta.isSub() ? 2 : 1);
+    var h = '<div class="shop-top"><h2>' + t('sg.title') + '</h2>' + coin(Meta.data.coins) + '</div>';
+    h += '<div class="sg-head"><b>' + esc(t('sg.month', mo.y, mo.mo)) + '</b><span>' + esc(t('sg.count', s.days.length, mo.len)) + (run ? ' · ' + esc(t('sg.streak', run - (due ? 1 : 0) || 0)) : '') + '</span></div>';
+    // the month as a calendar: ticks on the days signed, today ringed
+    h += '<div class="sg-cal" role="grid" aria-label="' + esc(t('sg.month', mo.y, mo.mo)) + '">';
+    t('sg.wd').split(',').forEach(function (w) { h += '<span class="sg-wd" role="columnheader">' + esc(w) + '</span>'; });
+    for (var i = 0; i < mo.first; i++) h += '<span class="sg-d none"></span>';
+    for (var d = 1; d <= mo.len; d++) {
+      var on = s.days.indexOf(d) >= 0, now = d === mo.d, past = d < mo.d;
+      h += '<span role="gridcell" class="sg-d' + (on ? ' on' : past ? ' miss' : '') + (now ? ' now' : '') + '"' + (on ? ' aria-label="' + d + ' ✓"' : '') + '><b>' + d + '</b>' + (on ? '<i aria-hidden="true">✓</i>' : '') + '</span>';
+    }
+    h += '</div>';
+    h += '<div class="row">' + (due ? '<button class="btn main" type="button" data-do="signIn">' + t('sg.sign') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('sg.done') + '</span>') + '</div>';
+    // the month's goals
+    h += '<h3>' + t('sg.goals') + '</h3><div class="sg-goals">';
+    Meta.SIGN_GOALS.forEach(function (g, gi) {
+      var need = g.n || mo.len, got = s.paid.indexOf(gi) >= 0, pct = Math.min(100, Math.round(s.days.length / need * 100));
+      h += '<div class="sg-goal' + (got ? ' got' : '') + '"><b>' + esc(g.n ? t('sg.goalN', g.n) : t('sg.full')) + '</b><div class="bar"><i style="width:' + pct + '%"></i></div>' + (got ? '<span class="tag on">' + t('jb.claimed') + '</span>' : coin(g.coins)) + '</div>';
+    });
+    return h + '</div><p class="note">' + t('sg.p') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.acts.signIn = function () {
+    var n = Meta.claimLogin();
+    if (n) { App.sfx.play('itemGet'); App.toast(t('sg.got', n)); App.updateMenu(); }
+    App.openSheet('sign');
+  };
+
   // ---------- daily jobs ----------
   App.sheets.jobs = function () {
     var d = Meta.data.daily, due = Meta.loginDue(), jobs = Meta.jobs(), day = due ? (d.login === Meta.dayNo() - 1 ? d.streak + 1 : 1) : d.streak, i;
     var pay = Meta.LOGIN[(day - 1) % Meta.LOGIN.length] * (Meta.isSub() ? 2 : 1);
     var h = '<div class="shop-top"><h2>' + t('m.jobs') + '</h2>' + coin(Meta.data.coins) + '</div><div class="rep"><div class="rep-t"><b>' + t('jb.login') + '</b><span>' + t('jb.day', day) + '</span></div>' +
-      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '</div><h3>' + t('jb.gen') + ' · ' + esc(t('jb.wave', Meta.waveInfo().wave, Meta.WAVE.max)) + '</h3><div class="levels">';
+      (due ? '<button class="btn sm buy main" type="button" data-do="login">' + t('jb.claim') + ' ' + coin(pay) + '</button>' : '<span class="tag on">' + t('jb.claimed') + '</span>') + '<button class="btn sm" type="button" data-sheet="sign">' + t('sg.title') + '</button></div><h3>' + t('jb.gen') + ' · ' + esc(t('jb.wave', Meta.waveInfo().wave, Meta.WAVE.max)) + '</h3><div class="levels">';
     function jobRow(j) {
       var pct = Math.round(j.n / j.need * 100);
       return '<div class="rep"><div class="rep-t"><b>' + esc(t('j.' + j.id)) + '</b><div class="bar"><i style="width:' + pct + '%"></i></div><span>' + j.n + ' / ' + j.need + '</span></div>' +

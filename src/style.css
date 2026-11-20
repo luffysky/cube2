@@ -895,3 +895,22 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .mu-check { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .mu-check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-check input { width: 20px; height: 20px; accent-color: var(--gold, #F5B82E); }
+
+/* 簽到表：一個月的日曆，簽過的打勾，今天圈起來 */
+.sg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sg-head b { font-size: 18px; }
+.sg-head span { color: var(--muted); font-size: 13px; }
+.sg-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 8px 0 12px; }
+.sg-wd { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding-bottom: 2px; }
+.sg-d { position: relative; aspect-ratio: 1; max-height: 52px; display: grid; place-items: center; border-radius: 9px; background: var(--floor); border: 1px solid var(--edge); font-variant-numeric: tabular-nums; }
+.sg-d b { font-size: 13px; font-weight: 700; }
+.sg-d.none { background: none; border: 0; }
+.sg-d.miss { opacity: .45; }
+.sg-d.on { background: color-mix(in srgb, var(--gold) 26%, var(--floor)); border-color: var(--gold); }
+.sg-d.on b { position: absolute; top: 3px; left: 5px; font-size: 10px; }
+.sg-d.on i { font-style: normal; font-size: 18px; font-weight: 900; color: var(--gold-ink); }
+.sg-d.now { outline: 2.5px solid var(--ink); outline-offset: 1px; }
+.sg-goals { display: grid; gap: 6px; }
+.sg-goal { display: grid; grid-template-columns: 5em 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--edge); background: var(--floor); }
+.sg-goal.got { border-color: var(--gold); }
+.sg-goal .bar { grid-column: auto; }

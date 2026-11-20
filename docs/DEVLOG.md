@@ -411,3 +411,18 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `rwd` 258（新增 667×375 橫放、按鍵不蓋到牆）、`onehand` 15、`music` 10、`flow` 60、`drawer` 28。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`2a0fcb6`](https://github.com/luffysky/cube2/commit/2a0fcb6)。
+
+## 2026-11-21 00:35（Asia/Taipei）｜簽到表
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（做簽到表）
+- 實際變更：
+  - 新的「簽到表」畫面（主選單連結、側邊選單「金幣」組、每日任務的簽到列都能開）：整個月的日曆，簽過的打勾、今天圈起來、錯過的變淡；顯示這個月幾天、連續幾天；按「簽到」領當天金幣。
+  - 月累積獎勵：這個月簽滿 7 天 150、14 天 250、21 天 350、全勤 600 金幣，達成那次簽到直接一起發；每月 1 日重新開始。原本的連續簽到金幣（20→120，會員加倍）不變。
+  - 記帳走原本的 `login` 操作，伺服器用同一份 `meta.js` 重做，所以金幣由伺服器算；存檔多了 `sign: { m, days, paid }`。建立雲端存檔時只帶這個月、不晚於今天的日子，帶進來已經達成的目標視為已領，不會重複發。
+  - 簽到的紅點從「每日任務」移到「簽到表」。
+- 檔案：`src/meta.js`、`server/rules.js`、`src/shop.js`、`src/ui.js`、`src/drawer.js`、`src/index.template.html`、`src/style.css`、`games/drawer-icons.js`、`test/meta.test.js`、`test/cloud.test.js`。
+- 資料庫：未改結構（存檔 JSON 多一個欄位）。｜刪除：無。
+- 測試：`node test/run.js` 全過（meta 173：連簽、7 天目標、整月四個目標、跨月重來、星期幾；cloud：匯入只帶本月、已達成視為已領）；瀏覽器 `drawer` 28、`flow` 60、`rwd` 258。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

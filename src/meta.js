@@ -339,6 +339,8 @@
     return jobs;
   }
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
+  // the sign-in sheet: days signed in this calendar month, and coins for 7, 14, 21 days and for every day of it
+  var SIGN_GOALS = [{ n: 7, coins: 150 }, { n: 14, coins: 250 }, { n: 21, coins: 350 }, { n: 0, coins: 600 }];     // n 0: the whole month
   function job(id) { for (var i = 0; i < JOBS.length; i++) if (JOBS[i].id === id) return JOBS[i]; return null; }
 
   // ---------- level and titles ----------
@@ -378,6 +380,7 @@
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
+      sign: { m: 0, days: [], paid: [] },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
       // the brick games: best score or time per difficulty, stars per level
       mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
@@ -454,6 +457,19 @@
     // the first wave of the day, picked by the date so everyone gets the same set
     d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0;
   };
+  // a day number as its calendar month: { m: 202611, d: 21, len: 30, first: weekday of the 1st (0 = Sunday) }
+  function monthOf(day) {
+    var dt = new Date(day * DAY), y = dt.getUTCFullYear(), mo = dt.getUTCMonth();
+    return { m: y * 100 + mo + 1, d: dt.getUTCDate(), len: new Date(Date.UTC(y, mo + 1, 0)).getUTCDate(), first: new Date(Date.UTC(y, mo, 1)).getUTCDay(), y: y, mo: mo + 1 };
+  }
+  Meta.monthOf = monthOf;
+  Meta.SIGN_GOALS = SIGN_GOALS;
+  // this month's sheet, started over when the month turns
+  Meta.signMonth = function () {
+    var s = Meta.data.sign, m = monthOf(Meta.dayNo()).m;
+    if (!s || s.m !== m) { s = Meta.data.sign = { m: m, days: [], paid: [] }; }
+    return s;
+  };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
     var d = Meta.data.daily, day = Meta.dayNo();
@@ -462,6 +478,13 @@
     d.login = day;
     var coins = LOGIN[(d.streak - 1) % LOGIN.length];
     if (Meta.isSub()) coins *= 2;
+    // on the month's sheet: today's day gets its tick, and a goal reached pays at once
+    var s = Meta.signMonth(), dm = monthOf(day);
+    if (dm.d && s.days.indexOf(dm.d) < 0) s.days.push(dm.d);
+    SIGN_GOALS.forEach(function (g, i) {
+      var need = g.n || dm.len;
+      if (s.days.length >= need && s.paid.indexOf(i) < 0) { s.paid.push(i); coins += g.coins; }
+    });
     Meta.earn(coins);
     emit('login', []);
     return coins;

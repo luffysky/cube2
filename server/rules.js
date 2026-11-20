@@ -233,6 +233,13 @@ function importState(raw, now) {
     });
   }
   d.daily.login = sd.login === today || sd.login === today - 1 ? sd.login : 0;
+  // this month's sign-in sheet comes along (days already ticked, goals already paid), nothing from other months
+  const ss = obj(src.sign), mm = Meta.monthOf(today);
+  if (ss.m === mm.m) {
+    d.sign = { m: mm.m, days: list(ss.days).filter((x, i, a) => x === Math.floor(x) && x >= 1 && x <= mm.d && a.indexOf(x) === i), paid: [] };
+    // a goal the brought-in days already reach counts as paid: ticks made on the device never pay twice
+    Meta.SIGN_GOALS.forEach((g, i) => { if (d.sign.days.length >= (g.n || mm.len)) d.sign.paid.push(i); });
+  }
   d.daily.streak = d.daily.login ? int(sd.streak, 0, 3650) : 0;
   d.daily.win = sd.win === today ? today : 0;
   // boxes already opened today come along, or deleting and remaking a cloud save would hand out a fresh day of boxes

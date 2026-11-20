@@ -1372,7 +1372,8 @@
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');
     txt('mOpen', d.first.openers.length ? d.first.openers.length + '/' + o.length : '');
-    $('mJobsDot').hidden = !(Meta.loginDue() || Meta.jobsReady() > 0);
+    $('mJobsDot').hidden = !(Meta.jobsReady() > 0);
+    if ($('mSignDot')) $('mSignDot').hidden = !Meta.loginDue();
     if ($('mBoxDot')) $('mBoxDot').hidden = !(Meta.drawsLeft && Meta.drawsLeft() > 0);
   }
 

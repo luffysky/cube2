@@ -277,5 +277,25 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   M.data.steam = false; M.data.owned.site.push('aurora', 'nope', 'mist'); M.save(); M.load();
   eq(M.data.owned.site, ['mist'], 'only bought coin themes stay owned');
 }
+// the sign-in sheet: ticks by calendar day, goals pay once, a new month starts over
+{
+  const save = clock;
+  clock = new Date(2026, 11, 1, 12).getTime();
+  M.data.daily.login = 0; M.data.daily.streak = 0;
+  let got = 0;
+  for (let d = 1; d <= 6; d++) { got += M.claimLogin(); clock += 86400000; }
+  eq(M.signMonth().days, [1, 2, 3, 4, 5, 6], 'six days ticked');
+  const c7 = M.claimLogin();
+  ok(c7 === 120 + 150 && M.signMonth().paid.join() === '0', 'day 7: the daily coins and the 7-day goal');
+  for (let d = 8; d <= 31; d++) { clock += 86400000; M.claimLogin(); }
+  eq(M.signMonth().paid, [0, 1, 2, 3], 'all four goals by the end of a full month');
+  ok(M.monthOf(M.dayNo()).len === 31 && M.signMonth().days.length === 31, 'December has 31 days, all ticked');
+  clock += 86400000;
+  ok(M.signMonth().m === 202701 && M.signMonth().days.length === 0, 'January starts a clean sheet');
+  M.claimLogin();
+  eq(M.signMonth().days, [1], 'and ticks the 1st');
+  eq(M.monthOf(M.dayNo()).first, new Date(2027, 0, 1).getDay(), 'the calendar knows which weekday the 1st is');
+  clock = save;
+}
 console.log('meta tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
