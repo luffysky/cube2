@@ -863,7 +863,38 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     eq((await rpc({ a: 'fileUp', kind: 'pics', name: 'p', size: 1000, type: 'image/svg+xml' }, F)).json.why, 'type', 'and only plain pictures (no SVG) for pictures');
     eq((await rpc({ a: 'fileOk', id: fid }, G)).status, 404, 'nobody else can touch the file');
     ok((await rpc({ a: 'fileHide', id: fid }, F)).json.ok && (await rpc({ a: 'fileList', kind: 'music' }, F)).json.files.length === 0, 'taken off the list');
-    eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE id = $1', [fid]))[0].n, 1, 'but the record stays (nothing is deleted without the Owner)');
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE id = $1', [fid]))[0].n, 1, 'but the record stays for now');
+    // "recently removed": 30 days to change one's mind, then the daily job deletes it (C-034)
+    x = await rpc({ a: 'fileList', kind: 'music', trash: true }, F);
+    ok(x.json.files.length === 1 && x.json.files[0].id === fid && x.json.files[0].left === 30 && !x.json.files[0].url, 'listed under recently removed, 30 days left, no read address', x.json);
+    eq((await rpc({ a: 'fileBack', id: fid }, G)).status, 404, 'nobody else can bring it back');
+    ok((await rpc({ a: 'fileBack', id: fid }, F)).json.ok && (await rpc({ a: 'fileList', kind: 'music' }, F)).json.files.length === 1, 'brought back onto the list');
+    eq((await rpc({ a: 'fileList', kind: 'music', trash: true }, F)).json.files.length, 0, 'and gone from recently removed');
+    // pictures: a new wall picture sends the old one to recently removed
+    const pic = async () => { const u = await rpc({ a: 'fileUp', kind: 'pics', name: 'bg', size: 2000, type: 'image/jpeg' }, F); await rpc({ a: 'fileOk', id: u.json.id }, F); return u.json.id; };
+    const p1 = await pic(), p2 = await pic();
+    x = await rpc({ a: 'fileList', kind: 'pics' }, F);
+    ok(x.json.files.length === 1 && x.json.files[0].id === p2, 'only the newest wall picture is on the list', x.json);
+    eq((await rpc({ a: 'fileList', kind: 'pics', trash: true }, F)).json.files.map(f => f.id).join(), p1, 'the one it replaced waits in recently removed');
+    ok((await rpc({ a: 'fileBack', id: p1 }, F)).json.ok, 'bringing the old one back');
+    eq((await rpc({ a: 'fileList', kind: 'pics' }, F)).json.files.map(f => f.id).join(), p1, 'puts it in place of the newer one');
+    ok((await rpc({ a: 'fileHide', kind: 'pics', name: 'bg' }, F)).json.ok && (await rpc({ a: 'fileList', kind: 'pics' }, F)).json.files.length === 0, 'removing the wall picture takes it off by name');
+    // the daily job
+    await rpc({ a: 'fileHide', id: fid }, F);
+    const t0 = now, dropped = [];
+    let r = await files.purge(pg, t0 + 29 * 86400000, async k => { dropped.push(k); return true; });
+    ok(r.status === 200 && r.body.due === 0 && !dropped.length, 'nothing is deleted before 30 days', r.body);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE pid = $1', [F.id]))[0].n, 3, 'all three files still there');
+    r = await files.purge(pg, t0 + 31 * 86400000, async k => { dropped.push(k); return !/\/pics\//.test(k); });
+    ok(r.body.due === 3 && r.body.gone === 1 && r.body.kept === 2, 'after 30 days: the bucket says gone for one, not for two', r.body);
+    eq((await pg.query('SELECT id FROM zz.files WHERE pid = $1 ORDER BY id', [F.id])).map(f => f.id).sort().join(), [p1, p2].sort().join(), 'a row goes only once its object is out of the bucket');
+    ok(dropped.every(k => k.indexOf('u/' + F.id + '/') === 0), 'objects named by player, kind and file', dropped);
+    r = await files.purge(pg, t0 + 31 * 86400000, async () => true);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE pid = $1', [F.id]))[0].n, 0, 'the next run finishes the rest');
+    process.env.CRON_SECRET = 'cronsecret-test';
+    eq((await call('cron')).status, 401, 'the daily job needs Vercel\'s secret when one is set');
+    eq((await call('cron', { headers: { authorization: 'Bearer cronsecret-test' } })).status, 200, 'and runs with it');
+    delete process.env.CRON_SECRET;
     for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']) delete process.env[k];
   }
 

@@ -82,6 +82,19 @@ const routes = {
     }
     send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=60' });
   },
+  // the daily job (Vercel Cron, see vercel.json): files off the list for more than 30 days leave the bucket.
+  // With CRON_SECRET set, only Vercel's call (which carries it) is let in; it only ever deletes what is already due.
+  async cron(req, res) {
+    if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
+    const secret = process.env.CRON_SECRET;
+    if (secret) {
+      const got = Buffer.from(String(header(req, 'authorization') || '')), want = Buffer.from('Bearer ' + secret);
+      if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) return send(res, 401, { ok: false, why: 'auth' });
+    }
+    if (!db.configured()) return send(res, 503, { ok: false, why: 'db' });
+    const out = await db.run(d => files.purge(d, clock()));
+    send(res, out.status, out.body);
+  },
   // the rewarded-ad network's callback (GET, signed). Not for pages: nothing is paid without a valid signature.
   async ad(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
@@ -149,12 +162,13 @@ const routes = {
         out = await db.run(d => core.restore(d, cred, clock()));
         break;
       // a member's own files in the cloud (R2; off until its keys are set, see server/files.js)
-      case 'fileUp': case 'fileOk': case 'fileList': case 'fileHide': {
+      case 'fileUp': case 'fileOk': case 'fileList': case 'fileHide': case 'fileBack': {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(async d => {
           const row = await core.findPlayer(d, cred);
           if (!row || row.pending) return { status: 401, body: { ok: false, why: 'auth' } };
-          return body.a === 'fileUp' ? files.up(d, row, body, now) : body.a === 'fileOk' ? files.done(d, row, body) : body.a === 'fileList' ? files.list(d, row, body, now) : files.hide(d, row, body);
+          return body.a === 'fileUp' ? files.up(d, row, body, now) : body.a === 'fileOk' ? files.done(d, row, body, now) : body.a === 'fileList' ? files.list(d, row, body, now)
+            : body.a === 'fileBack' ? files.back(d, row, body, now) : files.hide(d, row, body, now);
         });
         break;
       }

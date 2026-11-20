@@ -54,6 +54,14 @@ function wav() {
     ok(await p.evaluate(() => document.querySelectorAll('[data-mudel]').length === 0), 'nothing on this "new device" yet');
     await p.click('[data-do="muPull"]');
     ok(await (async () => { for (let i = 0; i < 60; i++) { if (await p.evaluate(() => document.querySelectorAll('[data-mudel]').length === 1 && /雲端的歌/.test(document.getElementById('sheetCard').textContent))) return true; await sleep(150); } return false; })(), 'get from the cloud brings the song back');
+    // removing it: gone here, waiting 30 days in "recently removed", and it can be brought back
+    p.once('dialog', d => { ok(/30/.test(d.message()), 'the question says the cloud copy waits 30 days', d.message()); d.accept(); });
+    await p.click('[data-mudel]'); await sleep(800);
+    ok(await p.evaluate(() => document.querySelectorAll('[data-mudel]').length === 0), 'removed from this device');
+    await p.click('[data-dstrash="music"]');
+    ok(await (async () => { for (let i = 0; i < 40; i++) { if (await p.evaluate(() => { const r = document.querySelector('.ds-trash'); return r && /雲端的歌/.test(r.textContent) && /30/.test(r.textContent); })) return true; await sleep(150); } return false; })(), 'listed under recently removed with 30 days left');
+    await p.click('[data-dsback^="music:"]');
+    ok(await (async () => { for (let i = 0; i < 60; i++) { if (await p.evaluate(() => document.querySelectorAll('[data-mudel]').length === 1)) return true; await sleep(150); } return false; })(), 'brought back, and onto this device again');
     // a picture too
     await p.evaluate(() => { ZZ.App.closeSheet(); ZZ.App.openSheet('shop'); }); await sleep(200);
     await p.click('[data-tab="member"]'); await sleep(200);

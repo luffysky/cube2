@@ -481,6 +481,8 @@
     });
   };
   function dropPic(key) {
+    // the cloud copy (if any) goes to "recently removed": kept 30 days, then deleted
+    if (ZZ.Cloud && ZZ.Cloud.files && ZZ.Cloud.file && Meta.isSub()) ZZ.Cloud.file({ a: 'fileHide', kind: 'pics', name: key });
     Pics.del(key);
     Meta.data.custom[key] = false;
     if (Meta.data.equip[key] === 'custom') Meta.equip(key, key === 'tile' ? 'glaze' : 'wall');

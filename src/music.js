@@ -47,6 +47,7 @@
     'mu.big': ['「{0}」超過 15 MB', '"{0}" is over 15 MB', '「{0}」は 15 MB を超えています', '"{0}"이(가) 15MB를 넘어요'],
     'mu.full': ['已經滿了（最多 30 首、200 MB）', 'Full (30 tracks or 200 MB at most)', 'いっぱいです（30 曲・200 MB まで）', '가득 찼어요(최대 30곡, 200MB)'],
     'mu.del': ['刪除', 'Remove', '削除', '삭제'],
+    'mu.delAskCloud': ['刪除「{0}」？這台裝置上的會馬上刪掉；雲端那份會放在「最近移除」30 天，期間可以復原，之後才真的刪除。', 'Remove "{0}"? It goes from this device now; the cloud copy waits in "Recently removed" for 30 days, when you can still bring it back, and is deleted after that.', '「{0}」を削除しますか？この端末からはすぐ消えます。クラウドの分は「最近削除した項目」に30日間残り、その間は元に戻せます。その後削除されます。', '"{0}"을(를) 삭제할까요? 이 기기에서는 바로 지워져요. 클라우드 사본은 "최근 삭제"에 30일 동안 남아 되돌릴 수 있고, 그 뒤에 삭제돼요.'],
     'mu.delAsk': ['從這台裝置刪除「{0}」？', 'Remove "{0}" from this device?', '「{0}」をこの端末から削除しますか？', '"{0}"을(를) 이 기기에서 삭제할까요?'],
     'mu.member': ['加入自己的音樂是會員功能。', 'Adding your own music is for members.', '自分の音楽の追加はメンバー機能です。', '내 음악 추가는 멤버 기능이에요.'],
     'mu.lapsed': ['會員到期了，這些音樂留在裝置上，恢復會員就能再播。', 'Membership has ended: these stay on the device and play again once it is back.', 'メンバーの期限が切れました。音楽は端末に残り、再開すると再生できます。', '멤버십이 끝났어요. 음악은 기기에 남아 있고 다시 가입하면 재생돼요.'],
@@ -278,7 +279,10 @@
     }
     if (d.mudel) {
       var did = d.mudel, nm = nameOf(did);
-      if (!window.confirm(t('mu.delAsk', nm))) return true;
+      var gone = ownOf(did), cid = gone && gone.cid;
+      if (!window.confirm(t(cid ? 'mu.delAskCloud' : 'mu.delAsk', nm))) return true;
+      // its cloud copy goes to "recently removed": kept 30 days, then deleted
+      if (cid && ZZ.Cloud && ZZ.Cloud.file) ZZ.Cloud.file({ a: 'fileHide', id: cid });
       st.own = st.own.filter(function (o) { return 'own:' + o.id !== did; });
       st.list = st.list.filter(function (x) { return x !== did; });
       if (cur === did) cur = '';

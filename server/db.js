@@ -150,6 +150,8 @@ const SCHEMA = [
      hidden boolean NOT NULL
    )`,
   'CREATE INDEX IF NOT EXISTS files_pid ON zz.files (pid, kind)',
+  // when a file was taken off the list: 30 days later the daily job deletes it (C-034)
+  'ALTER TABLE zz.files ADD COLUMN IF NOT EXISTS hidden_at double precision',
   // ranked matches against people: the two reports (zz.matches ids) of one match, put together once by the server.
   // ok says whether they agreed (then both ratings moved); a pair that disagreed changes nothing.
   `CREATE TABLE IF NOT EXISTS zz.pvp (

@@ -716,3 +716,21 @@
 - 關聯 Owner 指令：「好了」（R2 bucket、金鑰、CORS、Vercel 環境變數）
 - 確認 Vercel Production 有 `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET` 四個變數（只看名稱，沒有解密值）；變數在上次部署之後才加，用這次 commit 觸發重新部署。
 - 檔案：`docs/DEVLOG.md`、`docs/TODO.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`6199b73`](https://github.com/luffysky/cube2/commit/6199b73)，Vercel `dpl_AhvGuHADugLAvmsCYHJxmaH4kitU` READY，`/api/health` 回 `files: true`。
+
+## 2026-11-21 04:55（Asia/Taipei）｜雲端檔案：藏 30 天可復原，沒後悔才真的刪
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「先不刪 就藏 藏30天如果他們沒後悔才真正刪」（C-034）
+- 之前的問題：伺服器有「藏起來」的功能，但頁面上沒有任何地方會用到，玩家刪掉本機的歌，雲端那份還一直佔著他的空間。
+- 現在：
+  - 刪掉有上傳過的歌，會先問一句，說明這台裝置上的馬上刪、雲端那份放「最近移除」30 天。移除牆面／方塊圖也一樣。換一張新圖時，舊的自動進「最近移除」。
+  - 「也上傳到雲端」底下多一個「最近移除」，列出 30 天內移除的檔案和剩幾天，可以按「復原」，復原後馬上取回這台裝置。圖片復原後會換掉現在用的那張，現在那張進「最近移除」。
+  - 每天台灣時間凌晨 3:07 跑一次排程 `/api/cron`，把移除滿 30 天的檔案從 R2 刪掉；R2 回覆刪掉了，才刪 `zz.files` 那一筆，沒刪成功的隔天再試。一次最多 200 個。以前就藏起來、沒有時間的，從今天開始算 30 天。
+  - 有設 `CRON_SECRET` 就只接受 Vercel 的呼叫（可選，沒設也只會刪已經到期的）。
+  - 隱私權政策四語加上「最近移除 30 天」，並修掉幾句「音樂、圖片絕不上傳」的舊說法（現在選了上傳就會上傳）。
+- 正式站實測：雲端瀏覽器沒辦法選檔案，所以沒有在正式站真的傳一次；也沒有用 Owner 自己的 Chrome，因為那裡有 Owner 真正的遊戲存檔，不想動到。CORS 和金鑰要等第一次真的上傳成功才算驗證過。
+- 檔案：`server/files.js`、`server/app.js`、`server/db.js`、`api/cron.js`（新）、`vercel.json`、`src/devstore.js`、`src/music.js`、`src/shop.js`、`legal/src/privacy.*.html`、`test/api.test.js`、`test/r2.js`、`docs/R2_SETUP.md`、`docs/OWNER_DECISIONS.md`、`docs/TODO.md`。
+- 資料庫：`zz.files` 加欄位 `hidden_at`（`ADD COLUMN IF NOT EXISTS`）。｜刪除：排程會刪隱藏滿 30 天的 R2 物件和對應的 `zz.files` 紀錄（Owner 核准 C-034）；這次部署本身沒有刪任何東西。
+- 測試：`node test/run.js` 全過（api 380：「最近移除」列出、剩 30 天、別人不能復原、復原回清單、新圖取代舊圖、按名稱移除、未滿 30 天不刪、R2 沒刪成功就不刪紀錄、隔天補刪、`CRON_SECRET`）；瀏覽器 `r2` 13（刪歌時的提示、最近移除、復原後回到這台裝置）、`music` 10、`cloudui` 41、`legal` 439。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

@@ -9,13 +9,13 @@
    The files themselves never pass through our server: it hands the page a signed address, good for a few minutes, to
    put one file straight into the bucket (or to read one back), under u/<player id>/<kind>/<file id>. Each file has a
    row in zz.files (whose it is, its name, kind and size), so the limits hold and a list can be given back on another
-   device. Taking a file off the list hides the row; the object stays in the bucket until removal is approved (the
-   Owner decides on deletions). */
+   device. Taking a file off the list hides it for 30 days (the player can bring it back in that time); after that a
+   daily job (api/cron) deletes the object from the bucket and its row. The Owner approved this rule (C-034). */
 const crypto = require('crypto');
 
 const KINDS = { pics: { max: 5 * 1024 * 1024, total: 20 * 1024 * 1024, count: 10, type: /^image\/(png|jpeg|webp|gif)$/ },
   music: { max: 15 * 1024 * 1024, total: 200 * 1024 * 1024, count: 30, type: /^audio\/[a-z0-9.+-]{1,30}$/ } };
-const PUT_SECS = 600, GET_SECS = 3600;
+const PUT_SECS = 600, GET_SECS = 3600, DAY = 86400000, KEEP_DAYS = 30, PURGE_MAX = 200;
 
 function conf() {
   const e = process.env;
@@ -59,27 +59,74 @@ async function up(db, row, body, now) {
   if (!K.type.test(type)) return no(415, 'type');
   const used = (await db.query('SELECT count(*)::int AS n, COALESCE(sum(size), 0)::bigint AS s FROM zz.files WHERE pid = $1 AND kind = $2 AND NOT hidden', [row.id, body.kind]))[0];
   if (used.n >= K.count || +used.s + size > K.total) return no(409, 'full');
-  const id = crypto.randomBytes(9).toString('base64url'), key = 'u/' + row.id + '/' + body.kind + '/' + id;
+  const id = crypto.randomBytes(9).toString('base64url'), key = keyOf(row.id, body.kind, id);
   await db.query('INSERT INTO zz.files (id, pid, kind, name, size, type, at, ready, hidden) VALUES ($1, $2, $3, $4, $5, $6, $7, false, false)', [id, row.id, body.kind, cleanName(body.name), size, type, now]);
   return ok({ id, url: presign('PUT', key, PUT_SECS, now, { 'content-type': type }), type, exp: now + PUT_SECS * 1000 });
 }
-// the upload went through: the file goes on the list
-async function done(db, row, body) {
-  const r = await db.query('UPDATE zz.files SET ready = true WHERE id = $1 AND pid = $2 AND NOT hidden RETURNING id', [String(body.id || ''), row.id]);
-  return r[0] ? ok({ id: r[0].id }) : no(404, 'file');
+// the upload went through: the file goes on the list. A picture replaces the earlier one of the same name (the wall,
+// the tile), which goes to the 30 days of "recently removed".
+async function done(db, row, body, now) {
+  const r = await db.query('UPDATE zz.files SET ready = true WHERE id = $1 AND pid = $2 AND NOT hidden RETURNING id, kind, name', [String(body.id || ''), row.id]);
+  if (!r[0]) return no(404, 'file');
+  if (r[0].kind === 'pics') await db.query('UPDATE zz.files SET hidden = true, hidden_at = $4 WHERE pid = $1 AND kind = $2 AND name = $3 AND id <> $5 AND ready AND NOT hidden', [row.id, 'pics', r[0].name, now, r[0].id]);
+  return ok({ id: r[0].id });
 }
-// what this player has uploaded, with an address to read each one for the next hour
+// what this player has uploaded, with an address to read each one for the next hour.
+// trash: true lists instead what was taken off in the last 30 days, with the days left to bring it back.
 async function list(db, row, body, now) {
   if (!configured()) return no(503, 'off');
   const kind = KINDS[body.kind] ? body.kind : null;
   if (!kind) return no(400, 'kind');
+  if (body.trash === true) {
+    const gone = await db.query('SELECT id, name, size, type, at, hidden_at FROM zz.files WHERE pid = $1 AND kind = $2 AND ready AND hidden AND COALESCE(hidden_at, $3) > $4 ORDER BY hidden_at DESC NULLS FIRST', [row.id, kind, now, now - KEEP_DAYS * DAY]);
+    return ok({ files: gone.map(f => ({ id: f.id, name: f.name, size: +f.size, type: f.type, at: f.at, left: Math.max(1, Math.ceil(((f.hidden_at == null ? now : +f.hidden_at) + KEEP_DAYS * DAY - now) / DAY)) })) });
+  }
   const rows = await db.query('SELECT id, name, size, type, at FROM zz.files WHERE pid = $1 AND kind = $2 AND ready AND NOT hidden ORDER BY at', [row.id, kind]);
   return ok({ files: rows.map(f => ({ id: f.id, name: f.name, size: +f.size, type: f.type, at: f.at, url: presign('GET', 'u/' + row.id + '/' + kind + '/' + f.id, GET_SECS, now) })) });
 }
-// off the list (the object itself stays until deletions are approved)
-async function hide(db, row, body) {
-  const r = await db.query('UPDATE zz.files SET hidden = true WHERE id = $1 AND pid = $2 RETURNING id', [String(body.id || ''), row.id]);
-  return r[0] ? ok({ id: r[0].id }) : no(404, 'file');
+// off the list: one file by id, or (kind + name) every picture of that name. Kept 30 days before it is deleted.
+async function hide(db, row, body, now) {
+  const r = body.id
+    ? await db.query('UPDATE zz.files SET hidden = true, hidden_at = $3 WHERE id = $1 AND pid = $2 AND NOT hidden RETURNING id', [String(body.id), row.id, now])
+    : KINDS[body.kind] && body.name ? await db.query('UPDATE zz.files SET hidden = true, hidden_at = $4 WHERE pid = $1 AND kind = $2 AND name = $3 AND NOT hidden RETURNING id', [row.id, body.kind, cleanName(body.name), now]) : [];
+  return r[0] ? ok({ id: r[0].id, n: r.length }) : no(404, 'file');
+}
+// changed their mind within the 30 days: back on the list, if it still fits. A picture brought back takes the place
+// of the one in use now (which goes to "recently removed" in its turn).
+async function back(db, row, body, now) {
+  if (!configured()) return no(503, 'off');
+  const f = (await db.query('SELECT id, kind, name, size FROM zz.files WHERE id = $1 AND pid = $2 AND ready AND hidden AND COALESCE(hidden_at, $3) > $4', [String(body.id || ''), row.id, now, now - KEEP_DAYS * DAY]))[0];
+  if (!f) return no(404, 'file');
+  if (!isMember(row.state, now)) return no(403, 'member');
+  if (f.kind === 'pics') await db.query('UPDATE zz.files SET hidden = true, hidden_at = $4 WHERE pid = $1 AND kind = $2 AND name = $3 AND ready AND NOT hidden', [row.id, 'pics', f.name, now]);
+  const K = KINDS[f.kind], used = (await db.query('SELECT count(*)::int AS n, COALESCE(sum(size), 0)::bigint AS s FROM zz.files WHERE pid = $1 AND kind = $2 AND NOT hidden', [row.id, f.kind]))[0];
+  if (used.n >= K.count || +used.s + +f.size > K.total) return no(409, 'full');
+  await db.query('UPDATE zz.files SET hidden = false, hidden_at = NULL WHERE id = $1', [f.id]);
+  return ok({ id: f.id, kind: f.kind });
 }
 
-module.exports = { configured, presign, up, done, list, hide, KINDS };
+const keyOf = (pid, kind, id) => 'u/' + pid + '/' + kind + '/' + id;
+// one object out of the bucket; true once it is gone (already gone counts)
+async function dropObject(key, now) {
+  const url = presign('DELETE', key, 300, now);
+  if (!url) return false;
+  const r = await fetch(url, { method: 'DELETE', signal: AbortSignal.timeout(8000) });
+  return r.status === 204 || r.status === 200 || r.status === 404;
+}
+// the daily job: what has been off the list for more than 30 days is deleted, object first, then its row.
+// Rows hidden before hidden_at existed start their 30 days now. drop is replaceable for the tests.
+async function purge(db, now, drop) {
+  if (!configured()) return { status: 503, body: { ok: false, why: 'off' } };
+  drop = drop || dropObject;
+  await db.query('UPDATE zz.files SET hidden_at = $1 WHERE hidden AND hidden_at IS NULL', [now]);
+  const due = await db.query('SELECT id, pid, kind FROM zz.files WHERE hidden AND hidden_at <= $1 ORDER BY hidden_at LIMIT $2', [now - KEEP_DAYS * DAY, PURGE_MAX]);
+  let gone = 0, kept = 0;
+  for (const f of due) {
+    let yes = false;
+    try { yes = await drop(keyOf(f.pid, f.kind, f.id), now); } catch (e) { yes = false; }
+    if (yes) { await db.query('DELETE FROM zz.files WHERE id = $1 AND hidden', [f.id]); gone++; } else kept++;
+  }
+  return { status: 200, body: { ok: true, due: due.length, gone, kept } };
+}
+
+module.exports = { configured, presign, up, done, list, hide, back, purge, KINDS, KEEP_DAYS };

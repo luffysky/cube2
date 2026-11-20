@@ -23,6 +23,14 @@
     'ds.pulled': ['從雲端取回 {0} 個檔案', 'Got {0} files from the cloud', 'クラウドから {0} 件取得', '클라우드에서 {0}개 가져옴'],
     'ds.upFail': ['上傳到雲端沒有成功，檔案還在這台裝置上。', 'The upload did not go through; the file is still on this device.', 'アップロードできませんでした。ファイルはこの端末に残っています。', '업로드하지 못했어요. 파일은 이 기기에 남아 있어요.'],
     'ds.kept': ['瀏覽器已同意長期保存這些檔案。', 'The browser has agreed to keep these for good.', 'ブラウザがこれらを長期保存することに同意しました。', '브라우저가 이 파일들을 오래 보관하기로 했어요.'],
+    'ds.trash': ['最近移除', 'Recently removed', '最近削除した項目', '최근 삭제'],
+    'ds.trashP': ['從雲端移除的檔案會在這裡留 30 天，期間可以復原；之後就真的刪除了。', 'Files taken off the cloud wait here for 30 days and can be brought back; after that they are deleted.', 'クラウドから外したファイルはここに30日間残り、元に戻せます。その後は削除されます。', '클라우드에서 뺀 파일은 여기 30일 동안 남아 되돌릴 수 있어요. 그 뒤에는 삭제돼요.'],
+    'ds.trashNone': ['30 天內沒有移除過的檔案。', 'Nothing removed in the last 30 days.', '30日以内に削除したファイルはありません。', '30일 안에 삭제한 파일이 없어요.'],
+    'ds.left': ['還剩 {0} 天', '{0} days left', '残り{0}日', '{0}일 남음'],
+    'ds.back': ['復原', 'Bring back', '元に戻す', '되돌리기'],
+    'ds.backOk': ['已復原，正在取回這台裝置。', 'Brought back; getting it onto this device.', '元に戻しました。この端末に取得しています。', '되돌렸어요. 이 기기로 가져오는 중이에요.'],
+    'ds.backFull': ['雲端空間滿了，先移除別的檔案再復原。', 'Your cloud space is full; remove something else first.', 'クラウドの容量がいっぱいです。先に別のファイルを削除してください。', '클라우드 공간이 꽉 찼어요. 다른 파일을 먼저 지워 주세요.'],
+    'ds.backFail': ['復原沒有成功，稍後再試一次。', 'That did not work; try again in a moment.', '元に戻せませんでした。少ししてからもう一度お試しください。', '되돌리지 못했어요. 잠시 후 다시 해 보세요.'],
     'ds.notKept': ['瀏覽器沒有答應長期保存，空間不夠時可能先被清掉。', 'The browser did not promise to keep them; it may clear them when space runs low.', 'ブラウザは長期保存を約束していません。空き容量が少ないと消えることがあります。', '브라우저가 오래 보관하겠다고 하지 않았어요. 공간이 부족하면 지워질 수 있어요.']
   });
 
@@ -49,11 +57,43 @@
     });
     h += '</div>';
     if (!ready()) h += '<p class="note">' + t('ds.soon') + '</p>';
-    if (cur === 'cloud') h += '<p class="note">' + t('ds.cloudP') + '</p>';
+    if (cur === 'cloud') {
+      h += '<p class="note">' + t('ds.cloudP') + '</p>';
+      var tr = trash[kind];
+      if (!tr) h += '<div class="row"><button class="btn sm plain" type="button" data-dstrash="' + kind + '">' + t('ds.trash') + '</button></div>';
+      else {
+        h += '<h3>' + t('ds.trash') + '</h3><p class="note">' + t('ds.trashP') + '</p>';
+        h += tr.length ? '<div class="mu-list ds-trash">' + tr.map(function (f) {
+          return '<div class="mu-row"><span>' + App.esc(kind === 'pics' ? t(f.name === 'tile' ? 'mb.tile' : 'mb.wall') : f.name) + ' <small>' + t('ds.left', f.left) + '</small></span><button class="btn sm" type="button" data-dsback="' + kind + ':' + App.esc(f.id) + '">' + t('ds.back') + '</button></div>';
+        }).join('') + '</div>' : '<p class="note">' + t('ds.trashNone') + '</p>';
+      }
+    }
     if (cur === 'local') h += '<p class="note ds-local">' + t('ds.localP') + (kept === true ? ' ' + t('ds.kept') : kept === false ? ' ' + t('ds.notKept') : '') + '</p>';
     return h;
   }
+  // "recently removed": fetched when asked for, cleared when the sheet is opened afresh
+  var trash = {};
+  function reopen() { if (App.sheet()) App.openSheet(App.sheet()); }
   App.clicks.push(function (d) {
+    if (d.dstrash && (d.dstrash === 'pics' || d.dstrash === 'music') && ZZ.Cloud && ZZ.Cloud.file) {
+      var k = d.dstrash;
+      ZZ.Cloud.file({ a: 'fileList', kind: k, trash: true }).then(function (b) { trash[k] = b && b.files || []; reopen(); });
+      return true;
+    }
+    if (d.dsback && ZZ.Cloud && ZZ.Cloud.file) {
+      var q = String(d.dsback).split(':'), kind = q[0], id = q.slice(1).join(':');
+      ZZ.Cloud.file({ a: 'fileBack', id: id }).then(function (b) {
+        if (!b) {
+          // the page only gets the body of a good answer; ask the list again to tell "full" from a failure
+          return ZZ.Cloud.file({ a: 'fileList', kind: kind, trash: true }).then(function (l) { trash[kind] = l && l.files || trash[kind]; App.toast(t('ds.backFail'), 3000); reopen(); });
+        }
+        trash[kind] = (trash[kind] || []).filter(function (f) { return f.id !== id; });
+        App.toast(t('ds.backOk'), 2500);
+        var pull = App.acts[kind === 'pics' ? 'picPull' : 'muPull'];
+        if (pull) pull(); else reopen();
+      });
+      return true;
+    }
     if (!d.dswhere) return false;
     var p = String(d.dswhere).split(':');
     if ((p[0] === 'pics' || p[0] === 'music') && (p[1] === 'local' || (p[1] === 'cloud' && ready()))) { st[p[0]] = p[1]; save(); }
