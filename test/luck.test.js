@@ -84,5 +84,20 @@ ok(M.buy('tile', 'xmas').ok, 'Christmas is open');
 ok(M.buy('tile', 'cny').why === 'locked' && M.state('bg', 'cny') === 'locked' && M.buySet('cny').why === 'locked', 'the Lunar New Year waits');
 M.subscribe(); ok(M.state('theme', 'halloween') === 'locked', 'not even a member can use a holiday before it opens'); M.cancelSub();
 ok(M.festShown('cny', 'tw') && !M.festShown('cny', 'us') && M.festShown('thanks', 'us') && !M.festShown('thanks', 'jp') && M.festShown('xmas', 'jp') && M.festShown('hina', 'other'), 'each region sees its own holidays and the shared ones');
+// ---------- levels ----------
+require('../src/levels.js');
+const Lv = ZZ.Levels;
+ok(Lv.par() && Lv.par().length === 1000 && Lv.par().every(p => p[1] >= 4 && p[1] <= 150), 'every numbered level has a par the computer reached');
+ok(JSON.stringify(Lv.level(77)) === JSON.stringify(Lv.level(77)), 'a level is the same every time');
+ok(Lv.level(500).board.length <= 12 && Lv.level(1000).board.length <= 12, 'no level fills more than twelve rows');
+M.reset();
+ok(M.lvOpen(1) && !M.lvOpen(2) && M.levelClear(2, 10).ok === false, 'only level 1 is open at first');
+const l1 = Lv.level(1);
+let lr = M.levelClear(1, l1.par + 10); ok(lr.ok && lr.stars < 3 && M.lvOpen(2), 'a clear opens the next level', lr);
+lr = M.levelClear(1, l1.par); ok(lr.stars === 3 && lr.coins === (3 - lr.had) * 10, 'a better clear pays for the new stars only', lr);
+const code = Lv.encode({ goal: 'lines', need: 12, limit: 50, board: ['XX.XXXXXXX', 'X.XXXXXXXX'] }), lvBack = Lv.decode(code);
+ok(lvBack && lvBack.goal === 'lines' && lvBack.need === 12 && lvBack.limit === 50 && lvBack.board.join() === 'XX.XXXXXXX,X.XXXXXXXX', 'a custom level survives its share code');
+ok(Lv.decode('AAAA') === null && Lv.decode(Lv.encode({ goal: 'dig', need: 0, limit: 30, board: ['XXXXXXXXXX'] })) === null && Lv.decode('<script>') === null, 'a broken or impossible code is refused');
+
 console.log('luck tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

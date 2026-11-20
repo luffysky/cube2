@@ -291,15 +291,24 @@
     { id: 'bigsend', need: 1, coin: 70, on: function (m) { return m.battle && m.stats.sent >= 20 ? 1 : 0; } },
     { id: 'sprint90', need: 1, coin: 90, on: function (m) { return m.mode === 'sprint' && m.result > 0 && m.ms < 90000 ? 1 : 0; } },
     { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
-    { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } }
+    { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } },
+    // level jobs
+    { id: 'lv3', cat: 'lvl', need: 3, coin: 60, ev: 'lvl', on: function () { return 0; } },
+    { id: 'lvNew', cat: 'lvl', need: 1, coin: 50, ev: 'lvlNew', on: function () { return 0; } },
+    { id: 'lvStar', cat: 'lvl', need: 1, coin: 70, ev: 'lvl3s', on: function () { return 0; } },
+    { id: 'lvStars', cat: 'lvl', need: 5, coin: 80, ev: 'lvlStars', on: function () { return 0; } },
+    { id: 'lvEndless', cat: 'lvl', need: 5, coin: 90, ev: 'endless', max: true, on: function () { return 0; } },
+    { id: 'lvCustom', cat: 'lvl', need: 1, coin: 40, ev: 'custom', on: function () { return 0; } }
   ];
   // Jobs come in waves of five. Finish a wave (every job claimed) and the next one can be drawn at once; after the
   // second, the third waits twelve hours. Three waves a day at most, and a new day starts again from the first.
   // Every job here is an ordinary one (cat 'gen'); level jobs join when the levels mode does.
   var WAVE = { size: 5, max: 3, wait: 12 * 3600000 };
+  // a wave: three everyday jobs and two level jobs
   function pickWave(day, wave) {
-    var rnd = new ZZ.RNG(day * 2654435761 + wave * 40503), pool = JOBS.map(function (j) { return j.id; }), jobs = [];
-    for (var i = 0; i < WAVE.size; i++) jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false });
+    var rnd = new ZZ.RNG(day * 2654435761 + wave * 40503), jobs = [];
+    var gen = JOBS.filter(function (j) { return j.cat !== 'lvl'; }).map(function (j) { return j.id; }), lvl = JOBS.filter(function (j) { return j.cat === 'lvl'; }).map(function (j) { return j.id; });
+    for (var i = 0; i < WAVE.size; i++) { var pool = i < WAVE.size - 2 ? gen : lvl; jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false }); }
     return jobs;
   }
   var LOGIN = [20, 30, 40, 50, 60, 80, 120];
@@ -343,7 +352,7 @@
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
-      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null },
+      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -432,7 +441,7 @@
     Meta.rollDay();
     return Meta.data.daily.jobs.map(function (j, i) {
       var def = job(j.id) || { need: 1, coin: 0 };
-      return { i: i, id: j.id, need: def.need, coin: def.coin, n: Math.min(j.n, def.need), done: j.n >= def.need, paid: j.paid };
+      return { i: i, id: j.id, cat: def.cat || 'gen', need: def.need, coin: def.coin, n: Math.min(j.n, def.need), done: j.n >= def.need, paid: j.paid };
     });
   };
   Meta.jobsReady = function () { return Meta.jobs().filter(function (j) { return j.done && !j.paid; }).length; };
@@ -466,8 +475,47 @@
   };
   // progress from things other than matches (opening boxes, the wheel)
   function jobEvent(kind, n) {
-    Meta.data.daily.jobs.forEach(function (j) { var def = job(j.id); if (def && def.ev === kind && !j.paid && j.n < def.need) j.n = Math.min(def.need, j.n + n); });
+    Meta.data.daily.jobs.forEach(function (j) { var def = job(j.id); if (def && def.ev === kind && !j.paid && j.n < def.need) j.n = Math.min(def.need, def.max ? Math.max(j.n, n) : j.n + n); });
   }
+  // ---------- levels ----------
+  // stars: one character per numbered level, '0' to '3'; a level opens when the one before has a star
+  Meta.lvStars = function (n) { return +(Meta.data.lv.stars.charAt(n - 1) || 0); };
+  Meta.lvOpen = function (n) { return n >= 1 && n <= 1000 && (n === 1 || Meta.lvStars(n - 1) > 0); };
+  Meta.lvTotal = function () { var s = Meta.data.lv.stars, t = 0; for (var i = 0; i < s.length; i++) t += +s.charAt(i); return t; };
+  // a numbered level finished in so many pieces: the stars are worked out here (the same on the server)
+  Meta.levelClear = function (n, pieces) {
+    var Lv = ZZ.Levels;
+    n = Math.floor(+n); pieces = Math.floor(+pieces);
+    if (!Lv || !Meta.lvOpen(n) || !(pieces >= 1)) return { ok: false, why: 'no' };
+    var lv = Lv.level(n);
+    if (pieces > Lv.limitOf(lv)) return { ok: false, why: 'no' };
+    var st = Lv.stars(lv, pieces), had = Meta.lvStars(n), d = Meta.data, coins = 0;
+    if (!had) coins += 20 + Math.floor(n / 25) * 5;          // the first clear
+    if (st > had) {
+      coins += (st - had) * 10;
+      var s = d.lv.stars; while (s.length < n) s += '0';
+      d.lv.stars = s.slice(0, n - 1) + st + s.slice(n);
+    }
+    if (coins) { d.coins += coins; d.tot.coins += coins; }
+    jobEvent('lvl', 1);
+    if (!had) jobEvent('lvlNew', 1);
+    if (st === 3) jobEvent('lvl3s', 1);
+    if (st > had) jobEvent('lvlStars', st - had);
+    Meta.save();
+    emit('lvl', [n, pieces]);
+    return { ok: true, stars: st, had: had, coins: coins };
+  };
+  // an endless run reached this stage
+  Meta.endlessDone = function (stage) {
+    stage = Math.max(0, Math.min(999, Math.floor(+stage) || 0));
+    var d = Meta.data, best = stage > d.lv.endless;
+    if (best) d.lv.endless = stage;
+    jobEvent('endless', stage);
+    Meta.save();
+    emit('endless', [stage]);
+    return { ok: true, best: best };
+  };
+  Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
     Meta.rollDay();
@@ -608,6 +656,8 @@
     var d = Meta.data, def = blank().equip;
     KINDS.forEach(function (k) { if (!Meta.canUse(k, d.equip[k])) d.equip[k] = def[k]; });
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
+    d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
+    d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
   };
 
   // ---------- items carried into a match ----------
@@ -930,6 +980,9 @@
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
     wave: function () { return Meta.nextWave(); },
+    lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
+    endless: function (a) { return Meta.endlessDone(a[0]); },
+    custom: function () { return Meta.customPlayed(); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },

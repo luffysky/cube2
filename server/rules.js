@@ -19,6 +19,7 @@
 const ZZ = require('../src/engine.js');
 require('../src/drills.js');
 require('../src/openers.js');
+require('../src/levels.js');
 require('../src/meta.js');
 require('../src/replay.js');
 const Meta = ZZ.Meta;
@@ -42,7 +43,7 @@ const LIMIT = {
   TAPE_BYTES: 20000,         // the longest tape accepted with one match
   SEEDS_KEPT: 80,            // recent matches remembered, so the same tape cannot be handed in twice
   SPRINT_MIN: 15000,         // a 40-line sprint faster than this is not believed
-  IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20, IMPORT_ITEMS: 80, IMPORT_XP: 5000
+  IMPORT_COINS: 20000, IMPORT_RP: 900, IMPORT_ITEM: 20, IMPORT_ITEMS: 80, IMPORT_XP: 5000, LEVEL_MIN: 5000
 };
 
 function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
@@ -99,6 +100,12 @@ function applyOps(state, srv, ops, now) {
     if (++srv.hn > LIMIT.OPS_PER_HOUR) { res.push({ i: op.i, ok: false, why: 'slow' }); continue; }
     let r;
     if (op.k === 'fin') { r = finish(op.a, srv, mark); if (r.ok) matches.push(Object.assign({ at: now }, r.rec)); }
+    else if (op.k === 'lvl') {
+      // a level takes real time to play: about a third of a second a piece at the very least
+      const cost = Math.max(LIMIT.LEVEL_MIN, (Math.floor(+(op.a && op.a[1])) || 0) * 330);
+      if (srv.bud < cost) r = { ok: false, why: 'fast' };
+      else { r = Meta.run(op.k, op.a); if (r && r.ok) srv.bud -= cost; }
+    }
     else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
@@ -169,7 +176,9 @@ function importState(raw, now) {
   d.peak = Math.max(d.rp, int(src.peak, 0, LIMIT.IMPORT_RP));
   d.rgames = 0;
   d.streak = int(src.streak, 0, 50);
-  d.xp = int(src.xp, 0, LIMIT.IMPORT_XP);      // titles are not brought in: they are earned where the server can see it
+  d.xp = int(src.xp, 0, LIMIT.IMPORT_XP);
+  // level progress comes along (it only opens levels; the coins for them were paid on the device)
+  d.lv = { stars: String(obj(src.lv).stars || '').replace(/[^0-3]/g, '').slice(0, 1000), endless: int(obj(src.lv).endless, 0, 999) };      // titles are not brought in: they are earned where the server can see it
   d.titles = []; d.title = '';
   Meta.KINDS.forEach(kind => {
     const got = [];

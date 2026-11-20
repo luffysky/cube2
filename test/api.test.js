@@ -675,6 +675,27 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(r.json.res[0].ok === false, 'no pull without the coins', r.json.res);
   }
 
+  // ---------- levels: in order, plausible, not faster than they can be played ----------
+  {
+    const V = await newPlayer(null, '203.0.113.64');
+    const par1 = rules.ZZ.Levels.level(1).par;
+    r = await sync(V, [op('lvl', [3, par1])]);
+    ok(r.json.res[0].ok === false, 'a level cannot be skipped to', r.json.res);
+    r = await sync(V, [op('lvl', [1, 9999])]);
+    ok(r.json.res[0].ok === false, 'more pieces than the limit is not a clear');
+    const c0 = r.json.st.coins;
+    r = await sync(V, [op('lvl', [1, par1])]);
+    ok(r.json.res[0].ok && r.json.st.lv.stars === '3' && r.json.st.coins === c0 + 20 + 30, 'level 1 at par: three stars, first-clear coins and star coins', [r.json.st.lv, r.json.st.coins - c0]);
+    r = await sync(V, [op('lvl', [1, par1])]);
+    ok(r.json.st.coins === c0 + 50, 'clearing it again pays nothing more');
+    const many = []; for (let n = 2; n <= 220; n++) many.push(op('lvl', [n, rules.ZZ.Levels.level(n).par]));
+    let fastSeen = false;
+    for (let i = 0; i < many.length; i += 10) { r = await sync(V, many.slice(i, i + 10)); if (r.json.res.some(x => x.why === 'fast')) fastSeen = true; }
+    ok(fastSeen && r.json.st.lv.stars.length < 220, 'levels cannot be reported faster than they could be played', r.json.st.lv.stars.length);
+    const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'lvl'", [V.id]);
+    ok(lg[0].n >= 1, 'level coins are in the coin ledger');
+  }
+
   // ---------- when the database is in trouble ----------
   const logged = []; const realErr = console.error; console.error = (...a) => logged.push(a.join(' '));
   dbm.use({ query: async () => { const e = new Error('connect failed for postgresql://neondb_owner:s3cretPass@ep-x.neon.tech/neondb?sslmode=require'); e.code = 'XX000'; throw e; }, batch: async () => { throw new Error('boom'); } });
