@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 8 && (await page.$$('.card.soon')).length === 2, 'eight playable, two coming');
+    ok((await page.$$('a.card')).length === 9 && (await page.$$('.card.soon')).length === 1, 'nine playable, one coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -300,6 +300,30 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(pfit.r <= pfit.vw && pfit.b <= pfit.vh && pfit.w >= 280, 'on a phone the 10 by 10 grid fits', pfit);
     await pp2.screenshot({ path: path.join(OUT, 'picross-phone.png') });
     await ctx7.close();
+    // 磚道
+    const pi = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    pi.on('pageerror', e => problems.push('pipes: ' + e.message));
+    await pi.goto(BASE + 'games/pipes/'); await sleep(400);
+    await pi.click('[data-lv="easy"]'); await pi.click('#go'); await sleep(300);
+    ok(await pi.evaluate(() => window.__pipes().state === 'play' && window.__pipes().g.N === 5), 'easy is 5 by 5');
+    await pi.screenshot({ path: path.join(OUT, 'pipes-play.png') });
+    const pg = await pi.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(), g = window.__pipes().g; return { x: r.left, y: r.top, s: r.width / g.N, N: g.N, turns: g.tiles.map((m, c) => { let k = 0, t = m; while (t !== g.sol[c] && k < 4) { t = ((t << 1) | (t >> 3)) & 15; k++; } return k; }) }; });
+    for (let c = 0; c < pg.turns.length; c++) for (let k = 0; k < pg.turns[c]; k++) await pi.mouse.click(pg.x + (c % pg.N + 0.5) * pg.s, pg.y + (Math.floor(c / pg.N) + 0.5) * pg.s);
+    await sleep(1300);
+    ok(await pi.evaluate(() => window.__pipes().state === 'won' && !document.getElementById('end').hidden && !!JSON.parse(localStorage.getItem('snowrealm.pipes.bests')).easy), 'clicking every tile into place: done, and the time is kept');
+    await pi.screenshot({ path: path.join(OUT, 'pipes-done.png') });
+    const ctx8 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const pph = await ctx8.newPage();
+    pph.on('pageerror', e => problems.push('pipes phone: ' + e.message));
+    await pph.goto(BASE + 'games/pipes/'); await sleep(400);
+    await pph.tap('[data-lv="hard"]'); await pph.tap('#go'); await sleep(300);
+    const pfit2 = await pph.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { r: r.right, b: r.bottom, vw: innerWidth, vh: innerHeight, w: r.width }; });
+    ok(pfit2.r <= pfit2.vw && pfit2.b <= pfit2.vh && pfit2.w >= 280, 'on a phone the 9 by 9 board fits', pfit2);
+    const t0 = await pph.evaluate(() => window.__pipes().g.taps);
+    await pph.tap('#cv', { position: { x: 20, y: 20 } }); await sleep(100);
+    ok(await pph.evaluate(t => window.__pipes().g.taps === t + 1, t0), 'a tap turns a tile');
+    await pph.screenshot({ path: path.join(OUT, 'pipes-phone.png') });
+    await ctx8.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
