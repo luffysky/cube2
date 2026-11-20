@@ -45,7 +45,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.goto(BASE + 'index.html?sw=off&lang=zh-Hant'); await sleep(800);
     await page.click('[data-sheet="srAccount"]'); await sleep(300);
     const sr = await page.evaluate(() => { const a = document.querySelector('#sheetCard a[data-sr="signup"]'); return a && { href: a.href, target: a.target, rel: a.rel, text: document.getElementById('sheetCard').textContent }; });
-    ok(sr && sr.href === 'https://games.snowrealm.pet/' && sr.target === '_blank' && /noopener/.test(sr.rel) && /右上角的「登入」/.test(sr.text), 'the sign-in / register entry leads to SnowRealm Games', sr);
+    ok(sr && sr.href === 'https://games.snowrealm.pet/' && sr.target === '_blank' && /noopener/.test(sr.rel) && /右上角「登入」/.test(sr.text) && /註冊／登入/.test(sr.text), 'the sign-in / register entry leads to SnowRealm Games', sr);
     await page.screenshot({ path: path.join(OUT, 'minipay-signup.png') });
     await page.evaluate(() => ZZ.App.closeSheet()); await sleep(200);
     await page.click('[data-sheet="profile"]'); await sleep(300);

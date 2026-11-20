@@ -205,3 +205,16 @@
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
 - 風險、回滾：換回「預設」即恢復原樣；回滾 commit 即移除功能，已購買紀錄留在存檔不受影響。
 - 未完成／待確認：Owner 說總數 18，依各級數量相加為 17（3+3+5+4+2），待 Owner 指定第 18 款放在哪一級。Steam 解鎖要等 Steam 版與伺服器驗證。
+- 補記：上一條網站主題的 commit 為 [`ca50cd1`](https://github.com/luffysky/cube2/commit/ca50cd1)，Vercel `dpl_TNhF7JLDZsC6dLn5jt5iXhCwt8e4` READY。
+
+## 2026-11-20 18:40（Asia/Taipei）｜SnowRealm 帳號入口改「註冊／登入」；綁定開關維持關閉
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-020
+- 原因與目標：Owner 已有 SnowRealm Games 帳號，入口只寫「註冊」不對；要求打開綁定開關、已登入就能直接連結。
+- 實際變更：入口按鈕改「到 SnowRealm Games 註冊／登入」，說明改成「已有帳號按右上角登入，沒有再選註冊」（四語）。
+- 未變更（原因）：`IDENTITY_LINK_ENABLED` 未設定。依 cube1 `docs/BRICKDUEL_PLAYER_IDENTITY_HANDOFF.md`（cube1 `bde359b`）：Identity 簽發、JWKS、正式登入網址尚未部署，`identity.snowrealm.pet` 無法解析，並要求 cube2 開關維持關閉至兩端測試帳號驗收。即使打開，伺服器取不到 JWKS 會拒絕所有綁定，玩家只會看到錯誤。現有 SnowRealm Games 登入使用 Neon Auth，依核准書不得當作跨站登入。
+- 檔案：`src/cloud.js`、`test/minipay.js`、`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除操作：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `minipay` 10、`cloudui` 39。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 交接 GPT：Identity 上線後提供授權端點、token 交換端點、登記 callback `https://cube2-xi.vercel.app/api/auth/callback`、client 註冊與測試帳號；轉磚即做「已登入→一鍵連結」並跑驗收。
