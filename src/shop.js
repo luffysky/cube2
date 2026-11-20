@@ -61,6 +61,7 @@
     'mb.none': ['還沒選', 'None yet', '未選択', '선택 안 함'],
     'mb.set': ['已選好', 'Set', '設定済み', '설정됨'],
     // jobs
+    'p.badName': ['這個暱稱不能用，換一個吧。', 'That name cannot be used. Try another.', 'その名前は使えません。別の名前にしてください。', '이 닉네임은 쓸 수 없어요. 다른 걸로 해 주세요.'],
     'sg.title': ['簽到表', 'Sign-in sheet', 'ログインカレンダー', '출석부'],
     'sg.month': ['{0} 年 {1} 月', '{1}/{0}', '{0}年{1}月', '{0}년 {1}월'],
     'sg.wd': ['日,一,二,三,四,五,六', 'S,M,T,W,T,F,S', '日,月,火,水,木,金,土', '일,월,화,수,목,금,토'],
@@ -553,7 +554,13 @@
       View.setLook({ dim: +el.value });
       return true;
     }
-    if (el.id === 'pName') { Meta.setName(el.value); return true; }
+    if (el.id === 'pName') {
+      var want = String(el.value || '').trim();
+      Meta.setName(el.value);
+      // a refused name is cleared, and the player is told why
+      if (want && !Meta.data.name) { el.value = ''; App.toast(t('p.badName'), 3000); }
+      return true;
+    }
     return false;
   });
   // the side menu's 網站主題 opens the shop on that tab (the menu's own handler opens the shop)

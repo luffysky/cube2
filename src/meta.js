@@ -664,8 +664,14 @@
   var BAD_NAME = ['fuck', 'shit', 'bitch', 'cunt', 'nigg', 'faggot', 'retard', 'whore', 'slut', 'nazi', 'hitler', 'porn', 'pussy', 'penis', 'vagina',
     '幹你', '干你', '操你', '肏', '屄', '雞巴', '鸡巴', '雞掰', '機掰', '机掰', '婊子', '賤人', '贱人', '妓女', '強姦', '强奸', '智障', '低能', '白癡', '白痴', '去死', '傻逼', '傻屄', '他媽的', '他妈的', '媽的', '妈的', '靠北', '靠腰', '垃圾人', '廢物', '废物', '支那',
     '死ね', 'くそ', 'ばか', 'まんこ', 'ちんこ', '씨발', '시발', '병신', '좆', '개새끼', '지랄',
+    // more insults and slurs (pieces long enough not to catch ordinary words: no lone 幹, cock or rape)
+    'asshole', 'bastard', 'motherf', 'dickhead', 'rapist', 'killyourself', 'wanker', 'twat', 'chink', 'kike', 'tranny',
+    '靠杯', '靠夭', '雞歪', '鸡歪', '機歪', '尼瑪', '尼玛', '你媽', '你妈', '草泥馬', '草泥马', '王八蛋', '混蛋', '屌你', '屌', '賤貨', '贱货', '騷貨', '骚货', '淫', '色情', '援交', '約炮', '约炮',
+    '殺了你', '杀了你', '去吃屎', '吃屎', '狗娘', '畜生', '人渣', '腦殘', '脑残', '弱智', '蠢貨', '蠢货', '共匪', '台巴子', '黑鬼', '阿六仔',
+    '殺す', 'きちがい', '気違い', 'かたわ', 'ガイジ', 'ファック',
+    '꺼져', '미친놈', '미친년', '니미', '존나', '새끼', '썅', '느금', '애미', '한남충', '김치녀',
     'admin', 'moderator', 'official', 'snowrealm', 'system', 'support', '官方', '管理員', '管理员', '客服', '系統', '系统', '運営', '公式', '운영자', '관리자'];
-  var LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '!': 'i' };
+  var LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '@': 'a', '$': 's', '!': 'i' };
   Meta.badName = function (v) {
     var flat = String(v == null ? '' : v).normalize('NFKC').toLowerCase().replace(/[0134578@$!]/g, function (c) { return LEET[c]; }).replace(/[\s\-_.·•*~^|/,:;+=()\[\]{}#%?]/g, '');
     if (!flat) return false;

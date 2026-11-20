@@ -610,7 +610,7 @@
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
         if (!m.ack) { send(hello(1)); if (Net.host) send(cfgMsg()); }
-        var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
+        var nm = ZZ.Meta && ZZ.Meta.cleanName ? ZZ.Meta.cleanName(m.name) : String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
         Net.peers[from].lv = int(m.lv, 1, 999); Net.peers[from].tt = typeof m.tt === 'string' && /^[a-z0-9]{1,12}$/.test(m.tt) ? m.tt : '';
@@ -655,7 +655,7 @@
     var roster = [], names = {}, teams = null, i, s;
     for (i = 0; i < v.roster.length && i < Net.SEATS; i++) { s = v.roster[i]; if (s === Math.floor(s) && s >= 0 && s < Net.SEATS && roster.indexOf(s) < 0) roster.push(s); }
     if (roster.length < 3 || roster.indexOf(Net.seat) < 0) return null;
-    roster.forEach(function (r) { names[r] = String((v.names && v.names[r]) || '').replace(/[<>&"]/g, '').slice(0, 12); });
+    roster.forEach(function (r) { var raw = (v.names && v.names[r]) || ''; names[r] = ZZ.Meta && ZZ.Meta.cleanName ? ZZ.Meta.cleanName(raw) : String(raw).replace(/[<>&"]/g, '').slice(0, 12); });
     if (v.teams && typeof v.teams === 'object' && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r) { teams[r] = v.teams[r] === 1 ? 1 : 0; }); }
     return { roster: roster, names: names, teams: teams };
   }

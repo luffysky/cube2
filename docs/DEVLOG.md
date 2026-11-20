@@ -426,3 +426,17 @@
 - 資料庫：未改結構（存檔 JSON 多一個欄位）。｜刪除：無。
 - 測試：`node test/run.js` 全過（meta 173：連簽、7 天目標、整月四個目標、跨月重來、星期幾；cloud：匯入只帶本月、已達成視為已領）；瀏覽器 `drawer` 28、`flow` 60、`rwd` 258。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`6473415`](https://github.com/luffysky/cube2/commit/6473415)。
+
+## 2026-11-21 00:50（Asia/Taipei）｜暱稱過濾補強
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（待辦 16）
+- 實際變更：
+  - 原本就有關鍵字過濾，這次補洞：名字裡的「8」以前會被換成文字 undefined（對照表少了 8），修好；連線房間收到的對手名字以前只去掉標籤字元，現在也走同一個過濾；名字被擋時清空輸入框並提示「這個暱稱不能用」。
+  - 字表加了中英日韓常見髒話、歧視字眼（台灣用語、簡體、日韓），刻意不收太短、容易誤擋的片段（單一「幹」、cock、rape、kys、spic、しね、ちょん）。
+  - ARCHITECTURE「還沒做」移除這一條，改寫成過濾的做法與限制。
+- 檔案：`src/meta.js`、`src/net.js`、`src/shop.js`、`test/meta.test.js`、`docs/ARCHITECTURE.md`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過（meta 194：新擋 9 個、不該擋的 11 個如 Luffysky、Spicy、Peacock、幹部、ちょんまげ）；瀏覽器 `wxnet` 19。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

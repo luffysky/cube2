@@ -191,6 +191,9 @@ eq(M.cleanName('a\u202Eb\u0000c\n d'), 'abc d', 'control and direction marks dro
 // names on the public boards: insults and names posing as staff are cleared, ordinary ones are left alone
 for (const n of ['Sh1t head', 'f.u.c.k', '官方客服', 'GM', 'ＡＤＭＩＮ', '操你', 'SnowRealm', '씨발']) eq(M.cleanName(n), '', 'name ' + n + ' is turned away');
 for (const n of ['小明', 'Luffy', 'class', 'gmail', 'assassin', '鶯歌磚王', 'grape', 'Dickens', 'たのしね']) eq(M.cleanName(n), n, 'name ' + n + ' is kept');
+for (const n of ['a55hole', '靠杯啦', '草泥馬', '尼玛', '腦殘王', '미친놈', 'B4stard', '王八蛋', '屌爆']) eq(M.cleanName(n), '', 'name ' + n + ' is turned away too');
+for (const n of ['Luffysky', 'Spicy', 'Skyskipper', 'Lucky8', 'Peacock', 'Grapefruit', 'ちょんまげ', 'シネマ', '幹部', '能幹', 'Agent 88']) eq(M.cleanName(n), n, 'name ' + n + ' is kept too');
+ok(!M.badName('B8') && M.cleanName('B8') === 'B8', 'an 8 in a name is a b, not the word undefined');
 
 // ---------- a saved record with holes in it is filled in ----------
 M.use({ coins: 12, owned: { tile: ['neon'] }, tot: { wins: 3 }, items: [0, 1], bogus: 1 });
