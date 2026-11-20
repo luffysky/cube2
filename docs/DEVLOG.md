@@ -553,3 +553,16 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `cele` 8（轉盤、拉霸中與沒中、會員廣告獎勵、點一下關、減少動態）、`flow` 60。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`74d20b6`](https://github.com/luffysky/cube2/commit/74d20b6)，Vercel `dpl_5oDwrk4uMNzuTonf8CXbx6911x3L`；之前幾次部署都 READY，3 小時內沒有執行錯誤。
+
+## 2026-11-21 04:10（Asia/Taipei）｜瀏覽器測試放進 GitHub Actions
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（待辦 18）
+- 實際變更：
+  - 新增 `test/browser-run.js`：沒人在聽就自己開 8790、8765 兩個靜態伺服器，依序跑 18 個瀏覽器測試（flow、rwd、drawer、onehand、howto、bag、cele、music、skies、wxnet、legal、pwa、gameslang、cloudui、consent、sites、bricks、minipay），每個最多 8 分鐘，最後列出哪些沒過。
+  - `.github/workflows/test.yml` 多一個 `browser` 工作：安裝 Playwright 到 `/opt/npm-tools`（不下載瀏覽器，用執行環境內建的 Chrome），然後跑上面那支。
+- 檔案：`test/browser-run.js`（新）、`.github/workflows/test.yml`、`docs/ARCHITECTURE.md`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：本機 `node test/browser-run.js` 18 個全過（約 10 分鐘）。GitHub 上第一次執行結果要等這次推上去才知道。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

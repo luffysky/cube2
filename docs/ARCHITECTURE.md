@@ -253,7 +253,7 @@ Vercel 專案連到這個 GitHub 程式庫，推到 `main` 就部署正式站，
 
 ### 自動測試
 
-`.github/workflows/test.yml`：推到 `main` 或開 PR 時，檢查提交的 `index.html` 和 `build.js` 產生的一致，再跑 `npm test`。瀏覽器測試還沒放進去。
+`.github/workflows/test.yml`：推到 `main` 或開 PR 時，檢查提交的 `index.html` 和 `build.js` 產生的一致，再跑 `npm test`。另一個工作 `browser` 用執行環境內建的 Google Chrome 加 Playwright（裝在 `/opt/npm-tools`，不下載瀏覽器），由 `test/browser-run.js` 自己開兩個靜態伺服器（8790、8765），依序跑 18 個瀏覽器測試。本機也能 `node test/browser-run.js flow rwd` 只跑幾個。
 
 ## 安裝成 App、離線、被搜尋到
 

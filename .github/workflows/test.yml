@@ -22,3 +22,24 @@ jobs:
           node build.js
           cmp index.html /tmp/index.before.html
       - run: npm test
+  browser:
+    name: the pages in Chrome
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # the browser tests load Playwright from /opt/npm-tools and drive the runner's own Google Chrome
+      - name: Playwright (no browser download; the runner has Chrome)
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          sudo mkdir -p /opt/npm-tools && sudo chown "$USER" /opt/npm-tools
+          npm install --prefix /opt/npm-tools --no-save playwright@1
+          test -x /usr/bin/google-chrome
+      - name: browser tests
+        run: node test/browser-run.js
