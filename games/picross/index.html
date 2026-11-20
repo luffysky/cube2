@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>磚畫謎 · SnowRealm 磚塊遊戲</title>
+<meta name="description" content="磚畫謎：照每排每列旁邊的數字把磚填上，填完會出現一幅畫。打開瀏覽器就能玩。">
+<link rel="icon" href="../../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../games.css">
+</head>
+<body>
+<main class="game">
+  <div class="bar">
+    <a href="../">← 磚塊遊戲</a>
+    <h1>磚畫謎</h1>
+    <button type="button" id="levels">圖片</button>
+  </div>
+  <div class="stats">
+    <div class="hearts-box" style="align-items:flex-start"><b id="hearts" aria-label="剩下的命">♥♥♥♥♥</b><span>命</span></div>
+    <div class="hearts-box"><b class="lvname" id="lvName">磚畫謎</b><span>填錯一格少一條命</span></div>
+    <div class="row mode" role="group" aria-label="點格子要做什麼"><button class="btn plain" type="button" id="modeFill" aria-pressed="true">填磚</button><button class="btn plain" type="button" id="modeCross" aria-pressed="false">打叉</button></div>
+  </div>
+  <div class="board push" id="board">
+    <canvas id="cv" aria-label="磚畫謎的格子"></canvas>
+    <div class="over list" id="list"></div>
+    <div class="over reveal" id="win" hidden>
+      <h2 id="winName">完成！</h2>
+      <div class="big stars" id="winStars">★★★</div>
+      <p id="winNote"></p>
+      <div class="row"><button class="btn" type="button" id="next">下一幅</button><button class="btn plain" type="button" id="again">再畫一次</button><button class="btn plain" type="button" id="toList">圖片列表</button></div>
+    </div>
+    <div class="over" id="lost" hidden>
+      <h2>命用完了</h2>
+      <p>再試一次，這次多用打叉把確定是空的格子標起來。</p>
+      <div class="row"><button class="btn" type="button" id="retry">再試一次</button><button class="btn plain" type="button" id="toList2">圖片列表</button></div>
+    </div>
+  </div>
+  <p class="hint">按住拖曳可以一次填一整排；滑鼠右鍵或 X 鍵切換打叉</p>
+</main>
+<script src="pics.js"></script>
+<script src="picross.js"></script>
+</body>
+</html>

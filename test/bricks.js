@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 7 && (await page.$$('.card.soon')).length === 3, 'seven playable, three coming');
+    ok((await page.$$('a.card')).length === 8 && (await page.$$('.card.soon')).length === 2, 'eight playable, two coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -264,6 +264,42 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await sph.screenshot({ path: path.join(OUT, 'sort-phone.png') });
     void before;
     await ctx6.close();
+    // 磚畫謎
+    const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    pc.on('pageerror', e => problems.push('picross: ' + e.message));
+    await pc.goto(BASE + 'games/picross/'); await sleep(400);
+    ok(await pc.evaluate(() => document.querySelectorAll('.lv').length === window.PICROSS.length && !document.querySelector('[data-lv="0"]').disabled && !document.querySelector('[data-lv="10"]').disabled && document.querySelector('[data-lv="1"]').disabled), 'the list: the first of each size open');
+    await pc.click('[data-lv="0"]'); await sleep(300);
+    // click every brick of the heart through the canvas (the page tells where the grid is)
+    const geo = await pc.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(), g = window.__picross().g; return { x: r.left, y: r.top, w: r.width, h: r.height, W: g.W, H: g.H, sol: g.sol }; });
+    // the grid sits at the bottom right of the canvas: work out a cell's size from the canvas and the clue margins
+    const cellPx = await pc.evaluate(() => { const g = window.__picross().g, c = document.getElementById('cv'); for (let s = 56; s >= 20; s--) { const maxR = Math.max(...g.rows.map(r => r.length)), cl = Math.ceil(maxR * s * 0.62 + s * 0.3); if (cl + g.W * s + 2 === Math.round(c.getBoundingClientRect().width)) return { s, cl, ct: Math.round(c.getBoundingClientRect().height) - g.H * s - 2 }; } return null; });
+    ok(!!cellPx, 'the grid geometry is found', cellPx);
+    await pc.mouse.click(geo.x + cellPx.cl + 0.5 * cellPx.s, geo.y + cellPx.ct + 0.5 * cellPx.s); await sleep(100);
+    ok(await pc.evaluate(() => window.__picross().g.lives === 4), 'a wrong click costs a heart');
+    await pc.click('#modeCross'); await pc.mouse.click(geo.x + cellPx.cl + 2.5 * cellPx.s, geo.y + cellPx.ct + 0.5 * cellPx.s); await sleep(80);
+    ok(await pc.evaluate(() => window.__picross().g.cells[0][2] === 2 && window.__picross().g.lives === 4), 'cross mode marks a cell for free');
+    await pc.click('#modeFill');
+    // drag along row 1 (all five filled)
+    await pc.mouse.move(geo.x + cellPx.cl + 0.5 * cellPx.s, geo.y + cellPx.ct + 1.5 * cellPx.s); await pc.mouse.down();
+    for (let X = 1; X < 5; X++) await pc.mouse.move(geo.x + cellPx.cl + (X + 0.5) * cellPx.s, geo.y + cellPx.ct + 1.5 * cellPx.s, { steps: 3 });
+    await pc.mouse.up();
+    ok(await pc.evaluate(() => window.__picross().g.rowDone(1)), 'dragging fills a whole row');
+    for (let Y = 0; Y < geo.H; Y++) for (let X = 0; X < geo.W; X++) if (geo.sol[Y][X]) await pc.mouse.click(geo.x + cellPx.cl + (X + 0.5) * cellPx.s, geo.y + cellPx.ct + (Y + 0.5) * cellPx.s);
+    await sleep(1200);
+    ok(await pc.evaluate(() => window.__picross().state === 'won' && /愛心/.test(document.getElementById('winName').textContent) && /★★☆/.test(document.getElementById('winStars').textContent)), 'the picture appears: 愛心, two stars for one mistake');
+    await pc.screenshot({ path: path.join(OUT, 'picross-win.png') });
+    await pc.click('#toList'); await pc.click('[data-lv="10"]'); await sleep(300);
+    await pc.screenshot({ path: path.join(OUT, 'picross-10.png') });
+    const ctx7 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const pp2 = await ctx7.newPage();
+    pp2.on('pageerror', e => problems.push('picross phone: ' + e.message));
+    await pp2.goto(BASE + 'games/picross/'); await sleep(400);
+    await pp2.tap('[data-lv="10"]'); await sleep(300);
+    const pfit = await pp2.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { r: r.right, b: r.bottom, vw: innerWidth, vh: innerHeight, w: r.width }; });
+    ok(pfit.r <= pfit.vw && pfit.b <= pfit.vh && pfit.w >= 280, 'on a phone the 10 by 10 grid fits', pfit);
+    await pp2.screenshot({ path: path.join(OUT, 'picross-phone.png') });
+    await ctx7.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();

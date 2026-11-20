@@ -106,3 +106,11 @@ a.card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
 .stars { color: #F5B82E; font-style: normal !important; letter-spacing: 4px; }
 .row.tools .btn { padding: 8px 16px; font-size: 15px; }
 .row.tools .btn:disabled { opacity: 0.45; }
+
+/* ---------- 磚畫謎 ---------- */
+.stats .row.mode { gap: 4px; flex-wrap: nowrap; flex-direction: row; align-items: center; }
+.row.mode .btn { padding: 7px 12px; font-size: 14px; box-shadow: 0 2px 0 #9AA5B2; }
+.row.mode .btn[aria-pressed="true"] { background: var(--gold); color: #3B2A00; box-shadow: 0 2px 0 #B8861A; }
+.over .big.stars { color: #F5B82E; }
+/* the finished picture stays visible behind the result */
+.over.reveal { background: rgba(20, 26, 33, 0.6); }
