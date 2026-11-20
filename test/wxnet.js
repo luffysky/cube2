@@ -80,12 +80,14 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     const code = await A.evaluate(() => ZZ.Net.code);
     await B.evaluate(c => ZZ.Net.join(c, '小瓦'), code);
     ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && document.querySelectorAll('[data-nmode]').length === 4), 10000), 'the host sees the four room modes with two in the room');
+    ok(await A.evaluate(() => (document.getElementById('sheetCard').textContent.match(/💻 電腦/g) || []).length >= 1), 'the room shows what each player plays on');
     await A.click('[data-nmode="lv"]');
     ok(await until(() => B.evaluate(() => ZZ.Net.cfg.mode === 'lv' && /關卡地形/.test(document.getElementById('sheet').textContent)), 5000), 'the guest is told the room plays on a level wall');
     await A.click('[data-nmode="wx"]');
     ok(await until(() => B.evaluate(() => ZZ.Net.cfg.wx === true && ZZ.Net.cfg.mode === 'wx'), 5000), 'the guest is told the room has weather');
     await A.click('[data-do="netStart"]');
     ok(await until(async () => { const a = await sky(A), b = await sky(B); return a && b && a.sky && b.sky && a.seed === b.seed; }, 8000), 'the room plays under one sky');
+    ok(await B.evaluate(() => /💻/.test(document.getElementById('hud').textContent)), 'in the match, the rival\'s device is beside their name');
     // the host switches to a level wall and starts again: both start on the same numbered level's wall
     await A.evaluate(() => { ZZ.Net.setCfg({ minutes: 1, items: false, team: false, mode: 'lv' }); ZZ.Net.start(); });
     const wall = P => P.evaluate(() => { const S = ZZ.App.S(); return S && S.kind === 'battle' ? { lv: S.lvNo || 0, sky: !!S.sky, cells: S.me.grid.reduce((n, r) => n + r.filter(c => c).length, 0) } : null; });

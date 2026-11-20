@@ -780,6 +780,35 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(p2.json.seat === 1 && p2.json.code === plain.json.code, 'and an ordinary one with the ordinary room', p2.json);
   }
 
+  // ---------- random matching: keyboards with keyboards, touch screens with touch screens, mixed only after a wait ----------
+  {
+    let ipn = 120;
+    const q = (key, dev, mix) => room(Object.assign({ a: 'quick', key, dev }, mix ? { mix: true } : {}), { ip: '203.0.113.' + (ipn++) });
+    const k = n => ('devkey' + n).padEnd(28, 'x');
+    const pcHost = await q(k(1), 'pc');
+    const touch1 = await q(k(2), 'touch');
+    ok(pcHost.json.seat === 0 && touch1.json.seat === 0 && touch1.json.code !== pcHost.json.code, 'a phone does not take a keyboard player who has just started waiting', [pcHost.json, touch1.json]);
+    const pc2 = await q(k(3), 'pc');
+    ok(pc2.json.seat === 1 && pc2.json.code === pcHost.json.code, 'a keyboard player sits with the keyboard player', pc2.json);
+    const touch2 = await q(k(4), 'touch');
+    ok(touch2.json.seat === 1 && touch2.json.code === touch1.json.code, 'and a phone with the phone', touch2.json);
+    // nobody of the same kind: after the wait, the other kind is taken
+    const lonePc = await q(k(5), 'pc');
+    now += 9000;
+    const loneTouch = await q(k(6), 'touch');
+    ok(loneTouch.json.seat === 1 && loneTouch.json.code === lonePc.json.code, 'after waiting a while a keyboard player is matched with a phone', loneTouch.json);
+    // two hosts of different kinds both waiting: the one who says "still here" after the wait moves into the other's room
+    const h1 = await q(k(7), 'pc');
+    const h2 = await q(k(8), 'touch');
+    ok(h1.json.seat === 0 && h2.json.seat === 0 && h1.json.code !== h2.json.code, 'two of different kinds, both waiting');
+    eq((await room({ a: 'still', code: h2.json.code, key: k(8), mix: true })).json.join, undefined, 'not before the wait');
+    now += 9000;
+    const st = await room({ a: 'still', code: h2.json.code, key: k(8), mix: true });
+    ok(st.json.join === h1.json.code && st.json.seat === 1, 'after it, the waiting phone moves into the keyboard player\'s room', st.json);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.queue WHERE code = ANY($1)', [[h1.json.code, h2.json.code]]))[0].n, 0, 'and neither room is waiting any more');
+    ok((await room({ a: 'x', code: h1.json.code, key: k(7), seat: 0, out: [] })).json.paired === true, 'the keyboard player sees a guest');
+  }
+
   // ---------- when the database is in trouble ----------
   const logged = []; const realErr = console.error; console.error = (...a) => logged.push(a.join(' '));
   dbm.use({ query: async () => { const e = new Error('connect failed for postgresql://neondb_owner:s3cretPass@ep-x.neon.tech/neondb?sslmode=require'); e.code = 'XX000'; throw e; }, batch: async () => { throw new Error('boom'); } });

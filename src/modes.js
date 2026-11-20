@@ -70,6 +70,9 @@
     'net.quickP': ['先找線上的真人；{0} 秒內沒有人，就改跟電腦打（會標示是電腦）。', 'Looks for a real player first. If nobody turns up within {0} seconds, you play the computer instead (and it says so).', 'まずオンラインの人を探します。{0} 秒以内に見つからなければ、コンピューターと対戦します（そう表示されます）。', '먼저 온라인의 실제 사람을 찾습니다. {0}초 안에 없으면 컴퓨터와 대전합니다(컴퓨터라고 표시됩니다).'],
     'net.matching': ['正在找對手⋯ {0} 秒', 'Looking for a player… {0} s', '対戦相手を探しています… {0} 秒', '상대를 찾는 중… {0}초'],
     'net.matchingP': ['找到真人就會自動開始。', 'The match starts by itself once someone is found.', '見つかったら自動で始まります。', '상대를 찾으면 자동으로 시작합니다.'],
+    'dev.pc': ['💻 電腦', '💻 Computer', '💻 PC', '💻 컴퓨터'],
+    'dev.phone': ['📱 手機', '📱 Phone', '📱 スマホ', '📱 휴대폰'],
+    'dev.tablet': ['📱 平板', '📱 Tablet', '📱 タブレット', '📱 태블릿'],
     'net.found': ['找到對手了：{0}，馬上開始。', 'Found a player: {0}. Starting now.', '相手が見つかりました：{0}。すぐに始まります。', '상대를 찾았습니다: {0}. 곧 시작합니다.'],
     'net.noOne': ['現在沒有其他真人在線，先跟電腦打一場。', 'No other players are online right now, so this one is against the computer.', '今はほかにオンラインの人がいないので、コンピューターと対戦します。', '지금은 온라인인 다른 사람이 없어 컴퓨터와 대전합니다.'],
     'net.cpuTag': ['電腦｜{0}', 'Computer · {0}', 'コンピューター｜{0}', '컴퓨터 · {0}'],
@@ -318,6 +321,9 @@
   App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
+  // what a player plays on, as a small tag beside the name
+  function devTag(d) { return d ? ' <small class="devtag">' + esc(t('dev.' + d)) + '</small>' : ''; }
+  App.devTag = devTag;
   function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race') && n > 2 ? 'battle' : m; }
   function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
   // the host picks what the room plays; the others see it in the rules line
@@ -341,12 +347,12 @@
         (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('mp.more') + '</p><p class="note">' + t('net.keepOpen') + '</p>' : '') +
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.matched) {
-      h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b></p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
+      h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b>' + devTag(Net.foeDev()) + '</p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.relayed() && !Net.matched) {
       // the game's own relay: up to four in a room
       var ro = Net.roster(), n = ro.length, team = !!Net.cfg.team && Net.teamOk(n);
       h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.cap) + '</h3><ul class="roster">';
-      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
+      ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + devTag(r.dev) + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
@@ -362,7 +368,7 @@
         h += '<p>' + esc(rulesText()) + (Net.teamOk(n) && Net.cfg.team ? '　' + t('mp.teamMode', n / 2) : '') + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
     } else if (st === 'ready' || st === 'playing') {
-      h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b></p>';
+      h += '<p><b>' + esc(t('net.connected', Net.foe || t('foe'))) + '</b>' + devTag(Net.foeDev()) + '</p>';
       if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
       if (Net.host) {

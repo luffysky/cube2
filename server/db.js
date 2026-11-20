@@ -135,6 +135,8 @@ const SCHEMA = [
    )`,
   // which matchmaking pool a waiting room is in ('' ordinary battles, 'wx' weather battles)
   "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS pool text NOT NULL DEFAULT ''",
+  // what the waiting player plays on ('pc' keyboard, 'touch' phone or tablet): the same kind are matched first
+  "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS dev text NOT NULL DEFAULT ''",
   // every treasure box opened, kept so the published odds can be checked against what was really drawn
   `CREATE TABLE IF NOT EXISTS zz.draws (
      id bigserial PRIMARY KEY,

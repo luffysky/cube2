@@ -504,7 +504,7 @@
       el.oppName.textContent = t('mp.target', S.oppName);
       el.oppNameW.textContent = t('mp.target', S.oppName);
     } else if (k === 'battle') {
-      var name = '<span class="who">' + esc(S.oppName) + '</span>', you = '<span class="who">' + t('you') + '</span>';
+      var name = '<span class="who">' + esc(S.oppName) + (S.o.oppDev && App.devTag ? App.devTag(S.o.oppDev) : '') + '</span>', you = '<span class="who">' + t('you') + '</span>';
       if (S.flip) {
         el.hudL.innerHTML = name + stat('koOpp', t('ko')) + stat('sentOpp', t('sent'));
         el.hudR.innerHTML = stat('sentMe', t('sent')) + stat('koMe', t('ko')) + you;

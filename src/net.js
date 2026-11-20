@@ -51,10 +51,18 @@
   Net.teamOk = function (n) { return n >= 4 && n % 2 === 0; };
   function peerList() { return Object.keys(Net.peers).map(Number).sort(function (a, b) { return a - b; }); }
   Net.count = function () { return 1 + peerList().length; };
-  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { var p = s === Net.seat ? null : Net.peers[s]; return { seat: s, name: p ? p.name : Net.me, me: !p, lv: p ? p.lv : ZZ.Meta.level().lv, tt: p ? p.tt : ZZ.Meta.titleNow() }; }); };
+  Net.roster = function () { return [Net.seat].concat(peerList()).sort(function (a, b) { return a - b; }).map(function (s) { var p = s === Net.seat ? null : Net.peers[s]; return { seat: s, name: p ? p.name : Net.me, me: !p, lv: p ? p.lv : ZZ.Meta.level().lv, tt: p ? p.tt : ZZ.Meta.titleNow(), dev: p ? p.dev || '' : Net.devNow() }; }); };
+  // the first other player's device ('pc', 'phone', 'tablet' or '' from an older page)
+  Net.foeDev = function () { var l = peerList(); return l.length ? Net.peers[l[0]].dev || '' : ''; };
   // who I am, for the others' room list: name, level and the title on show
+  // what this player plays on: 'pc' (a keyboard), 'phone' or 'tablet' (a touch screen big enough to be one)
+  Net.devNow = function () {
+    var touch = !!(App.env && App.env.touch), s = window.screen || {}, small = Math.min(s.width || 0, s.height || 0);
+    return !touch ? 'pc' : small >= 600 ? 'tablet' : 'phone';
+  };
+  function devGroup() { return Net.devNow() === 'pc' ? 'pc' : 'touch'; }
   function hello(ack) {
-    var M = ZZ.Meta, o = { t: 'hello', v: 1, name: Net.me };
+    var M = ZZ.Meta, o = { t: 'hello', v: 1, name: Net.me, dev: Net.devNow() };
     try { o.lv = M.level().lv; o.tt = M.titleNow(); } catch (e) { /* the list just shows the name */ }
     if (ack) o.ack = 1;
     return o;
@@ -422,7 +430,7 @@
       if (kind !== 'relay') return fail('noquick');      // a plain static host has no server to match through
       var key = seatKey();
       relayed = true;
-      rpc({ a: 'quick', key: key, pool: pool }).then(function (r) {
+      rpc({ a: 'quick', key: key, pool: pool, dev: devGroup(), mix: Date.now() - Net.quickSince >= 8000 }).then(function (r) {
         if (run !== epoch || Net.state !== 'matching') return;
         var b = r.body;
         if (r.status !== 200 || !b || !b.ok || !b.code) return fail(r.status === 429 ? 'slow' : 'server');
@@ -433,7 +441,16 @@
           if (run !== epoch || Net.state !== 'matching') { clearInterval(quickT); quickT = 0; return; }
           var waited = Date.now() - Net.quickSince;
           if (waited >= Net.QUICK_WAIT) { clearInterval(quickT); quickT = 0; return noOne(); }
-          if (Net.host && Math.floor(waited / 1000) % 6 === 5) rpc({ a: 'still', code: Net.code, key: key }).then(null, function () { /* the next one will do */ });
+          // still here; after eight seconds with nobody of the same kind, ready to be matched with the other kind
+          if (Net.host && Math.floor(waited / 1000) % 3 === 2) rpc({ a: 'still', code: Net.code, key: key, mix: waited >= 8000 }).then(function (r) {
+            var b = r && r.body;
+            if (!b || !b.join || run !== epoch || Net.state !== 'matching' || !Net.host) return;
+            // moved into another waiting player's room: from now on we are its guest
+            var old = link; link = null;
+            if (old) { old.h = {}; try { old.close(); } catch (e) { /* it is going anyway */ } }
+            Net.code = String(b.join); Net.host = false; Net.seat = 1;
+            wire(new Relay(Net.code, key, 1));
+          }, function () { /* the next one will do */ });
           changed();      // the seconds on screen
         }, 1000);
       }, function () { if (run === epoch && Net.state === 'matching') fail('server'); });
@@ -475,7 +492,7 @@
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
-    var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
+    var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe'), oppDev: Net.foeDev() };
     if (wx && !multi) o.wx = wx >>> 0;
     if (lv) o.lv = lv;
     if (race && !multi) { o.race = 1; o.items = false; }
@@ -615,6 +632,7 @@
         var nm = ZZ.Meta && ZZ.Meta.cleanName ? ZZ.Meta.cleanName(m.name) : String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
+        Net.peers[from].dev = ['pc', 'phone', 'tablet'].indexOf(m.dev) >= 0 ? m.dev : '';
         Net.peers[from].lv = int(m.lv, 1, 999); Net.peers[from].tt = typeof m.tt === 'string' && /^[a-z0-9]{1,12}$/.test(m.tt) ? m.tt : '';
         Net.foe = firstName();
         Net.seated = false;

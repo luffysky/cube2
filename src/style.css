@@ -929,3 +929,6 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 table.ht th { text-align: left; font-weight: 700; white-space: nowrap; padding-right: 12px; }
 table.ht td { text-align: left; }
 kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; border: 1px solid var(--edge); border-bottom-width: 3px; border-radius: 6px; background: var(--floor); font: 700 12px/1.5 var(--num, inherit); text-align: center; }
+
+.devtag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--edge); font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; vertical-align: middle; }
+.who .devtag { font-size: 10px; padding: 0 5px; }

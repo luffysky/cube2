@@ -300,19 +300,24 @@ async function roomJoin(db, body, ip, now) {
 // asker, even when several ask at once) and the asker sits down in that room. Otherwise the asker opens a room and
 // waits in the queue themselves. A waiting host says "still here" every few seconds; a host that stops saying it
 // (a closed tab, a phone that went to sleep) is skipped, so nobody is matched with an empty chair.
-const QUICK = { STALE: 25000, TRIES: 30, WINDOW: 10 * 60000 };
+// Keyboards are matched with keyboards and touch screens with touch screens; a player of the other kind is taken only
+// once someone has waited MIX ms (the asker, or the host already in the queue), so nobody waits for ever.
+const QUICK = { STALE: 25000, TRIES: 30, WINDOW: 10 * 60000, MIX: 8000 };
 const CLAIM = `
   DELETE FROM zz.queue WHERE code = (
     SELECT q.code FROM zz.queue q JOIN zz.rooms r ON r.code = q.code
     WHERE q.seen > $1 AND r.exp > $2 AND cardinality(r.ks) = 1 AND r.cap = 2 AND NOT ($3 = ANY(r.ks)) AND q.pool = $4
-    ORDER BY q.made LIMIT 1 FOR UPDATE OF q SKIP LOCKED
+      AND (q.dev = $5 OR q.dev = '' OR $6 OR q.made < $7)
+    ORDER BY (q.dev = $5) DESC, q.made LIMIT 1 FOR UPDATE OF q SKIP LOCKED
   ) RETURNING code`;
+function devOf(v) { return v === 'pc' ? 'pc' : v === 'touch' ? 'touch' : ''; }
 async function roomQuick(db, body, ip, now) {
   if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
   if (await bump(db, 'quick', ip, QUICK.WINDOW, now) > QUICK.TRIES) return fail(429, 'slow');
   const hash = sha(body.key), pool = body.pool === 'wx' ? 'wx' : '';      // weather battles are matched only with each other
+  const dev = devOf(body.dev), mix = body.mix === true || !dev;
   for (let tries = 0; tries < 3; tries++) {
-    const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash, pool]);
+    const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash, pool, dev, mix, now - QUICK.MIX]);
     if (!got[0]) break;
     const sat = await db.query('UPDATE zz.rooms SET ks = ks || $2::text WHERE code = $1 AND exp > $3 AND cardinality(ks) < cap RETURNING cap', [got[0].code, hash, now]);
     if (sat[0]) return good({ code: got[0].code, seat: 1, cap: 2, quick: true, now });
@@ -323,7 +328,7 @@ async function roomQuick(db, body, ip, now) {
       await db.batch([
         ['DELETE FROM zz.rooms WHERE exp < $1', [now]],
         ['INSERT INTO zz.rooms (code, hk, exp, ks, cap) VALUES ($1, $2, $3, ARRAY[$2], 2)', [code, hash, now + ROOM.TTL]],
-        ['INSERT INTO zz.queue (code, made, seen, pool) VALUES ($1, $2, $2, $3)', [code, now, pool]]
+        ['INSERT INTO zz.queue (code, made, seen, pool, dev) VALUES ($1, $2, $2, $3, $4)', [code, now, pool, dev]]
       ]);
       return good({ code, seat: 0, cap: 2, quick: true, now });
     } catch (e) {
@@ -336,8 +341,24 @@ async function roomQuick(db, body, ip, now) {
 async function roomStill(db, body, now) {
   const code = readRoom(body.code);
   if (!code || typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(404, 'room');
-  const got = await db.query('UPDATE zz.queue q SET seen = $3 FROM zz.rooms r WHERE q.code = $1 AND r.code = q.code AND r.ks[1] = $2 RETURNING 1 AS x', [code, sha(body.key), now]);
-  return good({ queued: !!got[0], now });
+  const hash = sha(body.key);
+  const got = await db.query('UPDATE zz.queue q SET seen = $3 FROM zz.rooms r WHERE q.code = $1 AND r.code = q.code AND r.ks[1] = $2 RETURNING q.made, q.pool, q.dev', [code, hash, now]);
+  if (!got[0]) return good({ queued: false, now });
+  // waited long enough with nobody of the same kind: take a waiting player of the other kind, if there is one. Our own
+  // place in the queue goes first, so two hosts doing this at once never take each other's room.
+  const w = got[0];
+  if (body.mix === true && w.made < now - QUICK.MIX) {
+    const mine = await db.query('DELETE FROM zz.queue WHERE code = $1 RETURNING made', [code]);
+    if (!mine[0]) return good({ queued: false, now });      // someone is sitting down in our room right now
+    const other = await db.query(CLAIM, [now - QUICK.STALE, now, hash, w.pool, w.dev, true, now]);
+    if (other[0]) {
+      const sat = await db.query('UPDATE zz.rooms SET ks = ks || $2::text WHERE code = $1 AND exp > $3 AND cardinality(ks) < cap RETURNING cap', [other[0].code, hash, now]);
+      // our own empty room is out of the queue now, so nobody comes to it; it simply runs out like any other room
+      if (sat[0]) return good({ queued: false, join: other[0].code, seat: 1, cap: 2, now });
+    }
+    await db.query('INSERT INTO zz.queue (code, made, seen, pool, dev) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (code) DO NOTHING', [code, mine[0].made, now, w.pool, w.dev]);
+  }
+  return good({ queued: true, now });
 }
 // The host shuts the door: nobody else can take a seat (the match is starting with whoever is here).
 async function roomLock(db, body, now) {
