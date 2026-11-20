@@ -1076,7 +1076,7 @@
       for (i = 0; i < L.LANGS.length; i++) langs += '<option value="' + L.LANGS[i][0] + '">' + L.LANGS[i][1] + '</option>';
       var ais = '';
       for (i = -2; i <= 2; i++) ais += '<option value="' + i + '">' + t('s.ai' + aiKey(i)) + '</option>';
-      h = '<h2>' + t('m.settings') + '</h2><div class="field line"><label for="sLang">' + t('s.lang') + '</label><select id="sLang">' + langs + '</select></div>' +
+      h = '<h2>' + t('m.settings') + '</h2><div class="row"><button class="btn sm" type="button" data-tab="site">' + t('k.site') + '</button></div><div class="field line"><label for="sLang">' + t('s.lang') + '</label><select id="sLang">' + langs + '</select></div>' +
         '<h3>' + t('s.foe') + '</h3><div class="field line"><label for="sAi">' + t('s.ai') + '</label><select id="sAi">' + ais + '</select><small>' + t('s.aiN') + '</small></div>' +
         '<h3>' + t('s.feel') + '</h3>' +
         field('sDas', t('s.das'), 60, 300, 5, t('s.dasN')) + field('sArr', t('s.arr'), 0, 80, 5, t('s.arrN')) +
@@ -1674,6 +1674,7 @@
   function applyLook() {
     var e = Meta.data.equip, root = document.documentElement;
     if (e.theme && e.theme !== 'auto') root.setAttribute('data-skin', e.theme); else root.removeAttribute('data-skin');
+    if (e.site && e.site !== 'default') root.setAttribute('data-site', e.site); else root.removeAttribute('data-site');
     View.readTheme();
     View.terrazzo();
     View.setLook({ tile: e.tile, bg: e.bg, fx: e.fx, dim: Meta.data.custom.dim });

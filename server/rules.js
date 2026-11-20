@@ -207,6 +207,10 @@ function importState(raw, now) {
     const worn = obj(src.equip)[kind];
     if (typeof worn === 'string' && Meta.find(kind, worn)) d.equip[kind] = worn;
   });
+  // site themes bought with coins come along; the Steam unlock never does (only the server sets it)
+  d.owned.site = list(obj(src.owned).site).filter((id, i, a) => typeof id === 'string' && Meta.SITE.some(t => t.id === id && t.tier === 'coin') && a.indexOf(id) === i);
+  if (typeof obj(src.equip).site === 'string') d.equip.site = obj(src.equip).site;
+  d.steam = false;
   // each kind held to IMPORT_ITEM, and all of them together to IMPORT_ITEMS (there are 200 kinds)
   let itemsLeft = LIMIT.IMPORT_ITEMS;
   for (let i = 1; i < Meta.ITEM_PRICE.length; i++) { const n = Math.min(int(list(src.items)[i], 0, LIMIT.IMPORT_ITEM), itemsLeft); d.items[i] = n; itemsLeft -= n; }

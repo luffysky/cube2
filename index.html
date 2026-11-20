@@ -914,6 +914,43 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .dr-body button:hover, .dr-body a:hover { background: var(--panel); }
 .dr-body button[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+/* site theme cards: the page in miniature */
+.pv.sw.site { display: flex; align-items: center; justify-content: center; border: 1px solid; border-radius: 10px; }
+.pv.sw.site span { width: 62%; height: 58%; border-radius: 8px; border: 1px solid; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 10%; }
+.pv.sw.site i { display: block; height: 5px; border-radius: 3px; width: 80%; }
+.pv.sw.site i + i { width: 45%; }
+.steamtag { background: #1B2838; color: #C7D5E0; }
+
+/* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
+   (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
+   into 轉磚's page (build.js) and is linked by every brick-game page (games/theme.js puts the attribute on).
+   "default" sets nothing: the site follows the game's theme and the device's light or dark setting, as before. */
+
+/* ---- always there ---- */
+:root[data-site="dark"] { --floor: #121418; --floor-chip: #22262D; --panel: #1E2228; --edge: #343A44; --edge-deep: #08090B; --ink: #EEF1F4; --muted: #9AA3AE; --gold-ink: #F5C55A; color-scheme: dark; }
+:root[data-site="white"] { --floor: #FFFFFF; --floor-chip: #EDF0F3; --panel: #FFFFFF; --edge: #D6DCE2; --edge-deep: #AEB7C1; --ink: #14191F; --muted: #5B6672; --gold-ink: #7E5900; color-scheme: light; }
+
+/* ---- free: plain tones ---- */
+:root[data-site="slate"] { --floor: #DCE3EA; --floor-chip: #BCC8D4; --panel: #F4F7FA; --edge: #AEBBC9; --edge-deep: #7F8FA1; --ink: #1A2633; --muted: #4F5F70; --gold-ink: #7E5900; color-scheme: light; }
+:root[data-site="sage"] { --floor: #E2EADF; --floor-chip: #C3D3BD; --panel: #F7FAF5; --edge: #B4C6AD; --edge-deep: #849A7C; --ink: #1E2B1C; --muted: #52634E; --gold-ink: #6E5000; color-scheme: light; }
+:root[data-site="sand"] { --floor: #F1E9DD; --floor-chip: #DDCDB5; --panel: #FFFBF4; --edge: #D3C2A6; --edge-deep: #A99271; --ink: #2E241A; --muted: #6D5D4A; --gold-ink: #7A5200; color-scheme: light; }
+
+/* ---- bought with coins ---- */
+:root[data-site="mist"] { --floor: #E6EAF2; --floor-chip: #CDD4E3; --panel: #FAFBFE; --edge: #C2CADB; --edge-deep: #8D98B3; --ink: #1C2235; --muted: #59617A; --gold-ink: #6F5100; color-scheme: light; }
+:root[data-site="maple"] { --floor: #3A1A14; --floor-chip: #52261C; --panel: #4A2219; --edge: #6E3426; --edge-deep: #1C0A06; --ink: #FFE9DE; --muted: #E0A790; --gold-ink: #FFC24D; color-scheme: dark; }
+:root[data-site="seasalt"] { --floor: #DDEFF0; --floor-chip: #B4DCDE; --panel: #F5FCFC; --edge: #A3CFD2; --edge-deep: #6AA3A8; --ink: #0F2E33; --muted: #3F6A70; --gold-ink: #6E5000; color-scheme: light; }
+:root[data-site="amber"] { --floor: #2B2010; --floor-chip: #3F2F16; --panel: #3A2B14; --edge: #5C4520; --edge-deep: #120C04; --ink: #FFF1D6; --muted: #D8B47A; --gold-ink: #FFC845; color-scheme: dark; }
+:root[data-site="starry"] { --floor: #10142B; --floor-chip: #1E2448; --panel: #191E3C; --edge: #2E3664; --edge-deep: #05070F; --ink: #E9ECFF; --muted: #A2A9D8; --gold-ink: #FFD36A; color-scheme: dark; }
+
+/* ---- members ---- */
+:root[data-site="aurora"] { --floor: #0E1F24; --floor-chip: #17363B; --panel: #132B31; --edge: #22505A; --edge-deep: #050D0F; --ink: #E2FFF6; --muted: #8FD3C4; --gold-ink: #B8FF8A; color-scheme: dark; }
+:root[data-site="snowrealm"] { --floor: #EAF3FB; --floor-chip: #CFE2F3; --panel: #FFFFFF; --edge: #B9D3EA; --edge-deep: #7FA6CB; --ink: #0E2A47; --muted: #4A6A8C; --gold-ink: #6F5100; color-scheme: light; }
+:root[data-site="neon"] { --floor: #0B0B14; --floor-chip: #1A1A2E; --panel: #15152A; --edge: #3B1F5C; --edge-deep: #000000; --ink: #F4F0FF; --muted: #C59BFF; --gold-ink: #3CF2E0; color-scheme: dark; }
+:root[data-site="gilded"] { --floor: #1A160C; --floor-chip: #2C2412; --panel: #241E10; --edge: #6B5524; --edge-deep: #060402; --ink: #FFF4D4; --muted: #E6C77A; --gold-ink: #FFD75E; color-scheme: dark; }
+
+/* ---- Steam version only ---- */
+:root[data-site="furnace"] { --floor: #1C1512; --floor-chip: #2E221C; --panel: #271D18; --edge: #5A3B2A; --edge-deep: #090605; --ink: #FFE7D6; --muted: #D59A75; --gold-ink: #FF9D4D; color-scheme: dark; }
+:root[data-site="harbor"] { --floor: #14202C; --floor-chip: #1F3142; --panel: #1A2A3A; --edge: #2F4A63; --edge-deep: #060B10; --ink: #E3EEF8; --muted: #8DAAC4; --gold-ink: #66C0F4; color-scheme: dark; }
 </style>
 </head>
 <body>
@@ -992,6 +1029,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         <button type="button" data-go="sprint"><span data-t="m.sprint">40 行競速</span></button>
         <h3 data-t="dr.rewards">金幣與獎勵</h3>
         <button type="button" data-sheet="shop"><span data-t="m.shop">商店</span></button>
+        <button type="button" data-sheet="shop" data-sitepick><span data-t="k.site">網站主題</span></button>
         <button type="button" data-sheet="boxes"><span data-t="bx.title">寶箱</span><i class="dot" id="drBoxDot" hidden></i></button>
         <button type="button" data-sheet="bonus"><span data-t="bn.title">福利</span></button>
         <button type="button" data-sheet="jobs"><span data-t="m.jobs">每日任務</span><i class="dot" id="drJobsDot" hidden></i></button>
@@ -3523,6 +3561,29 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     ZZ.L.add(add);
   })();
   var KINDS = ['tile', 'bg', 'theme', 'fx'];
+  // Site themes: the colours of the whole site (menus, panels, sheets, the side menu and the brick games' pages),
+  // apart from the game's own look above. tier: base (always), free, coin (bought once), sub (members), steam (the
+  // Steam version only: unlocked by the server for Steam players; there is no Steam version yet, so these stay locked).
+  var SITE = [
+    { id: 'default', name: '預設', tier: 'base' },
+    { id: 'dark', name: '黑', tier: 'base' },
+    { id: 'white', name: '白', tier: 'base' },
+    { id: 'slate', name: '灰藍', tier: 'free' },
+    { id: 'sage', name: '淺綠', tier: 'free' },
+    { id: 'sand', name: '米杏', tier: 'free' },
+    { id: 'mist', name: '晨霧', tier: 'coin', price: 800 },
+    { id: 'maple', name: '楓紅', tier: 'coin', price: 1000 },
+    { id: 'seasalt', name: '海鹽', tier: 'coin', price: 1000 },
+    { id: 'amber', name: '琥珀', tier: 'coin', price: 1500 },
+    { id: 'starry', name: '星夜', tier: 'coin', price: 1500 },
+    { id: 'aurora', name: '極光', tier: 'sub' },
+    { id: 'snowrealm', name: '雪境', tier: 'sub' },
+    { id: 'neon', name: '霓虹', tier: 'sub' },
+    { id: 'gilded', name: '金箔', tier: 'sub' },
+    { id: 'furnace', name: '鍋爐', tier: 'steam' },
+    { id: 'harbor', name: '夜港', tier: 'steam' }
+  ];
+  function siteOf(id) { for (var i = 0; i < SITE.length; i++) if (SITE[i].id === id) return SITE[i]; return null; }
   var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
   // what each of the 200 items costs in the shop (engine.js ITEMS; the first seven keep their old prices)
   var ITEM_PRICE = ZZ.ITEMS.map(function (d) { return d ? d.price : 0; });
@@ -3620,8 +3681,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     return {
       v: 1, coins: 200, name: '', rp: 0, peak: 0, season: '', rgames: 0, streak: 0,
       xp: 0, titles: [], title: '',
-      owned: { tile: [], bg: [], theme: [], fx: [] },
-      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
+      owned: { tile: [], bg: [], theme: [], fx: [], site: [] }, steam: false,
+      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
@@ -3636,7 +3697,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   }
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
-    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
+    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, SITE: SITE, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
     SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
     TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
@@ -3911,6 +3972,33 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   };
 
   Meta.owns = function (kind, id) { return Meta.data.owned[kind].indexOf(id) >= 0; };
+  // ---------- site themes ----------
+  // ok · buy (coins) · sub (members only) · steam (Steam version only) · none
+  Meta.siteState = function (id) {
+    var it = siteOf(id);
+    if (!it) return 'none';
+    if (it.tier === 'base' || it.tier === 'free') return 'ok';
+    if (it.tier === 'steam') return Meta.data.steam === true ? 'ok' : 'steam';
+    if (it.tier === 'sub') return Meta.isSub() ? 'ok' : 'sub';
+    return Meta.owns('site', id) || Meta.isSub() ? 'ok' : 'buy';
+  };
+  Meta.buySite = function (id) {
+    var it = siteOf(id);
+    if (!it || it.tier !== 'coin') return { ok: false, why: 'no' };
+    if (Meta.owns('site', id)) return { ok: false, why: 'have' };
+    if (!Meta.spend(it.price)) return { ok: false, why: 'poor', n: it.price - Meta.data.coins };
+    Meta.data.owned.site.push(id);
+    Meta.save();
+    emit('sbuy', [id]);
+    return { ok: true };
+  };
+  Meta.wearSite = function (id) {
+    if (Meta.siteState(id) !== 'ok') return false;
+    Meta.data.equip.site = id;
+    Meta.save();
+    emit('swear', [id]);
+    return true;
+  };
   Meta.state = function (kind, id) {
     var it = find(kind, id);
     if (!it) return 'none';
@@ -3976,6 +4064,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   Meta.tidy = function () {
     var d = Meta.data, def = blank().equip;
     KINDS.forEach(function (k) { if (!Meta.canUse(k, d.equip[k])) d.equip[k] = def[k]; });
+    d.owned.site = d.owned.site.filter(function (id, i, a) { var it = siteOf(id); return it && it.tier === 'coin' && a.indexOf(id) === i; });
+    if (Meta.siteState(d.equip.site) !== 'ok') d.equip.site = 'default';
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
     d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
@@ -4299,6 +4389,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
+    sbuy: function (a) { return Meta.buySite(str(a[0])); },
+    swear: function (a) { return yes(Meta.wearSite(str(a[0]))); },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
     set: function (a) { return Meta.buySet(str(a[0])); },
     item: function (a) { return itemId(a[0]) ? Meta.buyItem(a[0]) : yes(0); },
@@ -7178,7 +7270,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       for (i = 0; i < L.LANGS.length; i++) langs += '<option value="' + L.LANGS[i][0] + '">' + L.LANGS[i][1] + '</option>';
       var ais = '';
       for (i = -2; i <= 2; i++) ais += '<option value="' + i + '">' + t('s.ai' + aiKey(i)) + '</option>';
-      h = '<h2>' + t('m.settings') + '</h2><div class="field line"><label for="sLang">' + t('s.lang') + '</label><select id="sLang">' + langs + '</select></div>' +
+      h = '<h2>' + t('m.settings') + '</h2><div class="row"><button class="btn sm" type="button" data-tab="site">' + t('k.site') + '</button></div><div class="field line"><label for="sLang">' + t('s.lang') + '</label><select id="sLang">' + langs + '</select></div>' +
         '<h3>' + t('s.foe') + '</h3><div class="field line"><label for="sAi">' + t('s.ai') + '</label><select id="sAi">' + ais + '</select><small>' + t('s.aiN') + '</small></div>' +
         '<h3>' + t('s.feel') + '</h3>' +
         field('sDas', t('s.das'), 60, 300, 5, t('s.dasN')) + field('sArr', t('s.arr'), 0, 80, 5, t('s.arrN')) +
@@ -7776,6 +7868,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   function applyLook() {
     var e = Meta.data.equip, root = document.documentElement;
     if (e.theme && e.theme !== 'auto') root.setAttribute('data-skin', e.theme); else root.removeAttribute('data-skin');
+    if (e.site && e.site !== 'default') root.setAttribute('data-site', e.site); else root.removeAttribute('data-site');
     View.readTheme();
     View.terrazzo();
     View.setLook({ tile: e.tile, bg: e.bg, fx: e.fx, dim: Meta.data.custom.dim });
@@ -9108,6 +9201,15 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'k.tile': ['方塊', 'Tiles', 'タイル', '타일'],
     'k.bg': ['牆面', 'Wall', '壁', '벽'],
     'k.theme': ['主題', 'Theme', 'テーマ', '테마'],
+    'k.site': ['網站主題', 'Site theme', 'サイトテーマ', '사이트 테마'],
+    'st.p': ['整個網站的顏色：選單、側邊欄、視窗和磚塊小遊戲的頁面都會換。遊戲畫面的牆面還是跟著上面的「主題」。', 'The colours of the whole site: menus, the side menu, windows and the brick games\' pages. The game wall still follows "Theme".', 'サイト全体の色：メニュー、サイドメニュー、ウィンドウ、ブロックゲームのページ。ゲームの壁は「テーマ」のままです。', '사이트 전체 색상: 메뉴, 사이드 메뉴, 창, 블록 게임 페이지. 게임 벽은 "테마"를 따릅니다.'],
+    'st.base': ['基本', 'Basic', '基本', '기본'],
+    'st.free': ['免費', 'Free', '無料', '무료'],
+    'st.coin': ['金幣購買', 'With coins', 'コインで購入', '코인 구매'],
+    'st.sub': ['會員限定', 'Members only', 'メンバー限定', '멤버 전용'],
+    'st.steam': ['Steam 限定', 'Steam only', 'Steam 限定', 'Steam 전용'],
+    'st.steamNote': ['Steam 版推出後，用 Steam 玩的玩家可以用。', 'For players on the Steam version, once it is out.', 'Steam 版リリース後、Steam のプレイヤーが使えます。', 'Steam 버전 출시 후 Steam 플레이어가 쓸 수 있어요.'],
+    'st.default': ['跟著遊戲主題和裝置的深淺色', 'Follows the game theme and the device\'s light or dark', 'ゲームテーマと端末の明暗に合わせる', '게임 테마와 기기 밝기를 따름'],
     'k.fx': ['消行特效', 'Clear effects', '消去エフェクト', '줄 삭제 효과'],
     'k.items': ['道具', 'Items', 'アイテム', '아이템'],
     'k.member': ['會員', 'Member', 'メンバー', '멤버십'],
@@ -9385,7 +9487,33 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   };
   // the holiday themes' card colours (their names come from meta.js)
   Meta.FESTIVE.forEach(function (f) { SWATCH[f.id] = [f.th[0], f.th[2] ? View.mix(f.th[0], '#FFFFFF', 0.06) : View.mix(f.th[0], '#FFFFFF', 0.7), f.th[1], f.pal[1]]; });
-  var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'items', 'member'], tab = 'set';
+  var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'site', 'items', 'member'], tab = 'set';
+  // site themes: a little picture of the page in the theme's own colours (read from the stylesheet itself)
+  var SITE_VARS = ['--floor', '--panel', '--ink', '--gold-ink', '--edge'];
+  function siteSwatch(id) {
+    var probe = document.documentElement, was = probe.getAttribute('data-site'), out = [];
+    if (id === 'default') probe.removeAttribute('data-site'); else probe.setAttribute('data-site', id);
+    var cs = getComputedStyle(probe);
+    SITE_VARS.forEach(function (v) { out.push(cs.getPropertyValue(v).trim()); });
+    if (was) probe.setAttribute('data-site', was); else probe.removeAttribute('data-site');
+    return '<div class="pv sw site" style="background:' + out[0] + ';border-color:' + out[4] + '"><span style="background:' + out[1] + ';border-color:' + out[4] + '"><i style="background:' + out[2] + '"></i><i style="background:' + out[3] + '"></i></span></div>';
+  }
+  function siteHtml() {
+    var h = '<p class="note">' + t('st.p') + '</p>', tiers = ['base', 'free', 'coin', 'sub', 'steam'];
+    tiers.forEach(function (tier) {
+      h += '<h3>' + t('st.' + tier) + '</h3>' + (tier === 'steam' ? '<p class="note">' + t('st.steamNote') + '</p>' : '') + '<div class="cards">';
+      Meta.SITE.filter(function (it) { return it.tier === tier; }).forEach(function (it) {
+        var st = Meta.siteState(it.id), on = Meta.data.equip.site === it.id, act;
+        if (on) act = '<span class="tag on">' + t('sh.using') + '</span>';
+        else if (st === 'ok') act = '<button class="btn sm" type="button" data-swear="' + it.id + '">' + t('sh.wear') + '</button>';
+        else if (st === 'buy') act = '<button class="btn sm buy" type="button" data-sbuy="' + it.id + '">' + coin(it.price) + '</button>';
+        else act = '<span class="tag lock">' + t(st === 'steam' ? 'st.steam' : 'st.sub') + '</span>';
+        h += '<div class="card' + (on ? ' on' : '') + '">' + siteSwatch(it.id) + '<b>' + esc(it.name) + (tier === 'steam' ? ' <small class="festtag steamtag">' + t('st.steam') + '</small>' : '') + '</b>' + (it.id === 'default' ? '<small class="parts">' + t('st.default') + '</small>' : '') + act + '</div>';
+      });
+      h += '</div>';
+    });
+    return h;
+  }
   function fail(r) { App.toast(t('e.' + r.why, r.n != null ? r.n : '')); App.sfx.play('fail'); }
 
   // ---------- the player's own pictures (kept on this device in IndexedDB) ----------
@@ -9572,11 +9700,14 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (tab === 'set') h += setsHtml();
     else if (tab === 'items') h += itemsHtml();
     else if (tab === 'member') h += memberHtml();
+    else if (tab === 'site') h += siteHtml();
     else h += cardsHtml(tab);
     return h + '<div class="row">' + btn('close', 'close') + '</div>';
   };
   var pickKey = '';
   App.opened.shop = function () {
+    var on = App.el.sheetCard.querySelector('[role="tab"][aria-selected="true"]'), bar = on && on.parentNode;
+    if (bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, on.offsetLeft - bar.offsetLeft - 16);   // the picked tab in sight
     var list = App.el.sheetCard.querySelectorAll('canvas[data-pv]'), i;
     for (i = 0; i < list.length; i++) {
       var p = list[i].getAttribute('data-pv').split('|'), w = list[i].clientWidth || 120, look = {};
@@ -9602,6 +9733,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (el.id === 'pName') { Meta.setName(el.value); return true; }
     return false;
   });
+  // the side menu's 網站主題 opens the shop on that tab (the menu's own handler opens the shop)
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-sitepick]'); if (b) tab = 'site'; }, true);
   App.clicks.push(function (d) {
     var p, r;
     if (d.tab) { tab = d.tab; App.openSheet('shop'); App.el.sheetCard.scrollTop = 0; return true; }
@@ -9610,6 +9743,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       p = d.buy.split('|'); r = Meta.buy(p[0], p[1]);
       if (!r.ok) { fail(r); return true; }
       Meta.equip(p[0], p[1]); App.applyLook(); App.sfx.play('itemGet'); App.toast(t('sh.bought')); App.openSheet('shop');
+      return true;
+    }
+    if (d.swear) { if (Meta.wearSite(d.swear)) { App.applyLook(); App.openSheet('shop'); } return true; }
+    if (d.sbuy) {
+      r = Meta.buySite(d.sbuy);
+      if (!r.ok) { fail(r); return true; }
+      Meta.wearSite(d.sbuy); App.applyLook(); App.sfx.play('itemGet'); App.toast(t('sh.bought')); App.openSheet('shop');
       return true;
     }
     if (d.wearset) { if (Meta.equipSet(d.wearset)) { App.applyLook(); App.openSheet('shop'); } return true; }

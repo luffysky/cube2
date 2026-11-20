@@ -54,7 +54,7 @@ const sp = M.setPrice('market');
 eq(sp.full, 1200 + 900 + 1000 + 600, 'set full price');
 eq(sp.price, Math.round((900 + 1000 + 600) * 0.75 / 10) * 10, 'set price skips owned parts');
 ok(M.buySet('market').ok && M.setUsable('market') && M.equipSet('market'), 'buy and wear a set');
-eq(M.data.equip, { tile: 'neon', bg: 'neongrid', theme: 'market', fx: 'star' }, 'set equipped');
+eq(M.data.equip, { tile: 'neon', bg: 'neongrid', theme: 'market', fx: 'star', site: 'default' }, 'set equipped');
 ok(!M.buySet('market').ok, 'set already owned');
 // items
 ok(M.buyItem(2).ok && M.data.items[2] === 1, 'buy item');
@@ -249,6 +249,33 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   M.now = () => Date.UTC(2026, 10, 19, 4, 30);
   M.reset(); M.finish(win); ok(!M.hasTitle('night'), 'not at noon');
   M.now = nowWas;
+}
+// ---------- site themes ----------
+{
+  M.reset();
+  const tiers = {}; M.SITE.forEach(t => { tiers[t.tier] = (tiers[t.tier] || 0) + 1; });
+  eq(tiers, { base: 3, free: 3, coin: 5, sub: 4, steam: 2 }, 'site themes: 3 basic, 3 free, 5 for coins, 4 for members, 2 Steam only');
+  eq(new Set(M.SITE.map(t => t.id)).size, M.SITE.length, 'site theme ids are all different');
+  eq(M.data.equip.site, 'default', 'the site starts on the default look');
+  ok(['default', 'dark', 'white', 'slate', 'sage', 'sand'].every(id => M.siteState(id) === 'ok'), 'basic and free themes need nothing');
+  eq(M.siteState('mist'), 'buy', 'a coin theme has to be bought');
+  eq(M.siteState('aurora'), 'sub', 'a member theme waits for membership');
+  eq(M.siteState('furnace'), 'steam', 'a Steam theme waits for the Steam version');
+  ok(M.wearSite('sage') && M.data.equip.site === 'sage', 'wear a free theme');
+  ok(!M.wearSite('mist') && M.data.equip.site === 'sage', 'cannot wear one not bought');
+  M.data.coins = 500; eq(M.buySite('mist'), { ok: false, why: 'poor', n: 300 }, 'not enough coins');
+  M.data.coins = 900; ok(M.buySite('mist').ok && M.data.coins === 100 && M.owns('site', 'mist'), 'buy one with coins');
+  eq(M.buySite('mist').why, 'have', 'not twice');
+  eq(M.buySite('aurora').why, 'no', 'member themes are not for sale'); eq(M.buySite('furnace').why, 'no', 'nor the Steam ones');
+  ok(M.wearSite('mist'), 'wear what was bought');
+  M.data.sub.until = clock + 86400000;
+  ok(M.siteState('aurora') === 'ok' && M.siteState('maple') === 'ok' && M.siteState('furnace') === 'steam', 'members get the member themes and the coin ones, not Steam');
+  ok(M.wearSite('aurora'), 'a member wears a member theme');
+  M.data.sub.until = 0; M.save(); M.load();
+  eq(M.data.equip.site, 'default', 'when membership ends the member theme comes off');
+  M.data.steam = true; ok(M.wearSite('harbor'), 'a Steam player wears a Steam theme');
+  M.data.steam = false; M.data.owned.site.push('aurora', 'nope', 'mist'); M.save(); M.load();
+  eq(M.data.owned.site, ['mist'], 'only bought coin themes stay owned');
 }
 console.log('meta tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

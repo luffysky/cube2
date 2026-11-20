@@ -864,3 +864,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .dr-body button:hover, .dr-body a:hover { background: var(--panel); }
 .dr-body button[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+/* site theme cards: the page in miniature */
+.pv.sw.site { display: flex; align-items: center; justify-content: center; border: 1px solid; border-radius: 10px; }
+.pv.sw.site span { width: 62%; height: 58%; border-radius: 8px; border: 1px solid; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 10%; }
+.pv.sw.site i { display: block; height: 5px; border-radius: 3px; width: 80%; }
+.pv.sw.site i + i { width: 45%; }
+.steamtag { background: #1B2838; color: #C7D5E0; }

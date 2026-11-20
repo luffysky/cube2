@@ -10,6 +10,15 @@
     'k.tile': ['方塊', 'Tiles', 'タイル', '타일'],
     'k.bg': ['牆面', 'Wall', '壁', '벽'],
     'k.theme': ['主題', 'Theme', 'テーマ', '테마'],
+    'k.site': ['網站主題', 'Site theme', 'サイトテーマ', '사이트 테마'],
+    'st.p': ['整個網站的顏色：選單、側邊欄、視窗和磚塊小遊戲的頁面都會換。遊戲畫面的牆面還是跟著上面的「主題」。', 'The colours of the whole site: menus, the side menu, windows and the brick games\' pages. The game wall still follows "Theme".', 'サイト全体の色：メニュー、サイドメニュー、ウィンドウ、ブロックゲームのページ。ゲームの壁は「テーマ」のままです。', '사이트 전체 색상: 메뉴, 사이드 메뉴, 창, 블록 게임 페이지. 게임 벽은 "테마"를 따릅니다.'],
+    'st.base': ['基本', 'Basic', '基本', '기본'],
+    'st.free': ['免費', 'Free', '無料', '무료'],
+    'st.coin': ['金幣購買', 'With coins', 'コインで購入', '코인 구매'],
+    'st.sub': ['會員限定', 'Members only', 'メンバー限定', '멤버 전용'],
+    'st.steam': ['Steam 限定', 'Steam only', 'Steam 限定', 'Steam 전용'],
+    'st.steamNote': ['Steam 版推出後，用 Steam 玩的玩家可以用。', 'For players on the Steam version, once it is out.', 'Steam 版リリース後、Steam のプレイヤーが使えます。', 'Steam 버전 출시 후 Steam 플레이어가 쓸 수 있어요.'],
+    'st.default': ['跟著遊戲主題和裝置的深淺色', 'Follows the game theme and the device\'s light or dark', 'ゲームテーマと端末の明暗に合わせる', '게임 테마와 기기 밝기를 따름'],
     'k.fx': ['消行特效', 'Clear effects', '消去エフェクト', '줄 삭제 효과'],
     'k.items': ['道具', 'Items', 'アイテム', '아이템'],
     'k.member': ['會員', 'Member', 'メンバー', '멤버십'],
@@ -287,7 +296,33 @@
   };
   // the holiday themes' card colours (their names come from meta.js)
   Meta.FESTIVE.forEach(function (f) { SWATCH[f.id] = [f.th[0], f.th[2] ? View.mix(f.th[0], '#FFFFFF', 0.06) : View.mix(f.th[0], '#FFFFFF', 0.7), f.th[1], f.pal[1]]; });
-  var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'items', 'member'], tab = 'set';
+  var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'site', 'items', 'member'], tab = 'set';
+  // site themes: a little picture of the page in the theme's own colours (read from the stylesheet itself)
+  var SITE_VARS = ['--floor', '--panel', '--ink', '--gold-ink', '--edge'];
+  function siteSwatch(id) {
+    var probe = document.documentElement, was = probe.getAttribute('data-site'), out = [];
+    if (id === 'default') probe.removeAttribute('data-site'); else probe.setAttribute('data-site', id);
+    var cs = getComputedStyle(probe);
+    SITE_VARS.forEach(function (v) { out.push(cs.getPropertyValue(v).trim()); });
+    if (was) probe.setAttribute('data-site', was); else probe.removeAttribute('data-site');
+    return '<div class="pv sw site" style="background:' + out[0] + ';border-color:' + out[4] + '"><span style="background:' + out[1] + ';border-color:' + out[4] + '"><i style="background:' + out[2] + '"></i><i style="background:' + out[3] + '"></i></span></div>';
+  }
+  function siteHtml() {
+    var h = '<p class="note">' + t('st.p') + '</p>', tiers = ['base', 'free', 'coin', 'sub', 'steam'];
+    tiers.forEach(function (tier) {
+      h += '<h3>' + t('st.' + tier) + '</h3>' + (tier === 'steam' ? '<p class="note">' + t('st.steamNote') + '</p>' : '') + '<div class="cards">';
+      Meta.SITE.filter(function (it) { return it.tier === tier; }).forEach(function (it) {
+        var st = Meta.siteState(it.id), on = Meta.data.equip.site === it.id, act;
+        if (on) act = '<span class="tag on">' + t('sh.using') + '</span>';
+        else if (st === 'ok') act = '<button class="btn sm" type="button" data-swear="' + it.id + '">' + t('sh.wear') + '</button>';
+        else if (st === 'buy') act = '<button class="btn sm buy" type="button" data-sbuy="' + it.id + '">' + coin(it.price) + '</button>';
+        else act = '<span class="tag lock">' + t(st === 'steam' ? 'st.steam' : 'st.sub') + '</span>';
+        h += '<div class="card' + (on ? ' on' : '') + '">' + siteSwatch(it.id) + '<b>' + esc(it.name) + (tier === 'steam' ? ' <small class="festtag steamtag">' + t('st.steam') + '</small>' : '') + '</b>' + (it.id === 'default' ? '<small class="parts">' + t('st.default') + '</small>' : '') + act + '</div>';
+      });
+      h += '</div>';
+    });
+    return h;
+  }
   function fail(r) { App.toast(t('e.' + r.why, r.n != null ? r.n : '')); App.sfx.play('fail'); }
 
   // ---------- the player's own pictures (kept on this device in IndexedDB) ----------
@@ -474,11 +509,14 @@
     if (tab === 'set') h += setsHtml();
     else if (tab === 'items') h += itemsHtml();
     else if (tab === 'member') h += memberHtml();
+    else if (tab === 'site') h += siteHtml();
     else h += cardsHtml(tab);
     return h + '<div class="row">' + btn('close', 'close') + '</div>';
   };
   var pickKey = '';
   App.opened.shop = function () {
+    var on = App.el.sheetCard.querySelector('[role="tab"][aria-selected="true"]'), bar = on && on.parentNode;
+    if (bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, on.offsetLeft - bar.offsetLeft - 16);   // the picked tab in sight
     var list = App.el.sheetCard.querySelectorAll('canvas[data-pv]'), i;
     for (i = 0; i < list.length; i++) {
       var p = list[i].getAttribute('data-pv').split('|'), w = list[i].clientWidth || 120, look = {};
@@ -504,6 +542,8 @@
     if (el.id === 'pName') { Meta.setName(el.value); return true; }
     return false;
   });
+  // the side menu's 網站主題 opens the shop on that tab (the menu's own handler opens the shop)
+  document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-sitepick]'); if (b) tab = 'site'; }, true);
   App.clicks.push(function (d) {
     var p, r;
     if (d.tab) { tab = d.tab; App.openSheet('shop'); App.el.sheetCard.scrollTop = 0; return true; }
@@ -512,6 +552,13 @@
       p = d.buy.split('|'); r = Meta.buy(p[0], p[1]);
       if (!r.ok) { fail(r); return true; }
       Meta.equip(p[0], p[1]); App.applyLook(); App.sfx.play('itemGet'); App.toast(t('sh.bought')); App.openSheet('shop');
+      return true;
+    }
+    if (d.swear) { if (Meta.wearSite(d.swear)) { App.applyLook(); App.openSheet('shop'); } return true; }
+    if (d.sbuy) {
+      r = Meta.buySite(d.sbuy);
+      if (!r.ok) { fail(r); return true; }
+      Meta.wearSite(d.sbuy); App.applyLook(); App.sfx.play('itemGet'); App.toast(t('sh.bought')); App.openSheet('shop');
       return true;
     }
     if (d.wearset) { if (Meta.equipSet(d.wearset)) { App.applyLook(); App.openSheet('shop'); } return true; }

@@ -252,6 +252,29 @@
     ZZ.L.add(add);
   })();
   var KINDS = ['tile', 'bg', 'theme', 'fx'];
+  // Site themes: the colours of the whole site (menus, panels, sheets, the side menu and the brick games' pages),
+  // apart from the game's own look above. tier: base (always), free, coin (bought once), sub (members), steam (the
+  // Steam version only: unlocked by the server for Steam players; there is no Steam version yet, so these stay locked).
+  var SITE = [
+    { id: 'default', name: '預設', tier: 'base' },
+    { id: 'dark', name: '黑', tier: 'base' },
+    { id: 'white', name: '白', tier: 'base' },
+    { id: 'slate', name: '灰藍', tier: 'free' },
+    { id: 'sage', name: '淺綠', tier: 'free' },
+    { id: 'sand', name: '米杏', tier: 'free' },
+    { id: 'mist', name: '晨霧', tier: 'coin', price: 800 },
+    { id: 'maple', name: '楓紅', tier: 'coin', price: 1000 },
+    { id: 'seasalt', name: '海鹽', tier: 'coin', price: 1000 },
+    { id: 'amber', name: '琥珀', tier: 'coin', price: 1500 },
+    { id: 'starry', name: '星夜', tier: 'coin', price: 1500 },
+    { id: 'aurora', name: '極光', tier: 'sub' },
+    { id: 'snowrealm', name: '雪境', tier: 'sub' },
+    { id: 'neon', name: '霓虹', tier: 'sub' },
+    { id: 'gilded', name: '金箔', tier: 'sub' },
+    { id: 'furnace', name: '鍋爐', tier: 'steam' },
+    { id: 'harbor', name: '夜港', tier: 'steam' }
+  ];
+  function siteOf(id) { for (var i = 0; i < SITE.length; i++) if (SITE[i].id === id) return SITE[i]; return null; }
   var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
   // what each of the 200 items costs in the shop (engine.js ITEMS; the first seven keep their old prices)
   var ITEM_PRICE = ZZ.ITEMS.map(function (d) { return d ? d.price : 0; });
@@ -349,8 +372,8 @@
     return {
       v: 1, coins: 200, name: '', rp: 0, peak: 0, season: '', rgames: 0, streak: 0,
       xp: 0, titles: [], title: '',
-      owned: { tile: [], bg: [], theme: [], fx: [] },
-      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard' },
+      owned: { tile: [], bg: [], theme: [], fx: [], site: [] }, steam: false,
+      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
@@ -365,7 +388,7 @@
   }
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
-    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
+    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, SITE: SITE, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
     SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
     TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
@@ -640,6 +663,33 @@
   };
 
   Meta.owns = function (kind, id) { return Meta.data.owned[kind].indexOf(id) >= 0; };
+  // ---------- site themes ----------
+  // ok · buy (coins) · sub (members only) · steam (Steam version only) · none
+  Meta.siteState = function (id) {
+    var it = siteOf(id);
+    if (!it) return 'none';
+    if (it.tier === 'base' || it.tier === 'free') return 'ok';
+    if (it.tier === 'steam') return Meta.data.steam === true ? 'ok' : 'steam';
+    if (it.tier === 'sub') return Meta.isSub() ? 'ok' : 'sub';
+    return Meta.owns('site', id) || Meta.isSub() ? 'ok' : 'buy';
+  };
+  Meta.buySite = function (id) {
+    var it = siteOf(id);
+    if (!it || it.tier !== 'coin') return { ok: false, why: 'no' };
+    if (Meta.owns('site', id)) return { ok: false, why: 'have' };
+    if (!Meta.spend(it.price)) return { ok: false, why: 'poor', n: it.price - Meta.data.coins };
+    Meta.data.owned.site.push(id);
+    Meta.save();
+    emit('sbuy', [id]);
+    return { ok: true };
+  };
+  Meta.wearSite = function (id) {
+    if (Meta.siteState(id) !== 'ok') return false;
+    Meta.data.equip.site = id;
+    Meta.save();
+    emit('swear', [id]);
+    return true;
+  };
   Meta.state = function (kind, id) {
     var it = find(kind, id);
     if (!it) return 'none';
@@ -705,6 +755,8 @@
   Meta.tidy = function () {
     var d = Meta.data, def = blank().equip;
     KINDS.forEach(function (k) { if (!Meta.canUse(k, d.equip[k])) d.equip[k] = def[k]; });
+    d.owned.site = d.owned.site.filter(function (id, i, a) { var it = siteOf(id); return it && it.tier === 'coin' && a.indexOf(id) === i; });
+    if (Meta.siteState(d.equip.site) !== 'ok') d.equip.site = 'default';
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
     d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
@@ -1028,6 +1080,8 @@
     draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
     fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
+    sbuy: function (a) { return Meta.buySite(str(a[0])); },
+    swear: function (a) { return yes(Meta.wearSite(str(a[0]))); },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
     set: function (a) { return Meta.buySet(str(a[0])); },
     item: function (a) { return itemId(a[0]) ? Meta.buyItem(a[0]) : yes(0); },

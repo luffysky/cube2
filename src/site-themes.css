@@ -1,0 +1,30 @@
+/* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
+   (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
+   into 轉磚's page (build.js) and is linked by every brick-game page (games/theme.js puts the attribute on).
+   "default" sets nothing: the site follows the game's theme and the device's light or dark setting, as before. */
+
+/* ---- always there ---- */
+:root[data-site="dark"] { --floor: #121418; --floor-chip: #22262D; --panel: #1E2228; --edge: #343A44; --edge-deep: #08090B; --ink: #EEF1F4; --muted: #9AA3AE; --gold-ink: #F5C55A; color-scheme: dark; }
+:root[data-site="white"] { --floor: #FFFFFF; --floor-chip: #EDF0F3; --panel: #FFFFFF; --edge: #D6DCE2; --edge-deep: #AEB7C1; --ink: #14191F; --muted: #5B6672; --gold-ink: #7E5900; color-scheme: light; }
+
+/* ---- free: plain tones ---- */
+:root[data-site="slate"] { --floor: #DCE3EA; --floor-chip: #BCC8D4; --panel: #F4F7FA; --edge: #AEBBC9; --edge-deep: #7F8FA1; --ink: #1A2633; --muted: #4F5F70; --gold-ink: #7E5900; color-scheme: light; }
+:root[data-site="sage"] { --floor: #E2EADF; --floor-chip: #C3D3BD; --panel: #F7FAF5; --edge: #B4C6AD; --edge-deep: #849A7C; --ink: #1E2B1C; --muted: #52634E; --gold-ink: #6E5000; color-scheme: light; }
+:root[data-site="sand"] { --floor: #F1E9DD; --floor-chip: #DDCDB5; --panel: #FFFBF4; --edge: #D3C2A6; --edge-deep: #A99271; --ink: #2E241A; --muted: #6D5D4A; --gold-ink: #7A5200; color-scheme: light; }
+
+/* ---- bought with coins ---- */
+:root[data-site="mist"] { --floor: #E6EAF2; --floor-chip: #CDD4E3; --panel: #FAFBFE; --edge: #C2CADB; --edge-deep: #8D98B3; --ink: #1C2235; --muted: #59617A; --gold-ink: #6F5100; color-scheme: light; }
+:root[data-site="maple"] { --floor: #3A1A14; --floor-chip: #52261C; --panel: #4A2219; --edge: #6E3426; --edge-deep: #1C0A06; --ink: #FFE9DE; --muted: #E0A790; --gold-ink: #FFC24D; color-scheme: dark; }
+:root[data-site="seasalt"] { --floor: #DDEFF0; --floor-chip: #B4DCDE; --panel: #F5FCFC; --edge: #A3CFD2; --edge-deep: #6AA3A8; --ink: #0F2E33; --muted: #3F6A70; --gold-ink: #6E5000; color-scheme: light; }
+:root[data-site="amber"] { --floor: #2B2010; --floor-chip: #3F2F16; --panel: #3A2B14; --edge: #5C4520; --edge-deep: #120C04; --ink: #FFF1D6; --muted: #D8B47A; --gold-ink: #FFC845; color-scheme: dark; }
+:root[data-site="starry"] { --floor: #10142B; --floor-chip: #1E2448; --panel: #191E3C; --edge: #2E3664; --edge-deep: #05070F; --ink: #E9ECFF; --muted: #A2A9D8; --gold-ink: #FFD36A; color-scheme: dark; }
+
+/* ---- members ---- */
+:root[data-site="aurora"] { --floor: #0E1F24; --floor-chip: #17363B; --panel: #132B31; --edge: #22505A; --edge-deep: #050D0F; --ink: #E2FFF6; --muted: #8FD3C4; --gold-ink: #B8FF8A; color-scheme: dark; }
+:root[data-site="snowrealm"] { --floor: #EAF3FB; --floor-chip: #CFE2F3; --panel: #FFFFFF; --edge: #B9D3EA; --edge-deep: #7FA6CB; --ink: #0E2A47; --muted: #4A6A8C; --gold-ink: #6F5100; color-scheme: light; }
+:root[data-site="neon"] { --floor: #0B0B14; --floor-chip: #1A1A2E; --panel: #15152A; --edge: #3B1F5C; --edge-deep: #000000; --ink: #F4F0FF; --muted: #C59BFF; --gold-ink: #3CF2E0; color-scheme: dark; }
+:root[data-site="gilded"] { --floor: #1A160C; --floor-chip: #2C2412; --panel: #241E10; --edge: #6B5524; --edge-deep: #060402; --ink: #FFF4D4; --muted: #E6C77A; --gold-ink: #FFD75E; color-scheme: dark; }
+
+/* ---- Steam version only ---- */
+:root[data-site="furnace"] { --floor: #1C1512; --floor-chip: #2E221C; --panel: #271D18; --edge: #5A3B2A; --edge-deep: #090605; --ink: #FFE7D6; --muted: #D59A75; --gold-ink: #FF9D4D; color-scheme: dark; }
+:root[data-site="harbor"] { --floor: #14202C; --floor-chip: #1F3142; --panel: #1A2A3A; --edge: #2F4A63; --edge-deep: #060B10; --ink: #E3EEF8; --muted: #8DAAC4; --gold-ink: #66C0F4; color-scheme: dark; }

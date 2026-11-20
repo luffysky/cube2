@@ -77,8 +77,8 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   const B = await newPlayer({ name: ' <i>林董</i> ', coins: 999999, rp: 5000, peak: 9999, rgames: 77, owned: { tile: ['neon', 'gem', 'nope'], bg: ['night'] }, equip: { tile: 'neon', bg: 'night', theme: 'market' },
     items: [5, 99, 3], tot: { games: 12, wins: 50, best: 9e9, sprint: 1200 }, first: { drills: [0, 1, 1, 400], openers: ['tsd', 'x'] }, note: { kind: 'season', coins: 1e9 } }, '203.0.113.8');
   ok(B.st.name === 'i林董/i' && B.st.coins === 20000 && B.st.rp === 900 && B.st.peak === 900 && B.st.rgames === 0, 'imported record is held to plausible values', B.st);
-  eq(B.st.owned, { tile: ['neon'], bg: ['night'], theme: [], fx: [] }, 'only things that exist and can be bought are kept');
-  eq(B.st.equip, { tile: 'neon', bg: 'night', theme: 'auto', fx: 'shard' }, 'a look that is not owned comes off');
+  eq(B.st.owned, { tile: ['neon'], bg: ['night'], theme: [], fx: [], site: [] }, 'only things that exist and can be bought are kept');
+  eq(B.st.equip, { tile: 'neon', bg: 'night', theme: 'auto', fx: 'shard', site: 'default' }, 'a look that is not owned comes off');
   ok(B.st.items[1] === 20 && B.st.items[2] === 3 && B.st.items[0] === 0 && B.st.tot.wins === 12 && B.st.tot.sprint === 0 && B.st.note === null, 'items and totals clamped', B.st);
   eq(B.st.first, { drills: [0, 1], openers: ['tsd'] }, 'first clears: real ones only, once each');
   const many = []; for (let i = 0; i <= 200; i++) many.push(99);

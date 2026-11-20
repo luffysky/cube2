@@ -186,3 +186,22 @@
 - 測試：`node test/run.js` 全過；瀏覽器 `drawer` 28、`flow` 60、`rwd` 232、`consent` 31、`cloudui` 39、`minipay` 10、`bricks` 73、`pwa` 47。手機實機未驗。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
 - 未完成：登出要等 SnowRealm 帳號綁定開放。
+- 補記：上一條側邊選單的 commit 為 [`8a5a4b1`](https://github.com/luffysky/cube2/commit/8a5a4b1)。
+
+## 2026-11-20 18:35（Asia/Taipei）｜網站主題（整個網站換色）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-019（整個網站的主題，不只遊戲畫面；預設＝現在的樣子，加黑、白；免費簡單色調 3、金幣 5、訂閱 4、Steam 限定 2 並標「Steam 限定」）
+- 原因與目標：讓玩家換整站的顏色（選單、側邊欄、視窗、磚塊小遊戲頁面），遊戲牆面仍由原本商店的「主題」決定。
+- 實際變更：
+  - `Meta.SITE` 17 款：基本 3（預設、黑、白）、免費 3（灰藍、淺綠、米杏）、金幣 5（晨霧 800、楓紅 1000、海鹽 1000、琥珀 1500、星夜 1500）、會員 4（極光、雪境、霓虹、金箔）、Steam 限定 2（鍋爐、夜港）。
+  - 新增存檔欄位 `owned.site`、`equip.site`（預設 `default`）、`steam`（只有伺服器能設定；目前沒有 Steam 版，一律 false，Steam 款維持鎖定並寫「Steam 版推出後開放」）。會員也能用金幣款（跟商店其他東西一致）；會員到期自動換回預設。
+  - 新操作 `sbuy`、`swear`，伺服器重算；匯入只帶已購買的金幣款，`steam` 一律歸零。
+  - `src/site-themes.css`：用 `:root[data-site]` 覆蓋頁面配色變數，打包進 `index.html`，同時輸出 `games/site-themes.css` 給小遊戲頁；`games/theme.js` 在 `<head>` 讀轉磚存檔套用。
+  - 商店新分頁「網站主題」（依等級分組、卡片是頁面縮圖）；側邊選單與設定頁都有入口。
+- 檔案／API／UI：`src/meta.js`、`server/rules.js`、`src/site-themes.css`（新）、`src/shop.js`、`src/ui.js`、`src/style.css`、`src/index.template.html`、`build.js`、`games/theme.js`（新）、`games/site-themes.css`（建置產生）、`games/index.html`、`games/*/index.html`、`test/meta.test.js`、`test/api.test.js`、`test/sites.js`（新）。
+- 資料庫：未異動（存檔 JSON 多欄位，舊存檔自動補預設）。｜刪除操作：無。
+- 測試：`node test/run.js` 全過（meta 166）；瀏覽器 `sites` 25、`drawer` 28、`rwd` 232、`flow`、`consent` 31、`cloudui` 39、`minipay` 10、`bricks` 73、`pwa` 47。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 風險、回滾：換回「預設」即恢復原樣；回滾 commit 即移除功能，已購買紀錄留在存檔不受影響。
+- 未完成／待確認：Owner 說總數 18，依各級數量相加為 17（3+3+5+4+2），待 Owner 指定第 18 款放在哪一級。Steam 解鎖要等 Steam 版與伺服器驗證。
