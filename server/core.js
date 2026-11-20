@@ -19,7 +19,7 @@ const LIMIT = {
   BOARD_ROWS: 50,
   SAVE_TRIES: 4
 };
-const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1, wxr: 1 };
+const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1, wxr: 1, prp: 1 };
 // the brick games: m_<game>_<0|1|2> for scores and times, m_<game> for the level games' stars
 const MINI_BOARD = /^m_(?:(?:snake|breakout|stack|merge|pipes|sweep)_[012]|push|sort|picross)$/;
 const okBoard = b => typeof b === 'string' && (BOARDS.hasOwnProperty(b) || MINI_BOARD.test(b));
@@ -130,6 +130,38 @@ async function adReward(db, tag, tx, now) {
   }
   return fail(409, 'busy');
 }
+// ---------- ranked against people (真人排位) ----------
+// Each player reports their own end of the match. When the second report of a ranked match comes in, the two are put
+// together, once: both must be backed by their piece placements (proven), agree on who won, and agree on the
+// knockouts each side counted. Then the server moves both ratings itself; otherwise neither moves.
+const PVP = { WINDOW: 15 * 60000 };
+async function settlePvp(db, pid, mid, room, now) {
+  const rows = await db.query(`SELECT m.id, m.pid, m.result, m.proven, m.data FROM zz.matches m
+    WHERE m.room = $1 AND m.mode = 'net' AND m.at > $2 AND (m.data->>'pr') = 'true'
+      AND NOT EXISTS (SELECT 1 FROM zz.pvp v WHERE v.m1 = m.id OR v.m2 = m.id) ORDER BY m.id DESC`, [room, now - PVP.WINDOW]);
+  const me = rows.find(r => String(r.id) === String(mid)), other = rows.find(r => r.pid !== pid);
+  if (!me || !other) return null;
+  const a = me.data || {}, b = other.data || {};
+  const fair = me.proven && other.proven && me.result === -other.result && (+a.ko || 0) === (+b.koOpp || 0) && (+a.koOpp || 0) === (+b.ko || 0);
+  const lo = Math.min(+me.id, +other.id), hi = Math.max(+me.id, +other.id);
+  const claim = await db.query('INSERT INTO zz.pvp (m1, m2, at, ok) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING 1', [lo, hi, now, fair]);
+  if (!claim[0] || !fair) return { settled: !!claim[0], fair: false };
+  await serverOp(db, other.pid, 'pvp:' + lo + ':' + hi, 'pvp', [other.result], now);
+  await serverOp(db, pid, 'pvp:' + lo + ':' + hi, 'pvp', [me.result], now);
+  return { settled: true, fair: true };
+}
+// A change only the server makes, to any player (by id): applied and saved like their own, retried if they save at once.
+async function serverOp(db, pid, key, k, a, now) {
+  for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
+    const rows = await db.query('SELECT id, state, srv, ver FROM zz.players WHERE id = $1 AND gone IS NULL', [pid]);
+    const row = rows[0];
+    if (!row) return false;
+    const out = rules.applyOps(row.state, row.srv, [{ i: key.slice(0, 60), k, a, srv: true }], now), d = out.state;
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
+    if (saved[0] && saved[0].saved === 1) return true;
+  }
+  return false;
+}
 async function sync(db, cred, ops, now) {
   for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
     const row = await findPlayer(db, cred);
@@ -139,7 +171,10 @@ async function sync(db, cred, ops, now) {
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
     if (saved[0] && saved[0].saved === 1) {
-      if (out.matches.length) await db.query('INSERT INTO zz.matches (pid, at, mode, result, proven, room, seats, data) SELECT $1, (x->>\'at\')::float8, x->>\'mode\', (x->>\'result\')::smallint, (x->>\'proven\')::boolean, x->>\'room\', (x->>\'seats\')::smallint, x->\'data\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.matches)]);
+      if (out.matches.length) {
+        const put = await db.query('INSERT INTO zz.matches (pid, at, mode, result, proven, room, seats, data) SELECT $1, (x->>\'at\')::float8, x->>\'mode\', (x->>\'result\')::smallint, (x->>\'proven\')::boolean, x->>\'room\', (x->>\'seats\')::smallint, x->\'data\' FROM jsonb_array_elements($2::jsonb) AS x RETURNING id, room, (data->>\'pr\') AS pr', [row.id, JSON.stringify(out.matches)]);
+        for (const m of put) if (m.pr === 'true' && m.room) await settlePvp(db, row.id, m.id, m.room, now);
+      }
       if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, kind, boxes) SELECT $1, (x->>\'at\')::float8, x->>\'kind\', x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
       return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
     }
@@ -318,7 +353,7 @@ function devOf(v) { return v === 'pc' ? 'pc' : v === 'touch' ? 'touch' : ''; }
 async function roomQuick(db, body, ip, now) {
   if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
   if (await bump(db, 'quick', ip, QUICK.WINDOW, now) > QUICK.TRIES) return fail(429, 'slow');
-  const hash = sha(body.key), pool = ['wx', 'lv', 'race'].indexOf(body.pool) >= 0 ? body.pool : '';      // each mode is matched only with itself
+  const hash = sha(body.key), pool = ['wx', 'lv', 'race', 'pr'].indexOf(body.pool) >= 0 ? body.pool : '';      // each mode is matched only with itself
   const dev = devOf(body.dev), mix = body.mix === true || !dev;
   for (let tries = 0; tries < 3; tries++) {
     const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash, pool, dev, mix, now - QUICK.MIX]);

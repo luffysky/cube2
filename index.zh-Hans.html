@@ -4230,6 +4230,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       sign: { m: 0, days: [], paid: [] },
+      // ranked against people (真人排位): the rating only the server changes, once both players' records agree
+      pvp: { rp: 0, games: 0, wins: 0 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
       // the brick games: best score or time per difficulty, stars per level
       mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
@@ -4753,11 +4755,20 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     return r;
   };
   // changes only the server may make: never in Meta.OPS, so a page cannot send them
-  var SERVER_RUN = { adGrant: function () { return grantAd(); } };
-  Meta.runServer = function (k) {
+  var SERVER_RUN = {
+    adGrant: function () { return grantAd(); },
+    // a ranked match against a person, settled by the server: a[0] the result (1 win, 0 draw, -1 loss)
+    pvp: function (a) {
+      var p = Meta.data.pvp, r = a && a[0] > 0 ? 1 : a && a[0] < 0 ? -1 : 0, delta = rpDelta(p.rp, r, 0, 0);
+      p.rp = Math.max(0, p.rp + delta); p.games++; if (r > 0) p.wins++;
+      Meta.save();
+      return { ok: true, delta: delta };
+    }
+  };
+  Meta.runServer = function (k, a) {
     if (!SERVER_RUN.hasOwnProperty(k)) return { ok: false, why: 'op' };
     Meta.quiet++;
-    try { return SERVER_RUN[k](); } finally { Meta.quiet--; }
+    try { return SERVER_RUN[k](a); } finally { Meta.quiet--; }
   };
   // Meta.remote(): set by the page's cloud code, true while a cloud save is linked (the server does the drawing then)
   function here() { return !(typeof Meta.remote === 'function' && Meta.remote()); }
@@ -4851,7 +4862,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
     return {
       mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 6),
-      team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true,
+      team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true, pr: mode === 'net' && m.pr === true,
       // which online room it was played in and how many seats it had, so the reports of one match can be put together
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
@@ -7864,7 +7875,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -9148,11 +9159,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
   // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
   Net.quick = function (name, again, pool) {
-    pool = ['wx', 'lv', 'race'].indexOf(pool) >= 0 ? pool : '';
+    pool = ['wx', 'lv', 'race', 'pr'].indexOf(pool) >= 0 ? pool : '';
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
-    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool || 'battle' };
+    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool && pool !== 'pr' ? pool : 'battle' };
     setState('matching');
     var run = epoch;
     transport(function (kind) {
@@ -9225,6 +9236,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe'), oppDev: Net.foeDev() };
     if (wx && !multi) o.wx = wx >>> 0;
     if (lv) o.lv = lv;
+    // ranked against a person: only from random matching, an ordinary two-minute battle with no items
+    if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
@@ -9616,6 +9629,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'net.m.only2': ['挑戰大自然和競速只限兩人，這房間會用普通對戰。', 'Nature and the race are for two players; this room plays an ordinary battle.', '大自然とレースは二人用。この部屋は通常バトルになります。', '대자연과 레이스는 2인 전용이라 이 방은 일반 대전으로 해요.'],
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
     'net.m.raceP': ['不互相攻擊，誰先消完 40 行誰贏；時間到了還沒人消完，就比誰消得多。只限兩人房。', 'No attacks: first to clear 40 lines wins; if time runs out first, most lines wins. Two players only.', '攻撃なし。先に40ライン消した方の勝ち。時間切れならライン数が多い方。二人部屋のみ。', '공격 없음. 먼저 40줄을 지우면 승리, 시간이 다 되면 더 많이 지운 쪽이 이겨요. 2인 방 전용.'],
+    'net.m.pr': ['真人排位', 'Ranked (people)', 'ランク（対人）', '랭크 (사람)'],
+    'net.m.prP': ['跟真人打兩分鐘、不帶道具。雙方的紀錄都送到伺服器、對得上，才會加減排位分；只靠一邊回報不算。需要雲端存檔。', 'Two minutes against a real player, no items. The rating moves only when both players\' records reach the server and agree; one side alone does not count. Needs a cloud save.', '人間相手に2分・アイテムなし。両者の記録がサーバーに届いて一致したときだけレートが動きます。片方だけの報告は無効。クラウドセーブが必要。', '사람과 2분, 아이템 없음. 양쪽 기록이 서버에 도착해 일치할 때만 레이팅이 바뀌어요. 한쪽만 보고하면 무효. 클라우드 저장 필요.'],
+    'pr.now': ['你的真人排位：{0}（{1} 分，打過 {2} 場）', 'Your ranked (people): {0} ({1} points, {2} played)', 'あなたの対人ランク：{0}（{1}点・{2}戦）', '내 랭크(사람): {0} ({1}점, {2}판)'],
+    'pr.wait': ['真人排位：等伺服器確認雙方紀錄後更新分數。', 'Ranked: the rating updates once the server has checked both records.', '対人ランク：サーバーが両者の記録を確認したらレートが更新されます。', '랭크: 서버가 양쪽 기록을 확인하면 레이팅이 바뀌어요.'],
     'net.quickH': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
     'net.quickGo': ['開始配對', 'Find a player', 'マッチング開始', '매칭 시작'],
     'net.raceOn': ['40 行競速：先消完 {0} 行的人贏', 'Race: first to {0} lines wins', 'レース：先に{0}ラインで勝ち', '레이스: 먼저 {0}줄이면 승리'],
@@ -9896,8 +9913,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       // random matching: pick what to play first; only players who picked the same are matched
       if (hosted) {
         h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-        ['battle', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
-        h += '</div><p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
+        ['battle', 'pr', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        h += '</div>' + (quickMode === 'pr' ? '<p><b>' + esc(t('pr.now', App.rankName(Meta.rankOf(Meta.data.pvp.rp)), Meta.data.pvp.rp, Meta.data.pvp.games)) + '</b></p>' : '') + '<p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
         h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
       }
       // a room of the game's own server holds 4, 6 or 8
@@ -9909,7 +9926,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  var QUICK_POOL = { battle: '', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
+  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
   App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
   App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   App.clicks.push(function (d) {
@@ -9956,7 +9973,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var S = App.S();
     if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return '';
-    var rc = '';
+    var rc = S.o.pr ? '<p class="note"><b>' + t('pr.wait') + '</b></p>' : '';
     // a race: each side's time to 40 lines, or how far they got
     if (S.race) {
       var one = function (who, ms, lines) { return '<b>' + esc(who) + '</b> ' + (ms ? App.fmtTime(ms) : t('net.raceNot', Math.min(S.race, lines))); };
@@ -10902,6 +10919,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
     var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
       '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    if (d.pvp && d.pvp.games) h += '<p class="note">' + esc(t('pr.now', App.rankName(Meta.rankOf(d.pvp.rp)), d.pvp.rp, d.pvp.games)) + '</p>';
     var lv = Meta.level(), lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100), now = Meta.titleNow();
     h += '<div class="rankbox lvbox"><b>' + t('xp.lv', lv.lv) + ' · ' + esc(t('tt.' + now)) + '</b><span>' + (lv.top ? t('xp.max') : lv.into + ' / ' + lv.need) + '</span><div class="bar"><i style="width:' + lp + '%"></i></div></div>' +
       '<h3>' + t('tt.head') + '</h3><p class="note">' + t('tt.pick') + '</p><div class="titles">';
@@ -11378,6 +11396,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   L.add({
     'm.board': ['排行榜', 'Leaderboards', 'ランキング', '랭킹'],
     'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
+    'lb.prp': ['真人排位', 'Ranked (people)', '対人ランク', '랭크 (사람)'],
+    'lb.none.prp': ['打一場真人排位（隨機配對選「真人排位」）就會上榜。', 'Play a ranked match against a person (random match, "Ranked (people)") to get on this board.', 'ランダムマッチで「対人ランク」を1戦すると載ります。', '랜덤 매칭에서 "랭크 (사람)"을 한 판 하면 등록돼요.'],
     'lb.mini': ['小遊戲', 'Brick games', 'ミニゲーム', '미니게임'],
     'lb.lv0': ['簡單', 'Easy', 'かんたん', '쉬움'], 'lb.lv1': ['普通', 'Normal', 'ふつう', '보통'], 'lb.lv2': ['困難', 'Hard', 'むずかしい', '어려움'],
     'lb.stars': ['★ {0}', '★ {0}', '★ {0}', '★ {0}'],
@@ -11603,13 +11623,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'score', 'sprint', 'wx', 'wxr', 'mini'];
+  var BOARDS = ['rp', 'prp', 'score', 'sprint', 'wx', 'wxr', 'mini'];
   // the brick games: one board per game and difficulty (scores and times), one per level game (stars)
   var MG = ['snake', 'breakout', 'stack', 'merge', 'pipes', 'sweep', 'push', 'sort', 'picross'], MG_LV = { push: 1, sort: 1, picross: 1 }, MG_TIME = { pipes: 1, sweep: 1 };
   var mini = { g: 'snake', lv: 1 };
   function boardId() { return lb.b !== 'mini' ? lb.b : 'm_' + mini.g + (MG_LV[mini.g] ? '' : '_' + mini.lv); }
   function valueOf(b, v) {
-    if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
+    if (b === 'rp' || b === 'prp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
     if (b === 'mini') return MG_LV[mini.g] ? esc(t('lb.stars', v)) : MG_TIME[mini.g] ? App.fmtTime(v) : L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);
   }

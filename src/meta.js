@@ -414,6 +414,8 @@
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       sign: { m: 0, days: [], paid: [] },
+      // ranked against people (真人排位): the rating only the server changes, once both players' records agree
+      pvp: { rp: 0, games: 0, wins: 0 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
       // the brick games: best score or time per difficulty, stars per level
       mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
@@ -937,11 +939,20 @@
     return r;
   };
   // changes only the server may make: never in Meta.OPS, so a page cannot send them
-  var SERVER_RUN = { adGrant: function () { return grantAd(); } };
-  Meta.runServer = function (k) {
+  var SERVER_RUN = {
+    adGrant: function () { return grantAd(); },
+    // a ranked match against a person, settled by the server: a[0] the result (1 win, 0 draw, -1 loss)
+    pvp: function (a) {
+      var p = Meta.data.pvp, r = a && a[0] > 0 ? 1 : a && a[0] < 0 ? -1 : 0, delta = rpDelta(p.rp, r, 0, 0);
+      p.rp = Math.max(0, p.rp + delta); p.games++; if (r > 0) p.wins++;
+      Meta.save();
+      return { ok: true, delta: delta };
+    }
+  };
+  Meta.runServer = function (k, a) {
     if (!SERVER_RUN.hasOwnProperty(k)) return { ok: false, why: 'op' };
     Meta.quiet++;
-    try { return SERVER_RUN[k](); } finally { Meta.quiet--; }
+    try { return SERVER_RUN[k](a); } finally { Meta.quiet--; }
   };
   // Meta.remote(): set by the page's cloud code, true while a cloud save is linked (the server does the drawing then)
   function here() { return !(typeof Meta.remote === 'function' && Meta.remote()); }
@@ -1035,7 +1046,7 @@
     var cap = function (v, perSec, base) { return int(v, 0, Math.round(base + sec * perSec)); };
     return {
       mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 6),
-      team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true,
+      team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true, pr: mode === 'net' && m.pr === true,
       // which online room it was played in and how many seats it had, so the reports of one match can be put together
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),

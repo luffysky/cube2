@@ -137,6 +137,14 @@ const SCHEMA = [
   "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS pool text NOT NULL DEFAULT ''",
   // what the waiting player plays on ('pc' keyboard, 'touch' phone or tablet): the same kind are matched first
   "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS dev text NOT NULL DEFAULT ''",
+  // ranked matches against people: the two reports (zz.matches ids) of one match, put together once by the server.
+  // ok says whether they agreed (then both ratings moved); a pair that disagreed changes nothing.
+  `CREATE TABLE IF NOT EXISTS zz.pvp (
+     m1 bigint PRIMARY KEY,
+     m2 bigint NOT NULL UNIQUE,
+     at double precision NOT NULL,
+     ok boolean NOT NULL
+   )`,
   // every treasure box opened, kept so the published odds can be checked against what was really drawn
   `CREATE TABLE IF NOT EXISTS zz.draws (
      id bigserial PRIMARY KEY,

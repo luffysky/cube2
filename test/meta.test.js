@@ -129,7 +129,7 @@ clock = Date.UTC(2027, 0, 1, 15, 0, 0); eq(M.seasonId(), '2027-01', 'January');
 
 // ---------- match numbers are kept inside what the match length allows ----------
 let c = M.cleanMatch({ mode: 'rank', result: 5, level: 9, ko: 999, koOpp: -3, itemsUsed: 1e9, ms: 60000, stats: { score: 1e9, sent: 1e9, spins: -5, minis: 'x', xspins: 2.4, quads: 1e9, maxCombo: 999, lines: 1e9, pieces: 1e9 } });
-eq(c, { mode: 'rank', result: 1, level: 6, team: false, quick: false, room: '', seats: 1, ko: 60, koOpp: 0, itemsUsed: 60, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, tst: 0, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
+eq(c, { mode: 'rank', result: 1, level: 6, team: false, quick: false, pr: false, room: '', seats: 1, ko: 60, koOpp: 0, itemsUsed: 60, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, tst: 0, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
 eq(M.cleanMatch({ mode: 'hack', result: -1, stats: { score: 99999 } }).mode, 'ai', 'unknown mode becomes a plain match');
 eq(M.cleanMatch({ mode: 'ai', result: 1, stats: { score: 99999 } }).stats.score, 5000, 'no length given, so almost no score counts');
 eq(M.cleanMatch({ mode: 'sprint', result: -1, ms: 30000 }).result, 0, 'a sprint cannot be lost for points');

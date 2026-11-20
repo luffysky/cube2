@@ -613,3 +613,18 @@
 - 實際變更：`test/browser-run.js` 先建 `shots/`；`test/onehand.js` 遇到 O 時換成 T 再測。
 - 檔案：`test/browser-run.js`、`test/onehand.js`。｜資料庫：未異動。｜刪除：無。
 - 測試：本機 `onehand` 18；`node test/run.js` 全過。
+- 補記：上一條的 commit 為 [`425f945`](https://github.com/luffysky/cube2/commit/425f945)。
+
+## 2026-11-21 06:00（Asia/Taipei）｜真人排位：伺服器判定勝負
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（待辦 15）
+- 背景：原本只有「對電腦的排位」，連線對戰不影響任何分數，勝負只靠各自前端回報。
+- 實際變更：
+  - 隨機配對多一個模式「真人排位」：兩分鐘、不帶道具、只配到也選真人排位的人（配對池 `pr`），需要雲端存檔。
+  - 伺服器裁判：每個人照舊回報自己這一場（附落子紀錄，伺服器重走一遍驗證），回報多標 `pr`。第二份回報進來時，伺服器在同一個房間、15 分鐘內找另一個人尚未配對的回報，配成一對寫進新表 `zz.pvp`（每份回報只能配一次，兩人同時送也只會配一次）。兩份都被落子紀錄佐證、勝負剛好相反、雙方數的擊倒次數對得上，才由伺服器用只有它能下的 `pvp` 操作同時改兩人的真人排位分（`state.pvp`：分數、場數、勝場；加減分和電腦排位同一套規則）。對不上就記下 `ok = false`，誰都不加減；只有一邊回報也不算。
+  - 新排行榜「真人排位」；個人資料和配對畫面顯示自己的真人排位；結算畫面說明「等伺服器確認雙方紀錄後更新分數」。
+- 檔案：`server/core.js`、`server/db.js`、`server/rules.js`、`src/meta.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/cloud.js`、`src/shop.js`、`test/api.test.js`、`test/meta.test.js`、`docs/ARCHITECTURE.md`。
+- 資料庫：新表 `zz.pvp`（`CREATE TABLE IF NOT EXISTS`，第一次 API 呼叫時建立）；`zz.matches.data` 多一個 `pr`。｜刪除：無。
+- 測試：`node test/run.js` 全過（api 344：一份回報不加減、兩份一致雙方都動且只算一次、重送不再算、兩邊都說自己贏誰都不動並留紀錄、前端送不了伺服器專用操作、勝者上榜）；瀏覽器 `quick`、`wxnet`、`cloudui` 全過。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

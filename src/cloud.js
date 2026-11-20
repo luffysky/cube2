@@ -443,6 +443,8 @@
   L.add({
     'm.board': ['排行榜', 'Leaderboards', 'ランキング', '랭킹'],
     'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
+    'lb.prp': ['真人排位', 'Ranked (people)', '対人ランク', '랭크 (사람)'],
+    'lb.none.prp': ['打一場真人排位（隨機配對選「真人排位」）就會上榜。', 'Play a ranked match against a person (random match, "Ranked (people)") to get on this board.', 'ランダムマッチで「対人ランク」を1戦すると載ります。', '랜덤 매칭에서 "랭크 (사람)"을 한 판 하면 등록돼요.'],
     'lb.mini': ['小遊戲', 'Brick games', 'ミニゲーム', '미니게임'],
     'lb.lv0': ['簡單', 'Easy', 'かんたん', '쉬움'], 'lb.lv1': ['普通', 'Normal', 'ふつう', '보통'], 'lb.lv2': ['困難', 'Hard', 'むずかしい', '어려움'],
     'lb.stars': ['★ {0}', '★ {0}', '★ {0}', '★ {0}'],
@@ -668,13 +670,13 @@
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'score', 'sprint', 'wx', 'wxr', 'mini'];
+  var BOARDS = ['rp', 'prp', 'score', 'sprint', 'wx', 'wxr', 'mini'];
   // the brick games: one board per game and difficulty (scores and times), one per level game (stars)
   var MG = ['snake', 'breakout', 'stack', 'merge', 'pipes', 'sweep', 'push', 'sort', 'picross'], MG_LV = { push: 1, sort: 1, picross: 1 }, MG_TIME = { pipes: 1, sweep: 1 };
   var mini = { g: 'snake', lv: 1 };
   function boardId() { return lb.b !== 'mini' ? lb.b : 'm_' + mini.g + (MG_LV[mini.g] ? '' : '_' + mini.lv); }
   function valueOf(b, v) {
-    if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
+    if (b === 'rp' || b === 'prp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
     if (b === 'mini') return MG_LV[mini.g] ? esc(t('lb.stars', v)) : MG_TIME[mini.g] ? App.fmtTime(v) : L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);
   }

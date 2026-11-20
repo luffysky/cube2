@@ -126,7 +126,7 @@ function applyOps(state, srv, ops, now) {
         if (r && r.ok) { srv.bud -= cost; miniMark(op.a, ms, mark); }
       }
     }
-    else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
+    else if (op.srv) { r = Meta.runServer(op.k, op.a); if (op.k === 'pvp' && r && r.ok) mark('prp', Meta.data.pvp.rp); }    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
     if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, kind: 'box', boxes: r.out.boxes });
@@ -188,7 +188,7 @@ function finish(a, srv, mark) {
   // one line for the match log: what was reported, and whether the piece placements backed it up
   const st = m.stats;
   return { ok: true, rec: { mode: m.mode, result: m.result, proven: !!v, room: m.room, seats: m.seats,
-    data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins, items: m.itemsUsed, team: m.team, quick: m.quick } } };
+    data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
 }
 // The record as it stands right now (a new day or season may have begun since it was stored).
 function current(state, now) { return clone(open(state, now)); }

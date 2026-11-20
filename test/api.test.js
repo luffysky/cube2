@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 18, 'eighteen tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 19, 'nineteen tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -797,6 +797,30 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
       ok(!r.json.top.some(x => x.p === M.pub), 'a score too big for the time played stays off the board', r.json.top);
       eq((await call('board', { url: '/api/board?b=m_tetris_0' })).status, 400, 'a board that does not exist');
     }
+
+  // ---------- ranked against people: the server settles it once both records are in and agree ----------
+  {
+    now += 3 * 3600000;
+    const P1 = await newPlayer(null, '198.51.100.241'), P2 = await newPlayer(null, '198.51.100.242');
+    const pm = (res, ko, koOpp, room) => taped(match({ mode: 'net', result: res, ko, koOpp, quick: true, pr: true, room, seats: 2 }));
+    let x = await sync(P1, [op('fin', pm(1, 2, 1, 'PVPAA'))]);
+    ok(x.json.res[0].ok && x.json.st.pvp.games === 0, 'one record alone moves nothing', x.json);
+    x = await sync(P2, [op('fin', pm(-1, 1, 2, 'PVPAA'))]);
+    const s2 = (await sync(P2)).json.st.pvp, s1 = (await sync(P1)).json.st.pvp;
+    ok(s1.games === 1 && s1.wins === 1 && s1.rp > 0 && s2.games === 1 && s2.wins === 0, 'with both in and agreeing, both ratings move', [s1, s2, x.json.res]);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.pvp WHERE ok'))[0].n, 1, 'settled once');
+    await sync(P2, [op('fin', pm(-1, 1, 2, 'PVPAA'))]);
+    ok((await sync(P1)).json.st.pvp.games === 1, 'a report that has no partner left settles nothing');
+    await sync(P1, [op('fin', pm(1, 2, 0, 'PVPBB'))]); await sync(P2, [op('fin', pm(1, 2, 0, 'PVPBB'))]);
+    const d1 = (await sync(P1)).json.st.pvp, d2 = (await sync(P2)).json.st.pvp;
+    ok(d1.games === 1 && d2.games === 1, 'two records that disagree (both claim the win) move nobody', [d1, d2]);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.pvp WHERE NOT ok'))[0].n, 1, 'and the disagreement is kept on record');
+    x = await rpc({ a: 'sync', ops: [{ i: 'pvpself1', k: 'pvp', a: [1], srv: true }] }, P1);
+    ok(x.status === 400 || (x.json.res && !x.json.res[0].ok), 'a page cannot send the server-only change', x.json);
+    ok((await sync(P1)).json.st.pvp.games === 1, 'and it did not count');
+    r = await call('board', { url: '/api/board?b=prp' });
+    ok(r.json.top.some(t => t.p === P1.pub && t.v === s1.rp), 'the winner is on the ranked board', r.json.top);
+  }
 
   // ---------- random matching: keyboards with keyboards, touch screens with touch screens, mixed only after a wait ----------
   {

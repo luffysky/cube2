@@ -107,6 +107,10 @@
     'net.m.only2': ['挑戰大自然和競速只限兩人，這房間會用普通對戰。', 'Nature and the race are for two players; this room plays an ordinary battle.', '大自然とレースは二人用。この部屋は通常バトルになります。', '대자연과 레이스는 2인 전용이라 이 방은 일반 대전으로 해요.'],
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
     'net.m.raceP': ['不互相攻擊，誰先消完 40 行誰贏；時間到了還沒人消完，就比誰消得多。只限兩人房。', 'No attacks: first to clear 40 lines wins; if time runs out first, most lines wins. Two players only.', '攻撃なし。先に40ライン消した方の勝ち。時間切れならライン数が多い方。二人部屋のみ。', '공격 없음. 먼저 40줄을 지우면 승리, 시간이 다 되면 더 많이 지운 쪽이 이겨요. 2인 방 전용.'],
+    'net.m.pr': ['真人排位', 'Ranked (people)', 'ランク（対人）', '랭크 (사람)'],
+    'net.m.prP': ['跟真人打兩分鐘、不帶道具。雙方的紀錄都送到伺服器、對得上，才會加減排位分；只靠一邊回報不算。需要雲端存檔。', 'Two minutes against a real player, no items. The rating moves only when both players\' records reach the server and agree; one side alone does not count. Needs a cloud save.', '人間相手に2分・アイテムなし。両者の記録がサーバーに届いて一致したときだけレートが動きます。片方だけの報告は無効。クラウドセーブが必要。', '사람과 2분, 아이템 없음. 양쪽 기록이 서버에 도착해 일치할 때만 레이팅이 바뀌어요. 한쪽만 보고하면 무효. 클라우드 저장 필요.'],
+    'pr.now': ['你的真人排位：{0}（{1} 分，打過 {2} 場）', 'Your ranked (people): {0} ({1} points, {2} played)', 'あなたの対人ランク：{0}（{1}点・{2}戦）', '내 랭크(사람): {0} ({1}점, {2}판)'],
+    'pr.wait': ['真人排位：等伺服器確認雙方紀錄後更新分數。', 'Ranked: the rating updates once the server has checked both records.', '対人ランク：サーバーが両者の記録を確認したらレートが更新されます。', '랭크: 서버가 양쪽 기록을 확인하면 레이팅이 바뀌어요.'],
     'net.quickH': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
     'net.quickGo': ['開始配對', 'Find a player', 'マッチング開始', '매칭 시작'],
     'net.raceOn': ['40 行競速：先消完 {0} 行的人贏', 'Race: first to {0} lines wins', 'レース：先に{0}ラインで勝ち', '레이스: 먼저 {0}줄이면 승리'],
@@ -387,8 +391,8 @@
       // random matching: pick what to play first; only players who picked the same are matched
       if (hosted) {
         h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-        ['battle', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
-        h += '</div><p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
+        ['battle', 'pr', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        h += '</div>' + (quickMode === 'pr' ? '<p><b>' + esc(t('pr.now', App.rankName(Meta.rankOf(Meta.data.pvp.rp)), Meta.data.pvp.rp, Meta.data.pvp.games)) + '</b></p>' : '') + '<p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
         h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
       }
       // a room of the game's own server holds 4, 6 or 8
@@ -400,7 +404,7 @@
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  var QUICK_POOL = { battle: '', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
+  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
   App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
   App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   App.clicks.push(function (d) {
@@ -447,7 +451,7 @@
     var S = App.S();
     if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return '';
-    var rc = '';
+    var rc = S.o.pr ? '<p class="note"><b>' + t('pr.wait') + '</b></p>' : '';
     // a race: each side's time to 40 lines, or how far they got
     if (S.race) {
       var one = function (who, ms, lines) { return '<b>' + esc(who) + '</b> ' + (ms ? App.fmtTime(ms) : t('net.raceNot', Math.min(S.race, lines))); };

@@ -418,11 +418,11 @@
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
   // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
   Net.quick = function (name, again, pool) {
-    pool = ['wx', 'lv', 'race'].indexOf(pool) >= 0 ? pool : '';
+    pool = ['wx', 'lv', 'race', 'pr'].indexOf(pool) >= 0 ? pool : '';
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
-    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool || 'battle' };
+    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool && pool !== 'pr' ? pool : 'battle' };
     setState('matching');
     var run = epoch;
     transport(function (kind) {
@@ -495,6 +495,8 @@
     var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe'), oppDev: Net.foeDev() };
     if (wx && !multi) o.wx = wx >>> 0;
     if (lv) o.lv = lv;
+    // ranked against a person: only from random matching, an ordinary two-minute battle with no items
+    if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
