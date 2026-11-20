@@ -268,3 +268,12 @@
 - 測試：`node test/run.js` 全過；瀏覽器 `contrast` 50、`sites` 25、`drawer` 28、`bricks` 73。
 - 影響：已購買的牆面／整套名稱與擁有狀態不變，只改顏色。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`a149b8b`](https://github.com/luffysky/cube2/commit/a149b8b)（時間更正 `6e23408`），Vercel `dpl_Dhq6EwcR7KvuRPXG4vBCzvv19sPN` READY。
+
+## 2026-11-20 19:40（Asia/Taipei）｜記錄 cube1 Issue #4 與兩項待 Owner 決定
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-021（cube1 Issue #4、`SNOWREALM_IDENTITY_LAUNCH_GATE_zh-TW.md`，cube1 `94dbd92`）
+- 實際變更：只更新文件。`IDENTITY_LINK_ENABLED` 維持未設定（關閉）。
+- 待 Owner 決定：正式回呼網域（`brickduel.snowrealm.pet` 或 `cube2-xi.vercel.app`）；玩家自刪雲端資料時綁定紀錄是否一併刪除。後者若要改成不連帶刪除，需要改資料表約束（屬刪除類變更），未經核准不動。
+- 檔案：`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除操作：無。｜測試：不適用（僅文件）。

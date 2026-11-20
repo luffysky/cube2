@@ -24,6 +24,7 @@
 | C-018 | 11-20 | 功能太發散，做側邊欄集中管理；遊戲也要；原本的留著、複製到側邊欄；加登入登出、個人資料 | 轉磚與九款小遊戲都加側邊選單；登出等綁定開放 | 已上線 |
 | C-019 | 11-20 | 整個網站的主題（不只遊戲區）：預設（現在的）＋黑＋白、免費簡單色調 3、金幣 5、訂閱 4、Steam 限定 2（標「Steam 限定」），共 18 | 依各級數量做 17 款；Owner 指定第 18 款為免費「淺粉」→ 免費 4 款，共 18 款 | 已上線 |
 | C-020 | 11-20 | 打開帳號綁定開關；按鈕改「註冊／登入」；已登入 SnowRealm Games 的玩家點進去就直接連結 | 按鈕已改。開關**未打開**：cube1 交付文件（`BRICKDUEL_PLAYER_IDENTITY_HANDOFF.md`，11-20 17:58）寫明 Identity 簽發、JWKS（`identity.snowrealm.pet` 無法解析）與正式登入網址都尚未部署，要求開關維持關閉到兩端測試帳號驗收；現有 SnowRealm Games 登入是 Neon Auth，不能冒充跨站登入。缺的東西齊了就接「點了直接連結」 | 等 GPT |
+| C-021 | 11-20 | cube1 Issue #4（P0：部署 SnowRealm Identity，驗收後才能啟用《轉磚》正式綁定）與 `SNOWREALM_IDENTITY_LAUNCH_GATE_zh-TW.md` | cube2 維持 `IDENTITY_LINK_ENABLED` 關閉；等 GPT 完成平台 UUID、授權服務、JWKS、撤銷查詢與雙帳號驗收。待 Owner 決定：① 正式回呼網域（cube1 文件寫 `brickduel.snowrealm.pet`，cube2 原規劃 `cube2-xi.vercel.app/api/auth/callback`）；② 玩家自己按「刪除雲端資料」時，綁定紀錄跟著刪（`zz.identity` 的 `ON DELETE CASCADE`）是否沿用 | 等 GPT／待 Owner |
 | C-016 | 11-19 | 律師審閱、統一編號登記的提醒 | 記在待辦；正式商用前完成 | 待辦 |
 | C-017 | 11-19 | 中國大陸版號等事項之後交給暖寶處理 | 不在 cube2 範圍內處理 | 待辦 |
 
