@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>推磚倉庫 · SnowRealm 磚塊遊戲</title>
+<meta name="description" content="推磚倉庫：把每塊磚推到它的位置上，只能推不能拉。60 關，打開瀏覽器就能玩。">
+<link rel="icon" href="../../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../games.css">
+</head>
+<body>
+<main class="game">
+  <div class="bar">
+    <a href="../">← 磚塊遊戲</a>
+    <h1>推磚倉庫</h1>
+    <button type="button" id="levels">關卡</button>
+  </div>
+  <div class="stats">
+    <div><b id="moves">0</b><span>步數</span></div>
+    <div class="hearts-box"><b class="lvname" id="lvName">關卡</b><span id="lvGoal"></span></div>
+    <div><b id="pushes">0</b><span>推數</span></div>
+  </div>
+  <div class="board push" id="board">
+    <canvas id="cv" aria-label="推磚倉庫的場地"></canvas>
+    <div class="over list" id="list"></div>
+    <div class="over" id="win" hidden>
+      <h2>過關！</h2>
+      <div class="big stars" id="winStars">★★★</div>
+      <p id="winNote"></p>
+      <div class="row"><button class="btn" type="button" id="next">下一關</button><button class="btn plain" type="button" id="again">再玩一次</button><button class="btn plain" type="button" id="toList">關卡列表</button></div>
+    </div>
+  </div>
+  <div class="row tools"><button class="btn plain" type="button" id="undo">上一步</button><button class="btn plain" type="button" id="restart">重來</button></div>
+  <div class="pad" id="pad">
+    <button type="button" data-d="up" aria-label="上">▲</button>
+    <button type="button" data-d="left" aria-label="左">◀</button>
+    <button type="button" data-d="down" aria-label="下">▼</button>
+    <button type="button" data-d="right" aria-label="右">▶</button>
+  </div>
+  <p class="hint" id="keysHint">方向鍵或 WASD 移動，Z 上一步，R 重來</p>
+</main>
+<script src="levels.js"></script>
+<script src="push.js"></script>
+</body>
+</html>

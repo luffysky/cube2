@@ -133,7 +133,7 @@ fs.writeFileSync(path.join(root, 'sitemap.xml'), [
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
   ...LANGS.map(l => ['  <url>', '    <loc>' + SITE + '/' + (l === 'zh-Hant' ? '' : '?lang=' + l) + '</loc>', '    <lastmod>' + day + '</lastmod>',
     ...LANGS.map(alt), '    <xhtml:link rel="alternate" hreflang="x-default" href="' + SITE + '/"/>', '  </url>'].join('\n')),
-  ...['games/', 'games/snake/', 'games/breakout/', 'games/stack/'].map(u => ['  <url>', '    <loc>' + SITE + '/' + u + '</loc>', '    <lastmod>' + day + '</lastmod>', '  </url>'].join('\n')),
+  ...['games/', 'games/snake/', 'games/breakout/', 'games/stack/', 'games/push/'].map(u => ['  <url>', '    <loc>' + SITE + '/' + u + '</loc>', '    <lastmod>' + day + '</lastmod>', '  </url>'].join('\n')),
   '</urlset>', ''
 ].join('\n'));
 

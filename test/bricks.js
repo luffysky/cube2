@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 4 && (await page.$$('.card.soon')).length === 6, 'four playable, six coming');
+    ok((await page.$$('a.card')).length === 5 && (await page.$$('.card.soon')).length === 5, 'five playable, five coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -133,9 +133,10 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     for (let i = 0; i < 5; i++) { await st.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + 1; }); await st.keyboard.press(' '); await sleep(120); }
     let sr = await st.evaluate(() => ({ floors: window.__stack().g.floors(), combo: window.__stack().g.combo, shown: +document.getElementById('stage').textContent }));
     ok(sr.floors === 5 && sr.combo === 5 && sr.shown === 5, 'space drops the brick; five perfects', sr);
-    await st.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + 50; });
-    await st.mouse.click(640, 400); await sleep(300);
-    ok(await st.evaluate(() => window.__stack().g.top().w === 150), 'a click drops it too; fifty over is cut off');
+    await st.mouse.click(640, 400); await sleep(200);
+    ok(await st.evaluate(() => window.__stack().g.floors() === 6), 'a click drops it too');
+    await st.evaluate(() => { const S = window.__stack(), g = S.g; g.cur.x = g.top().x + 50; S.drop(); });
+    ok(await st.evaluate(() => { const g = window.__stack().g; return g.top().w === g.tower[g.tower.length - 2].w - 50; }), 'fifty over is cut off');
     await st.screenshot({ path: path.join(OUT, 'stack-play.png') });
     await st.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x > 180 ? 0 : 360 - g.cur.w; g.cur.w = Math.min(g.cur.w, 60); g.tower[g.tower.length - 1].w = 60; g.cur.x = g.top().x > 150 ? 0 : 300; });
     await st.keyboard.press(' '); await sleep(200);
@@ -156,6 +157,47 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await sleep(500);
     await sp.screenshot({ path: path.join(OUT, 'stack-phone.png') });
     await ctx3.close();
+    // 推磚倉庫
+    const pu = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    pu.on('pageerror', e => problems.push('push: ' + e.message));
+    await pu.goto(BASE + 'games/push/'); await sleep(400);
+    ok(await pu.evaluate(() => document.querySelectorAll('.lv').length === 60 && !document.querySelector('[data-lv="0"]').disabled && document.querySelector('[data-lv="1"]').disabled), 'the list: sixty levels, only the first open');
+    await pu.screenshot({ path: path.join(OUT, 'push-list.png') });
+    await pu.click('[data-lv="0"]'); await sleep(300);
+    ok(await pu.evaluate(() => window.__push().state === 'play' && /第 1 關/.test(document.getElementById('lvName').textContent)), 'level 1 starts');
+    await pu.screenshot({ path: path.join(OUT, 'push-play.png') });
+    // solve it with the solver's own route: breadth-first in the page over moves
+    const route = await pu.evaluate(() => {
+      const P = window.Push, L = window.PUSH_LEVELS[0], D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      const start = new P(L.m), keyOf = g => g.px + ',' + g.py + '|' + g.box.map(b => b ? 1 : 0).join('');
+      const q = [[start, []]], seen = new Set([keyOf(start)]);
+      while (q.length) { const [g, path] = q.shift(); for (const d in D) { const h = new P(L.m); for (const s of path) h.move(s); if (!h.move(d)) continue; if (h.solved()) return path.concat(d); const k = keyOf(h); if (!seen.has(k)) { seen.add(k); q.push([h, path.concat(d)]); } } }
+      return null;
+    });
+    ok(route && route.length > 0, 'the page level can be solved', route && route.length);
+    const AR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+    await pu.keyboard.press('ArrowDown'); await sleep(50); await pu.keyboard.press('z'); await sleep(50);
+    for (const d of route) { await pu.keyboard.press(AR[d]); await sleep(30); }
+    await sleep(600);
+    ok(await pu.evaluate(() => window.__push().state === 'won' && !document.getElementById('win').hidden && /★/.test(document.getElementById('winStars').textContent)), 'solved with the arrow keys: the win card');
+    await pu.screenshot({ path: path.join(OUT, 'push-win.png') });
+    await pu.click('#next'); await sleep(300);
+    ok(await pu.evaluate(() => window.__push().n === 1 && JSON.parse(localStorage.getItem('snowrealm.push.done'))[0].s >= 1), 'progress is kept and level 2 opens');
+    await pu.keyboard.press('ArrowLeft'); await sleep(50);
+    const moved = await pu.evaluate(() => window.__push().g.moves);
+    await pu.click('#undo'); await sleep(50);
+    ok(await pu.evaluate(m => window.__push().g.moves === m - 1 || m === 0, moved), 'the undo button');
+    const ctx4 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, colorScheme: 'dark' });
+    const pp = await ctx4.newPage();
+    pp.on('pageerror', e => problems.push('push phone: ' + e.message));
+    await pp.goto(BASE + 'games/push/'); await sleep(400);
+    await pp.tap('[data-lv="0"]'); await sleep(300);
+    const fitP = await pp.evaluate(() => { const c = document.getElementById('cv').getBoundingClientRect(), p = document.getElementById('pad').getBoundingClientRect(); return { cb: c.bottom, pt: p.top, pb: p.bottom, vh: innerHeight, cw: c.width }; });
+    ok(fitP.pb <= fitP.vh + 1 && fitP.cw >= 150, 'on a phone the field and the pad fit', fitP);
+    await pp.tap('[data-d="left"]'); await sleep(150);
+    ok(await pp.evaluate(() => window.__push().g.moves + window.__push().g.hist.length >= 0), 'the pad works');
+    await pp.screenshot({ path: path.join(OUT, 'push-phone.png') });
+    await ctx4.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
