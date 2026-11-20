@@ -1828,18 +1828,24 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     this.emit('topout', { kind: kind });
   };
 
-  // After a knockout: cement rows fall away; if what is left is still tall, the wall is cleared.
+  // After a knockout: the cement rows fall away (a row counts as cement when at least half of it is), and the player's
+  // own wall stays. Only if it is still too tall to play on are rows taken off the top (what caused the knockout),
+  // never the base underneath.
+  var REVIVE_MAX = 12;
   Game.prototype.revive = function () {
     var keep = [], r, x;
     for (r = 0; r < ROWS; r++) {
-      var row = this.grid[r], cement = false;
-      for (x = 0; x < COLS; x++) if ((row[x] & 15) === GARBAGE) { cement = true; break; }
-      if (!cement) keep.push(row);
+      var row = this.grid[r], cement = 0;
+      for (x = 0; x < COLS; x++) if ((row[x] & 15) === GARBAGE) cement++;
+      if (cement * 2 < COLS) keep.push(row);
     }
     while (keep.length < ROWS) keep.unshift(emptyRow());
     this.grid = keep;
-    if (this.stackHeight() > 9) {
-      for (r = 0; r < ROWS; r++) this.grid[r] = emptyRow();
+    var over = this.stackHeight() - REVIVE_MAX;
+    for (r = 0; r < ROWS && over > 0; r++) {
+      var any = false;
+      for (x = 0; x < COLS; x++) if (this.grid[r][x]) { any = true; break; }
+      if (any) { this.grid[r] = emptyRow(); over--; }
     }
     this.pending = [];
     this.combo = -1;

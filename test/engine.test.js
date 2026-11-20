@@ -205,6 +205,24 @@ eq(SHAPES.I[3].slice().sort(), [[1, 0], [1, 1], [1, 2], [1, 3]], 'I left state')
   ok(g.isEmpty(), 'cement wall is removed on revive');
 }
 
+// --- a knockout keeps the player's own wall: only cement rows go, and a too-tall wall loses rows from the top only
+{
+  const g = new ZZ.Game({ seed: 4, garbage: false });
+  const put = (y, s) => { for (let x = 0; x < 10; x++) g.grid[y][x] = s[x] === 'X' ? 3 : s[x] === 'C' ? ZZ.GARBAGE : 0; };
+  put(ZZ.ROWS - 1, 'CCCCCCCCC.');      // cement rows from the rival
+  put(ZZ.ROWS - 2, 'CCCC.CCCCC');
+  put(ZZ.ROWS - 3, 'XXXXCXXXX.');      // the player's row with one cell turned to cement (lightning, an item)
+  put(ZZ.ROWS - 4, 'XXXXXXXX..');
+  g.over = true; g.revive();
+  const rows = g.grid.slice(ZZ.ROWS - 2).map(r => Array.from(r).map(v => v === ZZ.GARBAGE ? 'C' : v ? 'X' : '.').join(''));
+  eq(rows, ['XXXXXXXX..', 'XXXXCXXXX.'], 'cement rows go, the player\'s two rows stay and drop to the floor');
+  const t = new ZZ.Game({ seed: 4, garbage: false });
+  for (let y = ZZ.ROWS - 18; y < ZZ.ROWS; y++) for (let x = 0; x < 9; x++) t.grid[y][x] = 1 + (y % 7);
+  const base = t.grid[ZZ.ROWS - 1].slice();
+  t.over = true; t.revive();
+  ok(t.stackHeight() === 12 && t.grid[ZZ.ROWS - 1].join() === base.join(), 'an 18-row wall is cut to 12 from the top; the base is untouched');
+}
+
 // --- Z-spin and S-spin doubles: turn in the notch, the third kick drops the piece under the roof
 {
   const g = mk(['..X.......', 'XXX..XXXXX', 'XXXX..XXXX'], ['Z', 'I']);
