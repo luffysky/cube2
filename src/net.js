@@ -302,7 +302,7 @@
     c.on('open', function () {
       clearTimeout(joinT);
       send(hello(0));
-      if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team });
+      if (Net.host) send(cfgMsg());
       else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
     c.on('data', onMsg);
@@ -319,7 +319,7 @@
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     Net.matched = false; clearInterval(quickT); quickT = 0;
-    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false; Net.cfg.wx = false; Net.pool = '';
+    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false; Net.cfg.wx = false; Net.cfg.mode = 'battle'; Net.pool = '';
     epoch++;
   }
 
@@ -414,7 +414,7 @@
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
-    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx' };
+    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool === 'wx' ? 'wx' : 'battle' };
     setState('matching');
     var run = epoch;
     transport(function (kind) {
@@ -453,19 +453,31 @@
   };
   Net.setCfg = function (c) {
     if (!Net.host) return;
-    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team, wx: !!c.wx };
-    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx });
+    Net.cfg = readCfg(c);
+    send(cfgMsg());
     changed();
   };
 
+  // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
+  // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
+  var ROOM_MODES = ['battle', 'wx', 'lv'];
+  Net.ROOM_MODES = ROOM_MODES;
+  function readCfg(c) {
+    var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
+    return { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team, wx: mode === 'wx', mode: mode };
+  }
+  function cfgMsg() { return { t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team, wx: Net.cfg.mode === 'wx', mode: Net.cfg.mode || 'battle' }; }
+  Net.modeOf = function () { return Net.cfg.mode || (Net.cfg.wx ? 'wx' : 'battle'); };
+
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx) {
+  function startMatch(seed, minutes, items, multi, wx, lv) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
     var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
     if (wx && !multi) o.wx = wx >>> 0;
+    if (lv) o.lv = lv;
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -481,9 +493,11 @@
       if (Net.cfg.team && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
       multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
     }
-    var wx = Net.cfg.wx && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx);
+    var mode = Net.modeOf();
+    var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
+    var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -595,7 +609,7 @@
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send(hello(1)); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team, wx: !!Net.cfg.wx }); }
+        if (!m.ack) { send(hello(1)); if (Net.host) send(cfgMsg()); }
         var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
@@ -607,13 +621,13 @@
         if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
-      case 'cfg': if (!Net.host && from === 0) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items, team: !!m.team, wx: !!m.wx }; changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0); break;
+      case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
       case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
-      case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.indexOf(m.k) >= 0) App.wxHit(m.k); break;
+      case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.concat(ZZ.Weather.DISASTERS).indexOf(m.k) >= 0) App.wxHit(m.k); break;
       case 'end':
         var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
         // the rest of the result card (older pages do not send these)

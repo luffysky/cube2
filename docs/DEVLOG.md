@@ -366,3 +366,18 @@
 - 測試：`node test/run.js` 全過；瀏覽器 `legal` 439（24 頁語言、草稿標示、noindex、地區清單、所有站內連結可開、簡體版、選日本的玩家連到日文版）、`pwa` 52（五語頁面各自的 meta、canonical、結構化資料、rewrites）、`gameslang` 113、`rwd` 232、`flow` 60、`cloudui` 41、`consent` 31、`drawer` 28、`sites` 25、`bricks` 73、`minipay` 10。
 - 待律師：所有【待確認】項目（各地代表人、跨境傳輸條件、韓國遊戲分級、中國大陸是否關閉服務、準據法等）。法律文件內容是草稿，不是法律意見。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`15e991d`](https://github.com/luffysky/cube2/commit/15e991d)，Vercel `dpl_Vr8QEaoJnt8GgJrzzYp55wbo7ffV` READY，無執行錯誤。
+
+## 2026-11-20 22:58（Asia/Taipei）｜挑戰大自然加洪水／龍捲風／地震；音樂播放器；開房間可選模式
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-028
+- 實際變更：
+  - 災害：`src/weather.js` 新增 flood、tornado、quake（另一顆種子 RNG，兩邊同一片天仍一致；預警 2 秒；洪水把排好的行上下沖、落下中的方塊也被推；龍捲風捲起經過的格子後全部落回場上；地震震垮懸空的方塊，震出的整行照樣消、計分）；可在對戰中丟給對手；`src/wxmode.js` 畫浪、漏斗、裂縫與搖晃，練習清單可單練災害；`src/view.js` 新音效 wave、twister、quake、siren。
+  - 音樂播放器：新增 `src/music.js`（側邊選單「更多」與設定裡的入口）：自動（跟著畫面換）或播放列表（順序、隨機、單曲），上一首／下一首／暫停；訂閱會員可加入自己的音樂檔（單檔 15 MB、30 首、共 200 MB，瀏覽器解碼不了的不收），只存在本機 IndexedDB `zhuanzhuan-music`，不上傳、不進雲端存檔；會員到期後自己的歌鎖住但不刪。
+  - 連線房間：房主選「普通對戰／挑戰大自然／關卡地形」，訊息帶 `mode`（保留 `wx` 讓舊版頁面相容）；挑戰大自然限兩人；關卡地形開打時從 1000 關抽一關，所有人（含三到四人房）同一面地形開始，不留重播。
+  - 隱私政策四語的本機儲存清單加上音樂播放器。
+- 檔案：`src/weather.js`、`src/wxmode.js`、`src/view.js`、`src/music.js`（新）、`src/net.js`、`src/modes.js`、`src/ui.js`、`src/index.template.html`、`src/style.css`、`games/drawer-icons.js`、`build.js`、`tools/dict.js`、`legal/src/privacy.*.html`、`privacy.html`、`legal/`（重建）、`test/weather.test.js`、`test/i18n.test.js`、`test/skies.js`、`test/wxnet.js`、`test/music.js`（新）。
+- 資料庫：未異動。｜刪除：無（玩家自己刪本機音樂檔是本機操作，不碰伺服器）。
+- 測試：`node test/run.js` 全過（weather 52）；瀏覽器 `wxnet` 19（三種房間模式、房客看到模式、同一片天、關卡地形兩邊同一關）、`music` 9（非會員沒有上傳、壞檔不收、只存 IndexedDB、沒有任何上傳請求、播放列表、重開還在）、`skies` 23、`rwd` 232、`flow` 60、`cloudui` 41、`gameslang` 113、`legal` 439、`pwa` 52、`drawer` 28。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

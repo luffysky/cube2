@@ -94,6 +94,15 @@
     'net.leaveRoom': ['離開房間', 'Leave room', '部屋を出る', '방 나가기'],
     'net.items': ['道具戰', 'Item match', 'アイテム戦', '아이템전'],
     'net.rules': ['{0}　{1}', '{0} · {1}', '{0}　{1}', '{0} · {1}'],
+    'net.mode': ['玩什麼', 'Mode', 'モード', '모드'],
+    'net.m.battle': ['普通對戰', 'Battle', '通常バトル', '일반 대전'],
+    'net.m.wx': ['挑戰大自然', 'Nature', '大自然', '대자연'],
+    'net.m.lv': ['關卡地形', 'Level walls', 'ステージ地形', '스테이지 지형'],
+    'net.m.battleP': ['空場地開打，誰先把對手壓到頂就贏。', 'An empty well; push your rival to the top.', '空のフィールドから。相手を上まで押し上げよう。', '빈 필드에서 시작. 상대를 꼭대기까지 밀어 올리세요.'],
+    'net.m.wxP': ['兩人頭上同一片天：風、雨、雪、霧，偶爾還有洪水、龍捲風、地震。只限兩人房。', 'One sky over both walls: wind, rain, snow, fog, and now and then a flood, tornado or quake. Two players only.', '二人の上に同じ空。風・雨・雪・霧、ときどき洪水・竜巻・地震も。二人部屋のみ。', '두 사람 위에 같은 하늘: 바람, 비, 눈, 안개, 가끔 홍수, 토네이도, 지진까지. 2인 방 전용.'],
+    'net.m.lvP': ['開打時從 1000 關裡抽一關，大家從同一面地形開始。', 'One of the 1000 levels is drawn at the start; everyone begins on the same wall.', '開始時に1000ステージから1つ抽選、全員同じ地形からスタート。', '시작할 때 1000개 스테이지 중 하나를 뽑아 모두 같은 지형에서 시작해요.'],
+    'net.m.only2': ['挑戰大自然只限兩人，這房間會用普通對戰。', 'Nature is for two players; this room plays an ordinary battle.', '大自然は二人用。この部屋は通常バトルになります。', '대자연은 2인 전용이라 이 방은 일반 대전으로 해요.'],
+    'net.lvOn': ['關卡地形：第 {0} 關', 'Level wall: level {0}', 'ステージ地形：{0}', '스테이지 지형: {0}단계'],
     'net.itemsOn': ['有道具', 'items on', 'アイテムあり', '아이템 있음'],
     'net.itemsOff': ['沒有道具', 'no items', 'アイテムなし', '아이템 없음'],
     'net.e.lib': ['連線元件載不進來。如果這頁是在預覽裡開的，連線對戰請到正式站玩。', 'The networking component failed to load. Online play does not work inside a preview; use the live site.', '通信コンポーネントを読み込めません。プレビュー内ではオンライン対戦は使えません。公開サイトをご利用ください。', '통신 구성 요소를 불러오지 못했습니다. 미리보기에서는 온라인 대전을 쓸 수 없습니다. 정식 사이트를 이용하세요.'],
@@ -304,7 +313,15 @@
   App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
-  function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')) + (Net.cfg.wx && Net.count() === 2 ? '　' + t('wx.netOn') : ''); }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return m === 'wx' && n > 2 ? 'battle' : m; }
+  function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
+  // the host picks what the room plays; the others see it in the rules line
+  function modeSeg(n) {
+    var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
+    ['battle', 'wx', 'lv'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (k === 'wx' && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t(cur === 'wx' && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    return h;
+  }
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
@@ -331,8 +348,8 @@
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
-        h += '</div>';
-        if (n === 2) h += App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle'));
+        h += '</div>' + modeSeg(n);
+        if (n === 2) h += App.toggle('nItems', t('itemsMode'));
         else h += '<p class="note">' + t('mp.noItems') + '</p>';
         if (Net.teamOk(n)) h += App.toggle('nTeam', t('mp.teamMode', n / 2));
         h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
@@ -346,7 +363,7 @@
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
-        h += '</div>' + App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
+        h += '</div>' + modeSeg(2) + App.toggle('nItems', t('itemsMode')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
       } else {
         h += '<p>' + esc(rulesText()) + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
@@ -363,7 +380,7 @@
     }
     return h;
   };
-  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; c = $('nWx'); if (c) c.checked = !!Net.cfg.wx; };
+  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
   App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
   App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o && S.o.wx ? 'wx' : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   // nobody real in time: a computer at about the player's own level, named as a computer
@@ -388,9 +405,8 @@
     try { navigator.share({ title: t('title'), text: t('net.shareText', Net.code), url: inviteUrl() }).catch(function () { /* closed without sharing */ }); } catch (e) { /* not available */ }
   };
   App.inputs.push(function (el) {
-    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
-    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked, wx: Net.cfg.wx }); return true; }
-    if (el.id === 'nWx') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: el.checked }); return true; }
+    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team, mode: Net.modeOf() }); return true; }
+    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked, mode: Net.modeOf() }); return true; }
     if (el.id === 'nCode') { joinCode = el.value.toUpperCase(); return true; }
     return false;
   });
@@ -420,7 +436,8 @@
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
     if (d.nsize != null && [4, 6, 8].indexOf(+d.nsize) >= 0) { Net.size = +d.nsize; App.openSheet('online'); return true; }
-    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
+    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, mode: Net.modeOf() }); return true; }
+    if (d.nmode != null) { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, mode: d.nmode }); return true; }
     return false;
   });
 

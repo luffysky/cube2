@@ -917,6 +917,17 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .pv.sw.site i { display: block; height: 5px; border-radius: 3px; width: 80%; }
 .pv.sw.site i + i { width: 45%; }
 .steamtag { background: #1B2838; color: #C7D5E0; }
+/* the music player */
+.mu-now { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; border: 1px solid var(--edge); border-radius: 14px; background: var(--floor); text-align: center; }
+.mu-now small { color: var(--muted); font-size: 12px; }
+.mu-now b { font-size: 17px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-list { display: flex; flex-direction: column; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.mu-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.mu-row + .mu-row { border-top: 1px solid var(--edge); }
+.mu-row.on { background: color-mix(in srgb, var(--gold, #F5B82E) 14%, transparent); }
+.mu-check { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.mu-check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-check input { width: 20px; height: 20px; accent-color: var(--gold, #F5B82E); }
 
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
@@ -1099,6 +1110,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
           <a href="games/sweep/"><i class="ic" data-ic="mine"></i><span>掃磚</span><i class="ic go" data-ic="chev"></i></a>
         </div></section>
         <section class="dr-grp" data-tone="more"><h3 data-t="dr.more">その他</h3><div class="dr-list">
+          <button type="button" data-sheet="music"><i class="ic" data-ic="note"></i><span data-t="mu.open">ミュージック</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="settings"><i class="ic" data-ic="gear"></i><span data-t="m.settings">設定</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="help"><i class="ic" data-ic="help"></i><span data-t="m.help">操作とルール</span><i class="ic go" data-ic="chev"></i></button>
           <a href="privacy.html"><i class="ic" data-ic="shield"></i><span data-t="lg.privacy">プライバシー</span><i class="ic go" data-ic="chev"></i></a>
@@ -3083,12 +3095,24 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
      storm  wind and rain together, and lightning now and then turns a block into cement
      fog    the lower rows are hidden behind fog
 
-   The weather changes every 20 to 30 seconds and gets stronger the longer the run goes. */
+   The weather changes every 20 to 30 seconds and gets stronger the longer the run goes.
+
+   Disasters come on top of the weather, rarely (one every one to two minutes, from a minute in) and always after a
+   warning of about two seconds:
+     flood    a wave sweeps across: the top blocks of each column it passes are washed downstream (off the far edge
+              they are gone), and the falling piece bobs up and down and drifts with it
+     tornado  a funnel crosses the wall: it lifts the top blocks of the columns it passes and, as it leaves, drops them
+              back on other columns
+     quake    the wall shakes: every block with a gap under it falls (rows filled that way are cleared and scored), and
+              columns standing well above both neighbours topple one block over
+   They run on their own random stream, so the ordinary weather is the same with or without them. */
 (function (root) {
   'use strict';
   var ZZ = root.ZZ, COLS = ZZ.COLS, ROWS = ZZ.ROWS, TOP = ZZ.TOP, GARBAGE = ZZ.GARBAGE, RNG = ZZ.RNG, SHAPES = ZZ.SHAPES;
   var SNOW = 9;
   var KINDS = ['wind', 'rain', 'snow', 'storm', 'fog'];
+  var DISASTERS = ['flood', 'tornado', 'quake'];
+  var DIS_WARN = 2000, DIS_LEN = { flood: 3200, tornado: 3800, quake: 2200 };
   var CALM = 6000;          // a short calm at the start
   var MINUTE = 60000;
 
@@ -3096,6 +3120,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     o = o || {};
     this.seed = (o.seed >>> 0) || 1;
     this.only = KINDS.indexOf(o.only) >= 0 ? o.only : '';       // practice one kind of weather all the way through
+    this.onlyDis = DISASTERS.indexOf(o.only) >= 0 ? o.only : '';   // …or one kind of disaster, under a clear sky
+    this.noDis = !!o.noDis;
+    this.drng = new RNG(this.seed ^ 0x2545F491);
+    this.dis = null; this.disNext = this.onlyDis ? 8000 : 60000 + this.drng.next() * 30000;
     this.rng = new RNG(this.seed ^ 0x5bd1e995);
     this.t = 0;
     this.kind = 'clear'; this.lvl = 0; this.left = CALM; this.n = 0;
@@ -3111,6 +3139,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   Weather.prototype.next = function () {
     var r = this.rng, prev = this.kind, k;
     if (this.only) k = this.only;
+    else if (this.onlyDis) k = 'clear';
     else do { k = KINDS[Math.floor(r.next() * KINDS.length)]; } while (k === prev);
     this.n++;
     this.kind = k;
@@ -3127,6 +3156,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   // Weather thrown by the rival (a 4-line clear in a weather battle): this kind at full strength for ms, then the sky
   // goes back to its own schedule.
   Weather.prototype.hit = function (kind, ms) {
+    if (DISASTERS.indexOf(kind) >= 0) { if (this.dis) return false; this.startDis(kind, 3, 1500); return true; }
     if (KINDS.indexOf(kind) < 0) return false;
     this.hitKind = kind; this.hitLeft = Math.max(1000, Math.min(15000, ms || 9000));
     this.boltAt = Math.min(this.boltAt, 1500); this.driftAcc = 0; this.pushAcc = 0;
@@ -3182,8 +3212,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     } else this.pushAcc = 0;
     return this.land(g, dt, k, L, out);
   };
-  // what the weather does to the wall itself: snow settling and lightning
+  // what the weather does to the wall itself: snow settling, lightning, and the disasters
   Weather.prototype.land = function (g, dt, k, L, out) {
+    this.disaster(g, dt, out);
     // snow settles: one cell at a time on top of a column, never filling a row by itself
     if (k === 'snow') {
       this.driftAcc += dt;
@@ -3241,9 +3272,137 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     return null;
   };
 
+  // ---------- disasters ----------
+  Weather.prototype.startDis = function (kind, lvl, warn) {
+    var r = this.drng;
+    this.dis = { kind: kind, lvl: lvl, phase: 'warn', t: 0, warn: warn || DIS_WARN, dur: DIS_LEN[kind], dir: r.next() < 0.5 ? -1 : 1, col: -1, air: [], bob: 0, wob: r.next() * 6.283, gone: 0, started: true };
+  };
+  Weather.prototype.disaster = function (g, dt, out) {
+    var d = this.dis;
+    if (!d) {
+      if (this.noDis) return;
+      this.disNext -= dt;
+      if (this.disNext > 0) return;
+      this.startDis(this.onlyDis || DISASTERS[Math.floor(this.drng.next() * DISASTERS.length)], this.onlyDis ? Math.max(1, this.lvl) : Math.max(1, Math.min(3, this.lvl)));
+      d = this.dis;
+    }
+    if (d.started) { d.started = false; out.push({ type: 'disaster', kind: d.kind, phase: 'warn', dir: d.dir, lvl: d.lvl }); }
+    d.t += dt;
+    if (d.phase === 'warn') {
+      if (d.t < d.warn) return;
+      d.phase = 'hit'; d.t = 0;
+      out.push({ type: 'disaster', kind: d.kind, phase: 'hit', dir: d.dir, lvl: d.lvl });
+      if (d.kind === 'quake') out.push(this.quake(g, d));
+      return;
+    }
+    var p = Math.min(1, d.t / d.dur), col;
+    if (d.kind === 'flood') {
+      col = Math.min(COLS - 1, Math.floor(p * (COLS + 1)));
+      col = d.dir > 0 ? col : COLS - 1 - col;
+      while (d.col !== col && p < 1) {
+        d.col = d.col < 0 ? (d.dir > 0 ? 0 : COLS - 1) : d.col + d.dir;
+        var w = this.wash(g, d.col, d);
+        if (w) out.push(w);
+      }
+      // the falling piece rides the wave: up and down, and along with it where the wave is
+      if (!this.boardOnly && g.cur) {
+        d.bob += dt;
+        if (d.bob >= 260) {
+          d.bob -= 260;
+          var c = g.cur, up = Math.floor(d.t / 260) % 2 === 0, dy = up ? -1 : 1;
+          if (g.fits(c.type, c.rot, c.x, c.y + dy)) { c.y += dy; g.emit('move', { dx: 0, x: c.x, y: c.y, rot: c.rot, wind: true }); }
+          if (Math.abs(c.x + 1.5 - d.col) < 2.5 && g.fits(c.type, c.rot, c.x + d.dir, c.y)) { c.x += d.dir; g.lastMove = 'wind'; g.emit('move', { dx: d.dir, x: c.x, y: c.y, rot: c.rot, wind: true }); }
+        }
+      }
+    } else if (d.kind === 'tornado') {
+      // the funnel's column: across the wall with a wobble
+      var along = p * (COLS - 1), wob = Math.sin(d.wob + p * 9) * 1.2;
+      col = Math.max(0, Math.min(COLS - 1, Math.round((d.dir > 0 ? along : COLS - 1 - along) + wob)));
+      if (col !== d.col && p < 1) { d.col = col; var l = this.lift(g, col, d); if (l) out.push(l); }
+    }
+    if (d.t >= d.dur) {
+      if (d.kind === 'tornado') out.push(this.drop(g, d));
+      out.push({ type: 'disaster', kind: d.kind, phase: 'end', gone: d.gone });
+      this.dis = null;
+      this.disNext = this.onlyDis ? 12000 + this.drng.next() * 8000 : 60000 + this.drng.next() * 60000;
+    }
+  };
+  // the wave washes the top blocks of column x one column downstream; off the far edge they are gone
+  Weather.prototype.wash = function (g, x, d) {
+    var n = d.lvl, moved = 0, nx = x + d.dir;
+    for (var i = 0; i < n; i++) {
+      var y = top(g, x);
+      if (y >= ROWS) break;
+      var v = g.grid[y][x];
+      g.grid[y][x] = 0;
+      moved++;
+      if (nx < 0 || nx >= COLS) { d.gone++; continue; }
+      var ty = top(g, nx) - 1;
+      if (ty < TOP + 1 || fullAfter(g, ty, nx)) { d.gone++; continue; }
+      g.grid[ty][nx] = v;
+    }
+    if (!moved) return null;
+    g.refit();
+    g.emit('wash', { x: x, n: moved });
+    return { type: 'wash', x: x, n: moved };
+  };
+  // the funnel lifts the top blocks of column x
+  Weather.prototype.lift = function (g, x, d) {
+    var n = d.lvl, got = 0;
+    for (var i = 0; i < n; i++) {
+      var y = top(g, x);
+      if (y >= ROWS) break;
+      d.air.push(g.grid[y][x]);
+      g.grid[y][x] = 0;
+      got++;
+    }
+    if (!got) return null;
+    g.refit();
+    g.emit('lift', { x: x, n: got });
+    return { type: 'lift', x: x, n: got };
+  };
+  // …and drops them back on other columns as it leaves (never filling a row by itself)
+  Weather.prototype.drop = function (g, d) {
+    var r = this.drng, put = [];
+    for (var i = 0; i < d.air.length; i++) {
+      var start = Math.floor(r.next() * COLS), done = false;
+      for (var j = 0; j < COLS && !done; j++) {
+        var x = (start + j * 3) % COLS, y = top(g, x) - 1;
+        if (y < TOP + 2 || underPiece(g, x, y) || fullAfter(g, y, x)) continue;
+        g.grid[y][x] = d.air[i];
+        put.push([x, y]); done = true;
+      }
+      if (!done) d.gone++;
+    }
+    d.air = [];
+    g.refit();
+    g.emit('drop', { cells: put });
+    return { type: 'drop', cells: put };
+  };
+  // the ground shakes: everything with a gap under it falls (full rows go, and score), tall columns topple
+  Weather.prototype.quake = function (g, d) {
+    var before = g.stats.lines;
+    g.trowel(0);
+    var lines = g.stats.lines - before, fell = 0;
+    for (var x = 0; x < COLS; x++) {
+      var h = ROWS - top(g, x), hl = x > 0 ? ROWS - top(g, x - 1) : 99, hr = x < COLS - 1 ? ROWS - top(g, x + 1) : 99;
+      if (h - Math.min(hl, hr) < 3) continue;
+      var to = hl <= hr ? x - 1 : x + 1, y = top(g, x), ty = top(g, to) - 1;
+      if (ty < TOP + 1 || fullAfter(g, ty, to)) continue;
+      g.grid[ty][to] = g.grid[y][x]; g.grid[y][x] = 0; fell++;
+    }
+    if (lines) g.stats.score = (g.stats.score || 0) + lines * 150 * d.lvl;
+    g.refit();
+    g.emit('quake', { lines: lines, fell: fell });
+    return { type: 'quake', lines: lines, fell: fell };
+  };
+  function fullAfter(g, y, x) { var row = g.grid[y], n = 0; for (var j = 0; j < COLS; j++) if (row[j] || j === x) n++; return n >= COLS; }
+
   // what the screen shows beside the next pieces
   Weather.prototype.info = function () {
-    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left) };
+    var d = this.dis;
+    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left),
+      dis: d ? { kind: d.kind, phase: d.phase, p: d.phase === 'hit' ? Math.min(1, d.t / d.dur) : d.t / d.warn, col: d.col, dir: d.dir, air: d.air.length, lvl: d.lvl } : null };
   };
 
   // How the run is scored: the game's own score plus 5 for every second survived.
@@ -3254,6 +3413,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   ZZ.SNOW = SNOW;
   ZZ.Weather = Weather;
   Weather.KINDS = KINDS;
+  Weather.DISASTERS = DISASTERS;
   Weather.scoreOf = scoreOf;
   Weather.gravAt = gravAt;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
@@ -3417,6 +3577,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
     snow: '<path d="M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5"/><path d="M9.5 4l2.5 2 2.5-2M9.5 20l2.5-2 2.5 2M4 10.5l3-.5-1-3M20 13.5l-3 .5 1 3M4 13.5l3 .5-1 3M20 10.5l-3-.5 1-3"/>',
     out: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    note: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
     chev: '<path d="M9.5 6l6 6-6 6"/>'
   };
   function svg(n) { return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (P[n] || P.brick) + '</svg>'; }
@@ -5810,6 +5971,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     this.ac = null; this.out = null; this.mout = null; this.nb = null;
     this.buf = {}; this.decoding = false;
     this.mwant = ''; this.mname = ''; this.msrc = null; this.mgain = null; this.mcache = {}; this.mload = ''; this.duck = 1;
+    // the music player (src/music.js): which track a screen's music really is, whether it loops, the player's own
+    // tracks (kept on the device), and what happens when a track that does not loop ends
+    this.pick = null; this.own = null; this.onEnd = null; this.mloop = true;
   }
   function b64buf(b64) {
     var bin = atob(b64), n = bin.length, u = new Uint8Array(n);
@@ -5924,6 +6088,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     this.msrc = null; this.mgain = null; this.mname = '';
   };
   Sound.prototype.music = function (name) {
+    if (this.pick && name) { var p = this.pick(name); name = p.id; this.mloop = p.loop !== false; } else this.mloop = true;
     this.mwant = name || '';
     if (!this.ac) return;
     if (this.mname === this.mwant && (this.msrc || !this.mwant)) return;
@@ -5933,6 +6098,18 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (this.mcache[want]) return this.startTrack(want, this.mcache[want]);
     if (this.mload === want) return;
     this.mload = want;
+    if (/^own:/.test(want)) {
+      if (!this.own) { this.mload = ''; return; }
+      this.own(want.slice(4), function (ab) {
+        self.decode(ab, function (buf) {
+          if (self.mload === want) self.mload = '';
+          for (var k in self.mcache) if (k !== 'menu' && k !== want) delete self.mcache[k];
+          self.mcache[want] = buf;
+          if (self.mwant === want && self.mname !== want) self.startTrack(want, buf);
+        }, function () { if (self.mload === want) self.mload = ''; if (self.onEnd && self.mwant === want) self.onEnd(want, true); });
+      }, function () { if (self.mload === want) self.mload = ''; if (self.onEnd && self.mwant === want) self.onEnd(want, true); });
+      return;
+    }
     var probe = document.createElement('audio');
     var exts = probe.canPlayType && probe.canPlayType('audio/ogg; codecs="vorbis"') ? ['ogg', 'mp3'] : ['mp3', 'ogg'], i = 0;
     (function next() {
@@ -5951,12 +6128,14 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   Sound.prototype.startTrack = function (name, buf) {
     if (this.cfg().mvol <= 0) return;
     var ac = this.ac, s = ac.createBufferSource(), g = ac.createGain(), t = ac.currentTime;
-    s.buffer = buf; s.loop = true;
+    s.buffer = buf; s.loop = this.mloop;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(1, t + 0.45);
     s.connect(g); g.connect(this.mout);
+    var self = this;
+    s.onended = function () { if (self.msrc === s) { self.msrc = null; self.mgain = null; self.mname = ''; if (self.onEnd) self.onEnd(name); } };
     s.start(t);
-    this.msrc = s; this.mgain = g; this.mname = name;
+    this.msrc = s; this.mgain = g; this.mname = name; this.mstart = t; this.mlen = buf.duration;
   };
 
   var SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760, 2093];
@@ -6012,6 +6191,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     // the weather mode: a whoosh of wind, a soft pat of snow, and thunder
     gust: function (s) { s.noise(0.32, 0.035, 300, 1600); },
     drift: function (s) { s.noise(0.08, 0.05, 2000, 6000); },
+    wave: function (s) { s.noise(1.4, 0.16, 80, 900); s.noise(0.6, 0.06, 1500, 5000, 0.5); },
+    twister: function (s) { s.noise(2.2, 0.12, 200, 1400); s.tone(110, 2, 'sawtooth', 0.025, 220); },
+    quake: function (s) { s.noise(1.6, 0.26, 20, 220); s.tone(48, 1.4, 'sine', 0.2, 30); },
+    siren: function (s) { s.tone(660, 0.35, 'triangle', 0.05, 880); s.tone(880, 0.35, 'triangle', 0.05, 660, 0.36); },
     thunder: function (s) { s.noise(0.08, 0.2, 800, 9000); s.noise(1.1, 0.24, 30, 420, 0.06); s.tone(70, 0.9, 'sawtooth', 0.07, 38, 0.05); },
     tock: function (s) { s.tone(1046, 0.07, 'sine', 0.11, 880); s.noise(0.02, 0.05, 1800, 5000); },
     tockHi: function (s) { s.tone(1568, 0.09, 'square', 0.05); s.tone(1568, 0.12, 'sine', 0.12, null, 0); }
@@ -6613,7 +6796,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (kind === 'battle') {
       var mode = o.mode || 'ai';
       S.mode = mode;
-      S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [] });
+      // a room on a level's wall (關卡地形): every player starts from the same numbered level's wall
+      var lvWall = o.lv && ZZ.Levels ? ZZ.Levels.level(o.lv).board : null;
+      S.lvNo = lvWall ? o.lv : 0;
+      S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [], board: lvWall || undefined });
       S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
       if (mode === 'net' && o.multi) {
@@ -6621,7 +6807,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         var M = o.multi, foes = {}, order = [], myTeam = M.teams ? M.teams[M.me] : -1;
         M.roster.forEach(function (st) {
           if (st === M.me) return;
-          foes[st] = { seat: st, name: M.names[st] || t('foe'), team: M.teams ? M.teams[st] : -1, g: new ZZ.Game({ seed: seed, manual: true, garbage: false }), downs: 0, sent: 0, gone: false };
+          foes[st] = { seat: st, name: M.names[st] || t('foe'), team: M.teams ? M.teams[st] : -1, g: new ZZ.Game({ seed: seed, manual: true, garbage: false, board: lvWall || undefined }), downs: 0, sent: 0, gone: false };
           order.push(st);
         });
         S.multi = { me: M.me, teams: M.teams, myTeam: myTeam, foes: foes, order: order, target: null };
@@ -6630,7 +6816,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         S.multi.target = first; S.opp = foes[first].g; S.oppName = foes[first].name;
         S.me.onAttack = function (n) { ZZ.Net.attack(n); };
       } else if (mode === 'net') {
-        S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false });   // a mirror of the other player's wall
+        S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false, board: lvWall || undefined });   // a mirror of the other player's wall
         S.remote = true; S.bot = null;
         S.oppName = o.oppName || t('foe');
         S.me.onAttack = function (n) { ZZ.Net.attack(n); };
@@ -6652,6 +6838,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
       S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
       S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
+      // a replay starts from an empty wall, so a level-wall room keeps none
+      if (S.lvNo) { S.rec = null; S.tape = null; toast(t('net.lvOn', S.lvNo), 3000); }
       // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
       if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
         S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
@@ -7401,7 +7589,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         [0, 1, 2].map(function (j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + t('s.pad' + j) + '</button>'; }).join('') + '</div>' +
         toggle('sSwap', t('s.swap')) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
         (env.touch ? '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>' : '') +
-        '<h3>' + t('s.sound') + '</h3>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
+        '<h3>' + t('s.sound') + '</h3><div class="row"><button class="btn sm" type="button" data-do="musicOpen">' + t('mu.title') + '</button></div>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
         (App.settingsExtra ? App.settingsExtra() : '') +
         '<div class="row">' + btn('defaults', 's.defaults') + btn('close', 'done', true) + '</div>';
     } else if (name === 'keys') {
@@ -8379,7 +8567,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     c.on('open', function () {
       clearTimeout(joinT);
       send(hello(0));
-      if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team });
+      if (Net.host) send(cfgMsg());
       else if (relayed && Net.state === 'joining') { Net.seated = true; changed(); }
     });
     c.on('data', onMsg);
@@ -8396,7 +8584,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     Net.matched = false; clearInterval(quickT); quickT = 0;
-    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false; Net.cfg.wx = false; Net.pool = '';
+    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false; Net.cfg.wx = false; Net.cfg.mode = 'battle'; Net.pool = '';
     epoch++;
   }
 
@@ -8491,7 +8679,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
-    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx' };
+    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool === 'wx' ? 'wx' : 'battle' };
     setState('matching');
     var run = epoch;
     transport(function (kind) {
@@ -8530,19 +8718,31 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   };
   Net.setCfg = function (c) {
     if (!Net.host) return;
-    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team, wx: !!c.wx };
-    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx });
+    Net.cfg = readCfg(c);
+    send(cfgMsg());
     changed();
   };
 
+  // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
+  // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
+  var ROOM_MODES = ['battle', 'wx', 'lv'];
+  Net.ROOM_MODES = ROOM_MODES;
+  function readCfg(c) {
+    var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
+    return { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team, wx: mode === 'wx', mode: mode };
+  }
+  function cfgMsg() { return { t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team, wx: Net.cfg.mode === 'wx', mode: Net.cfg.mode || 'battle' }; }
+  Net.modeOf = function () { return Net.cfg.mode || (Net.cfg.wx ? 'wx' : 'battle'); };
+
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx) {
+  function startMatch(seed, minutes, items, multi, wx, lv) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
     var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
     if (wx && !multi) o.wx = wx >>> 0;
+    if (lv) o.lv = lv;
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -8558,9 +8758,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       if (Net.cfg.team && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
       multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
     }
-    var wx = Net.cfg.wx && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx);
+    var mode = Net.modeOf();
+    var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
+    var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -8672,7 +8874,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send(hello(1)); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team, wx: !!Net.cfg.wx }); }
+        if (!m.ack) { send(hello(1)); if (Net.host) send(cfgMsg()); }
         var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
@@ -8684,13 +8886,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
-      case 'cfg': if (!Net.host && from === 0) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items, team: !!m.team, wx: !!m.wx }; changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0); break;
+      case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
       case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
-      case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.indexOf(m.k) >= 0) App.wxHit(m.k); break;
+      case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.concat(ZZ.Weather.DISASTERS).indexOf(m.k) >= 0) App.wxHit(m.k); break;
       case 'end':
         var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
         // the rest of the result card (older pages do not send these)
@@ -8915,6 +9117,15 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'net.leaveRoom': ['離開房間', 'Leave room', '部屋を出る', '방 나가기'],
     'net.items': ['道具戰', 'Item match', 'アイテム戦', '아이템전'],
     'net.rules': ['{0}　{1}', '{0} · {1}', '{0}　{1}', '{0} · {1}'],
+    'net.mode': ['玩什麼', 'Mode', 'モード', '모드'],
+    'net.m.battle': ['普通對戰', 'Battle', '通常バトル', '일반 대전'],
+    'net.m.wx': ['挑戰大自然', 'Nature', '大自然', '대자연'],
+    'net.m.lv': ['關卡地形', 'Level walls', 'ステージ地形', '스테이지 지형'],
+    'net.m.battleP': ['空場地開打，誰先把對手壓到頂就贏。', 'An empty well; push your rival to the top.', '空のフィールドから。相手を上まで押し上げよう。', '빈 필드에서 시작. 상대를 꼭대기까지 밀어 올리세요.'],
+    'net.m.wxP': ['兩人頭上同一片天：風、雨、雪、霧，偶爾還有洪水、龍捲風、地震。只限兩人房。', 'One sky over both walls: wind, rain, snow, fog, and now and then a flood, tornado or quake. Two players only.', '二人の上に同じ空。風・雨・雪・霧、ときどき洪水・竜巻・地震も。二人部屋のみ。', '두 사람 위에 같은 하늘: 바람, 비, 눈, 안개, 가끔 홍수, 토네이도, 지진까지. 2인 방 전용.'],
+    'net.m.lvP': ['開打時從 1000 關裡抽一關，大家從同一面地形開始。', 'One of the 1000 levels is drawn at the start; everyone begins on the same wall.', '開始時に1000ステージから1つ抽選、全員同じ地形からスタート。', '시작할 때 1000개 스테이지 중 하나를 뽑아 모두 같은 지형에서 시작해요.'],
+    'net.m.only2': ['挑戰大自然只限兩人，這房間會用普通對戰。', 'Nature is for two players; this room plays an ordinary battle.', '大自然は二人用。この部屋は通常バトルになります。', '대자연은 2인 전용이라 이 방은 일반 대전으로 해요.'],
+    'net.lvOn': ['關卡地形：第 {0} 關', 'Level wall: level {0}', 'ステージ地形：{0}', '스테이지 지형: {0}단계'],
     'net.itemsOn': ['有道具', 'items on', 'アイテムあり', '아이템 있음'],
     'net.itemsOff': ['沒有道具', 'no items', 'アイテムなし', '아이템 없음'],
     'net.e.lib': ['連線元件載不進來。如果這頁是在預覽裡開的，連線對戰請到正式站玩。', 'The networking component failed to load. Online play does not work inside a preview; use the live site.', '通信コンポーネントを読み込めません。プレビュー内ではオンライン対戦は使えません。公開サイトをご利用ください。', '통신 구성 요소를 불러오지 못했습니다. 미리보기에서는 온라인 대전을 쓸 수 없습니다. 정식 사이트를 이용하세요.'],
@@ -9125,7 +9336,15 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
-  function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')) + (Net.cfg.wx && Net.count() === 2 ? '　' + t('wx.netOn') : ''); }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return m === 'wx' && n > 2 ? 'battle' : m; }
+  function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
+  // the host picks what the room plays; the others see it in the rules line
+  function modeSeg(n) {
+    var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
+    ['battle', 'wx', 'lv'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (k === 'wx' && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t(cur === 'wx' && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    return h;
+  }
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
@@ -9152,8 +9371,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
-        h += '</div>';
-        if (n === 2) h += App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle'));
+        h += '</div>' + modeSeg(n);
+        if (n === 2) h += App.toggle('nItems', t('itemsMode'));
         else h += '<p class="note">' + t('mp.noItems') + '</p>';
         if (Net.teamOk(n)) h += App.toggle('nTeam', t('mp.teamMode', n / 2));
         h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
@@ -9167,7 +9386,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
-        h += '</div>' + App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
+        h += '</div>' + modeSeg(2) + App.toggle('nItems', t('itemsMode')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
       } else {
         h += '<p>' + esc(rulesText()) + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
@@ -9184,7 +9403,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     }
     return h;
   };
-  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; c = $('nWx'); if (c) c.checked = !!Net.cfg.wx; };
+  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
   App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
   App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o && S.o.wx ? 'wx' : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   // nobody real in time: a computer at about the player's own level, named as a computer
@@ -9209,9 +9428,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     try { navigator.share({ title: t('title'), text: t('net.shareText', Net.code), url: inviteUrl() }).catch(function () { /* closed without sharing */ }); } catch (e) { /* not available */ }
   };
   App.inputs.push(function (el) {
-    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
-    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked, wx: Net.cfg.wx }); return true; }
-    if (el.id === 'nWx') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: el.checked }); return true; }
+    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team, mode: Net.modeOf() }); return true; }
+    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked, mode: Net.modeOf() }); return true; }
     if (el.id === 'nCode') { joinCode = el.value.toUpperCase(); return true; }
     return false;
   });
@@ -9241,7 +9459,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
     if (d.nsize != null && [4, 6, 8].indexOf(+d.nsize) >= 0) { Net.size = +d.nsize; App.openSheet('online'); return true; }
-    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
+    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, mode: Net.modeOf() }); return true; }
+    if (d.nmode != null) { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, mode: d.nmode }); return true; }
     return false;
   });
 
@@ -11506,6 +11725,14 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'wx.k.snow': ['下雪', 'Snow', '雪', '눈'],
     'wx.k.storm': ['雷雨', 'Thunderstorm', '雷雨', '뇌우'],
     'wx.k.fog': ['濃霧', 'Fog', '濃霧', '짙은 안개'],
+    'wx.k.flood': ['洪水', 'Flood', '洪水', '홍수'],
+    'wx.k.tornado': ['龍捲風', 'Tornado', '竜巻', '토네이도'],
+    'wx.k.quake': ['地震', 'Earthquake', '地震', '지진'],
+    'wx.warn': ['{0} 來了！', '{0} coming!', '{0}が来る！', '{0}이(가) 온다!'],
+    'wx.dis': ['災害', 'Disasters', '災害', '재해'],
+    'wx.disP': ['偶爾還會有災害，出現前會先警告：洪水把疊好的磚往下游沖、落下的方塊也會跟著上下漂；龍捲風把經過的磚捲起來，丟到別的地方；地震讓懸空的磚垮下來（補滿的行照樣消掉、計分），太高的柱子會倒。', 'Now and then a disaster strikes, always after a warning: a flood washes blocks downstream and makes the falling piece bob; a tornado lifts the blocks it passes and drops them somewhere else; an earthquake brings down every block with a gap under it (rows filled that way clear and score) and topples tall columns.', 'ときどき災害も起こります（必ず予告あり）：洪水は積んだブロックを下流へ流し、落下中のブロックも上下に揺れます。竜巻は通ったブロックを巻き上げて別の場所に落とします。地震は浮いたブロックを崩し（埋まった段は消えて得点）、高すぎる柱は倒れます。', '가끔 재해도 와요(항상 미리 경고): 홍수는 쌓은 블록을 하류로 쓸어 가고 떨어지는 블록도 위아래로 흔들려요. 토네이도는 지나간 블록을 감아올려 다른 곳에 떨어뜨려요. 지진은 떠 있는 블록을 무너뜨리고(채워진 줄은 지워지고 점수) 너무 높은 기둥은 쓰러져요.'],
+    'wx.washed': ['被沖走 {0} 塊', '{0} washed away', '{0} 個流された', '{0}개 휩쓸림'],
+    'wx.quakeLines': ['震垮消了 {0} 行！', 'The quake cleared {0}!', '地震で {0} ライン消えた！', '지진으로 {0}줄 지워짐!'],
     'wx.lvl': ['{0} 級', 'level {0}', 'レベル{0}', '{0}단계'],
     'wx.wind': ['風速', 'Wind', '風速', '풍속'],
     'wx.rain': ['雨量', 'Rain', '雨量', '강우량'],
@@ -11521,7 +11748,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'wx.practice': ['練習場，不算獎勵', 'Practice: no rewards', '練習：報酬なし', '연습: 보상 없음'],
     'wx.again': ['再挑戰', 'Go again', 'もう一度', '다시 도전'],
     'wx.vs': ['天氣對戰', 'Weather battles', '天気バトル', '날씨 대전'],
-    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣丟到對手那邊 9 秒。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw a burst of strong weather at your rival for 9 seconds. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気を相手に9秒投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨를 상대에게 9초간 던져요. 이기면 날씨 랭크가 올라요.'],
+    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣（或一場洪水、龍捲風、地震）丟到對手那邊。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw strong weather (or a flood, tornado or earthquake) at your rival. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気（または洪水・竜巻・地震）を相手に投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨(또는 홍수, 토네이도, 지진)를 상대에게 던져요. 이기면 날씨 랭크가 올라요.'],
     'wx.rank': ['天氣排位：{0} 分', 'Storm rank: {0}', '天気ランク：{0}', '날씨 랭크: {0}'],
     'wx.vsAi': ['對電腦', 'Against the computer', 'コンピューターと', '컴퓨터와'],
     'wx.vsQuick': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
@@ -11534,7 +11761,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'wx.short': ['撐 20 秒以上才有金幣。', 'Last 20 seconds or more for coins.', '20秒以上でコイン獲得。', '20초 이상 버텨야 코인을 받아요.']
   });
 
-  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️' };
+  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️', flood: '🌊', tornado: '🌪️', quake: '🌍' };
+  var ALL = W.KINDS.concat(W.DISASTERS);
   function kindName(k) { return t('wx.k.' + k); }
   function clock(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
 
@@ -11542,12 +11770,12 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   var pick = { only: '' };
   App.go.weather = function () { App.openSheet('wxSetup'); };
   App.sheets.wxSetup = function () {
-    var d = Meta.data.lv, h = '<h2>' + t('wx.title') + '</h2><p class="note">' + t('wx.p') + '</p>';
+    var d = Meta.data.lv, h = '<h2>' + t('wx.title') + '</h2><p class="note">' + t('wx.p') + '</p><p class="note">' + t('wx.disP') + '</p>';
     if (d.wx) h += '<p><b>' + esc(t('wx.best', L.num(d.wx), clock(d.wxs * 1000))) + '</b></p>';
     h += '<div class="wxpick" role="radiogroup" aria-label="' + esc(t('wx.title')) + '">';
     h += '<button type="button" role="radio" class="wxp wide" aria-checked="' + (!pick.only) + '" data-wxonly=""><b>' + t('wx.mix') + '</b><span>' + t('wx.mixS') + '</span></button>';
     h += '</div><h3>' + t('wx.only') + '</h3><div class="wxpick" role="radiogroup" aria-label="' + esc(t('wx.only')) + '">';
-    W.KINDS.forEach(function (k) {
+    ALL.forEach(function (k) {
       h += '<button type="button" role="radio" class="wxp" aria-checked="' + (pick.only === k) + '" data-wxonly="' + k + '"><i aria-hidden="true">' + KIND_ICON[k] + '</i><b>' + esc(kindName(k)) + '</b></button>';
     });
     h += '</div><div class="row">' + btn('wxGo', 'wx.go', true) + '</div>';
@@ -11562,7 +11790,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   };
   App.acts.wxQuick = function () { App.openSheet('online'); ZZ.Net.quick(Meta.data.name || t('player'), false, 'wx'); };
   App.clicks.push(function (d) {
-    if (d.wxonly != null) { pick.only = W.KINDS.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
+    if (d.wxonly != null) { pick.only = ALL.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
     return false;
   });
   App.acts.wxGo = function () { App.begin('weather', { only: pick.only, seed: (Math.random() * 4294967296) >>> 0 }); };
@@ -11604,7 +11832,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   // the weather beside the next pieces (the weather mode and weather battles alike)
   function showInfo(S) {
     var wx = S.wx, n = wx.info();
-    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
+    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang + (n.dis ? n.dis.kind + n.dis.phase : '');
     if (key === S.infoKey) return;
     S.infoKey = key;
     var now = document.getElementById('wxNow');
@@ -11615,6 +11843,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
     if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
     if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
+    if (n.dis) h += '<p class="wxdis"><b>' + KIND_ICON[n.dis.kind] + ' ' + esc(n.dis.phase === 'warn' ? t('wx.warn', kindName(n.dis.kind)) : kindName(n.dis.kind)) + '</b></p>';
     if (n.hit) h += '<p>' + esc(t('wx.gotHit', kindName(n.kind))) + '</p>';
     else if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
     box.innerHTML = h;
@@ -11657,13 +11886,20 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       else if (e.type === 'gust') { if (wx.t - sky.gustAt > 900) { sky.gustAt = wx.t; App.sfx.play('gust'); } }
       else if (e.type === 'drift') App.sfx.play('drift');
       else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
+      else if (e.type === 'disaster') {
+        if (e.phase === 'warn') { App.banner('⚠️ ' + t('wx.warn', KIND_ICON[e.kind] + kindName(e.kind)), '', 1600); App.sfx.play('siren'); }
+        else if (e.phase === 'hit') { App.sfx.play(e.kind === 'flood' ? 'wave' : e.kind === 'tornado' ? 'twister' : 'quake'); App.buzz(e.kind === 'quake' ? [80, 40, 120, 40, 160] : [40, 30, 40]); }
+        else if (e.phase === 'end' && e.gone) App.popRaw(t('wx.washed', e.gone), [], 0, false);
+      }
+      else if (e.type === 'quake' && e.lines) App.popRaw(t('wx.quakeLines', e.lines), [], 0, false);
     }
   };
   // ---------- weather battles ----------
   // A four-line clear or a T-spin double or better throws strong weather at the rival for nine seconds.
   var HIT_MS = 9000;
   function throws(e) { return e.lines >= 4 || (e.tspin === 'full' && e.lines >= 2); }
-  function anyKind() { return W.KINDS[Math.floor(Math.random() * W.KINDS.length)]; }
+  // weather or, three times in eight, a disaster
+  function anyKind() { return ALL[Math.floor(Math.random() * ALL.length)]; }
   App.hooks.push(function (g, e, mine) {
     var S = App.S();
     if (!S || !S.sky || S.state !== 'play' || e.type !== 'lock' || !throws(e)) return;
@@ -11677,6 +11913,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   App.wxHit = function (k) {
     var S = App.S();
     if (!S || !S.sky || !S.sky.me.hit(k, HIT_MS)) return;
+    if (W.DISASTERS.indexOf(k) >= 0) { App.popRaw(t('wx.gotHit', kindName(k)), [], 0, false); return; }    // its own warning follows
     App.banner(KIND_ICON[k] + ' ' + kindName(k), '', 1100);
     App.popRaw(t('wx.gotHit', kindName(k)), [], 0, false);
     App.sfx.play(k === 'storm' ? 'thunder' : 'gust');
@@ -11719,7 +11956,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       this.cv.hidden = false;
       if (!this.on) { this.on = true; this.last = 0; window.requestAnimationFrame(this.frame); }
     },
-    stop: function () { this.on = false; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
+    stop: function () { this.on = false; if (App.el.wellWrap) App.el.wellWrap.style.transform = ''; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
     frame: function (now) {
       var s = sky, S = App.S();
       if (!S || !S.wx || App.screen() !== 'play') { s.stop(); return; }
@@ -11798,6 +12035,59 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         x.stroke(); x.shadowBlur = 0;
       }
       if (this.flash > 0) { x.fillStyle = 'rgba(255,255,255,' + this.flash.toFixed(3) + ')'; x.fillRect(0, 0, w, h); this.flash = Math.max(0, this.flash - dt / 260); }
+      this.disaster(x, n.dis, v, cell, w, h, dt);
+    },
+    // the disasters: water, a funnel, a shaking wall
+    disT: 0,
+    disaster: function (x, d, v, cell, w, h, dt) {
+      var wrap = App.el.wellWrap, reduce = App.env.reduce;
+      this.disT += dt;
+      if (!d) { if (wrap.style.transform) wrap.style.transform = ''; return; }
+      var tt = this.disT / 1000, x0 = v.mw, bw = COLS * cell, i;
+      if (d.kind === 'flood') {
+        var lvl = d.phase === 'warn' ? d.p * cell * 1.2 : cell * (1.2 + d.lvl * 0.6);
+        // water along the bottom, rising during the warning
+        x.fillStyle = 'rgba(60,140,210,0.32)';
+        x.beginPath(); x.moveTo(x0, h);
+        for (i = 0; i <= 40; i++) { var px = x0 + bw * i / 40; x.lineTo(px, h - lvl - Math.sin(tt * 4 + i * 0.6) * cell * 0.15); }
+        x.lineTo(x0 + bw, h); x.closePath(); x.fill();
+        if (d.phase === 'hit' && d.col >= 0) {
+          // the wave front: a tall curl of water at its column, white foam on top
+          var cx = x0 + (d.col + 0.5) * cell, gw = cell * 2.4, gr = x.createLinearGradient(cx - gw * d.dir, 0, cx + gw * 0.4 * d.dir, 0);
+          gr.addColorStop(0, 'rgba(40,120,200,0)'); gr.addColorStop(1, 'rgba(70,160,230,0.55)');
+          x.fillStyle = gr; x.fillRect(Math.min(cx - gw * d.dir, cx + gw * 0.4 * d.dir), 0, gw * 1.4, h);
+          x.fillStyle = 'rgba(255,255,255,0.7)';
+          for (i = 0; i < 14; i++) { x.beginPath(); x.arc(cx + Math.sin(tt * 9 + i) * cell * 0.5, (i / 14) * h + Math.sin(tt * 5 + i * 2) * cell * 0.3, cell * 0.12, 0, 6.283); x.fill(); }
+          // the whole wall rides the wave
+          if (!reduce) wrap.style.transform = 'translateY(' + (Math.sin(tt * 12) * cell * 0.18).toFixed(1) + 'px)';
+        }
+      } else if (d.kind === 'tornado') {
+        var col = d.col >= 0 ? d.col : (d.dir > 0 ? -1 : COLS), fx = x0 + (col + 0.5) * cell, a = d.phase === 'warn' ? 0.25 + d.p * 0.4 : 0.75;
+        if (d.phase === 'warn') fx = d.dir > 0 ? x0 - cell * (1 - d.p) : x0 + bw + cell * (1 - d.p);
+        // the funnel: rings, wide at the top and narrow at the ground, spinning
+        for (i = 0; i < 18; i++) {
+          var fy = h * (i / 18), r = cell * (0.4 + (1 - i / 18) * 2.2), sx = fx + Math.sin(tt * 3 + i * 0.5) * cell * 0.4;
+          x.strokeStyle = 'rgba(120,128,140,' + (a * (0.5 + 0.5 * Math.sin(tt * 8 + i))).toFixed(3) + ')';
+          x.lineWidth = Math.max(1.5, cell * 0.12);
+          x.beginPath(); x.ellipse(sx, fy, r, r * 0.22, 0, 0, 6.283); x.stroke();
+        }
+        // what it has picked up, flying round
+        x.fillStyle = 'rgba(200,180,140,0.9)';
+        for (i = 0; i < d.air; i++) { var an = tt * 6 + i * 2.1, rr = cell * (0.8 + (i % 3) * 0.5); x.fillRect(fx + Math.cos(an) * rr - cell * 0.3, h * (0.2 + (i % 4) * 0.12) + Math.sin(an) * rr * 0.3, cell * 0.6, cell * 0.6); }
+        x.fillStyle = 'rgba(90,96,110,' + (0.12 * a).toFixed(3) + ')'; x.fillRect(0, 0, w, h);
+      } else if (d.kind === 'quake') {
+        var amp = d.phase === 'warn' ? cell * 0.06 * d.p : cell * 0.3 * (1 - d.p * 0.6);
+        if (!reduce) wrap.style.transform = 'translate(' + ((Math.random() - 0.5) * amp * 2).toFixed(1) + 'px,' + ((Math.random() - 0.5) * amp).toFixed(1) + 'px)';
+        if (d.phase === 'hit') {
+          // cracks in the ground and falling dust
+          x.strokeStyle = 'rgba(60,40,30,0.5)'; x.lineWidth = Math.max(1, cell * 0.08);
+          x.beginPath(); var cy = h - cell * 0.3; x.moveTo(x0, cy);
+          for (i = 1; i <= 12; i++) x.lineTo(x0 + bw * i / 12, cy + (i % 2 ? -1 : 1) * cell * 0.25);
+          x.stroke();
+          x.fillStyle = 'rgba(150,130,110,0.5)';
+          for (i = 0; i < 20; i++) { var dx = x0 + ((i * 53) % 100) / 100 * bw, dy = ((tt * 200 + i * 37) % h); x.fillRect(dx, dy, cell * 0.08, cell * 0.08); }
+        }
+      }
     },
     spawn: function (k, w, h, anywhere, windX) {
       var cell = App.V.me.cell || 20, from = windX > 0 ? -30 : windX < 0 ? w + 30 : 0, side = windX && Math.random() < 0.35;
@@ -11914,6 +12204,279 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       if (go === 'profile' || go === 'signin') setTimeout(function () { if (!App.sheet()) App.openSheet(go === 'profile' ? 'profile' : 'srAccount'); }, 300);
     } catch (e) { /* no query */ }
   });
+})();
+</script>
+<script>
+/* 轉磚 music player: the player picks the background music.
+   - Auto (the default): each screen plays its own track, as before.
+   - My playlist: the tracks the player ticked play one after another (in order or shuffled, or one on repeat) on every
+     screen, without restarting when the screen changes.
+   - Members can add their own music files. They are kept only on this device (IndexedDB "zhuanzhuan-music"): never
+     sent to our server or anywhere else, and not part of the cloud save. If membership ends they stay on the device
+     but do not play until it is back.
+   Settings live in localStorage "zhuanzhuan.music.v1". */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta;
+  var KEY = 'zhuanzhuan.music.v1', DB = 'zhuanzhuan-music';
+  var MAX_FILE = 15 * 1024 * 1024, MAX_COUNT = 30, MAX_TOTAL = 200 * 1024 * 1024;
+  L.add({
+    'mu.title': ['音樂播放器', 'Music player', 'ミュージックプレイヤー', '음악 플레이어'],
+    'mu.open': ['音樂', 'Music', 'ミュージック', '음악'],
+    'mu.now': ['正在播放', 'Now playing', '再生中', '재생 중'],
+    'mu.none': ['沒有播放', 'Nothing playing', '停止中', '재생 안 함'],
+    'mu.off': ['背景音樂的音量是 0，到設定把「音樂」調大就聽得到。', 'Music volume is 0. Turn "Music" up in Settings to hear it.', '音楽の音量が 0 です。設定で「音楽」を上げてください。', '음악 볼륨이 0이에요. 설정에서 "음악"을 올려 주세요.'],
+    'mu.play': ['播放', 'Play', '再生', '재생'],
+    'mu.pause': ['暫停', 'Pause', '一時停止', '일시정지'],
+    'mu.prev': ['上一首', 'Previous', '前の曲', '이전 곡'],
+    'mu.next': ['下一首', 'Next', '次の曲', '다음 곡'],
+    'mu.mode': ['播放方式', 'What plays', '再生のしかた', '재생 방식'],
+    'mu.auto': ['自動（依畫面）', 'Auto (by screen)', '自動（画面ごと）', '자동(화면별)'],
+    'mu.list': ['我的播放清單', 'My playlist', 'マイプレイリスト', '내 재생 목록'],
+    'mu.listEmpty': ['先在下面勾選要放進清單的歌。', 'Tick the tracks below to put them on the list.', '下の曲にチェックを入れてリストに追加してください。', '아래에서 목록에 넣을 곡을 체크하세요.'],
+    'mu.order': ['順序', 'Order', '順番', '순서'],
+    'mu.inOrder': ['依序', 'In order', '順番どおり', '순서대로'],
+    'mu.shuffle': ['隨機', 'Shuffle', 'シャッフル', '무작위'],
+    'mu.one': ['單曲重複', 'Repeat one', '1 曲リピート', '한 곡 반복'],
+    'mu.tracks': ['曲目', 'Tracks', '曲', '곡 목록'],
+    'mu.inList': ['放進清單', 'On the list', 'リストに入れる', '목록에 넣기'],
+    'mu.playNow': ['播這首', 'Play this', 'この曲を再生', '이 곡 재생'],
+    'mu.b.menu': ['主選單', 'Main menu', 'メインメニュー', '메인 메뉴'],
+    'mu.b.calm': ['練習', 'Practice', '練習', '연습'],
+    'mu.b.battle1': ['對戰 1', 'Battle 1', 'バトル 1', '대전 1'],
+    'mu.b.battle2': ['對戰 2', 'Battle 2', 'バトル 2', '대전 2'],
+    'mu.b.battle3': ['對戰 3', 'Battle 3', 'バトル 3', '대전 3'],
+    'mu.builtin': ['遊戲內建', 'Built in', 'ゲーム内蔵', '기본 제공'],
+    'mu.own': ['我的音樂', 'My music', 'マイミュージック', '내 음악'],
+    'mu.ownP': ['會員可以加入自己的音樂檔（每首最多 15 MB、最多 30 首）。檔案只存在這台裝置，不會上傳到我們的伺服器，也不會跟著雲端存檔走；清除瀏覽器資料就會一起消失。請只加入你有權使用的音樂。', 'Members can add their own music files (up to 15 MB each, 30 tracks). They are kept only on this device: never uploaded to our server and not part of the cloud save, and they go if you clear the browser\'s data. Please add only music you have the right to use.', 'メンバーは自分の音楽ファイルを追加できます（1 曲 15 MB まで、30 曲まで）。ファイルはこの端末にだけ保存され、サーバーにはアップロードされず、クラウドセーブにも含まれません。ブラウザのデータを消すと消えます。使用する権利のある音楽だけを追加してください。', '멤버는 자기 음악 파일을 넣을 수 있어요(곡당 15MB, 최대 30곡). 파일은 이 기기에만 저장되고 서버에 올라가지 않으며 클라우드 저장에도 포함되지 않아요. 브라우저 데이터를 지우면 함께 사라져요. 사용할 권리가 있는 음악만 넣어 주세요.'],
+    'mu.add': ['加入音樂檔', 'Add music files', '音楽ファイルを追加', '음악 파일 추가'],
+    'mu.adding': ['正在讀取…', 'Reading…', '読み込み中…', '읽는 중…'],
+    'mu.added': ['加入了 {0} 首', 'Added {0}', '{0} 曲追加しました', '{0}곡 추가했어요'],
+    'mu.bad': ['「{0}」不是這個瀏覽器能播的音樂檔', '"{0}" is not a music file this browser can play', '「{0}」はこのブラウザで再生できない音楽ファイルです', '"{0}"은(는) 이 브라우저에서 재생할 수 없는 파일이에요'],
+    'mu.big': ['「{0}」超過 15 MB', '"{0}" is over 15 MB', '「{0}」は 15 MB を超えています', '"{0}"이(가) 15MB를 넘어요'],
+    'mu.full': ['已經滿了（最多 30 首、200 MB）', 'Full (30 tracks or 200 MB at most)', 'いっぱいです（30 曲・200 MB まで）', '가득 찼어요(최대 30곡, 200MB)'],
+    'mu.del': ['刪除', 'Remove', '削除', '삭제'],
+    'mu.delAsk': ['從這台裝置刪除「{0}」？', 'Remove "{0}" from this device?', '「{0}」をこの端末から削除しますか？', '"{0}"을(를) 이 기기에서 삭제할까요?'],
+    'mu.member': ['加入自己的音樂是會員功能。', 'Adding your own music is for members.', '自分の音楽の追加はメンバー機能です。', '내 음악 추가는 멤버 기능이에요.'],
+    'mu.lapsed': ['會員到期了，這些音樂留在裝置上，恢復會員就能再播。', 'Membership has ended: these stay on the device and play again once it is back.', 'メンバーの期限が切れました。音楽は端末に残り、再開すると再生できます。', '멤버십이 끝났어요. 음악은 기기에 남아 있고 다시 가입하면 재생돼요.'],
+    'mu.noStore': ['這個瀏覽器不能存音樂檔（可能是無痕模式）。', 'This browser cannot keep music files (perhaps a private window).', 'このブラウザでは音楽ファイルを保存できません（シークレットモードかもしれません）。', '이 브라우저는 음악 파일을 저장할 수 없어요(시크릿 모드일 수 있어요).']
+  });
+
+  var BUILT = ['menu', 'calm', 'battle1', 'battle2', 'battle3'];
+  var st = { mode: 'auto', list: [], order: 'seq', paused: false, own: [] }, cur = '', screenWant = 'menu', history = [];
+  function load() {
+    try {
+      var v = JSON.parse(window.localStorage.getItem(KEY) || 'null') || {};
+      st.mode = v.mode === 'list' ? 'list' : 'auto';
+      st.order = ['seq', 'shuffle', 'one'].indexOf(v.order) >= 0 ? v.order : 'seq';
+      st.paused = !!v.paused;
+      st.own = Array.isArray(v.own) ? v.own.filter(function (o) { return o && /^[a-z0-9]{6,20}$/.test(o.id) && typeof o.name === 'string'; }).slice(0, MAX_COUNT) : [];
+      st.list = Array.isArray(v.list) ? v.list.filter(function (id) { return exists(id); }) : [];
+    } catch (e) { /* the defaults */ }
+  }
+  function keep() { try { window.localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* this visit only */ } }
+  function exists(id) { return BUILT.indexOf(id) >= 0 || (/^own:/.test(id) && st.own.some(function (o) { return 'own:' + o.id === id; })); }
+  function canOwn() { return Meta.isSub(); }
+  function playable(id) { return BUILT.indexOf(id) >= 0 || (canOwn() && exists(id)); }
+  function nameOf(id) {
+    if (BUILT.indexOf(id) >= 0) return t('mu.b.' + id);
+    var o = st.own.filter(function (x) { return 'own:' + x.id === id; })[0];
+    return o ? o.name : id;
+  }
+  function queue() { return st.list.filter(playable); }
+
+  // ---------- the files (IndexedDB) ----------
+  var db = null;
+  function openDb(cb) {
+    if (db) return cb(db);
+    try {
+      var rq = window.indexedDB.open(DB, 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('track'); };
+      rq.onsuccess = function () { db = rq.result; cb(db); };
+      rq.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  }
+  function getFile(id, ok, bad) {
+    openDb(function (d) {
+      if (!d) return bad();
+      try {
+        var rq = d.transaction('track').objectStore('track').get(id);
+        rq.onsuccess = function () { var v = rq.result; if (v && v.data) ok(v.data.slice(0)); else bad(); };
+        rq.onerror = bad;
+      } catch (e) { bad(); }
+    });
+  }
+  function putFile(id, data, cb) {
+    openDb(function (d) {
+      if (!d) return cb(false);
+      try {
+        var tx = d.transaction('track', 'readwrite');
+        tx.objectStore('track').put({ data: data }, id);
+        tx.oncomplete = function () { cb(true); };
+        tx.onerror = tx.onabort = function () { cb(false); };
+      } catch (e) { cb(false); }
+    });
+  }
+  function dropFile(id, cb) {
+    openDb(function (d) {
+      if (!d) return cb();
+      try { var tx = d.transaction('track', 'readwrite'); tx.objectStore('track').delete(id); tx.oncomplete = tx.onerror = function () { cb(); }; } catch (e) { cb(); }
+    });
+  }
+
+  // ---------- what plays ----------
+  // the screen asked for its music (want); in playlist mode the playlist's own track plays instead, and keeps playing
+  function pick(want) {
+    screenWant = want;
+    if (st.paused) return { id: '', loop: true };
+    var q = queue();
+    if (st.mode !== 'list' || !q.length) { cur = want; return { id: want, loop: true }; }
+    if (q.indexOf(cur) < 0) cur = st.order === 'shuffle' ? q[Math.floor(Math.random() * q.length)] : q[0];
+    return { id: cur, loop: st.order === 'one' || q.length === 1 };
+  }
+  function step(dir) {
+    var q = queue();
+    if (!q.length) return;
+    if (dir < 0 && history.length) { cur = history.pop(); }
+    else {
+      if (cur) history.push(cur);
+      if (history.length > 30) history.shift();
+      var i = q.indexOf(cur);
+      if (st.order === 'shuffle' && q.length > 1) { var n; do { n = q[Math.floor(Math.random() * q.length)]; } while (n === cur); cur = n; }
+      else cur = q[(i + (dir < 0 ? q.length - 1 : 1)) % q.length] || q[0];
+    }
+    replay();
+  }
+  function replay() { var s = App.sfx; s.stopMusic(); s.music(screenWant); }
+  function hook() {
+    var s = App.sfx;
+    s.pick = pick;
+    s.own = getFile;
+    // a playlist track ended (or could not be read): the next one
+    s.onEnd = function (id, broken) {
+      if (st.mode !== 'list' || st.paused) return;
+      if (broken) { st.list = st.list.filter(function (x) { return x !== id; }); keep(); }
+      step(1);
+      if (App.sheet && App.sheet() === 'music') App.openSheet('music');
+    };
+  }
+
+  // ---------- adding files ----------
+  function addFiles(files) {
+    if (!canOwn()) { App.toast(t('mu.member')); return; }
+    var list = Array.prototype.slice.call(files || []), added = 0, total = st.own.reduce(function (a, o) { return a + (o.size || 0); }, 0);
+    App.toast(t('mu.adding'), 1500);
+    (function next() {
+      var f = list.shift();
+      if (!f) { keep(); if (added) App.toast(t('mu.added', added)); App.openSheet('music'); return; }
+      if (st.own.length >= MAX_COUNT || total + f.size > MAX_TOTAL) { App.toast(t('mu.full')); list = []; return next(); }
+      if (f.size > MAX_FILE) { App.toast(t('mu.big', f.name)); return next(); }
+      var rd = new FileReader();
+      rd.onload = function () {
+        var data = rd.result;
+        App.sfx.wake();
+        // only files the browser can really play are kept
+        App.sfx.decode(data.slice(0), function () {
+          var id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+          putFile(id, data, function (okk) {
+            if (!okk) { App.toast(t('mu.noStore')); list = []; return next(); }
+            st.own.push({ id: id, name: String(f.name).replace(/\.[a-z0-9]{2,4}$/i, '').slice(0, 60), size: f.size });
+            st.list.push('own:' + id);
+            total += f.size; added++;
+            next();
+          });
+        }, function () { App.toast(t('mu.bad', f.name)); next(); });
+      };
+      rd.onerror = function () { App.toast(t('mu.bad', f.name)); next(); };
+      rd.readAsArrayBuffer(f);
+    })();
+  }
+
+  // ---------- the sheet ----------
+  function trackRow(id) {
+    var on = st.list.indexOf(id) >= 0, own = /^own:/.test(id), locked = own && !canOwn(), playing = App.sfx.mname === id;
+    return '<div class="mu-row' + (playing ? ' on' : '') + '"><label class="mu-check"><input type="checkbox" data-mulist="' + App.esc(id) + '"' + (on ? ' checked' : '') + (locked ? ' disabled' : '') + '><span>' + App.esc(nameOf(id)) + '</span></label>' +
+      (locked ? '<span class="tag lock">' + t('st.sub') + '</span>' : '<button class="btn sm" type="button" data-muplay="' + App.esc(id) + '">' + (playing ? '♪' : t('mu.playNow')) + '</button>') +
+      (own ? '<button class="btn sm plain" type="button" data-mudel="' + App.esc(id) + '">' + t('mu.del') + '</button>' : '') + '</div>';
+  }
+  App.dismiss = App.dismiss || {};
+  App.dismiss.music = 1;
+  App.sheets.music = function () {
+    var s = App.sfx, name = s.mname ? nameOf(s.mname) : '', h = '<h2>' + t('mu.title') + '</h2>';
+    h += '<div class="mu-now"><small>' + t(name ? 'mu.now' : 'mu.none') + '</small><b>' + App.esc(name || '—') + '</b>' +
+      '<div class="row"><button class="btn sm" type="button" data-do="muPrev" aria-label="' + t('mu.prev') + '">⏮</button>' +
+      '<button class="btn sm main" type="button" data-do="muToggle">' + t(st.paused ? 'mu.play' : 'mu.pause') + '</button>' +
+      '<button class="btn sm" type="button" data-do="muNext" aria-label="' + t('mu.next') + '">⏭</button></div></div>';
+    if (App.set.mvol <= 0) h += '<p class="warn">' + t('mu.off') + '</p>';
+    h += '<h3>' + t('mu.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('mu.mode') + '">' +
+      ['auto', 'list'].map(function (m) { return '<button type="button" role="radio" aria-checked="' + (st.mode === m) + '" data-mumode="' + m + '">' + t('mu.' + m) + '</button>'; }).join('') + '</div>';
+    if (st.mode === 'list') {
+      h += '<div class="seg" role="radiogroup" aria-label="' + t('mu.order') + '">' + ['seq', 'shuffle', 'one'].map(function (o) { return '<button type="button" role="radio" aria-checked="' + (st.order === o) + '" data-muorder="' + o + '">' + t(o === 'seq' ? 'mu.inOrder' : o === 'shuffle' ? 'mu.shuffle' : 'mu.one') + '</button>'; }).join('') + '</div>';
+      if (!queue().length) h += '<p class="note">' + t('mu.listEmpty') + '</p>';
+    }
+    h += '<h3>' + t('mu.builtin') + '</h3><div class="mu-list">' + BUILT.map(trackRow).join('') + '</div>';
+    h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>';
+    if (st.own.length) h += (canOwn() ? '' : '<p class="note">' + t('mu.lapsed') + '</p>') + '<div class="mu-list">' + st.own.map(function (o) { return trackRow('own:' + o.id); }).join('') + '</div>';
+    h += canOwn() ? '<div class="row"><label class="btn" for="muFile">' + t('mu.add') + '</label><input id="muFile" type="file" accept="audio/*" multiple hidden></div>'
+      : '<p class="note">' + t('mu.member') + '</p><div class="row"><button class="btn" type="button" data-tab="member">' + t('k.member') + '</button></div>';
+    return h + '<div class="row">' + App.btn('close', 'done', true) + '</div>';
+  };
+  App.opened = App.opened || {};
+  var tick = 0;
+  App.opened.music = function () {
+    // what is playing changes by itself (a track ends, a file finishes reading): keep the top of the sheet current
+    clearInterval(tick);
+    tick = setInterval(function () {
+      if (App.sheet() !== 'music') return clearInterval(tick);
+      var el = document.querySelector('.mu-now b'), n = App.sfx.mname ? nameOf(App.sfx.mname) : '—';
+      if (el && el.textContent !== n) App.openSheet('music');
+    }, 800);
+    var f = document.getElementById('muFile');
+    if (f) f.onchange = function () { addFiles(f.files); f.value = ''; };
+  };
+  App.acts.muToggle = function () {
+    st.paused = !st.paused; keep();
+    App.sfx.wake();
+    if (st.paused) App.sfx.stopMusic(); else replay();
+    App.openSheet('music');
+  };
+  App.acts.muNext = function () { App.sfx.wake(); if (st.mode === 'list' && queue().length) step(1); App.openSheet('music'); };
+  App.acts.muPrev = function () { App.sfx.wake(); if (st.mode === 'list' && queue().length) step(-1); App.openSheet('music'); };
+  App.acts.musicOpen = function () { App.openSheet('music'); };
+  App.clicks.push(function (d) {
+    if (d.mumode) { st.mode = d.mumode === 'list' ? 'list' : 'auto'; keep(); App.sfx.wake(); replay(); App.openSheet('music'); return true; }
+    if (d.muorder) { st.order = d.muorder; keep(); replay(); App.openSheet('music'); return true; }
+    if (d.muplay) {
+      var id = d.muplay;
+      if (!playable(id)) return true;
+      if (st.list.indexOf(id) < 0) st.list.push(id);
+      st.mode = 'list'; st.paused = false; if (cur) history.push(cur); cur = id; keep();
+      App.sfx.wake(); replay(); App.openSheet('music');
+      return true;
+    }
+    if (d.mudel) {
+      var did = d.mudel, nm = nameOf(did);
+      if (!window.confirm(t('mu.delAsk', nm))) return true;
+      st.own = st.own.filter(function (o) { return 'own:' + o.id !== did; });
+      st.list = st.list.filter(function (x) { return x !== did; });
+      if (cur === did) cur = '';
+      keep();
+      dropFile(did.slice(4), function () { if (App.sfx.mname === did) replay(); App.openSheet('music'); });
+      return true;
+    }
+    return false;
+  });
+  App.inputs.push(function (el) {
+    if (!el.getAttribute || !el.hasAttribute('data-mulist')) return false;
+    var id = el.getAttribute('data-mulist');
+    if (el.checked && st.list.indexOf(id) < 0) st.list.push(id);
+    if (!el.checked) st.list = st.list.filter(function (x) { return x !== id; });
+    keep();
+    if (st.mode === 'list') { if (!queue().length || (!el.checked && cur === id)) replay(); }
+    return true;
+  });
+  App.boot.push(function () { load(); hook(); });
+  ZZ.Music = { state: function () { return st; }, pick: pick, step: step, BUILT: BUILT, MAX_FILE: MAX_FILE };
 })();
 </script>
 <script>

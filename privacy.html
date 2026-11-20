@@ -98,6 +98,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <li><code>zhuanzhuan.rep.v1</code>：對戰錄影（分身對戰用）</li>
 <li><code>zhuanzhuan.consent.v1</code>：你在第一次進來時的選擇</li>
 <li><code>zhuanzhuan-pics</code>（IndexedDB）：會員自己選的圖片</li>
+<li><code>zhuanzhuan-music</code>（IndexedDB）與 <code>zhuanzhuan.music.v1</code>：音樂播放器的設定，以及會員自己加入的音樂檔。音樂檔只存在這台裝置，不會上傳到我們的伺服器或任何地方，也不在雲端存檔裡。</li>
 </ul>
 <p><strong>選擇性的：Google 字型。</strong>遊戲的字型放在 Google Fonts。只有你在第一次進來的畫面或「設定 → 隱私與資料」允許之後，瀏覽器才會連到 Google 下載字型（Google 會因此看到你的網路位址）。不允許也能完整玩，只是用裝置內建的字型。隨時可以改。</p>
 
@@ -194,7 +195,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <p>Accounts are optional. Once they launch, linking one adds: the id and email from the service you sign in with (to sign you in, recover the account and send important account notices, never ads); the region you chose as where you live, stored only as a region code, to apply local age rules; only the result of the age check, never your birthday; your friends list and invites; and a record of which guest save was linked to which account and when, to settle disputes. Accounts are run by 斯諾瑞姆工作室 (SnowRealm) and shared across its games; each game receives only what it needs, such as the account number and name. The full account privacy notice will be published at launch.</p>
 
 <h2>4. Cookies and storage on your device</h2>
-<p>The game uses <strong>no cookies</strong>. It uses the browser's storage (localStorage and IndexedDB) for what the game itself needs: settings, progress, the cloud save identity, match recordings, your first-visit choices and member pictures. Without these the game cannot remember anything, so they are not optional.</p>
+<p>The game uses <strong>no cookies</strong>. It uses the browser's storage (localStorage and IndexedDB) for what the game itself needs: settings, progress, the cloud save identity, match recordings, your first-visit choices, member pictures, and the music player's settings with any music files a member adds (kept only on this device: never uploaded to our server or anywhere else, and not part of the cloud save). Without these the game cannot remember anything, so they are not optional.</p>
 <p><strong>Optional: Google Fonts.</strong> Only after you allow it (on the first-visit screen or in Settings → Privacy and data) does your browser fetch the game's fonts from Google, which then sees your network address. Without it the game uses your device's fonts. You can change this any time.</p>
 
 <h2>4a. Coins for an ad (not switched on yet)</h2>

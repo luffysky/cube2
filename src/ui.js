@@ -299,7 +299,10 @@
     if (kind === 'battle') {
       var mode = o.mode || 'ai';
       S.mode = mode;
-      S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [] });
+      // a room on a level's wall (關卡地形): every player starts from the same numbered level's wall
+      var lvWall = o.lv && ZZ.Levels ? ZZ.Levels.level(o.lv).board : null;
+      S.lvNo = lvWall ? o.lv : 0;
+      S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [], board: lvWall || undefined });
       S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
       if (mode === 'net' && o.multi) {
@@ -307,7 +310,7 @@
         var M = o.multi, foes = {}, order = [], myTeam = M.teams ? M.teams[M.me] : -1;
         M.roster.forEach(function (st) {
           if (st === M.me) return;
-          foes[st] = { seat: st, name: M.names[st] || t('foe'), team: M.teams ? M.teams[st] : -1, g: new ZZ.Game({ seed: seed, manual: true, garbage: false }), downs: 0, sent: 0, gone: false };
+          foes[st] = { seat: st, name: M.names[st] || t('foe'), team: M.teams ? M.teams[st] : -1, g: new ZZ.Game({ seed: seed, manual: true, garbage: false, board: lvWall || undefined }), downs: 0, sent: 0, gone: false };
           order.push(st);
         });
         S.multi = { me: M.me, teams: M.teams, myTeam: myTeam, foes: foes, order: order, target: null };
@@ -316,7 +319,7 @@
         S.multi.target = first; S.opp = foes[first].g; S.oppName = foes[first].name;
         S.me.onAttack = function (n) { ZZ.Net.attack(n); };
       } else if (mode === 'net') {
-        S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false });   // a mirror of the other player's wall
+        S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false, board: lvWall || undefined });   // a mirror of the other player's wall
         S.remote = true; S.bot = null;
         S.oppName = o.oppName || t('foe');
         S.me.onAttack = function (n) { ZZ.Net.attack(n); };
@@ -338,6 +341,8 @@
       S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
       S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
       S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
+      // a replay starts from an empty wall, so a level-wall room keeps none
+      if (S.lvNo) { S.rec = null; S.tape = null; toast(t('net.lvOn', S.lvNo), 3000); }
       // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
       if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
         S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
@@ -1087,7 +1092,7 @@
         [0, 1, 2].map(function (j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + t('s.pad' + j) + '</button>'; }).join('') + '</div>' +
         toggle('sSwap', t('s.swap')) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
         (env.touch ? '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>' : '') +
-        '<h3>' + t('s.sound') + '</h3>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
+        '<h3>' + t('s.sound') + '</h3><div class="row"><button class="btn sm" type="button" data-do="musicOpen">' + t('mu.title') + '</button></div>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
         (App.settingsExtra ? App.settingsExtra() : '') +
         '<div class="row">' + btn('defaults', 's.defaults') + btn('close', 'done', true) + '</div>';
     } else if (name === 'keys') {

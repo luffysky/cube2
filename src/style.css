@@ -867,3 +867,14 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .pv.sw.site i { display: block; height: 5px; border-radius: 3px; width: 80%; }
 .pv.sw.site i + i { width: 45%; }
 .steamtag { background: #1B2838; color: #C7D5E0; }
+/* the music player */
+.mu-now { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; border: 1px solid var(--edge); border-radius: 14px; background: var(--floor); text-align: center; }
+.mu-now small { color: var(--muted); font-size: 12px; }
+.mu-now b { font-size: 17px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-list { display: flex; flex-direction: column; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.mu-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.mu-row + .mu-row { border-top: 1px solid var(--edge); }
+.mu-row.on { background: color-mix(in srgb, var(--gold, #F5B82E) 14%, transparent); }
+.mu-check { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.mu-check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-check input { width: 20px; height: 20px; accent-color: var(--gold, #F5B82E); }

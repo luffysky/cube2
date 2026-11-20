@@ -23,7 +23,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   try {
     await page.goto(URL); await sleep(600);
     await page.click('[data-go="weather"]'); await sleep(300);
-    ok(await page.evaluate(() => ZZ.peek().sheet === 'wxSetup' && document.querySelectorAll('.wxp').length === 6), 'the setup sheet lists changing weather and five kinds');
+    ok(await page.evaluate(() => ZZ.peek().sheet === 'wxSetup' && document.querySelectorAll('.wxp').length === 9), 'the setup sheet lists changing weather, five kinds and three disasters');
     await page.screenshot({ path: path.join(OUT, 'wx-setup.png') });
     for (const k of ['rain', 'snow', 'wind', 'fog', 'storm']) {
       await page.evaluate(() => { if (ZZ.peek().S) ZZ.App.toMenu(); });

@@ -22,6 +22,14 @@
     'wx.k.snow': ['下雪', 'Snow', '雪', '눈'],
     'wx.k.storm': ['雷雨', 'Thunderstorm', '雷雨', '뇌우'],
     'wx.k.fog': ['濃霧', 'Fog', '濃霧', '짙은 안개'],
+    'wx.k.flood': ['洪水', 'Flood', '洪水', '홍수'],
+    'wx.k.tornado': ['龍捲風', 'Tornado', '竜巻', '토네이도'],
+    'wx.k.quake': ['地震', 'Earthquake', '地震', '지진'],
+    'wx.warn': ['{0} 來了！', '{0} coming!', '{0}が来る！', '{0}이(가) 온다!'],
+    'wx.dis': ['災害', 'Disasters', '災害', '재해'],
+    'wx.disP': ['偶爾還會有災害，出現前會先警告：洪水把疊好的磚往下游沖、落下的方塊也會跟著上下漂；龍捲風把經過的磚捲起來，丟到別的地方；地震讓懸空的磚垮下來（補滿的行照樣消掉、計分），太高的柱子會倒。', 'Now and then a disaster strikes, always after a warning: a flood washes blocks downstream and makes the falling piece bob; a tornado lifts the blocks it passes and drops them somewhere else; an earthquake brings down every block with a gap under it (rows filled that way clear and score) and topples tall columns.', 'ときどき災害も起こります（必ず予告あり）：洪水は積んだブロックを下流へ流し、落下中のブロックも上下に揺れます。竜巻は通ったブロックを巻き上げて別の場所に落とします。地震は浮いたブロックを崩し（埋まった段は消えて得点）、高すぎる柱は倒れます。', '가끔 재해도 와요(항상 미리 경고): 홍수는 쌓은 블록을 하류로 쓸어 가고 떨어지는 블록도 위아래로 흔들려요. 토네이도는 지나간 블록을 감아올려 다른 곳에 떨어뜨려요. 지진은 떠 있는 블록을 무너뜨리고(채워진 줄은 지워지고 점수) 너무 높은 기둥은 쓰러져요.'],
+    'wx.washed': ['被沖走 {0} 塊', '{0} washed away', '{0} 個流された', '{0}개 휩쓸림'],
+    'wx.quakeLines': ['震垮消了 {0} 行！', 'The quake cleared {0}!', '地震で {0} ライン消えた！', '지진으로 {0}줄 지워짐!'],
     'wx.lvl': ['{0} 級', 'level {0}', 'レベル{0}', '{0}단계'],
     'wx.wind': ['風速', 'Wind', '風速', '풍속'],
     'wx.rain': ['雨量', 'Rain', '雨量', '강우량'],
@@ -37,7 +45,7 @@
     'wx.practice': ['練習場，不算獎勵', 'Practice: no rewards', '練習：報酬なし', '연습: 보상 없음'],
     'wx.again': ['再挑戰', 'Go again', 'もう一度', '다시 도전'],
     'wx.vs': ['天氣對戰', 'Weather battles', '天気バトル', '날씨 대전'],
-    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣丟到對手那邊 9 秒。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw a burst of strong weather at your rival for 9 seconds. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気を相手に9秒投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨를 상대에게 9초간 던져요. 이기면 날씨 랭크가 올라요.'],
+    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣（或一場洪水、龍捲風、地震）丟到對手那邊。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw strong weather (or a flood, tornado or earthquake) at your rival. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気（または洪水・竜巻・地震）を相手に投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨(또는 홍수, 토네이도, 지진)를 상대에게 던져요. 이기면 날씨 랭크가 올라요.'],
     'wx.rank': ['天氣排位：{0} 分', 'Storm rank: {0}', '天気ランク：{0}', '날씨 랭크: {0}'],
     'wx.vsAi': ['對電腦', 'Against the computer', 'コンピューターと', '컴퓨터와'],
     'wx.vsQuick': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
@@ -50,7 +58,8 @@
     'wx.short': ['撐 20 秒以上才有金幣。', 'Last 20 seconds or more for coins.', '20秒以上でコイン獲得。', '20초 이상 버텨야 코인을 받아요.']
   });
 
-  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️' };
+  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️', flood: '🌊', tornado: '🌪️', quake: '🌍' };
+  var ALL = W.KINDS.concat(W.DISASTERS);
   function kindName(k) { return t('wx.k.' + k); }
   function clock(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
 
@@ -58,12 +67,12 @@
   var pick = { only: '' };
   App.go.weather = function () { App.openSheet('wxSetup'); };
   App.sheets.wxSetup = function () {
-    var d = Meta.data.lv, h = '<h2>' + t('wx.title') + '</h2><p class="note">' + t('wx.p') + '</p>';
+    var d = Meta.data.lv, h = '<h2>' + t('wx.title') + '</h2><p class="note">' + t('wx.p') + '</p><p class="note">' + t('wx.disP') + '</p>';
     if (d.wx) h += '<p><b>' + esc(t('wx.best', L.num(d.wx), clock(d.wxs * 1000))) + '</b></p>';
     h += '<div class="wxpick" role="radiogroup" aria-label="' + esc(t('wx.title')) + '">';
     h += '<button type="button" role="radio" class="wxp wide" aria-checked="' + (!pick.only) + '" data-wxonly=""><b>' + t('wx.mix') + '</b><span>' + t('wx.mixS') + '</span></button>';
     h += '</div><h3>' + t('wx.only') + '</h3><div class="wxpick" role="radiogroup" aria-label="' + esc(t('wx.only')) + '">';
-    W.KINDS.forEach(function (k) {
+    ALL.forEach(function (k) {
       h += '<button type="button" role="radio" class="wxp" aria-checked="' + (pick.only === k) + '" data-wxonly="' + k + '"><i aria-hidden="true">' + KIND_ICON[k] + '</i><b>' + esc(kindName(k)) + '</b></button>';
     });
     h += '</div><div class="row">' + btn('wxGo', 'wx.go', true) + '</div>';
@@ -78,7 +87,7 @@
   };
   App.acts.wxQuick = function () { App.openSheet('online'); ZZ.Net.quick(Meta.data.name || t('player'), false, 'wx'); };
   App.clicks.push(function (d) {
-    if (d.wxonly != null) { pick.only = W.KINDS.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
+    if (d.wxonly != null) { pick.only = ALL.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
     return false;
   });
   App.acts.wxGo = function () { App.begin('weather', { only: pick.only, seed: (Math.random() * 4294967296) >>> 0 }); };
@@ -120,7 +129,7 @@
   // the weather beside the next pieces (the weather mode and weather battles alike)
   function showInfo(S) {
     var wx = S.wx, n = wx.info();
-    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
+    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang + (n.dis ? n.dis.kind + n.dis.phase : '');
     if (key === S.infoKey) return;
     S.infoKey = key;
     var now = document.getElementById('wxNow');
@@ -131,6 +140,7 @@
       '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
     if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
     if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
+    if (n.dis) h += '<p class="wxdis"><b>' + KIND_ICON[n.dis.kind] + ' ' + esc(n.dis.phase === 'warn' ? t('wx.warn', kindName(n.dis.kind)) : kindName(n.dis.kind)) + '</b></p>';
     if (n.hit) h += '<p>' + esc(t('wx.gotHit', kindName(n.kind))) + '</p>';
     else if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
     box.innerHTML = h;
@@ -173,13 +183,20 @@
       else if (e.type === 'gust') { if (wx.t - sky.gustAt > 900) { sky.gustAt = wx.t; App.sfx.play('gust'); } }
       else if (e.type === 'drift') App.sfx.play('drift');
       else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
+      else if (e.type === 'disaster') {
+        if (e.phase === 'warn') { App.banner('⚠️ ' + t('wx.warn', KIND_ICON[e.kind] + kindName(e.kind)), '', 1600); App.sfx.play('siren'); }
+        else if (e.phase === 'hit') { App.sfx.play(e.kind === 'flood' ? 'wave' : e.kind === 'tornado' ? 'twister' : 'quake'); App.buzz(e.kind === 'quake' ? [80, 40, 120, 40, 160] : [40, 30, 40]); }
+        else if (e.phase === 'end' && e.gone) App.popRaw(t('wx.washed', e.gone), [], 0, false);
+      }
+      else if (e.type === 'quake' && e.lines) App.popRaw(t('wx.quakeLines', e.lines), [], 0, false);
     }
   };
   // ---------- weather battles ----------
   // A four-line clear or a T-spin double or better throws strong weather at the rival for nine seconds.
   var HIT_MS = 9000;
   function throws(e) { return e.lines >= 4 || (e.tspin === 'full' && e.lines >= 2); }
-  function anyKind() { return W.KINDS[Math.floor(Math.random() * W.KINDS.length)]; }
+  // weather or, three times in eight, a disaster
+  function anyKind() { return ALL[Math.floor(Math.random() * ALL.length)]; }
   App.hooks.push(function (g, e, mine) {
     var S = App.S();
     if (!S || !S.sky || S.state !== 'play' || e.type !== 'lock' || !throws(e)) return;
@@ -193,6 +210,7 @@
   App.wxHit = function (k) {
     var S = App.S();
     if (!S || !S.sky || !S.sky.me.hit(k, HIT_MS)) return;
+    if (W.DISASTERS.indexOf(k) >= 0) { App.popRaw(t('wx.gotHit', kindName(k)), [], 0, false); return; }    // its own warning follows
     App.banner(KIND_ICON[k] + ' ' + kindName(k), '', 1100);
     App.popRaw(t('wx.gotHit', kindName(k)), [], 0, false);
     App.sfx.play(k === 'storm' ? 'thunder' : 'gust');
@@ -235,7 +253,7 @@
       this.cv.hidden = false;
       if (!this.on) { this.on = true; this.last = 0; window.requestAnimationFrame(this.frame); }
     },
-    stop: function () { this.on = false; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
+    stop: function () { this.on = false; if (App.el.wellWrap) App.el.wellWrap.style.transform = ''; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
     frame: function (now) {
       var s = sky, S = App.S();
       if (!S || !S.wx || App.screen() !== 'play') { s.stop(); return; }
@@ -314,6 +332,59 @@
         x.stroke(); x.shadowBlur = 0;
       }
       if (this.flash > 0) { x.fillStyle = 'rgba(255,255,255,' + this.flash.toFixed(3) + ')'; x.fillRect(0, 0, w, h); this.flash = Math.max(0, this.flash - dt / 260); }
+      this.disaster(x, n.dis, v, cell, w, h, dt);
+    },
+    // the disasters: water, a funnel, a shaking wall
+    disT: 0,
+    disaster: function (x, d, v, cell, w, h, dt) {
+      var wrap = App.el.wellWrap, reduce = App.env.reduce;
+      this.disT += dt;
+      if (!d) { if (wrap.style.transform) wrap.style.transform = ''; return; }
+      var tt = this.disT / 1000, x0 = v.mw, bw = COLS * cell, i;
+      if (d.kind === 'flood') {
+        var lvl = d.phase === 'warn' ? d.p * cell * 1.2 : cell * (1.2 + d.lvl * 0.6);
+        // water along the bottom, rising during the warning
+        x.fillStyle = 'rgba(60,140,210,0.32)';
+        x.beginPath(); x.moveTo(x0, h);
+        for (i = 0; i <= 40; i++) { var px = x0 + bw * i / 40; x.lineTo(px, h - lvl - Math.sin(tt * 4 + i * 0.6) * cell * 0.15); }
+        x.lineTo(x0 + bw, h); x.closePath(); x.fill();
+        if (d.phase === 'hit' && d.col >= 0) {
+          // the wave front: a tall curl of water at its column, white foam on top
+          var cx = x0 + (d.col + 0.5) * cell, gw = cell * 2.4, gr = x.createLinearGradient(cx - gw * d.dir, 0, cx + gw * 0.4 * d.dir, 0);
+          gr.addColorStop(0, 'rgba(40,120,200,0)'); gr.addColorStop(1, 'rgba(70,160,230,0.55)');
+          x.fillStyle = gr; x.fillRect(Math.min(cx - gw * d.dir, cx + gw * 0.4 * d.dir), 0, gw * 1.4, h);
+          x.fillStyle = 'rgba(255,255,255,0.7)';
+          for (i = 0; i < 14; i++) { x.beginPath(); x.arc(cx + Math.sin(tt * 9 + i) * cell * 0.5, (i / 14) * h + Math.sin(tt * 5 + i * 2) * cell * 0.3, cell * 0.12, 0, 6.283); x.fill(); }
+          // the whole wall rides the wave
+          if (!reduce) wrap.style.transform = 'translateY(' + (Math.sin(tt * 12) * cell * 0.18).toFixed(1) + 'px)';
+        }
+      } else if (d.kind === 'tornado') {
+        var col = d.col >= 0 ? d.col : (d.dir > 0 ? -1 : COLS), fx = x0 + (col + 0.5) * cell, a = d.phase === 'warn' ? 0.25 + d.p * 0.4 : 0.75;
+        if (d.phase === 'warn') fx = d.dir > 0 ? x0 - cell * (1 - d.p) : x0 + bw + cell * (1 - d.p);
+        // the funnel: rings, wide at the top and narrow at the ground, spinning
+        for (i = 0; i < 18; i++) {
+          var fy = h * (i / 18), r = cell * (0.4 + (1 - i / 18) * 2.2), sx = fx + Math.sin(tt * 3 + i * 0.5) * cell * 0.4;
+          x.strokeStyle = 'rgba(120,128,140,' + (a * (0.5 + 0.5 * Math.sin(tt * 8 + i))).toFixed(3) + ')';
+          x.lineWidth = Math.max(1.5, cell * 0.12);
+          x.beginPath(); x.ellipse(sx, fy, r, r * 0.22, 0, 0, 6.283); x.stroke();
+        }
+        // what it has picked up, flying round
+        x.fillStyle = 'rgba(200,180,140,0.9)';
+        for (i = 0; i < d.air; i++) { var an = tt * 6 + i * 2.1, rr = cell * (0.8 + (i % 3) * 0.5); x.fillRect(fx + Math.cos(an) * rr - cell * 0.3, h * (0.2 + (i % 4) * 0.12) + Math.sin(an) * rr * 0.3, cell * 0.6, cell * 0.6); }
+        x.fillStyle = 'rgba(90,96,110,' + (0.12 * a).toFixed(3) + ')'; x.fillRect(0, 0, w, h);
+      } else if (d.kind === 'quake') {
+        var amp = d.phase === 'warn' ? cell * 0.06 * d.p : cell * 0.3 * (1 - d.p * 0.6);
+        if (!reduce) wrap.style.transform = 'translate(' + ((Math.random() - 0.5) * amp * 2).toFixed(1) + 'px,' + ((Math.random() - 0.5) * amp).toFixed(1) + 'px)';
+        if (d.phase === 'hit') {
+          // cracks in the ground and falling dust
+          x.strokeStyle = 'rgba(60,40,30,0.5)'; x.lineWidth = Math.max(1, cell * 0.08);
+          x.beginPath(); var cy = h - cell * 0.3; x.moveTo(x0, cy);
+          for (i = 1; i <= 12; i++) x.lineTo(x0 + bw * i / 12, cy + (i % 2 ? -1 : 1) * cell * 0.25);
+          x.stroke();
+          x.fillStyle = 'rgba(150,130,110,0.5)';
+          for (i = 0; i < 20; i++) { var dx = x0 + ((i * 53) % 100) / 100 * bw, dy = ((tt * 200 + i * 37) % h); x.fillRect(dx, dy, cell * 0.08, cell * 0.08); }
+        }
+      }
     },
     spawn: function (k, w, h, anywhere, windX) {
       var cell = App.V.me.cell || 20, from = windX > 0 ? -30 : windX < 0 ? w + 30 : 0, side = windX && Math.random() < 0.35;

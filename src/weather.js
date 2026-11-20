@@ -11,12 +11,24 @@
      storm  wind and rain together, and lightning now and then turns a block into cement
      fog    the lower rows are hidden behind fog
 
-   The weather changes every 20 to 30 seconds and gets stronger the longer the run goes. */
+   The weather changes every 20 to 30 seconds and gets stronger the longer the run goes.
+
+   Disasters come on top of the weather, rarely (one every one to two minutes, from a minute in) and always after a
+   warning of about two seconds:
+     flood    a wave sweeps across: the top blocks of each column it passes are washed downstream (off the far edge
+              they are gone), and the falling piece bobs up and down and drifts with it
+     tornado  a funnel crosses the wall: it lifts the top blocks of the columns it passes and, as it leaves, drops them
+              back on other columns
+     quake    the wall shakes: every block with a gap under it falls (rows filled that way are cleared and scored), and
+              columns standing well above both neighbours topple one block over
+   They run on their own random stream, so the ordinary weather is the same with or without them. */
 (function (root) {
   'use strict';
   var ZZ = root.ZZ, COLS = ZZ.COLS, ROWS = ZZ.ROWS, TOP = ZZ.TOP, GARBAGE = ZZ.GARBAGE, RNG = ZZ.RNG, SHAPES = ZZ.SHAPES;
   var SNOW = 9;
   var KINDS = ['wind', 'rain', 'snow', 'storm', 'fog'];
+  var DISASTERS = ['flood', 'tornado', 'quake'];
+  var DIS_WARN = 2000, DIS_LEN = { flood: 3200, tornado: 3800, quake: 2200 };
   var CALM = 6000;          // a short calm at the start
   var MINUTE = 60000;
 
@@ -24,6 +36,10 @@
     o = o || {};
     this.seed = (o.seed >>> 0) || 1;
     this.only = KINDS.indexOf(o.only) >= 0 ? o.only : '';       // practice one kind of weather all the way through
+    this.onlyDis = DISASTERS.indexOf(o.only) >= 0 ? o.only : '';   // …or one kind of disaster, under a clear sky
+    this.noDis = !!o.noDis;
+    this.drng = new RNG(this.seed ^ 0x2545F491);
+    this.dis = null; this.disNext = this.onlyDis ? 8000 : 60000 + this.drng.next() * 30000;
     this.rng = new RNG(this.seed ^ 0x5bd1e995);
     this.t = 0;
     this.kind = 'clear'; this.lvl = 0; this.left = CALM; this.n = 0;
@@ -39,6 +55,7 @@
   Weather.prototype.next = function () {
     var r = this.rng, prev = this.kind, k;
     if (this.only) k = this.only;
+    else if (this.onlyDis) k = 'clear';
     else do { k = KINDS[Math.floor(r.next() * KINDS.length)]; } while (k === prev);
     this.n++;
     this.kind = k;
@@ -55,6 +72,7 @@
   // Weather thrown by the rival (a 4-line clear in a weather battle): this kind at full strength for ms, then the sky
   // goes back to its own schedule.
   Weather.prototype.hit = function (kind, ms) {
+    if (DISASTERS.indexOf(kind) >= 0) { if (this.dis) return false; this.startDis(kind, 3, 1500); return true; }
     if (KINDS.indexOf(kind) < 0) return false;
     this.hitKind = kind; this.hitLeft = Math.max(1000, Math.min(15000, ms || 9000));
     this.boltAt = Math.min(this.boltAt, 1500); this.driftAcc = 0; this.pushAcc = 0;
@@ -110,8 +128,9 @@
     } else this.pushAcc = 0;
     return this.land(g, dt, k, L, out);
   };
-  // what the weather does to the wall itself: snow settling and lightning
+  // what the weather does to the wall itself: snow settling, lightning, and the disasters
   Weather.prototype.land = function (g, dt, k, L, out) {
+    this.disaster(g, dt, out);
     // snow settles: one cell at a time on top of a column, never filling a row by itself
     if (k === 'snow') {
       this.driftAcc += dt;
@@ -169,9 +188,137 @@
     return null;
   };
 
+  // ---------- disasters ----------
+  Weather.prototype.startDis = function (kind, lvl, warn) {
+    var r = this.drng;
+    this.dis = { kind: kind, lvl: lvl, phase: 'warn', t: 0, warn: warn || DIS_WARN, dur: DIS_LEN[kind], dir: r.next() < 0.5 ? -1 : 1, col: -1, air: [], bob: 0, wob: r.next() * 6.283, gone: 0, started: true };
+  };
+  Weather.prototype.disaster = function (g, dt, out) {
+    var d = this.dis;
+    if (!d) {
+      if (this.noDis) return;
+      this.disNext -= dt;
+      if (this.disNext > 0) return;
+      this.startDis(this.onlyDis || DISASTERS[Math.floor(this.drng.next() * DISASTERS.length)], this.onlyDis ? Math.max(1, this.lvl) : Math.max(1, Math.min(3, this.lvl)));
+      d = this.dis;
+    }
+    if (d.started) { d.started = false; out.push({ type: 'disaster', kind: d.kind, phase: 'warn', dir: d.dir, lvl: d.lvl }); }
+    d.t += dt;
+    if (d.phase === 'warn') {
+      if (d.t < d.warn) return;
+      d.phase = 'hit'; d.t = 0;
+      out.push({ type: 'disaster', kind: d.kind, phase: 'hit', dir: d.dir, lvl: d.lvl });
+      if (d.kind === 'quake') out.push(this.quake(g, d));
+      return;
+    }
+    var p = Math.min(1, d.t / d.dur), col;
+    if (d.kind === 'flood') {
+      col = Math.min(COLS - 1, Math.floor(p * (COLS + 1)));
+      col = d.dir > 0 ? col : COLS - 1 - col;
+      while (d.col !== col && p < 1) {
+        d.col = d.col < 0 ? (d.dir > 0 ? 0 : COLS - 1) : d.col + d.dir;
+        var w = this.wash(g, d.col, d);
+        if (w) out.push(w);
+      }
+      // the falling piece rides the wave: up and down, and along with it where the wave is
+      if (!this.boardOnly && g.cur) {
+        d.bob += dt;
+        if (d.bob >= 260) {
+          d.bob -= 260;
+          var c = g.cur, up = Math.floor(d.t / 260) % 2 === 0, dy = up ? -1 : 1;
+          if (g.fits(c.type, c.rot, c.x, c.y + dy)) { c.y += dy; g.emit('move', { dx: 0, x: c.x, y: c.y, rot: c.rot, wind: true }); }
+          if (Math.abs(c.x + 1.5 - d.col) < 2.5 && g.fits(c.type, c.rot, c.x + d.dir, c.y)) { c.x += d.dir; g.lastMove = 'wind'; g.emit('move', { dx: d.dir, x: c.x, y: c.y, rot: c.rot, wind: true }); }
+        }
+      }
+    } else if (d.kind === 'tornado') {
+      // the funnel's column: across the wall with a wobble
+      var along = p * (COLS - 1), wob = Math.sin(d.wob + p * 9) * 1.2;
+      col = Math.max(0, Math.min(COLS - 1, Math.round((d.dir > 0 ? along : COLS - 1 - along) + wob)));
+      if (col !== d.col && p < 1) { d.col = col; var l = this.lift(g, col, d); if (l) out.push(l); }
+    }
+    if (d.t >= d.dur) {
+      if (d.kind === 'tornado') out.push(this.drop(g, d));
+      out.push({ type: 'disaster', kind: d.kind, phase: 'end', gone: d.gone });
+      this.dis = null;
+      this.disNext = this.onlyDis ? 12000 + this.drng.next() * 8000 : 60000 + this.drng.next() * 60000;
+    }
+  };
+  // the wave washes the top blocks of column x one column downstream; off the far edge they are gone
+  Weather.prototype.wash = function (g, x, d) {
+    var n = d.lvl, moved = 0, nx = x + d.dir;
+    for (var i = 0; i < n; i++) {
+      var y = top(g, x);
+      if (y >= ROWS) break;
+      var v = g.grid[y][x];
+      g.grid[y][x] = 0;
+      moved++;
+      if (nx < 0 || nx >= COLS) { d.gone++; continue; }
+      var ty = top(g, nx) - 1;
+      if (ty < TOP + 1 || fullAfter(g, ty, nx)) { d.gone++; continue; }
+      g.grid[ty][nx] = v;
+    }
+    if (!moved) return null;
+    g.refit();
+    g.emit('wash', { x: x, n: moved });
+    return { type: 'wash', x: x, n: moved };
+  };
+  // the funnel lifts the top blocks of column x
+  Weather.prototype.lift = function (g, x, d) {
+    var n = d.lvl, got = 0;
+    for (var i = 0; i < n; i++) {
+      var y = top(g, x);
+      if (y >= ROWS) break;
+      d.air.push(g.grid[y][x]);
+      g.grid[y][x] = 0;
+      got++;
+    }
+    if (!got) return null;
+    g.refit();
+    g.emit('lift', { x: x, n: got });
+    return { type: 'lift', x: x, n: got };
+  };
+  // …and drops them back on other columns as it leaves (never filling a row by itself)
+  Weather.prototype.drop = function (g, d) {
+    var r = this.drng, put = [];
+    for (var i = 0; i < d.air.length; i++) {
+      var start = Math.floor(r.next() * COLS), done = false;
+      for (var j = 0; j < COLS && !done; j++) {
+        var x = (start + j * 3) % COLS, y = top(g, x) - 1;
+        if (y < TOP + 2 || underPiece(g, x, y) || fullAfter(g, y, x)) continue;
+        g.grid[y][x] = d.air[i];
+        put.push([x, y]); done = true;
+      }
+      if (!done) d.gone++;
+    }
+    d.air = [];
+    g.refit();
+    g.emit('drop', { cells: put });
+    return { type: 'drop', cells: put };
+  };
+  // the ground shakes: everything with a gap under it falls (full rows go, and score), tall columns topple
+  Weather.prototype.quake = function (g, d) {
+    var before = g.stats.lines;
+    g.trowel(0);
+    var lines = g.stats.lines - before, fell = 0;
+    for (var x = 0; x < COLS; x++) {
+      var h = ROWS - top(g, x), hl = x > 0 ? ROWS - top(g, x - 1) : 99, hr = x < COLS - 1 ? ROWS - top(g, x + 1) : 99;
+      if (h - Math.min(hl, hr) < 3) continue;
+      var to = hl <= hr ? x - 1 : x + 1, y = top(g, x), ty = top(g, to) - 1;
+      if (ty < TOP + 1 || fullAfter(g, ty, to)) continue;
+      g.grid[ty][to] = g.grid[y][x]; g.grid[y][x] = 0; fell++;
+    }
+    if (lines) g.stats.score = (g.stats.score || 0) + lines * 150 * d.lvl;
+    g.refit();
+    g.emit('quake', { lines: lines, fell: fell });
+    return { type: 'quake', lines: lines, fell: fell };
+  };
+  function fullAfter(g, y, x) { var row = g.grid[y], n = 0; for (var j = 0; j < COLS; j++) if (row[j] || j === x) n++; return n >= COLS; }
+
   // what the screen shows beside the next pieces
   Weather.prototype.info = function () {
-    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left) };
+    var d = this.dis;
+    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left),
+      dis: d ? { kind: d.kind, phase: d.phase, p: d.phase === 'hit' ? Math.min(1, d.t / d.dur) : d.t / d.warn, col: d.col, dir: d.dir, air: d.air.length, lvl: d.lvl } : null };
   };
 
   // How the run is scored: the game's own score plus 5 for every second survived.
@@ -182,6 +329,7 @@
   ZZ.SNOW = SNOW;
   ZZ.Weather = Weather;
   Weather.KINDS = KINDS;
+  Weather.DISASTERS = DISASTERS;
   Weather.scoreOf = scoreOf;
   Weather.gravAt = gravAt;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;

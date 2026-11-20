@@ -1256,6 +1256,9 @@
     this.ac = null; this.out = null; this.mout = null; this.nb = null;
     this.buf = {}; this.decoding = false;
     this.mwant = ''; this.mname = ''; this.msrc = null; this.mgain = null; this.mcache = {}; this.mload = ''; this.duck = 1;
+    // the music player (src/music.js): which track a screen's music really is, whether it loops, the player's own
+    // tracks (kept on the device), and what happens when a track that does not loop ends
+    this.pick = null; this.own = null; this.onEnd = null; this.mloop = true;
   }
   function b64buf(b64) {
     var bin = atob(b64), n = bin.length, u = new Uint8Array(n);
@@ -1370,6 +1373,7 @@
     this.msrc = null; this.mgain = null; this.mname = '';
   };
   Sound.prototype.music = function (name) {
+    if (this.pick && name) { var p = this.pick(name); name = p.id; this.mloop = p.loop !== false; } else this.mloop = true;
     this.mwant = name || '';
     if (!this.ac) return;
     if (this.mname === this.mwant && (this.msrc || !this.mwant)) return;
@@ -1379,6 +1383,18 @@
     if (this.mcache[want]) return this.startTrack(want, this.mcache[want]);
     if (this.mload === want) return;
     this.mload = want;
+    if (/^own:/.test(want)) {
+      if (!this.own) { this.mload = ''; return; }
+      this.own(want.slice(4), function (ab) {
+        self.decode(ab, function (buf) {
+          if (self.mload === want) self.mload = '';
+          for (var k in self.mcache) if (k !== 'menu' && k !== want) delete self.mcache[k];
+          self.mcache[want] = buf;
+          if (self.mwant === want && self.mname !== want) self.startTrack(want, buf);
+        }, function () { if (self.mload === want) self.mload = ''; if (self.onEnd && self.mwant === want) self.onEnd(want, true); });
+      }, function () { if (self.mload === want) self.mload = ''; if (self.onEnd && self.mwant === want) self.onEnd(want, true); });
+      return;
+    }
     var probe = document.createElement('audio');
     var exts = probe.canPlayType && probe.canPlayType('audio/ogg; codecs="vorbis"') ? ['ogg', 'mp3'] : ['mp3', 'ogg'], i = 0;
     (function next() {
@@ -1397,12 +1413,14 @@
   Sound.prototype.startTrack = function (name, buf) {
     if (this.cfg().mvol <= 0) return;
     var ac = this.ac, s = ac.createBufferSource(), g = ac.createGain(), t = ac.currentTime;
-    s.buffer = buf; s.loop = true;
+    s.buffer = buf; s.loop = this.mloop;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(1, t + 0.45);
     s.connect(g); g.connect(this.mout);
+    var self = this;
+    s.onended = function () { if (self.msrc === s) { self.msrc = null; self.mgain = null; self.mname = ''; if (self.onEnd) self.onEnd(name); } };
     s.start(t);
-    this.msrc = s; this.mgain = g; this.mname = name;
+    this.msrc = s; this.mgain = g; this.mname = name; this.mstart = t; this.mlen = buf.duration;
   };
 
   var SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760, 2093];
@@ -1458,6 +1476,10 @@
     // the weather mode: a whoosh of wind, a soft pat of snow, and thunder
     gust: function (s) { s.noise(0.32, 0.035, 300, 1600); },
     drift: function (s) { s.noise(0.08, 0.05, 2000, 6000); },
+    wave: function (s) { s.noise(1.4, 0.16, 80, 900); s.noise(0.6, 0.06, 1500, 5000, 0.5); },
+    twister: function (s) { s.noise(2.2, 0.12, 200, 1400); s.tone(110, 2, 'sawtooth', 0.025, 220); },
+    quake: function (s) { s.noise(1.6, 0.26, 20, 220); s.tone(48, 1.4, 'sine', 0.2, 30); },
+    siren: function (s) { s.tone(660, 0.35, 'triangle', 0.05, 880); s.tone(880, 0.35, 'triangle', 0.05, 660, 0.36); },
     thunder: function (s) { s.noise(0.08, 0.2, 800, 9000); s.noise(1.1, 0.24, 30, 420, 0.06); s.tone(70, 0.9, 'sawtooth', 0.07, 38, 0.05); },
     tock: function (s) { s.tone(1046, 0.07, 'sine', 0.11, 880); s.noise(0.02, 0.05, 1800, 5000); },
     tockHi: function (s) { s.tone(1568, 0.09, 'square', 0.05); s.tone(1568, 0.12, 'sine', 0.12, null, 0); }

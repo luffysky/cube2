@@ -25,7 +25,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.evaluate(n => ZZ.Meta.setName(n), name);
     return page;
   };
-  const sky = p => p.evaluate(() => { const S = ZZ.peek().S; return S && S.kind === 'battle' ? { mode: S.mode, wx: S.o.wx || 0, sky: !!S.sky, seed: S.sky && S.sky.me.seed, state: S.state, hit: S.sky && S.sky.me.hitLeft > 0 ? S.sky.me.hitKind : '', oppHit: S.sky && S.sky.opp ? S.sky.opp.hitLeft > 0 : null } : null; });
+  const sky = p => p.evaluate(() => { const S = ZZ.peek().S; return S && S.kind === 'battle' ? { mode: S.mode, wx: S.o.wx || 0, sky: !!S.sky, seed: S.sky && S.sky.me.seed, state: S.state, hit: S.sky && S.sky.me.hitLeft > 0 ? S.sky.me.hitKind : S.sky && S.sky.me.dis ? S.sky.me.dis.kind : '', oppHit: S.sky && S.sky.opp ? S.sky.opp.hitLeft > 0 || !!S.sky.opp.dis : null } : null; });
   const quad = p => p.evaluate(() => { const S = ZZ.peek().S; ZZ.App.hooks.forEach(h => h(S.me, { type: 'lock', lines: 4, tspin: 'none' }, true)); });
   try {
     // ---------- against the computer ----------
@@ -79,11 +79,17 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await until(() => A.evaluate(() => ZZ.Net.state === 'waiting' && !!ZZ.Net.code), 6000), 'A opens a room');
     const code = await A.evaluate(() => ZZ.Net.code);
     await B.evaluate(c => ZZ.Net.join(c, '小瓦'), code);
-    ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && !!document.getElementById('nWx')), 10000), 'the host sees the weather switch with two in the room');
-    await A.click('label:has(#nWx)').catch(() => A.check('#nWx'));
-    ok(await until(() => B.evaluate(() => ZZ.Net.cfg.wx === true), 5000), 'the guest is told the room has weather');
+    ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && document.querySelectorAll('[data-nmode]').length === 3), 10000), 'the host sees the three room modes with two in the room');
+    await A.click('[data-nmode="lv"]');
+    ok(await until(() => B.evaluate(() => ZZ.Net.cfg.mode === 'lv' && /關卡地形/.test(document.getElementById('sheet').textContent)), 5000), 'the guest is told the room plays on a level wall');
+    await A.click('[data-nmode="wx"]');
+    ok(await until(() => B.evaluate(() => ZZ.Net.cfg.wx === true && ZZ.Net.cfg.mode === 'wx'), 5000), 'the guest is told the room has weather');
     await A.click('[data-do="netStart"]');
     ok(await until(async () => { const a = await sky(A), b = await sky(B); return a && b && a.sky && b.sky && a.seed === b.seed; }, 8000), 'the room plays under one sky');
+    // the host switches to a level wall and starts again: both start on the same numbered level's wall
+    await A.evaluate(() => { ZZ.Net.setCfg({ minutes: 1, items: false, team: false, mode: 'lv' }); ZZ.Net.start(); });
+    const wall = P => P.evaluate(() => { const S = ZZ.App.S(); return S && S.kind === 'battle' ? { lv: S.lvNo || 0, sky: !!S.sky, cells: S.me.grid.reduce((n, r) => n + r.filter(c => c).length, 0) } : null; });
+    ok(await until(async () => { const a = await wall(A), b = await wall(B); return a && b && a.lv > 0 && a.lv === b.lv && !a.sky && !b.sky && a.cells > 0; }, 8000), 'a level-wall room starts both on the same level', [await wall(A), await wall(B)]);
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();

@@ -89,6 +89,85 @@ ok(W.gravAt(300000) > W.gravAt(0), 'the run speeds up');
   opp.hit('rain', 5000); const g0 = og.gravity; opp.step(og, 16);
   ok(og.gravity === g0, "a computer's wall only gets what lands on it");
 }
+// ---------- disasters ----------
+{
+  const cnt = g => g.grid.reduce((a, row) => a + row.filter(v => v).length, 0);
+  const wall = (g, rows) => { for (let y = 0; y < rows.length; y++) { const r = rows[rows.length - 1 - y]; for (let x = 0; x < ZZ.COLS; x++) g.grid[ZZ.ROWS - 1 - y][x] = r[x] === '#' ? 3 : 0; } };
+  const stepFor = (w, g, ms) => { const ev = []; for (let t = 0; t < ms; t += 16) ev.push(...w.step(g, 16)); return ev; };
+  ok(W.DISASTERS.join() === 'flood,tornado,quake', 'three disasters');
+  // the plain weather is the same with or without them
+  const a = new W({ seed: 77 }), b = new W({ seed: 77, noDis: true }), g1 = new ZZ.Game({ seed: 1, garbage: false }), g2 = new ZZ.Game({ seed: 1, garbage: false });
+  let ka = [], kb = [];
+  for (let t = 0; t < 400000; t += 100) { a.step(g1, 100).forEach(e => e.type === 'change' && ka.push(e.kind)); b.step(g2, 100).forEach(e => e.type === 'change' && kb.push(e.kind)); }
+  ok(ka.join() === kb.join() && ka.length > 10, 'disasters do not change the weather sequence');
+  // rare, warned, from a minute in
+  const w = new W({ seed: 5 }), g = new ZZ.Game({ seed: 5, garbage: false });
+  const ev = stepFor(w, g, 600000).filter(e => e.type === 'disaster');
+  const warns = ev.filter(e => e.phase === 'warn'), hits = ev.filter(e => e.phase === 'hit');
+  ok(warns.length >= 4 && warns.length <= 10 && hits.length === warns.length, 'one every one to two minutes over ten minutes (' + warns.length + ')');
+  // same seed, same disasters
+  const w2 = new W({ seed: 5 }), ev2 = stepFor(w2, new ZZ.Game({ seed: 5, garbage: false }), 600000).filter(e => e.type === 'disaster');
+  ok(JSON.stringify(ev.map(e => e.kind + e.phase)) === JSON.stringify(ev2.map(e => e.kind + e.phase)), 'the same seed brings the same disasters');
+  // practice one disaster under a clear sky
+  const pw = new W({ seed: 9, only: 'quake' }), pev = stepFor(pw, new ZZ.Game({ seed: 9, garbage: false }), 60000);
+  ok(pw.kind === 'clear' && pev.filter(e => e.type === 'disaster' && e.phase === 'hit').every(e => e.kind === 'quake') && pev.filter(e => e.type === 'disaster' && e.phase === 'hit').length >= 2, 'practising earthquakes: clear sky, quakes only, often');
+
+  // the earthquake brings down floating blocks, clears the rows it fills, topples a tower
+  {
+    const q = new W({ seed: 3, noDis: true }), qg = new ZZ.Game({ seed: 3, garbage: false });
+    wall(qg, ['#.........', '..........', '#########.', '#########.']);
+    q.startDis('quake', 2, 10);
+    const e = stepFor(q, qg, 2400);
+    ok(e.some(x => x.type === 'disaster' && x.phase === 'warn') && e.some(x => x.type === 'disaster' && x.phase === 'hit') && e.some(x => x.type === 'disaster' && x.phase === 'end'), 'warn, hit, end');
+    ok(qg.grid[ZZ.ROWS - 4][0] === 0 && qg.grid[ZZ.ROWS - 3][0] !== 0 && cnt(qg) === 19, 'the floating block came down, nothing lost');
+    const t2 = new W({ seed: 3, noDis: true }), tg = new ZZ.Game({ seed: 3, garbage: false });
+    wall(tg, ['....#.....', '....#.....', '....#.....', '....#.....', '###.##.###']);
+    const before = cnt(tg), s0 = tg.stats.score || 0;
+    t2.startDis('quake', 1, 10); stepFor(t2, tg, 400);
+    ok(cnt(tg) === before && (ZZ.ROWS - tg.grid.findIndex(r => r[4])) < 5, 'a tall column topples one block over');
+    const l3 = new W({ seed: 3, noDis: true }), lg = new ZZ.Game({ seed: 3, garbage: false });
+    wall(lg, ['....#.....', '##########'.replace(/#/g, '#').slice(0, 4) + '.' + '#####']);
+    l3.startDis('quake', 2, 10); stepFor(l3, lg, 400);
+    ok(lg.stats.lines === 1 && lg.stats.score > s0 && cnt(lg) === 0, 'a row filled by the quake is cleared and scored');
+  }
+  // the flood washes the top blocks downstream; off the far edge they are gone
+  {
+    const f = new W({ seed: 4, noDis: true }), fg = new ZZ.Game({ seed: 4, garbage: false });
+    wall(fg, ['#.#.#.#.#.', '##########'.slice(0, 9) + '.']);
+    const before = cnt(fg);
+    f.startDis('flood', 1, 10); f.dis.dir = 1;
+    const e = stepFor(f, fg, 3600);
+    const end = e.find(x => x.type === 'disaster' && x.phase === 'end');
+    ok(e.filter(x => x.type === 'wash').length >= 5, 'the wave washes column after column');
+    ok(cnt(fg) + end.gone === before, 'every block is either still on the wall or counted as washed away');
+    ok(fg.grid.every(r => r.some(v => !v)), 'it never fills a row by itself');
+  }
+  // the tornado lifts what it passes and drops it elsewhere
+  {
+    const tw = new W({ seed: 6, noDis: true }), tg = new ZZ.Game({ seed: 6, garbage: false });
+    wall(tg, ['##.##.##..', '###.######']);
+    const before = cnt(tg);
+    tw.startDis('tornado', 2, 10);
+    const e = stepFor(tw, tg, 4200), end = e.find(x => x.type === 'disaster' && x.phase === 'end');
+    ok(e.some(x => x.type === 'lift') && e.some(x => x.type === 'drop'), 'lifted, then dropped');
+    ok(cnt(tg) + end.gone === before && tw.dis === null, 'nothing appears from nowhere');
+  }
+  // the falling piece rides the flood
+  {
+    const f = new W({ seed: 8, noDis: true }), fg = new ZZ.Game({ seed: 8, garbage: false, gravity: 0 });
+    fg.start(); const y0 = fg.cur.y, ys = new Set();
+    f.startDis('flood', 2, 10);
+    for (let t = 0; t < 3000; t += 16) { f.step(fg, 16); ys.add(fg.cur.y); }
+    ok(ys.size >= 2, 'the piece bobs up and down');
+  }
+  // thrown by the rival
+  {
+    const hw = new W({ seed: 2, noDis: true });
+    ok(hw.hit('tornado', 9000) && hw.dis && hw.dis.kind === 'tornado' && hw.dis.lvl === 3, 'a disaster can be thrown');
+    ok(!hw.hit('quake', 9000), 'but not on top of one already going');
+  }
+}
+
 // storm points
 {
   const mem2 = {}; M.store = { getItem: k => mem2[k] || null, setItem: (k, v) => { mem2[k] = v; } }; M.load();
