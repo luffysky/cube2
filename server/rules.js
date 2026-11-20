@@ -104,7 +104,16 @@ function applyOps(state, srv, ops, now) {
       // a level takes real time to play: about a third of a second a piece at the very least
       const cost = Math.max(LIMIT.LEVEL_MIN, (Math.floor(+(op.a && op.a[1])) || 0) * 330);
       if (srv.bud < cost) r = { ok: false, why: 'fast' };
-      else { r = Meta.run(op.k, op.a); if (r && r.ok) srv.bud -= cost; }
+      else {
+        r = Meta.run(op.k, op.a);
+        if (r && r.ok) { srv.bud -= cost; mark('lvs', String(Meta.data.lv.stars || '').split('').reduce((n, c) => n + (+c || 0), 0)); }
+      }
+    }
+    else if (op.k === 'endless') {
+      // the endless run: its best stage goes on the board only if there was time to play that far (15 s a stage)
+      r = Meta.run(op.k, op.a);
+      const stage = Math.max(0, Math.min(999, Math.floor(+(op.a && op.a[0])) || 0)), cost = Math.max(LIMIT.LEVEL_MIN, stage * 15000);
+      if (r && r.ok && stage > 0 && srv.bud >= cost) { srv.bud -= cost; mark('lve', stage); }
     }
     else if (op.k === 'wx') {
       // a weather run is paid by how long it lasted, so it has to have taken that long

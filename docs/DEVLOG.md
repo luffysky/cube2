@@ -628,3 +628,14 @@
 - 資料庫：新表 `zz.pvp`（`CREATE TABLE IF NOT EXISTS`，第一次 API 呼叫時建立）；`zz.matches.data` 多一個 `pr`。｜刪除：無。
 - 測試：`node test/run.js` 全過（api 344：一份回報不加減、兩份一致雙方都動且只算一次、重送不再算、兩邊都說自己贏誰都不動並留紀錄、前端送不了伺服器專用操作、勝者上榜）；瀏覽器 `quick`、`wxnet`、`cloudui` 全過。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`bb7e4bd`](https://github.com/luffysky/cube2/commit/bb7e4bd)，Vercel `dpl_8kCHnDFbuVHNXL7jpPXUKDpZYd52` READY，2 小時內無執行錯誤。
+
+## 2026-11-21 06:15（Asia/Taipei）｜排行榜加關卡
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「排行榜 關卡排行怎麼沒在裡面」
+- 實際變更：排行榜多一個「關卡」分頁，分「星星總數」（1000 關拿到的星星加總，伺服器重做每次過關時記）和「無限挑戰」（跑到第幾關；每關至少要有 15 秒的遊玩時間才上榜，防亂報）。本季、歷來都有。
+- 檔案：`server/rules.js`、`server/core.js`、`src/cloud.js`、`test/api.test.js`。
+- 資料庫：未改結構（`zz.scores` 多 `lvs`、`lve` 兩個榜名）。｜刪除：無。
+- 測試：`node test/run.js` 全過（api 348：星星加總上榜、無限挑戰上榜、跑太快的關數不上榜）；瀏覽器 `cloudui` 41。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

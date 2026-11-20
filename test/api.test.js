@@ -822,6 +822,22 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(r.json.top.some(t => t.p === P1.pub && t.v === s1.rp), 'the winner is on the ranked board', r.json.top);
   }
 
+  // ---------- level boards: stars across the levels, the endless run's best stage ----------
+  {
+    now += 3 * 3600000;
+    const L1 = await newPlayer(null, '198.51.100.244');
+    let x = await sync(L1, [op('lvl', [1, 6]), op('lvl', [2, 8]), op('endless', [12])]);
+    ok(x.json.res.every(y => y.ok), 'levels and an endless run are taken', x.json.res);
+    const stars = String(x.json.st.lv.stars).split('').reduce((n, c) => n + (+c || 0), 0);
+    r = await call('board', { url: '/api/board?b=lvs&me=' + L1.pub });
+    ok(stars > 0 && r.json.me && r.json.me.v === stars, 'the stars add up on the levels board', [stars, r.json.me]);
+    r = await call('board', { url: '/api/board?b=lve&me=' + L1.pub });
+    ok(r.json.me && r.json.me.v === 12, 'the endless stage is on its board', r.json.me);
+    x = await sync(L1, [op('endless', [900])]);
+    r = await call('board', { url: '/api/board?b=lve&me=' + L1.pub });
+    ok(r.json.me.v === 12, 'a stage too far for the time played stays off the board', r.json.me);
+  }
+
   // ---------- random matching: keyboards with keyboards, touch screens with touch screens, mixed only after a wait ----------
   {
     let ipn = 120;

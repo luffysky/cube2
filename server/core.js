@@ -19,7 +19,7 @@ const LIMIT = {
   BOARD_ROWS: 50,
   SAVE_TRIES: 4
 };
-const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1, wxr: 1, prp: 1 };
+const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1, wxr: 1, prp: 1, lvs: 1, lve: 1 };
 // the brick games: m_<game>_<0|1|2> for scores and times, m_<game> for the level games' stars
 const MINI_BOARD = /^m_(?:(?:snake|breakout|stack|merge|pipes|sweep)_[012]|push|sort|picross)$/;
 const okBoard = b => typeof b === 'string' && (BOARDS.hasOwnProperty(b) || MINI_BOARD.test(b));

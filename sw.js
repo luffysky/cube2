@@ -9,7 +9,7 @@
    - Anything under api/ is left completely alone: rooms, saves and leaderboards always talk to the server.
    - Requests to other sites (fonts) and anything that is not a plain GET are not touched. */
 'use strict';
-const BUILD = 'ef3f61030b9f';
+const BUILD = '16df8bfb133d';
 const PAGE = 'zz-page-' + BUILD, FILES = 'zz-files-v1';
 const HOME = new URL('./', self.location).href;                 // where the game lives (the folder of this file)
 const FIRST = ['manifest.webmanifest', 'icons/icon-192.png', 'icons/favicon.svg', 'favicon.ico'];

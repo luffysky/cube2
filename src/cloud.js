@@ -445,6 +445,11 @@
     'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
     'lb.prp': ['真人排位', 'Ranked (people)', '対人ランク', '랭크 (사람)'],
     'lb.none.prp': ['打一場真人排位（隨機配對選「真人排位」）就會上榜。', 'Play a ranked match against a person (random match, "Ranked (people)") to get on this board.', 'ランダムマッチで「対人ランク」を1戦すると載ります。', '랜덤 매칭에서 "랭크 (사람)"을 한 판 하면 등록돼요.'],
+    'lb.lv': ['關卡', 'Levels', 'ステージ', '스테이지'],
+    'lb.lvs': ['星星總數', 'Total stars', '星の合計', '별 합계'],
+    'lb.lve': ['無限挑戰', 'Endless run', 'エンドレス', '무한 도전'],
+    'lb.stage': ['第 {0} 關', 'Stage {0}', '{0}面', '{0}단계'],
+    'lb.none.lv': ['過一關（或跑一次無限挑戰）就會上榜。', 'Clear a level (or play an endless run) to get on this board.', 'ステージを1つクリア（またはエンドレスを1回）すると載ります。', '스테이지를 하나 깨거나 무한 도전을 한 번 하면 등록돼요.'],
     'lb.mini': ['小遊戲', 'Brick games', 'ミニゲーム', '미니게임'],
     'lb.lv0': ['簡單', 'Easy', 'かんたん', '쉬움'], 'lb.lv1': ['普通', 'Normal', 'ふつう', '보통'], 'lb.lv2': ['困難', 'Hard', 'むずかしい', '어려움'],
     'lb.stars': ['★ {0}', '★ {0}', '★ {0}', '★ {0}'],
@@ -670,13 +675,15 @@
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'prp', 'score', 'sprint', 'wx', 'wxr', 'mini'];
+  var BOARDS = ['rp', 'prp', 'score', 'sprint', 'lv', 'wx', 'wxr', 'mini'];
+  var lvb = 'lvs';      // the levels tab: stars across the 1000 levels, or the endless run's best stage
   // the brick games: one board per game and difficulty (scores and times), one per level game (stars)
   var MG = ['snake', 'breakout', 'stack', 'merge', 'pipes', 'sweep', 'push', 'sort', 'picross'], MG_LV = { push: 1, sort: 1, picross: 1 }, MG_TIME = { pipes: 1, sweep: 1 };
   var mini = { g: 'snake', lv: 1 };
-  function boardId() { return lb.b !== 'mini' ? lb.b : 'm_' + mini.g + (MG_LV[mini.g] ? '' : '_' + mini.lv); }
+  function boardId() { return lb.b === 'lv' ? lvb : lb.b !== 'mini' ? lb.b : 'm_' + mini.g + (MG_LV[mini.g] ? '' : '_' + mini.lv); }
   function valueOf(b, v) {
     if (b === 'rp' || b === 'prp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
+    if (b === 'lv') return lvb === 'lvs' ? esc(t('lb.stars', v)) : esc(t('lb.stage', v));
     if (b === 'mini') return MG_LV[mini.g] ? esc(t('lb.stars', v)) : MG_TIME[mini.g] ? App.fmtTime(v) : L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);
   }
@@ -694,6 +701,9 @@
     var h = '<h2>' + t('m.board') + '</h2><div class="tabs" role="tablist">', i, b = lb.b;
     for (i = 0; i < BOARDS.length; i++) h += '<button type="button" role="tab" aria-selected="' + (b === BOARDS[i]) + '" data-lb="' + BOARDS[i] + '">' + t('lb.' + BOARDS[i]) + '</button>';
     h += '</div>';
+    if (b === 'lv') {
+      h += '<div class="seg" role="radiogroup" aria-label="' + esc(t('lb.lv')) + '">' + ['lvs', 'lve'].map(function (k) { return '<button type="button" role="radio" aria-checked="' + (lvb === k) + '" data-lbv="' + k + '">' + t('lb.' + k) + '</button>'; }).join('') + '</div>';
+    }
     if (b === 'mini') {
       h += '<div class="seg wrap" role="radiogroup" aria-label="' + esc(t('lb.mini')) + '">' + MG.map(function (g) { return '<button type="button" role="radio" aria-checked="' + (mini.g === g) + '" data-lbg="' + g + '">' + esc(t('lb.g.' + g)) + '</button>'; }).join('') + '</div>';
       if (!MG_LV[mini.g]) h += '<div class="seg" role="radiogroup" aria-label="' + esc(t('lb.lv1')) + '">' + [0, 1, 2].map(function (k) { return '<button type="button" role="radio" aria-checked="' + (mini.lv === k) + '" data-lbl="' + k + '">' + t('lb.lv' + k) + '</button>'; }).join('') + '</div>';
@@ -734,6 +744,7 @@
   App.clicks.push(function (d) {
     if (d.lb) { if (d.lb !== lb.b) { lb.b = d.lb; fetchBoard(); App.openSheet('board'); App.el.sheetCard.scrollTop = 0; } return true; }
     if (d.lbs) { if (d.lbs !== lb.scope) { lb.scope = d.lbs; fetchBoard(); App.openSheet('board'); } return true; }
+    if (d.lbv) { if ((d.lbv === 'lvs' || d.lbv === 'lve') && d.lbv !== lvb) { lvb = d.lbv; fetchBoard(); App.openSheet('board'); } return true; }
     if (d.lbg) { if (MG.indexOf(d.lbg) >= 0 && d.lbg !== mini.g) { mini.g = d.lbg; fetchBoard(); App.openSheet('board'); } return true; }
     if (d.lbl != null) { var k = +d.lbl; if (k >= 0 && k <= 2 && k !== mini.lv) { mini.lv = k; fetchBoard(); App.openSheet('board'); } return true; }
     return false;
