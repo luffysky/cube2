@@ -213,6 +213,37 @@
     'c.theme.matcha': ['抹茶', 'Matcha', '抹茶', '말차'],
     'c.theme.sakura': ['櫻花', 'Sakura', '桜', '벚꽃'],
     'c.theme.market': ['夜市', 'Night market', '夜市', '야시장'],
+    'k.ghost': ['落點方塊', 'Landing shadow', '落下位置', '착지 그림자'],
+    'c.ghost.line': ['描邊', 'Outline', 'ふち', '테두리'],
+    'c.ghost.soft': ['淡影', 'Soft fill', 'うす影', '옅은 그림자'],
+    'c.ghost.dash': ['虛線', 'Dashed', '点線', '점선'],
+    'c.ghost.dot': ['圓點', 'Dots', 'ドット', '점'],
+    'c.ghost.corner': ['四角', 'Corners', '四隅', '모서리'],
+    'c.ghost.cross': ['叉叉', 'Crosses', 'バツ印', '엑스'],
+    'c.ghost.base': ['底線', 'Underline', '下線', '밑줄'],
+    'c.ghost.frame': ['外框', 'Silhouette', 'シルエット', '실루엣'],
+    'c.ghost.glow': ['微光', 'Glow', 'ほのか', '은은한 빛'],
+    'c.ghost.pulse': ['呼吸', 'Breathing', '呼吸', '숨쉬기'],
+    'c.ghost.white': ['白描', 'White line', '白線', '흰 선'],
+    'c.ghost.whiteglow': ['白光', 'White glow', '白い光', '흰 빛'],
+    'c.ghost.gold': ['金線', 'Gold line', '金の線', '금빛 선'],
+    'c.ghost.goldglow': ['金光', 'Gold glow', '金の光', '금빛'],
+    'c.ghost.cyan': ['青霓虹', 'Cyan neon', 'シアンネオン', '청록 네온'],
+    'c.ghost.pink': ['粉霓虹', 'Pink neon', 'ピンクネオン', '분홍 네온'],
+    'c.ghost.lime': ['綠霓虹', 'Lime neon', 'ライムネオン', '라임 네온'],
+    'c.ghost.ember': ['餘燼', 'Embers', '残り火', '불씨'],
+    'c.ghost.violet': ['紫影', 'Violet', '紫の影', '보랏빛'],
+    'c.ghost.ice': ['冰晶', 'Ice', '氷', '얼음'],
+    'c.ghost.ink': ['墨影', 'Ink', '墨', '먹'],
+    'c.ghost.chalk': ['粉筆', 'Chalk', 'チョーク', '분필'],
+    'c.ghost.grid': ['格紋', 'Checks', 'チェック', '체크'],
+    'c.ghost.bubble': ['泡泡', 'Bubbles', 'あわ', '거품'],
+    'c.ghost.star': ['星星', 'Stars', '星', '별'],
+    'c.ghost.heart': ['愛心', 'Hearts', 'ハート', '하트'],
+    'c.ghost.rainbow': ['彩虹', 'Rainbow', '虹', '무지개'],
+    'c.ghost.aurora': ['極光', 'Aurora', 'オーロラ', '오로라'],
+    'c.ghost.halo': ['光環', 'Halo', '光輪', '후광'],
+    'c.ghost.shadow': ['深影', 'Deep shadow', '濃い影', '짙은 그림자'],
     'c.fx.shard': ['碎磚', 'Shards', 'かけら', '파편'],
     'c.fx.star': ['星屑', 'Stardust', '星くず', '별가루'],
     'c.fx.bubble': ['泡泡', 'Bubbles', '泡', '방울'],
@@ -322,7 +353,7 @@
   };
   // the holiday themes' card colours (their names come from meta.js)
   Meta.FESTIVE.forEach(function (f) { SWATCH[f.id] = [f.th[0], f.th[2] ? View.mix(f.th[0], '#FFFFFF', 0.06) : View.mix(f.th[0], '#FFFFFF', 0.7), f.th[1], f.pal[1]]; });
-  var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'site', 'items', 'member'], tab = 'set';
+  var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'ghost', 'site', 'items', 'member'], tab = 'set';
   // site themes: a little picture of the page in the theme's own colours (read from the stylesheet itself)
   var SITE_VARS = ['--floor', '--panel', '--ink', '--gold-ink', '--edge'];
   function siteSwatch(id) {
@@ -474,7 +505,7 @@
     var list = openFirst(Meta.CATALOG.set.filter(festOk)), h = festSeg() + '<div class="cards wide">', i;
     for (i = 0; i < list.length; i++) {
       var st = list[i], p = Meta.setPrice(st.id), usable = Meta.setUsable(st.id), e = Meta.data.equip;
-      var on = Meta.KINDS.every(function (k) { return e[k] === st.parts[k]; }), names = Meta.KINDS.map(function (k) { return t('c.' + k + '.' + st.parts[k]); }).join('・'), act;
+      var pk = Object.keys(st.parts), on = pk.every(function (k) { return e[k] === st.parts[k]; }), names = pk.map(function (k) { return t('c.' + k + '.' + st.parts[k]); }).join('・'), act;
       if (st.fest && Meta.FEST_OPEN.indexOf(st.id) < 0 && !usable) act = '<span class="tag lock">' + t('sh.locked') + '</span>';
       else if (usable) act = on ? '<span class="tag on">' + t('sh.using') + '</span>' : '<button class="btn sm" type="button" data-wearset="' + st.id + '">' + t('sh.wear') + '</button>';
       else act = '<button class="btn sm buy" type="button" data-buyset="' + st.id + '">' + coin(p.price) + '</button><small>' + t('sh.setWas', L.num(p.miss)) + '</small>';

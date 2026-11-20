@@ -75,7 +75,7 @@
   }
 
   // ---------- looks: tile styles, wall backgrounds and clear effects the player can swap ----------
-  var LOOK = { tile: 'glaze', bg: 'wall', fx: 'shard', dim: 45, img: { tile: null, bg: null } }, lookRev = 0;
+  var LOOK = { tile: 'glaze', bg: 'wall', fx: 'shard', ghost: 'line', dim: 45, img: { tile: null, bg: null } }, lookRev = 0;
   function setLook(o) {
     for (var k in o) {
       if (k === 'img') { for (var n in o.img) LOOK.img[n] = o.img[n]; }
@@ -1110,17 +1110,9 @@
       if (o.ghost) {
         var gy = g.ghostY();
         if (gy > c.y) {
-          ctx.save();
-          ctx.strokeStyle = rgba(col, 0.85);
-          ctx.fillStyle = rgba(col, 0.15);
-          ctx.lineWidth = Math.max(1.2, cell * 0.07);
-          for (i = 0; i < 4; i++) {
-            p = this.cellXY(c.x + sh[i][0], gy + sh[i][1]);
-            rr(ctx, p[0] + 1.5, p[1] + 1.5, cell - 3, cell - 3, cell * 0.16);
-            ctx.fill();
-            ctx.stroke();
-          }
-          ctx.restore();
+          var gc = [];
+          for (i = 0; i < 4; i++) gc.push(this.cellXY(c.x + sh[i][0], gy + sh[i][1]));
+          drawGhost(ctx, this.lookOf('ghost'), gc, cell, col, now);
         }
       }
       var n = BOX[c.type], v = this.vis, px = bx + (c.x + v.ox) * cell, py = by + (c.y - first + v.oy) * cell, tile = tiles[id];
@@ -1521,7 +1513,86 @@
 
   // A small still of one look for the shop: a few tiles on a patch of wall. look: { tile, bg, fx } (missing parts use the current look).
   var SAMPLE = ['..3...', '.333.6', '55.166', '.55116'];
+  // ---------- the landing shadow (落點方塊) ----------
+  // m: how each cell is drawn; c: a colour of its own (none: the piece's colour); a: fill strength; glow; pulse
+  var GHOST = {
+    line: { m: 'box', a: 0.15 }, soft: { m: 'fill', a: 0.3 }, dash: { m: 'box', a: 0.06, dash: true },
+    dot: { m: 'dot' }, corner: { m: 'corner' }, cross: { m: 'cross' }, base: { m: 'base' }, frame: { m: 'frame', a: 0.12 },
+    glow: { m: 'box', a: 0.12, glow: 1 }, pulse: { m: 'box', a: 0.2, pulse: true },
+    white: { m: 'box', c: '#FFFFFF', a: 0.08 }, whiteglow: { m: 'box', c: '#FFFFFF', a: 0.1, glow: 1.4 },
+    gold: { m: 'box', c: '#F5B82E', a: 0.12 }, goldglow: { m: 'box', c: '#FFC940', a: 0.16, glow: 1.4 },
+    cyan: { m: 'box', c: '#3FF3FF', a: 0.1, glow: 1.6 }, pink: { m: 'box', c: '#FF5FC8', a: 0.1, glow: 1.6 }, lime: { m: 'box', c: '#A4FF4F', a: 0.1, glow: 1.6 },
+    ember: { m: 'box', c: '#FF6A2B', a: 0.14, glow: 1.2, dash: true }, violet: { m: 'fill', c: '#9B6BFF', a: 0.38 },
+    ice: { m: 'box', c: '#BFE6F7', a: 0.35 }, ink: { m: 'fill', c: '#0B0F18', a: 0.42 }, chalk: { m: 'box', c: '#F4F1E8', a: 0, dash: true, thick: 1.6 },
+    grid: { m: 'grid' }, bubble: { m: 'bubble' }, star: { m: 'mark', mark: 'star' }, heart: { m: 'mark', mark: 'heart' },
+    rainbow: { m: 'box', a: 0.18, hue: true }, aurora: { m: 'box', a: 0.14, hue: true, glow: 1.6 }, halo: { m: 'box', c: '#FFD86B', a: 0.2, glow: 2, pulse: true },
+    shadow: { m: 'fill', a: 0.6 }
+  };
+  // cells: [[x, y], ...] in pixels (top-left of each cell); set: which cells are the piece's (for the outer frame)
+  function drawGhost(ctx, id, cells, cell, col, now) {
+    var g = GHOST[id] || GHOST.line, c = g.c || col, i, p, x, y, k;
+    if (g.hue) c = 'hsl(' + Math.round((now / 12) % 360) + ',90%,65%)';
+    var alpha = g.pulse ? 0.55 + 0.45 * Math.sin(now / 260) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = Math.max(1.2, cell * 0.07 * (g.thick || 1));
+    ctx.strokeStyle = rgbaAny(c, 0.85);
+    ctx.fillStyle = rgbaAny(c, g.a || 0);
+    if (g.glow) { ctx.shadowColor = c; ctx.shadowBlur = cell * 0.35 * g.glow; }
+    if (g.dash) ctx.setLineDash([cell * 0.18, cell * 0.12]);
+    var key = {};
+    for (i = 0; i < cells.length; i++) key[Math.round(cells[i][0] / cell) + ',' + Math.round(cells[i][1] / cell)] = 1;
+    for (i = 0; i < cells.length; i++) {
+      p = cells[i]; x = p[0]; y = p[1];
+      if (g.m === 'box') { rr(ctx, x + 1.5, y + 1.5, cell - 3, cell - 3, cell * 0.16); if (g.a) ctx.fill(); ctx.stroke(); }
+      else if (g.m === 'fill') { rr(ctx, x + 1.5, y + 1.5, cell - 3, cell - 3, cell * 0.16); ctx.fill(); }
+      else if (g.m === 'dot') { ctx.fillStyle = rgbaAny(c, 0.8); ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.16, 0, 6.283); ctx.fill(); }
+      else if (g.m === 'bubble') { ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.36, 0, 6.283); ctx.fillStyle = rgbaAny(c, 0.12); ctx.fill(); ctx.stroke(); }
+      else if (g.m === 'cross') { ctx.beginPath(); ctx.moveTo(x + cell * 0.28, y + cell * 0.28); ctx.lineTo(x + cell * 0.72, y + cell * 0.72); ctx.moveTo(x + cell * 0.72, y + cell * 0.28); ctx.lineTo(x + cell * 0.28, y + cell * 0.72); ctx.stroke(); }
+      else if (g.m === 'corner') {
+        var e = cell * 0.28, a0 = x + 2, b0 = y + 2, a1 = x + cell - 2, b1 = y + cell - 2;
+        ctx.beginPath(); ctx.moveTo(a0, b0 + e); ctx.lineTo(a0, b0); ctx.lineTo(a0 + e, b0); ctx.moveTo(a1 - e, b0); ctx.lineTo(a1, b0); ctx.lineTo(a1, b0 + e);
+        ctx.moveTo(a1, b1 - e); ctx.lineTo(a1, b1); ctx.lineTo(a1 - e, b1); ctx.moveTo(a0 + e, b1); ctx.lineTo(a0, b1); ctx.lineTo(a0, b1 - e); ctx.stroke();
+      }
+      else if (g.m === 'base') { k = Math.round(x / cell) + ',' + (Math.round(y / cell) + 1); if (!key[k]) { ctx.fillStyle = rgbaAny(c, 0.85); ctx.fillRect(x + 2, y + cell - cell * 0.16, cell - 4, cell * 0.12); } }
+      else if (g.m === 'grid') { ctx.fillStyle = rgbaAny(c, 0.45); var q = cell / 4; for (var gy = 0; gy < 4; gy++) for (var gx = 0; gx < 4; gx++) if ((gx + gy) % 2 === 0) ctx.fillRect(x + gx * q + 1, y + gy * q + 1, q - 1, q - 1); }
+      else if (g.m === 'mark') { ctx.fillStyle = rgbaAny(c, 0.75); ctx.save(); ctx.translate(x + cell / 2, y + cell / 2); ghostMark(ctx, g.mark, cell * 0.3); ctx.restore(); }
+      else if (g.m === 'frame') {
+        // only the outer edges of the piece
+        var cx = Math.round(x / cell), cy = Math.round(y / cell);
+        ctx.fillRect(x, y, cell, cell);
+        ctx.beginPath();
+        if (!key[cx + ',' + (cy - 1)]) { ctx.moveTo(x, y + 1); ctx.lineTo(x + cell, y + 1); }
+        if (!key[cx + ',' + (cy + 1)]) { ctx.moveTo(x, y + cell - 1); ctx.lineTo(x + cell, y + cell - 1); }
+        if (!key[(cx - 1) + ',' + cy]) { ctx.moveTo(x + 1, y); ctx.lineTo(x + 1, y + cell); }
+        if (!key[(cx + 1) + ',' + cy]) { ctx.moveTo(x + cell - 1, y); ctx.lineTo(x + cell - 1, y + cell); }
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function ghostMark(x, mark, r) {
+    x.beginPath();
+    if (mark === 'star') { for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, rr2 = i % 2 ? r * 0.45 : r; x.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); } }
+    else { x.moveTo(0, r * 0.9); x.bezierCurveTo(-r * 1.6, -r * 0.2, -r * 0.6, -r * 1.3, 0, -r * 0.45); x.bezierCurveTo(r * 0.6, -r * 1.3, r * 1.6, -r * 0.2, 0, r * 0.9); }
+    x.closePath(); x.fill();
+  }
+  // any colour (hex or hsl) with an alpha
+  function rgbaAny(c, a) { if (c.charAt(0) === '#') return rgba(c, a); return c.replace('hsl(', 'hsla(').replace(')', ',' + a + ')'); }
+  // the shop's card: a little wall, a T piece up high and its landing shadow on the wall
+  function ghostPreview(cv, id, w, h) {
+    var x = sizeCanvas(cv, w, h), cell = Math.floor(Math.min(w / 7, h / 5.2)), ox = Math.round((w - cell * 6) / 2), oy = h - cell * 2 - 3, i;
+    x.fillStyle = theme.wall; x.fillRect(0, 0, w, h);
+    var tiles = sprites(Math.max(2, Math.round(cell * env.dpr)), LOOK.tile);
+    var floor = ['100011', '111101'];
+    for (var j = 0; j < 2; j++) for (i = 0; i < 6; i++) if (floor[j].charAt(i) === '1') x.drawImage(tiles[8], ox + i * cell, oy + j * cell, cell, cell);
+    var T = [[1, 0], [0, 1], [1, 1], [2, 1]], gx = ox + cell * 1, gy = oy - cell * 1;
+    drawGhost(x, id, T.map(function (c) { return [gx + c[0] * cell, gy + c[1] * cell]; }), cell, TILE[7], performance.now ? 900 : 0);
+    for (i = 0; i < 4; i++) x.drawImage(tiles[7], gx + T[i][0] * cell, Math.max(2, oy - cell * 4) + T[i][1] * cell - cell, cell, cell);
+  }
+
   function preview(cv, look, w, h) {
+    if (look.ghost) return ghostPreview(cv, look.ghost, w, h);
     var x = sizeCanvas(cv, w, h), cell = Math.floor(Math.min(w / 6.3, h / 4.3)), i, j;
     var tiles = sprites(Math.max(2, Math.round(cell * env.dpr)), look.tile || LOOK.tile), ox = Math.round((w - cell * 6) / 2), oy = h - cell * 4 - 3;
     x.fillStyle = theme.wall;

@@ -1724,7 +1724,7 @@
     if (e.site && e.site !== 'default') root.setAttribute('data-site', e.site); else root.removeAttribute('data-site');
     View.readTheme();
     View.terrazzo();
-    View.setLook({ tile: e.tile, bg: e.bg, fx: e.fx, dim: Meta.data.custom.dim });
+    View.setLook({ tile: e.tile, bg: e.bg, fx: e.fx, ghost: e.ghost || 'line', dim: Meta.data.custom.dim });
     lookKey = e.tile + e.bg + e.theme + Date.now();
     sideKey = '';
     if (V.me) V.me.bg = V.opp.bg = V.hero.bg = null;

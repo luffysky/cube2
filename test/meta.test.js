@@ -54,7 +54,7 @@ const sp = M.setPrice('market');
 eq(sp.full, 1200 + 900 + 1000 + 600, 'set full price');
 eq(sp.price, Math.round((900 + 1000 + 600) * 0.75 / 10) * 10, 'set price skips owned parts');
 ok(M.buySet('market').ok && M.setUsable('market') && M.equipSet('market'), 'buy and wear a set');
-eq(M.data.equip, { tile: 'neon', bg: 'neongrid', theme: 'market', fx: 'star', site: 'default' }, 'set equipped');
+eq(M.data.equip, { tile: 'neon', bg: 'neongrid', theme: 'market', fx: 'star', ghost: 'line', site: 'default' }, 'set equipped');
 ok(!M.buySet('market').ok, 'set already owned');
 // items
 ok(M.buyItem(2).ok && M.data.items[2] === 1, 'buy item');
@@ -299,6 +299,15 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   eq(M.signMonth().days, [1], 'and ticks the 1st');
   eq(M.monthOf(M.dayNo()).first, new Date(2027, 0, 1).getDay(), 'the calendar knows which weekday the 1st is');
   clock = save;
+}
+// landing shadows: 30 of them, three free, four for members; bought and worn like any look; a set leaves it alone
+{
+  ok(M.CATALOG.ghost.length === 30 && M.CATALOG.ghost.filter(g => g.price === 0 && !g.sub).length === 3 && M.CATALOG.ghost.filter(g => g.sub).length === 4, 'thirty landing shadows: 3 free, 4 for members');
+  M.data.coins = 1000;
+  ok(M.buy('ghost', 'gold').ok && M.equip('ghost', 'gold') && M.data.equip.ghost === 'gold', 'a landing shadow is bought and worn');
+  ok(!M.equip('ghost', 'rainbow') || M.isSub(), 'a members\' one needs membership');
+  M.equipSet('market');
+  ok(M.data.equip.ghost === 'gold', 'wearing a set keeps the landing shadow');
 }
 console.log('meta tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

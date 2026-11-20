@@ -210,6 +210,39 @@
       { id: 'spark', name: '火花', price: 800 },
       { id: 'smoke', name: '輕煙', price: 600 }
     ],
+    // the landing shadow (落點方塊): 30 ways to show where the piece will land
+    ghost: [
+      { id: 'line', name: '描邊', price: 0 },
+      { id: 'soft', name: '淡影', price: 0 },
+      { id: 'dash', name: '虛線', price: 0 },
+      { id: 'dot', name: '圓點', price: 300 },
+      { id: 'corner', name: '四角', price: 400 },
+      { id: 'cross', name: '叉叉', price: 400 },
+      { id: 'base', name: '底線', price: 400 },
+      { id: 'frame', name: '外框', price: 500 },
+      { id: 'glow', name: '微光', price: 600 },
+      { id: 'pulse', name: '呼吸', price: 600 },
+      { id: 'white', name: '白描', price: 300 },
+      { id: 'whiteglow', name: '白光', price: 700 },
+      { id: 'gold', name: '金線', price: 500 },
+      { id: 'goldglow', name: '金光', price: 800 },
+      { id: 'cyan', name: '青霓虹', price: 700 },
+      { id: 'pink', name: '粉霓虹', price: 700 },
+      { id: 'lime', name: '綠霓虹', price: 700 },
+      { id: 'ember', name: '餘燼', price: 800 },
+      { id: 'violet', name: '紫影', price: 600 },
+      { id: 'ice', name: '冰晶', price: 700 },
+      { id: 'ink', name: '墨影', price: 500 },
+      { id: 'chalk', name: '粉筆', price: 500 },
+      { id: 'grid', name: '格紋', price: 600 },
+      { id: 'bubble', name: '泡泡', price: 600 },
+      { id: 'star', name: '星星', price: 800 },
+      { id: 'heart', name: '愛心', price: 800 },
+      { id: 'rainbow', name: '彩虹', sub: true, price: 0 },
+      { id: 'aurora', name: '極光', sub: true, price: 0 },
+      { id: 'halo', name: '光環', sub: true, price: 0 },
+      { id: 'shadow', name: '深影', sub: true, price: 0 }
+    ],
     set: [
       { id: 'market', name: '霓虹夜市', parts: { tile: 'neon', bg: 'neongrid', theme: 'market', fx: 'star' } },
       { id: 'qinghua', name: '青花瓷', parts: { tile: 'glass', bg: 'blueprint', theme: 'qinghua', fx: 'bubble' } },
@@ -251,7 +284,7 @@
     });
     ZZ.L.add(add);
   })();
-  var KINDS = ['tile', 'bg', 'theme', 'fx'];
+  var KINDS = ['tile', 'bg', 'theme', 'fx', 'ghost'];
   // Site themes: the colours of the whole site (menus, panels, sheets, the side menu and the brick games' pages),
   // apart from the game's own look above. tier: base (always), free, coin (bought once), sub (members), steam (the
   // Steam version only: unlocked by the server for Steam players; there is no Steam version yet, so these stay locked).
@@ -375,8 +408,8 @@
     return {
       v: 1, coins: 200, name: '', rp: 0, peak: 0, season: '', rgames: 0, streak: 0,
       xp: 0, titles: [], title: '',
-      owned: { tile: [], bg: [], theme: [], fx: [], site: [] }, steam: false,
-      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', site: 'default' },
+      owned: { tile: [], bg: [], theme: [], fx: [], ghost: [], site: [] }, steam: false,
+      equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', ghost: 'line', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
@@ -744,7 +777,7 @@
   Meta.setPrice = function (id) {
     var st = find('set', id), sum = 0, miss = 0;
     if (!st) return { price: 0, full: 0, miss: 0 };
-    KINDS.forEach(function (k) {
+    Object.keys(st.parts).forEach(function (k) {
       var it = find(k, st.parts[k]);
       if (!it || !it.price) return;
       sum += it.price;
@@ -757,14 +790,14 @@
     if (festLocked(st)) return { ok: false, why: 'locked' };
     if (!st || !p.miss) return { ok: false, why: 'setHave' };
     if (!Meta.spend(p.price)) return { ok: false, why: 'poor', n: p.price - Meta.data.coins };
-    KINDS.forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
+    Object.keys(st.parts).forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
     Meta.save();
     emit('set', [id]);
     return { ok: true };
   };
   Meta.setUsable = function (id) {
     var st = find('set', id);
-    return !!st && KINDS.every(function (k) { return Meta.canUse(k, st.parts[k]); });
+    return !!st && Object.keys(st.parts).every(function (k) { return Meta.canUse(k, st.parts[k]); });
   };
   Meta.equip = function (kind, id) {
     if (KINDS.indexOf(kind) < 0 || !Meta.canUse(kind, id)) return false;
@@ -776,7 +809,7 @@
   Meta.equipSet = function (id) {
     var st = find('set', id);
     if (!st || !Meta.setUsable(id)) return false;
-    KINDS.forEach(function (k) { Meta.data.equip[k] = st.parts[k]; });
+    Object.keys(st.parts).forEach(function (k) { Meta.data.equip[k] = st.parts[k]; });
     Meta.save();
     emit('wset', [id]);
     return true;
