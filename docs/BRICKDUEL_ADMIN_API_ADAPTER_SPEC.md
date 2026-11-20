@@ -271,7 +271,7 @@
 - `Authorization: Bearer <JWT>`；header `alg=EdDSA`、`kid` 必填、不接受 `crit`。
 - 公鑰只從管理專用 JWKS：預設 `https://identity.snowrealm.pet/.well-known/admin-jwks.json`（不接受玩家的 `jwks.json`），快取 10 分鐘；未知 `kid` 每分鐘最多重抓一次；同一個 `kid` 出現兩把鑰匙時兩把都不信。緊急換鑰可改用 `BRICKDUEL_ADMIN_JWKS`（直接放 JWKS JSON）。
 - `iss` 必須正好是 `https://identity.snowrealm.pet`（測試用的別的 issuer 要 `BRICKDUEL_ADMIN_TEST_TRUST=1`，而且在 Vercel production 一律拒絕）。
-- `aud` 含 `snowrealm:brickduel:admin`；`scope` 用空白切開後要有完整的 `brickduel:admin:read`；`sub` 在 `BRICKDUEL_ADMIN_SUBJECTS`（預定 `svc:snowrealm-games-admin`）。
+- `aud` 含 `snowrealm:brickduel:admin`；`scope` 用空白切開後要有完整的 `brickduel:admin:read`；`sub` 必須是 `svc:snowrealm-games-admin` 且列在 `BRICKDUEL_ADMIN_SUBJECTS`（2026-11-21 起：測試以外，名單裡別的值一律被忽略，只有別的值時整個功能視為未設定、回 503）。
 - `iat`、`nbf`、`exp` 都要是整數秒；`iat`、`nbf` 不晚於現在 +60 秒；`exp` 超過現在 −60 秒；`0 < exp − iat ≤ 600`；`jti` 必填，唯讀可以重複使用。
 
 **錯誤**：
@@ -300,5 +300,7 @@
 - `players/{id}`：`subscription.kind` 現在只會是 `trial` 或 `null`；`items` 只列持有量大於 0 的道具。
 
 **測試**：`test/admin.test.js`（98 項）：自己產生的 Ed25519 金鑰、17 種 401、2 種 403、換鑰與未知 kid、JWKS 故障 503、內嵌 JWKS、404／405／400、分頁與 cursor、各端點欄位、不含金鑰雜湊／原始存檔／IP、429、稽核內容；並用 cube1 的 fixture（`test/fixtures/cube1-brickduel-admin-jwt.json`，公開鑰與已過期 token）在它的時鐘驗過、過期後 401、正式 subject／issuer 不接受它。
+
+**清理**：`zz.admin_log` 的 180 天保存目前只有監控（`/api/cron` 的 `watch`），刪除方案見 `docs/RETENTION_PROPOSAL.md`，等 Owner 核准。
 
 **阻塞（等 cube1）**：機器簽發端、`https://identity.snowrealm.pet/.well-known/admin-jwks.json` 上線，並給一組非正式環境可用的測試 token 來源。上線後 Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS=svc:snowrealm-games-admin` 即開通。

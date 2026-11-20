@@ -52,7 +52,7 @@ bff.setFetch(async (url, o) => {
     if (!c || c.used || body.clientId !== 'brickduel-bff' || body.redirectUri !== 'https://brickduel.snowrealm.pet/api/auth/callback' ||
       crypto.createHash('sha256').update(body.codeVerifier, 'ascii').digest('base64url') !== c.challenge || body.state !== c.state || body.nonce !== c.nonce) return reply(400, { error: 'invalid_grant' });
     c.used = true;
-    return reply(200, { access_token: sign(Object.assign({ sub: c.sub }, claimsExtra)), token_type: 'Bearer', expires_in: 300, scope: 'brickduel:account:link' });
+    return reply(200, { access_token: sign(Object.assign({ sub: c.sub, nonce: c.nonce }, claimsExtra)), token_type: 'Bearer', expires_in: 300, scope: 'brickduel:account:link' });
   }
   if (url === ISS + '/v1/token/status') {
     if (statusMode === 'timeout') throw new Error('timeout');
@@ -160,9 +160,28 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   eq(where(r), '/?auth=replay', 'and that session is used up even after a wrong state');
   x = await round('recover', null, U1, p => { codes[p.code].nonce = 'n'.repeat(43); return 'code=' + p.code + '&state=' + p.state; });
   eq(where(x.cb), '/?auth=token', 'wrong nonce (the token endpoint refuses)');
+  // the nonce claim is required (cube1 contract 2026-11-21): the stand-in signer puts the stored nonce in by default
   claimsExtra = { nonce: 'not-the-nonce-at-all-xxxxxxxx' };
   x = await round('recover', null, U1);
-  eq(where(x.cb), '/?auth=token', 'wrong nonce inside the token');
+  eq(where(x.cb), '/?auth=token', 'nonce inside the token is different: refused');
+  claimsExtra = { nonce: undefined };
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=token', 'no nonce in the token: refused');
+  claimsExtra = { nonce: '' };
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=token', 'an empty nonce: refused');
+  claimsExtra = { nonce: 12345 };
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=token', 'a nonce that is not a string: refused');
+  claimsExtra = {};
+  // a good token with the right nonce, replayed through a new session: the code is spent and the jti used
+  const good = await round('recover', null, U1);
+  ok(where(good.cb) === '/?auth=recovered', 'the right nonce: accepted', where(good.cb));
+  eq(where(await back('code=' + good.p.code + '&state=' + good.p.state, good.cookie)), '/?auth=replay', 'and the same callback again: replay');
+  // an expired token that does carry the right nonce
+  claimsExtra = { iat: Math.floor(now / 1000) - 700, nbf: Math.floor(now / 1000) - 700, exp: Math.floor(now / 1000) - 400 };
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=token', 'an expired token with the right nonce: refused');
   claimsExtra = {};
   const used = await round('recover', null, U1);
   const s2 = await startIt('recover');

@@ -893,7 +893,14 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE pid = $1', [F.id]))[0].n, 0, 'the next run finishes the rest');
     process.env.CRON_SECRET = 'cronsecret-test';
     eq((await call('cron')).status, 401, 'the daily job needs Vercel\'s secret when one is set');
-    eq((await call('cron', { headers: { authorization: 'Bearer cronsecret-test' } })).status, 200, 'and runs with it');
+    const cr = await call('cron', { headers: { authorization: 'Bearer cronsecret-test' } });
+    eq(cr.status, 200, 'and runs with it');
+    // it also counts what is past its keeping time in the audit log and sign-in sessions, without removing anything
+    await pg.query("INSERT INTO zz.admin_log (at, sub, jti, path, status) VALUES ($1, 'svc:snowrealm-games-admin', 'j-old', 'overview', 200), ($2, 'svc:snowrealm-games-admin', 'j-new', 'overview', 200)", [now - 200 * DAY, now]);
+    await pg.query("INSERT INTO zz.authsess (id, intent, box, made, exp) VALUES ('s-old', 'recover', 'sealed', $1, $2)", [now - 3 * DAY, now - 3 * DAY + 600000]);
+    const w = (await call('cron', { headers: { authorization: 'Bearer cronsecret-test' } })).json.watch;
+    ok(w && w.adminLog.rows === 2 && w.adminLog.pastKeep === 1 && w.adminLog.keepDays === 180 && /Z$/.test(w.adminLog.oldest) && w.authSessions.expired === 1 && w.authSessions.expiredWithData === 1, 'the daily job reports what is past its time', w);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.admin_log'))[0].n + (await pg.query('SELECT count(*)::int AS n FROM zz.authsess'))[0].n, 3, 'and deletes none of it');
     delete process.env.CRON_SECRET;
     for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']) delete process.env[k];
   }

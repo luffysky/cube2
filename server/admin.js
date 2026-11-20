@@ -14,7 +14,7 @@
    except the audit line of each call. Who may call is decided by one thing: a short-lived Ed25519 JWT from the
    SnowRealm machine issuer, checked against its own admin JWKS (never the players' JWKS), with
      iss  https://identity.snowrealm.pet              aud  snowrealm:brickduel:admin
-     scope brickduel:admin:read (whole word)          sub  in BRICKDUEL_ADMIN_SUBJECTS (svc:snowrealm-games-admin)
+     scope brickduel:admin:read (whole word)          sub  svc:snowrealm-games-admin, and listed in BRICKDUEL_ADMIN_SUBJECTS
      kid, iat, nbf, exp, jti all there; whole seconds; 0 < exp - iat <= 600; 60 s of clock leeway
    No origin, network address or player token counts for anything here.
 
@@ -34,7 +34,7 @@ const crypto = require('crypto');
 const { Meta } = require('./rules.js');
 
 const ISSUER = 'https://identity.snowrealm.pet', JWKS_URL = ISSUER + '/.well-known/admin-jwks.json';
-const AUD = 'snowrealm:brickduel:admin', SCOPE = 'brickduel:admin:read';
+const AUD = 'snowrealm:brickduel:admin', SCOPE = 'brickduel:admin:read', SERVICE = 'svc:snowrealm-games-admin';
 const SKEW = 60, MAX_LIFE = 600, KEYS_TTL = 10 * 60000, REFETCH_GAP = 60000, FETCH_MS = 4000, PER_MIN = 60;
 const DAY = 86400000, UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, SUB = /^svc:[a-z0-9][a-z0-9-]{0,79}$/;
 let cache = { src: '', at: 0, tried: 0, keys: null };
@@ -43,9 +43,10 @@ let fetcher = null;
 // ---------- settings ----------
 function settings(env) {
   env = env || process.env;
-  const subs = String(env.BRICKDUEL_ADMIN_SUBJECTS || '').split(',').map(s => s.trim()).filter(s => SUB.test(s));
-  if (!subs.length) return null;
   const test = env.BRICKDUEL_ADMIN_TEST_TRUST === '1' && env.VERCEL_ENV !== 'production';
+  // outside tests the one service the console calls with is the only subject there can be (cube1 contract 2026-11-21)
+  const subs = String(env.BRICKDUEL_ADMIN_SUBJECTS || '').split(',').map(s => s.trim()).filter(s => SUB.test(s) && (test || s === SERVICE));
+  if (!subs.length) return null;
   const iss = env.BRICKDUEL_ADMIN_ISSUER || ISSUER;
   if (iss !== ISSUER && !test) return null;
   let inline = null;
@@ -354,5 +355,5 @@ async function audit(db, now, o) {
     [now, o.sub ? String(o.sub).slice(0, 100) : null, o.jti ? String(o.jti).slice(0, 200) : null, String(o.path || '').slice(0, 120), o.status]);
 }
 
-module.exports = { serve, audit, settings, configured, route, ISSUER, JWKS_URL, AUD, SCOPE,
+module.exports = { serve, audit, settings, configured, route, ISSUER, JWKS_URL, AUD, SCOPE, SERVICE,
   setFetch(fn) { fetcher = fn; cache = { src: '', at: 0, tried: 0, keys: null }; }, clearCache() { cache = { src: '', at: 0, tried: 0, keys: null }; } };

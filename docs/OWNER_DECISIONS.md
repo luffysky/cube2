@@ -39,6 +39,7 @@
 | C-033 | 11-21 | 遊戲載入 Loading 動畫；「繼續後面的」 | 主遊戲與九款小遊戲的載入畫面；會員雲端上傳（R2）程式完成但關著，等 Owner 開 bucket 與設定金鑰（`docs/R2_SETUP.md`）；雲端檔案目前不刪，刪除規則待 Owner 決定（之後由 C-034 決定） | 已上線（R2 待開） |
 | C-034 | 11-21 | 「先不刪 就藏 藏30天如果他們沒後悔才真正刪」 | 玩家移除的雲端檔案放進「最近移除」30 天，可復原；30 天後每天一次的排程（`api/cron`）先刪 R2 物件、再刪 `zz.files` 那一筆。新圖片取代舊的時，舊的同樣進 30 天。這是 Owner 核准的自動刪除，只刪隱藏滿 30 天的檔案 | 已上線 |
 | C-035 | 11-21 | 轉交 GPT 交辦：cube2 唯讀營運 API（7 支）＋ OAuth BFF callback（正式綁定仍不可開） | 七支 `/internal/admin/v1/*` 已實作，未設定前 503；BFF `start/callback/result` 已實作，`IDENTITY_LINK_ENABLED` 維持關閉；新增兩張表 `zz.admin_log`、`zz.authsess`。兩者的定期清除（稽核 180 天、過期 session）屬於刪除，未實作，待 Owner 核准 | 程式已上線（功能關閉） |
+| C-036 | 11-21 | 轉交 GPT 契約補充：nonce 必填、管理 sub 限定、清理先提案、R2 測試與 cookie 法律審查另外追蹤 | BFF 的 token 缺 nonce 或不同一律拒絕；管理 API 測試以外只接受 `svc:snowrealm-games-admin`；`/api/cron` 加只讀監控；清理方案寫在 `docs/RETENTION_PROPOSAL.md`，未執行任何刪除 | 已上線（清理待 Owner） |
 | C-016 | 11-19 | 律師審閱、統一編號登記的提醒 | 記在待辦；正式商用前完成 | 待辦 |
 | C-017 | 11-19 | 中國大陸版號等事項之後交給暖寶處理 | 不在 cube2 範圍內處理 | 待辦 |
 

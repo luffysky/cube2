@@ -68,6 +68,10 @@ const reset = () => { for (const k of ENV) delete process.env[k]; admin.clearCac
   ok((await get('overview', null, { method: 'DELETE' })).headers.allow === 'GET', 'and says GET is allowed');
   process.env.BRICKDUEL_ADMIN_SUBJECTS = 'not a subject, also bad';
   eq((await get('overview', sign())).status, 503, 'a subjects list with nothing valid in it is still off');
+  process.env.BRICKDUEL_ADMIN_SUBJECTS = 'svc:some-other-service';
+  eq((await get('overview', sign({ sub: 'svc:some-other-service' }))).status, 503, 'outside tests only svc:snowrealm-games-admin can be listed: anything else leaves it off');
+  process.env.BRICKDUEL_ADMIN_SUBJECTS = 'svc:some-other-service, ' + SUB;
+  eq((await get('overview', sign({ sub: 'svc:some-other-service' }))).status, 403, 'and listing another beside it does not let that one in');
   process.env.BRICKDUEL_ADMIN_SUBJECTS = SUB;
   process.env.BRICKDUEL_ADMIN_ISSUER = 'https://elsewhere.example';
   eq((await get('overview', sign({ iss: 'https://elsewhere.example' }))).status, 503, 'another issuer without the test switch: off');
@@ -106,6 +110,10 @@ const reset = () => { for (const k of ENV) delete process.env[k]; admin.clearCac
   for (const [name, tok] of bad) { const x = await get('overview', tok); ok(x.status === 401 && x.json.error === 'unauthorized' && x.headers['www-authenticate'] === 'Bearer', '401: ' + name, x.json); }
   eq((await get('overview', sign({ sub: 'svc:someone-else' }))).status, 403, '403: a good token for a subject not on the list');
   eq((await get('overview', sign({ scope: 'brickduel:admin:readwrite' }))).status, 403, '403: the scope must be the whole word');
+  eq((await get('overview', sign({ scope: 'brickduel:account:link' }))).status, 403, '403: a player scope');
+  eq((await get('overview', sign({}, { drop: ['scope'] }))).status, 403, '403: no scope at all');
+  eq((await get('overview', sign({ sub: '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b' }))).status, 403, '403: a player UUID as subject');
+  eq((await get('overview', sign({ aud: ['snowrealm:brickduel:api'] }))).status, 401, '401: player audience in a list');
   eq((await get('overview', sign({ scope: 'brickduel:admin:read brickduel:other' }))).status, 200, 'other scopes beside it are fine');
   const tok = sign();
   ok((await get('overview', tok)).status === 200 && (await get('players', tok)).status === 200, 'the same short-lived token can be used again (refresh, paging)');
@@ -228,7 +236,9 @@ const reset = () => { for (const k of ENV) delete process.env[k]; admin.clearCac
   eq((await get('overview', FIX.token)).status, 403, 'the fixture subject is not the production subject');
   delete process.env.BRICKDUEL_ADMIN_ISSUER; delete process.env.BRICKDUEL_ADMIN_TEST_TRUST;
   process.env.BRICKDUEL_ADMIN_SUBJECTS = FIX.subject;
-  eq((await get('overview', FIX.token)).status, 401, 'the fixture issuer is not accepted as the production issuer');
+  eq((await get('overview', FIX.token)).status, 503, 'outside tests the fixture subject cannot even be configured');
+  process.env.BRICKDUEL_ADMIN_SUBJECTS = 'svc:snowrealm-games-admin';
+  eq((await get('overview', FIX.token)).status, 401, 'and with the production settings the fixture token is refused (its issuer)');
   reset();
 
   console.log('admin api tests: ' + pass + ' passed, ' + fail + ' failed');

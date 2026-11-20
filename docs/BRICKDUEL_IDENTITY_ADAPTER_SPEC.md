@@ -80,7 +80,7 @@
 | 導向 | `https://games.snowrealm.pet/?sso=brickduel&client_id=brickduel-bff&redirect_uri=…&response_type=code&code_challenge=…&code_challenge_method=S256&state=…&nonce=…`（與 cube1 `dist/sso-flow.mjs` 相符）。使用者同意由 Games 平台的可信後端確認，cube2 不採信瀏覽器的 `consent:true` |
 | Callback | 要有 cookie、對得上未使用且未過期的 session；**一進來就用一條 SQL 標記為已用**（不管後面成不成功）。驗 `state`（固定時間比較）、`iss` 參數（有帶就必須相同）、`error`、code 格式 |
 | 換 token | 伺服器 `POST {iss}/oauth/token`，標頭 `x-snowrealm-client-secret`，JSON `{clientId, redirectUri, code, codeVerifier, state, nonce}`，5 秒逾時，不跟隨轉址 |
-| 驗 token | `server/identity.js`：EdDSA、kid、iss、aud=`snowrealm:brickduel:api`、scope=`brickduel:account:link`、sub（UUID）、iat／nbf／exp（≤600 秒）、jti；token 若帶 `nonce` 必須相同 |
+| 驗 token | `server/identity.js`：EdDSA、kid、iss、aud=`snowrealm:brickduel:api`、scope=`brickduel:account:link`、sub（UUID）、iat／nbf／exp（≤600 秒）、jti；**`nonce` claim 必填**，缺少、空字串、不是字串或與伺服器保存的不同一律拒絕（cube1 契約 2026-11-21） |
 | 撤銷 | `POST {iss}/v1/token/status`（Bearer token＋client secret），只有 200 且 `active === true` 才繼續；`active:false`、401、403 → `revoked`；503、逾時、JWKS 抓不到 → `unavailable`，全部 fail-closed |
 | 綁定 | 沿用 `core.idLink`／`core.idRecover`：jti 只能用一次、一對一、409 衝突不合併不覆蓋不轉金幣；綁定時這台裝置換新金鑰、舊金鑰和引繼碼作廢；等待刪除的存檔 30 天內可用 `restore` 取消刪除 |
 | 回到遊戲 | `303 /?auth=<結果>`（只有一個字，沒有 token、code）。頁面立刻把網址清掉，再 `POST /api/auth/result`（同一個 cookie）拿一次結果；新裝置金鑰讀過就從資料庫清掉，cookie 同時清除 |

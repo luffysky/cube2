@@ -20,7 +20,8 @@
       in one statement, whatever happens next. The state must match. The code goes to POST /oauth/token with the
       client secret (a server setting; never in the page, a log or the repository) along with the verifier and the
       original state and nonce. The token must pass server/identity.js (EdDSA, kid, iss, aud, scope
-      brickduel:account:link, sub, iat/nbf/exp, jti), carry the same nonce if it carries one, and then
+      brickduel:account:link, sub, iat/nbf/exp, jti) and carry a nonce claim equal to the stored one (required: cube1
+      puts it in every link token, contract 2026-11-21; missing or different is refused), and then
       POST /v1/token/status must answer 200 with active: true. Anything else (403, 503, a timeout, a JWKS that cannot
       be fetched) is a refusal.
    4. Then the existing core.idLink / core.idRecover run: one platform player to one save, each jti once, 409 when
@@ -159,7 +160,8 @@ async function finish(db, q, cookie, now, env) {
   const v = await identity.verify(token, { now, need: identity.LINK_SCOPE, env: s.env });
   if (!v.ok) return done(v.why === 'jwks' ? 'unavailable' : 'token');
   const c = claimsOf(token);
-  if (c && c.nonce != null && !same(String(c.nonce), box.nonce)) return done('token');
+  // the nonce must be in the token and be ours: missing or different is a refusal
+  if (!c || typeof c.nonce !== 'string' || !c.nonce || !same(c.nonce, box.nonce)) return done('token');
   // revoked since it was signed? Only an explicit active: true lets it through.
   let st;
   try { st = await post(s.status, { Authorization: 'Bearer ' + token, 'x-snowrealm-client-secret': s.secret }, {}, STATUS_MS); } catch (e) { return done('unavailable'); }

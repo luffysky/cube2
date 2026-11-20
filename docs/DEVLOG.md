@@ -770,3 +770,17 @@
 - 隱私權政策第 4 節（四語、各地區版本）列出這個 cookie 的名稱 `__Host-zzauth`、用途、內容（只是隨機編號）、期限、HttpOnly／Secure、不分享不追蹤、為什麼不另外詢問、不想要就不按連結。
 - 檔案：`src/consent.js`、`legal/src/privacy.*.html`、`docs/TODO.md`、`docs/CUBE1_REPLY_20261121.md`、`docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md`。｜資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `consent` 31、`pwa` 52、`authui` 9、`legal` 439。
+- 補記：上一條的 commit 為 [`853b5e9`](https://github.com/luffysky/cube2/commit/853b5e9)。
+
+## 2026-11-21 08:15（Asia/Taipei）｜契約補充：nonce 必填、管理 sub 限定、清理方案與監控
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的 GPT「cube2 2026-11-21 後續契約補充」（C-036）；不重做已完成的路由。
+- **nonce 必填**：BFF 原本是「token 有帶 nonce 才比」，改成「缺少、空字串、不是字串、或跟伺服器存的不同，一律拒絕」。測試用的假 Identity 改成照 cube1 的新規則，每張 token 都帶 nonce。新增的測試：正常、缺少、不同、空字串、型別錯、重放、過期但 nonce 對。這些都是模擬，不是正式 E2E。
+- **管理 API 的 sub**：測試以外只接受 `svc:snowrealm-games-admin`。名單裡填了別的值會被忽略；如果只有別的值，就當作沒設定、回 503。新增的 403 測試：玩家 scope、沒有 scope、玩家 UUID 當 sub。新增的 401 測試：玩家 audience 寫成陣列。cube1 的 fixture 在正式設定下不能被列進名單，用正式設定時也會被拒絕。
+- **清理**：沒有刪任何東西。`/api/cron` 多了只讀的 `watch`，報告 `zz.admin_log` 超過 180 天的筆數、`zz.authsess` 過期的筆數，超過門檻時記一行日誌。分批刪除、先彙總、開關、還原演練的方案寫在 `docs/RETENTION_PROPOSAL.md`，等 Owner 批准。
+- R2 正式上傳測試、cookie 的法律審查另外追蹤，不影響這次的程式。
+- 檔案：`server/bff.js`、`server/admin.js`、`server/retention.js`（新）、`server/app.js`、`test/bff.test.js`、`test/admin.test.js`、`test/api.test.js`、`docs/RETENTION_PROPOSAL.md`（新）、`docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md`、`docs/BRICKDUEL_ADMIN_API_ADAPTER_SPEC.md`、`docs/OWNER_DECISIONS.md`、`docs/TODO.md`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過（bff 72、admin 105、api 382）。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

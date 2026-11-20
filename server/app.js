@@ -20,6 +20,7 @@ const identity = require('./identity.js');
 const files = require('./files.js');
 const admin = require('./admin.js');
 const bff = require('./bff.js');
+const retention = require('./retention.js');
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
@@ -147,8 +148,13 @@ const routes = {
       if (got.length !== want.length || !crypto.timingSafeEqual(got, want)) return send(res, 401, { ok: false, why: 'auth' });
     }
     if (!db.configured()) return send(res, 503, { ok: false, why: 'db' });
-    const out = await db.run(d => files.purge(d, clock()));
-    send(res, out.status, out.body);
+    const now = clock();
+    const out = await db.run(d => files.purge(d, now));
+    // how much of the audit log and the sign-in scratch table is past its time: counted only, nothing removed
+    let watch = null;
+    try { watch = await db.run(d => retention.watch(d, now)); } catch (e) { log('cron-watch', e); }
+    if (watch && (watch.adminLog.pastKeep > 0 || watch.authSessions.expired > 1000)) console.warn('[zz] retention ' + JSON.stringify(watch));
+    send(res, out.status, Object.assign({}, out.body, { watch }));
   },
   // the rewarded-ad network's callback (GET, signed). Not for pages: nothing is paid without a valid signature.
   async ad(req, res, url) {
