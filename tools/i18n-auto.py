@@ -52,7 +52,7 @@ def gemini():
                                      headers={'x-goog-api-key': key, 'Content-Type': 'application/json'})
         for tries in range(3):
             try:
-                with urllib.request.urlopen(req, timeout=120) as r:
+                with urllib.request.urlopen(req, timeout=60) as r:
                     return json.loads(r.read().decode())
             except urllib.error.HTTPError as e:
                 if e.code in (429, 500, 503) and tries < 2:
@@ -72,6 +72,7 @@ def gemini():
             sys.exit('no Gemini flash model available to this key')
         # newest first; one that keeps answering "busy" or "not here" gives way to the next
         order = sorted(flash, key=ver, reverse=True)
+    print('gemini: models to try, in order: ' + ', '.join(order))
     state = {'i': 0}
     guide = ('You translate the user-interface words of 轉磚, a casual web block-puzzle game (Taiwan, Traditional Chinese), '
              'into natural, short game UI language: English (en), Japanese (ja), Korean (ko). Keep {0} {1} blanks and '
@@ -86,9 +87,10 @@ def gemini():
             try:
                 out = call('models/%s:generateContent' % name, body)
                 break
-            except urllib.error.HTTPError as e:
-                if e.code in (404, 429, 500, 503) and state['i'] + 1 < len(order):
-                    print('gemini: %s answered %d, trying %s' % (name, e.code, order[state['i'] + 1]))
+            except (urllib.error.HTTPError, TimeoutError, urllib.error.URLError) as e:
+                code = getattr(e, 'code', 'timeout')
+                if code in (404, 429, 500, 503, 'timeout') and state['i'] + 1 < len(order):
+                    print('gemini: %s answered %s, trying %s' % (name, code, order[state['i'] + 1]))
                     state['i'] += 1
                     continue
                 raise
