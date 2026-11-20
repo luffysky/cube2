@@ -69,3 +69,24 @@
 - 不改 cube1，不讀 cube1 的資料庫或 Secrets。
 - Identity 上線前，不在正式環境開啟綁定，不宣稱「已用 SnowRealm 帳號登入」。
 - 不把轉磚金幣、道具、段位帶到其他遊戲，也不收其他遊戲的經濟資料。
+
+## 7. OAuth BFF（2026-11-21 實作，`server/bff.js`；開關仍關）
+
+| 項目 | cube2 實作 |
+|---|---|
+| Client | `brickduel-bff`；callback 固定 `https://brickduel.snowrealm.pet/api/auth/callback` |
+| 開始 | `POST /api/auth/start {intent:'link'|'recover'|'restore'}`，只接受同站；`link` 要帶這台裝置的金鑰（證明擁有這份存檔）。每 10 分鐘同一份存檔／同一網路位置最多 10 次 |
+| 工作階段 | 伺服器產生 32 bytes 的 session id、state、nonce 和 PKCE verifier（S256）。瀏覽器只拿到 `__Host-zzauth` cookie（Secure、HttpOnly、SameSite=Lax、Path=/、10 分鐘）。資料庫 `zz.authsess` 只存 session id 的雜湊；verifier／state／nonce 用從 session id 衍生的金鑰（HKDF-SHA256 → AES-256-GCM）加密保存，只有資料庫讀不出來 |
+| 導向 | `https://games.snowrealm.pet/?sso=brickduel&client_id=brickduel-bff&redirect_uri=…&response_type=code&code_challenge=…&code_challenge_method=S256&state=…&nonce=…`（與 cube1 `dist/sso-flow.mjs` 相符）。使用者同意由 Games 平台的可信後端確認，cube2 不採信瀏覽器的 `consent:true` |
+| Callback | 要有 cookie、對得上未使用且未過期的 session；**一進來就用一條 SQL 標記為已用**（不管後面成不成功）。驗 `state`（固定時間比較）、`iss` 參數（有帶就必須相同）、`error`、code 格式 |
+| 換 token | 伺服器 `POST {iss}/oauth/token`，標頭 `x-snowrealm-client-secret`，JSON `{clientId, redirectUri, code, codeVerifier, state, nonce}`，5 秒逾時，不跟隨轉址 |
+| 驗 token | `server/identity.js`：EdDSA、kid、iss、aud=`snowrealm:brickduel:api`、scope=`brickduel:account:link`、sub（UUID）、iat／nbf／exp（≤600 秒）、jti；token 若帶 `nonce` 必須相同 |
+| 撤銷 | `POST {iss}/v1/token/status`（Bearer token＋client secret），只有 200 且 `active === true` 才繼續；`active:false`、401、403 → `revoked`；503、逾時、JWKS 抓不到 → `unavailable`，全部 fail-closed |
+| 綁定 | 沿用 `core.idLink`／`core.idRecover`：jti 只能用一次、一對一、409 衝突不合併不覆蓋不轉金幣；綁定時這台裝置換新金鑰、舊金鑰和引繼碼作廢；等待刪除的存檔 30 天內可用 `restore` 取消刪除 |
+| 回到遊戲 | `303 /?auth=<結果>`（只有一個字，沒有 token、code）。頁面立刻把網址清掉，再 `POST /api/auth/result`（同一個 cookie）拿一次結果；新裝置金鑰讀過就從資料庫清掉，cookie 同時清除 |
+| 結果字 | `linked` `recovered` `conflict` `pending` `none` `ban` `purged` `session` `expired` `replay` `state` `denied` `code` `token` `revoked` `unavailable` `off` |
+| 開關 | `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_LINK_ENABLED=1`、`IDENTITY_BRICKDUEL_CLIENT_SECRET`（至少 32 字）都在才開；否則 start／result 回 503、callback 導回 `/?auth=off`，`/api/health` 的 `link` 為 false，頁面不顯示連結按鈕 |
+
+**測試**：`test/bff.test.js`（66 項，用測試自己產生的金鑰模擬 Identity）：正常綁定、錯 state、錯 nonce（token 端拒絕、token 內 nonce 不同）、同一 callback 重放、已換過的 code、過期、沒有 cookie／別人的 cookie（換機）、409（兩份存檔都不變、金幣不變）、已綁的存檔不能再綁別的帳號、撤銷（active:false、403、503、逾時、`active` 不是 true）、token 端 503／逾時、JWKS 失聯、拒絕的情況都沒有發出裝置金鑰、另一台裝置找回、等待刪除後恢復、限流；`test/authui.js`（瀏覽器 9 項）。
+
+**還沒做到（不能假裝通過）**：cube1 的 `/oauth/authorize`、`/oauth/token` 目前回 503，`identity.snowrealm.pet` 尚無正式部署，所以**沒有任何正式 E2E**。開 `IDENTITY_LINK_ENABLED` 要等兩邊用兩個測試帳號驗收。開之前還要：同意畫面「不用 cookie」的文字改寫（隱私權政策已先寫明這個例外）、Owner 決定過期 session 怎麼清。

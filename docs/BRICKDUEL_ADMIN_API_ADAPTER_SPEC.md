@@ -4,7 +4,7 @@
 **撰寫：** Claude（cube2）。日期：2026-11-20。
 **對照版本：** `luffysky/cube2` main @ `42ac4f3`。CI：https://github.com/luffysky/cube2/actions （前一個提交 `5df2cde` 的 CI 已成功）。
 
-> 這份文件的端點**全部都還沒寫程式**。第 3 節是提案，等雙方確認第 5 節的阻塞項目後才實作。
+> **2026-11-21 更新：七支唯讀端點已實作（`server/admin.js`），契約以 cube1 `SNOWREALM_GAMES_ADMIN_API_BRICKDUEL_HANDOFF.md` v0.2 為準，見第 8 節。** 正式站沒有設 `BRICKDUEL_ADMIN_SUBJECTS`，所以目前一律回 503；等機器簽發端與 `admin-jwks.json` 上線後才設定。第 1–7 節保留當初的提案與討論紀錄。
 > 文件裡沒有任何正式管理網址、token、secret 或真實玩家資料。
 
 ---
@@ -222,14 +222,14 @@
 
 | 端點 / 項目 | 規劃 | 已寫碼 | CI 成功 | 測試環境上線 | 正式可用 |
 |---|---|---|---|---|---|
-| `overview` | ✓ | — | — | — | — |
-| `players` | ✓ | — | — | — | — |
-| `draws` | ✓ | — | — | — | — |
-| `matches` | ✓ | 資料表已寫碼（API 未寫） | — | — | — |
-| `metrics`、`metrics/daily`、`players/{id}` | ✓ | — | — | — | — |
-| Steam 欄位與登入 | 預留 | — | — | — | — |
-| JWT 驗證層（可替換 Auth Adapter） | ✓ | — | — | — | — |
-| 稽核紀錄表 | ✓ | — | — | — | — |
+| `overview` | ✓ | ✓ | ✓ | 正式站回 503（未設定） | 等機器憑證 |
+| `players` | ✓ | ✓ | ✓ | 同上 | 等機器憑證 |
+| `draws` | ✓ | ✓ | ✓ | 同上 | 等機器憑證 |
+| `matches` | ✓ | ✓ | ✓ | 同上 | 等機器憑證 |
+| `metrics`、`metrics/daily`、`players/{id}` | ✓ | ✓ | ✓ | 同上 | 等機器憑證 |
+| Steam 欄位與登入 | 預留 | 欄位回 `null` | ✓ | — | — |
+| JWT 驗證層 | ✓ | ✓（`server/admin.js`） | ✓ | 同上 | 等 `admin-jwks.json` |
+| 稽核紀錄表 | ✓ | ✓（`zz.admin_log`） | ✓ | — | 180 天後清除待 Owner 核准 |
 
 正式網址：**TBD**（部署後會是 cube2 的網址加上 `/internal/admin/v1/…`）。
 
@@ -262,3 +262,43 @@
 1. 實作 `api/admin.js`、Auth Adapter、稽核表，以及交接包第 8 節列的測試（401／403／錯 audience 或 issuer／過期／`jti` 重送／不同玩家資料隔離／前端不能自己送金幣、段位、勝負）。
 2. 補齊另外兩份：`BRICKDUEL_IDENTITY_ADAPTER_SPEC.md`、`BRICKDUEL_SECURITY_PRIVACY_CHECKLIST.md`。
 3. 提交後附 commit SHA、CI 連結，以及沒有機密資料的測試紀錄。
+
+## 8. v1 實作（2026-11-21，cube2 `server/admin.js`）
+
+**路徑**：`GET https://brickduel.snowrealm.pet/internal/admin/v1/{overview | players | players/{gameUserId} | draws | matches | metrics | metrics/daily}`（`vercel.json` rewrite 到 `api/admin.js`）。
+
+**認證**（與 cube1 handoff §5 相同）：
+- `Authorization: Bearer <JWT>`；header `alg=EdDSA`、`kid` 必填、不接受 `crit`。
+- 公鑰只從管理專用 JWKS：預設 `https://identity.snowrealm.pet/.well-known/admin-jwks.json`（不接受玩家的 `jwks.json`），快取 10 分鐘；未知 `kid` 每分鐘最多重抓一次；同一個 `kid` 出現兩把鑰匙時兩把都不信。緊急換鑰可改用 `BRICKDUEL_ADMIN_JWKS`（直接放 JWKS JSON）。
+- `iss` 必須正好是 `https://identity.snowrealm.pet`（測試用的別的 issuer 要 `BRICKDUEL_ADMIN_TEST_TRUST=1`，而且在 Vercel production 一律拒絕）。
+- `aud` 含 `snowrealm:brickduel:admin`；`scope` 用空白切開後要有完整的 `brickduel:admin:read`；`sub` 在 `BRICKDUEL_ADMIN_SUBJECTS`（預定 `svc:snowrealm-games-admin`）。
+- `iat`、`nbf`、`exp` 都要是整數秒；`iat`、`nbf` 不晚於現在 +60 秒；`exp` 超過現在 −60 秒；`0 < exp − iat ≤ 600`；`jti` 必填，唯讀可以重複使用。
+
+**錯誤**：
+
+| 狀態 | body | 何時 |
+|---|---|---|
+| 405 | `{"error":"method"}` | 不是 GET（不論有沒有設定）|
+| 503 | `{"error":"disabled"}` | `BRICKDUEL_ADMIN_SUBJECTS` 沒設或沒有合法值、issuer／JWKS 設定不合規 |
+| 503 | `{"error":"unavailable"}` | JWKS 抓不到、資料庫不通。後台要顯示「來源不可用」，不能當 0 |
+| 401 | `{"error":"unauthorized"}` | token 缺、格式錯、簽章錯、未知 kid、iss／aud／時間／jti 不對（不說是哪一項），帶 `WWW-Authenticate: Bearer` |
+| 403 | `{"error":"forbidden"}` | 簽章與聲明都對，但 `sub` 不在名單或沒有 scope |
+| 404 | `{"error":"not_found"}` | 路徑不存在、玩家 ID 格式不對或查無此人（含等待刪除中的存檔）|
+| 400 | `{"error":"bad_request"}` | `limit` 不在 1–100、`cursor` 壞掉、日期格式錯、`from` 晚於 `to`、日報超過 366 天 |
+| 429 | `{"error":"slow"}` | 同一個 `sub` 每分鐘超過 60 次，帶 `Retry-After` |
+
+全部回應 `Cache-Control: no-store`，不送 CORS 標頭；service worker 不攔 `/internal/`。
+
+**稽核**：簽章通過的每一次呼叫（含 403、404、400、429）寫一筆 `zz.admin_log(at, sub, jti, path, status)`，不存 token、查詢字串、IP。驗不過的 401 不寫進資料庫（避免被灌爆），只在伺服器日誌記一個原因類別。
+
+**欄位**：照 cube1 handoff §4、§4.1–4.3。補充：
+- 等待刪除（玩家按了刪除、30 天內）的存檔不出現在任何列表與計數裡，單查回 404。
+- `draws` 另有 `kind`（`box`／`wheel`／`slot`）；`summary` 只算寶箱（`kind=box`），範圍是整個 `from`–`to`（`from` 含、`to` 不含），每個等級有 `count`、`share`（期間沒有開箱時為 `null`）、`published`（公布機率，0–1）。
+- `matches` 可加 `player=<uuid>`、`room=<房號>` 篩選。
+- `metrics`：`players.linked` 是 `zz.identity` 筆數（功能未開，現在是 0）；`players.steam`、`players.minorDeclared`、`regions`、`devices.unsaved` 為 `null`；`subs.paid` 是 0（目前沒有付費，全是體驗）；`matches.today`、`boxes.today` 以 UTC 當日計；另附 `day`、`generatedAt`。
+- `metrics/daily`：沒給日期時是最近 7 天；回 `{timezone:"UTC", from, to, items, generatedAt}`；`coinsEarned`／`coinsSpent` 來自 `zz.ledger`，不含新存檔的起始金幣（`kind=open`）；`newSubs`、`steamNewPlayers`、`steamActivePlayers` 為 `null`。
+- `players/{id}`：`subscription.kind` 現在只會是 `trial` 或 `null`；`items` 只列持有量大於 0 的道具。
+
+**測試**：`test/admin.test.js`（98 項）：自己產生的 Ed25519 金鑰、17 種 401、2 種 403、換鑰與未知 kid、JWKS 故障 503、內嵌 JWKS、404／405／400、分頁與 cursor、各端點欄位、不含金鑰雜湊／原始存檔／IP、429、稽核內容；並用 cube1 的 fixture（`test/fixtures/cube1-brickduel-admin-jwt.json`，公開鑰與已過期 token）在它的時鐘驗過、過期後 401、正式 subject／issuer 不接受它。
+
+**阻塞（等 cube1）**：機器簽發端、`https://identity.snowrealm.pet/.well-known/admin-jwks.json` 上線，並給一組非正式環境可用的測試 token 來源。上線後 Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS=svc:snowrealm-games-admin` 即開通。

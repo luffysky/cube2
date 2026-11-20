@@ -12,6 +12,9 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   '.webmanifest': 'application/manifest+json; charset=utf-8', '.ico': 'image/x-icon', '.xml': 'application/xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (/^\/internal\/admin\/v1\//.test(url.pathname)) return app.handle('admin', req, res);
+  const au = /^\/api\/auth\/(start|callback|result)$/.exec(url.pathname);
+  if (au) return app.handle('auth' + au[1][0].toUpperCase() + au[1].slice(1), req, res);
   const m = /^\/api\/([a-z]+)$/.exec(url.pathname);
   if (m && m[1] === 'ws') { res.statusCode = 426; return res.end('websocket'); }
   if (m) {

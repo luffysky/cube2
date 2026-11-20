@@ -18,6 +18,8 @@ const ads = require('./ads.js');
 const rules = require('./rules.js');
 const identity = require('./identity.js');
 const files = require('./files.js');
+const admin = require('./admin.js');
+const bff = require('./bff.js');
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
@@ -72,7 +74,7 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), link: bff.enabled(), region: process.env.VERCEL_REGION || '', now: clock() };
     if (url.searchParams.get('deep') && out.db) {
       // a look at the database itself: is it reachable, how long does one round trip take
       const t0 = Date.now();
@@ -81,6 +83,59 @@ const routes = {
       return send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=15' });
     }
     send(res, 200, out, { 'Cache-Control': 'public, max-age=0, s-maxage=60' });
+  },
+  // "connect to SnowRealm Games" (server/bff.js): start (POST, same site), callback (GET from the portal), result (POST)
+  async authStart(req, res) {
+    if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
+    if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
+    if (!bff.enabled()) return send(res, 503, { ok: false, why: 'off' });
+    const body = await readBody(req), now = clock(), cred = core.readCred(header(req, 'authorization'));
+    const out = await db.run(d => bff.start(d, body, cred, ipTag(req), now));
+    send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
+  },
+  async authCallback(req, res, url) {
+    if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
+    let outcome;
+    if (!bff.enabled()) outcome = 'off';
+    else {
+      try { outcome = (await db.run(d => bff.finish(d, url.searchParams, header(req, 'cookie'), clock()))).outcome; }
+      catch (e) { log('auth', e); outcome = 'unavailable'; }
+    }
+    if (bff.OUTCOMES.indexOf(outcome) < 0) outcome = 'unavailable';
+    if (['linked', 'recovered'].indexOf(outcome) < 0) console.warn('[zz] auth ' + outcome);
+    res.statusCode = 303;
+    res.setHeader('Location', '/?auth=' + outcome);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.end();
+  },
+  async authResult(req, res) {
+    if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
+    if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
+    if (!bff.enabled()) return send(res, 503, { ok: false, why: 'off' });
+    const out = await db.run(d => bff.result(d, header(req, 'cookie'), clock()));
+    send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
+  },
+  // the read-only operations API for the SnowRealm Games console (server/admin.js). Reached as
+  // /internal/admin/v1/<path> (vercel.json rewrites it here with __ap=<path>). Server to server: no CORS, no-store.
+  async admin(req, res, url) {
+    const now = clock();
+    let path = '';
+    const m = /^\/internal\/admin\/v1\/(.*)$/.exec(url.pathname);
+    if (m) path = m[1]; else path = url.searchParams.get('__ap') || '';
+    const q = new URLSearchParams(url.searchParams); q.delete('__ap');
+    const d = db.configured() ? db.get() : null;
+    let o;
+    try {
+      o = await admin.serve(d ? { query: (t, p) => db.run(x => x.query(t, p)) } : null, req.method, path, q, header(req, 'authorization'), now);
+    } catch (e) { log('admin', e); o = { status: 503, body: { error: 'unavailable' }, path }; }
+    if (o.why && o.status === 401) console.warn('[zz] admin 401 ' + o.why);
+    if (o.sub && d) { try { await db.run(x => admin.audit(x, now, o)); } catch (e) { log('admin-audit', e); } }
+    const extra = { 'Cache-Control': 'no-store' };
+    if (o.allow) extra.Allow = o.allow;
+    if (o.retry) extra['Retry-After'] = String(o.retry);
+    if (o.status === 401) extra['WWW-Authenticate'] = 'Bearer';
+    send(res, o.status, o.body, extra);
   },
   // the daily job (Vercel Cron, see vercel.json): files off the list for more than 30 days leave the bucket.
   // With CRON_SECRET set, only Vercel's call (which carries it) is let in; it only ever deletes what is already due.

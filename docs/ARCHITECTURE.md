@@ -211,6 +211,9 @@ API 只給同一個網址的頁面用：不送任何 CORS 標頭，請求如果�
 | `POST /api/room` | `{ a: 'open' \| 'join' \| 'x' \| 'close', … }`。連線對戰的房間：開房、入座、交換訊息、關房。座位用頁面自己產生的隨機鑰匙認，資料庫只存雜湊。房主最後一次交換訊息帶 `end: true`，伺服器就順手把房間收掉 |
 | `POST /api/rpc` | `{ a: 'hello' \| 'sync' \| 'code' \| 'redeem' \| 'delete', … }`。除了 `hello` 和 `redeem` 都要 `Authorization: Bearer <id>.<密鑰>` |
 | `GET /api/board?b=rp\|score\|sprint` | 排行榜前 50 名。`&s=all` 看歷來（段位榜只有本季），`&me=<代號>` 順便回自己的名次。回應可以在 CDN 快取 30 秒 |
+| `GET /internal/admin/v1/*` | SnowRealm Games 後台用的唯讀營運 API（`server/admin.js`）：只認管理專用 JWKS 簽的短效 Ed25519 機器 token，沒設 `BRICKDUEL_ADMIN_SUBJECTS` 前一律 503。規格見 `docs/BRICKDUEL_ADMIN_API_ADAPTER_SPEC.md` 第 8 節 |
+| `POST /api/auth/start`、`GET /api/auth/callback`、`POST /api/auth/result` | 「連結 SnowRealm Games」的 OAuth BFF（`server/bff.js`）：PKCE S256、伺服器端工作階段、`__Host-zzauth` cookie。`IDENTITY_LINK_ENABLED` 沒開前 503。規格見 `docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md` 第 7 節 |
+| `GET /api/cron` | 每天一次的排程：雲端檔案移除滿 30 天才從 R2 刪（C-034） |
 
 錯誤一律是 `{ ok: false, why: '代碼' }`，不帶任何內部訊息。
 
@@ -227,6 +230,8 @@ API 只給同一個網址的頁面用：不送任何 CORS 標頭，請求如果�
 | `zz.rate` | 限流計數 |
 | `zz.rooms` | 連線對戰的房間：代碼、每個座位鑰匙的雜湊（`ks`）、座位數（`cap`）、到期時間（三小時）。`hk`、`jk` 是舊欄位 |
 | `zz.post` | 房間裡每個座位的信箱，記著是哪個座位寄的。收件人讀過就刪，房間到期或關閉時整批清掉（取代舊的 `zz.mail`） |
+| `zz.admin_log` | 唯讀後台 API 每次驗過 token 的呼叫：時間、`sub`、`jti`、路徑、狀態碼。不存 token、查詢字串、IP。清除規則待 Owner 核准 |
+| `zz.authsess` | 連結 SnowRealm Games 的暫存工作階段：session id 的雜湊、用途、加密的 PKCE／state／nonce 與結果（用過即清）。過期列的清除待 Owner 核准 |
 
 玩家按「刪除雲端資料」時走 30 天狀態機（Owner C-022，規格見 cube1 `docs/BRICKDUEL_ACCOUNT_LINK_AND_DELETION_POLICY_zh-TW.md`）：
 - **有效 → 等待刪除**：`delete` 在 `zz.players.gone` 記下伺服器時間（重複申請以第一次為準），回傳 `until = gone + 30 天`。等待期間存檔不能被讀寫、結算或產生引繼碼（API 回 409 `pending` 附 `until`），也從所有排行榜消失；裝置密鑰與 `zz.identity` 綁定都**保留**，不在當天級聯刪除。

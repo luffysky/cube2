@@ -1,0 +1,18 @@
+{
+  "verificationTime": "2025-01-01T00:01:00Z",
+  "issuer": "https://admin-fixture.snowrealm.invalid",
+  "subject": "svc:test-snowrealm-games-admin",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "9YtKxuuvBYMMQ1yQFNMy26qpBAq0emsd-ur5hzGKhXc",
+        "kid": "test-brickduel-admin-001",
+        "alg": "EdDSA",
+        "use": "sig"
+      }
+    ]
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6InRlc3QtYnJpY2tkdWVsLWFkbWluLTAwMSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2FkbWluLWZpeHR1cmUuc25vd3JlYWxtLmludmFsaWQiLCJhdWQiOiJzbm93cmVhbG06YnJpY2tkdWVsOmFkbWluIiwic3ViIjoic3ZjOnRlc3Qtc25vd3JlYWxtLWdhbWVzLWFkbWluIiwic2NvcGUiOiJicmlja2R1ZWw6YWRtaW46cmVhZCIsImlhdCI6MTczNTY4OTYwMCwibmJmIjoxNzM1Njg5NjAwLCJleHAiOjE3MzU2ODk5MDAsImp0aSI6IjFmNTBjNzUxLTg4YWQtNDkzOC05N2E0LTg4MzI1YzU4MjY4ZiJ9.WJ7l1tcojjJSaSuOsv0Vp12hz3yFu1X-EHvP4H9x0OuCQ1W-r8zTB9_-YruiNjAaWUTl7ix-rwGIpXFCLqMgCQ"
+}

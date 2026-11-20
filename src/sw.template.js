@@ -77,7 +77,7 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET' || req.url.indexOf(HOME) !== 0 || req.headers.has('range')) return;
   const path = req.url.slice(HOME.length).split(/[?#]/)[0];
-  if (path.indexOf('api/') === 0) return;
+  if (path.indexOf('api/') === 0 || path.indexOf('internal/') === 0) return;
   if (path === '' || path === 'index.html') return event.respondWith(page(event));      // (other documents in this folder are not the game)
   if (/^audio\//.test(path)) return event.respondWith(file(event, false));
   if (/^(icons|vendor)\//.test(path) || path === 'manifest.webmanifest' || path === 'favicon.ico') return event.respondWith(file(event, true));

@@ -11414,7 +11414,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
         if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true;      // files: members may upload their own pictures and music (R2)
+        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true;      // files: members may upload their own pictures and music (R2)
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
@@ -11477,6 +11477,33 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     return Cloud.flush().then(function () { return !!Cloud.cred; });
   };
   Cloud.restart = Cloud.ensure;
+  // ---------- "connect to SnowRealm Games" (server/bff.js) ----------
+  // intent: 'link' (this save, needs this device's key), 'recover' or 'restore' (a linked save on another device).
+  // The server keeps every secret; the page only goes to the address it is given.
+  Cloud.authStart = function (intent) {
+    if (!Cloud.link) return Promise.resolve({ ok: false, why: 'off' });
+    var go = function () {
+      return call('POST', 'auth/start', { intent: intent }, intent === 'link').then(function (r) {
+        var b = answer(r);
+        if (r.status === 200 && b.ok && typeof b.url === 'string' && /^https:\/\//.test(b.url)) { (Cloud.go || function (u) { root.location.assign(u); })(b.url); return { ok: true }; }
+        return b;
+      }, offline);
+    };
+    return intent === 'link' ? Cloud.ensure().then(function (ok) { return ok ? go() : offline(); }) : go();
+  };
+  // back from the portal (?auth=<outcome>): the result is read once, with the cookie; a new device key is taken
+  Cloud.authResult = function () {
+    return call('POST', 'auth/result', {}).then(function (r) {
+      var b = answer(r);
+      if (r.status !== 200 || !b.ok) return b;
+      if (b.id && b.key) {
+        if (b.outcome === 'recovered') { Cloud.q = []; take(b); if (b.st) adopt(b.st); }
+        else take({ id: b.id, key: b.key, pub: Cloud.pub, now: b.now });
+        changed();
+      }
+      return b;
+    }, offline);
+  };
   // a member's own files in the cloud: a = 'fileUp' | 'fileOk' | 'fileList' | 'fileHide' (see server/files.js)
   Cloud.file = function (body) {
     return Cloud.ensure().then(function (ok) {
@@ -11619,6 +11646,17 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'sr.p': ['轉磚不用註冊就能玩。想用同一個帳號玩 SnowRealm 的每一款遊戲，請到 SnowRealm Games：已經有帳號就按右上角「登入」，還沒有就在登入畫面選「註冊」。', 'You can play 轉磚 without an account. To use one account across every SnowRealm game, go to SnowRealm Games: press "Sign in" at the top right, or choose "Register" there if you have no account yet.', '轉磚は登録なしで遊べます。SnowRealm の全ゲームで同じアカウントを使うには SnowRealm Games へ：右上の「ログイン」、まだなら「登録」を選んでください。', '轉磚는 가입 없이 즐길 수 있어요. SnowRealm의 모든 게임을 한 계정으로 즐기려면 SnowRealm Games에서 오른쪽 위 "로그인", 계정이 없으면 "회원가입"을 고르세요.'],
     'sr.kid': ['13 歲以下先不用註冊帳號，直接玩就可以，進度會存在這台裝置。', 'Under 13 there is no need for an account: just play, and progress stays on this device.', '13歳未満の方はアカウント登録なしでそのまま遊べます。', '13세 미만은 계정 없이 그대로 즐기면 돼요.'],
     'sr.menu': ['登入／註冊', 'Sign in / Register', 'ログイン／登録', '로그인/가입'],
+    'sr.link': ['把這份存檔連結到 SnowRealm Games 帳號', 'Link this save to your SnowRealm Games account', 'このセーブを SnowRealm Games アカウントに連携', '이 저장 데이터를 SnowRealm Games 계정에 연결'],
+    'sr.linkP': ['會先到 SnowRealm Games 登入並確認。連結後換裝置只要登入就能找回；金幣、進度都不會合併或移動。', 'You sign in and confirm at SnowRealm Games first. Once linked, signing in on another device brings this save back; coins and progress are never merged or moved.', 'まず SnowRealm Games でログインして確認します。連携後は別の端末でもログインすれば取り戻せます。コインや進行状況が合算・移動されることはありません。', '먼저 SnowRealm Games에서 로그인하고 확인해요. 연결하면 다른 기기에서도 로그인만 하면 되찾을 수 있고, 코인과 진행 상황은 합쳐지거나 옮겨지지 않아요.'],
+    'sr.recover': ['用 SnowRealm Games 帳號找回存檔', 'Get my save back with SnowRealm Games', 'SnowRealm Games アカウントでセーブを取り戻す', 'SnowRealm Games 계정으로 저장 데이터 되찾기'],
+    'sr.recoverP': ['找回後，這台裝置現在的進度（{0}、{1} 金幣）會換成帳號上的那份。', 'This device\'s current progress ({0}, {1} coins) is replaced by the save on the account.', 'この端末の現在の進行状況（{0}、{1}コイン）はアカウントのセーブに置き換わります。', '이 기기의 현재 진행 상황({0}, {1}코인)은 계정의 저장 데이터로 바뀌어요.'],
+    'sr.linked': ['已連結 SnowRealm Games 帳號。', 'Linked to your SnowRealm Games account.', 'SnowRealm Games アカウントと連携しました。', 'SnowRealm Games 계정과 연결했어요.'],
+    'sr.recovered': ['找回了，這台裝置現在用的是帳號上的存檔。', 'Done. This device now uses the save on your account.', '取り戻しました。この端末はアカウントのセーブを使います。', '되찾았어요. 이 기기는 이제 계정의 저장 데이터를 사용해요.'],
+    'sr.conflict': ['這個帳號或這份存檔已經連結了別的，兩邊都保持原樣，沒有合併。', 'That account or this save is already linked to another; both stay as they are and nothing was merged.', 'このアカウントかこのセーブは別のものと連携済みです。どちらもそのままで、合算はしていません。', '그 계정이나 이 저장 데이터는 이미 다른 것과 연결되어 있어요. 둘 다 그대로이고 합치지 않았어요.'],
+    'sr.none': ['這個帳號還沒有連結轉磚的存檔。先在有進度的裝置上按「連結」。', 'That account has no 轉磚 save linked yet. Use "Link" on the device that has your progress first.', 'このアカウントにはまだ轉磚のセーブが連携されていません。先に進行状況のある端末で「連携」してください。', '그 계정에는 아직 轉磚 저장 데이터가 연결되어 있지 않아요. 진행 상황이 있는 기기에서 먼저 "연결"하세요.'],
+    'sr.pendingP': ['帳號上的存檔正在等待刪除。要恢復的話再按一次找回，並選擇恢復。', 'The save on that account is waiting to be deleted. To keep it, get it back again and choose to restore it.', 'アカウントのセーブは削除待ちです。残すにはもう一度取り戻して、復元を選んでください。', '계정의 저장 데이터가 삭제 대기 중이에요. 남기려면 다시 되찾기에서 복구를 고르세요.'],
+    'sr.restore': ['恢復帳號上等待刪除的存檔', 'Restore the save waiting to be deleted', '削除待ちのセーブを復元', '삭제 대기 중인 저장 데이터 복구'],
+    'sr.authFail': ['沒有完成連結，存檔都沒有變動。可以稍後再試。', 'Linking did not go through; no save was changed. You can try again later.', '連携は完了せず、セーブは変わっていません。後でもう一度お試しください。', '연결이 완료되지 않았고 저장 데이터는 바뀌지 않았어요. 나중에 다시 해 보세요.'],
     'sr.go': ['到 SnowRealm Games 註冊／登入', 'Register / sign in at SnowRealm Games', 'SnowRealm Games で登録／ログイン', 'SnowRealm Games 가입/로그인'],
     'sr.soon': ['登入或註冊好之後，轉磚這邊的綁定會在 SnowRealm 統一登入上線時開放；你在轉磚的進度、金幣都會保留，綁定時再接上去。', 'Linking 轉磚 to that account opens when SnowRealm sign-in goes live; your progress and coins here stay as they are and carry over when you link.', 'アカウント連携は SnowRealm の統一ログイン開始時に開放されます。ここでの進行状況とコインはそのまま引き継げます。', '계정 연결은 SnowRealm 통합 로그인이 열리면 가능해요. 여기의 진행 상황과 코인은 그대로 유지되고 연결할 때 이어집니다.'],
     'cl.title': ['雲端存檔', 'Cloud save', 'クラウドセーブ', '클라우드 저장'],
@@ -11689,9 +11727,35 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   function srBlock() {
     // under 13: no sign-up push (accounts for children need a parent's consent, which is not in place)
     if (ZZ.Consent && ZZ.Consent.child()) return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.kid') + '</p>';
-    return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.p') + '</p><div class="row"><a class="btn main" href="' + SR_URL + '" target="_blank" rel="noopener" data-sr="signup">' + esc(t('sr.go')) + ' ↗</a></div><p class="note">' + t('sr.soon') + '</p>';
+    var h = '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.p') + '</p><div class="row"><a class="btn main" href="' + SR_URL + '" target="_blank" rel="noopener" data-sr="signup">' + esc(t('sr.go')) + ' ↗</a></div>';
+    // linking is shown only once the server says it is fully set up (it stays off until both sides have tested it)
+    if (!Cloud.link) return h + '<p class="note">' + t('sr.soon') + '</p>';
+    var d = Meta.data;
+    if (Cloud.cred) h += '<p class="note">' + t('sr.linkP') + '</p><div class="row">' + btn('srLink', 'sr.link', true) + '</div>';
+    h += '<p class="note">' + esc(t('sr.recoverP', rankText(d.rp), L.num(d.coins))) + '</p><div class="row">' + btn('srRecover', 'sr.recover') + (ui.srPending ? btn('srRestore', 'sr.restore') : '') + '</div>';
+    return h;
   }
   App.srBlock = srBlock;
+  function srGo(intent) { Cloud.authStart(intent).then(function (b) { if (!b || !b.ok) App.toast(t(b && b.why === 'slow' ? 'cl.slow' : 'sr.authFail'), 4200); }); }
+  App.acts.srLink = function () { srGo('link'); };
+  App.acts.srRecover = function () { srGo('recover'); };
+  App.acts.srRestore = function () { srGo('restore'); };
+  // back from SnowRealm Games: /?auth=<outcome> (a word only). The address is cleaned at once, then the result read.
+  function authBack() {
+    var m = /[?&]auth=([a-z]{2,12})\b/.exec(window.location.search || '');
+    if (!m) return;
+    try { var u = new URL(window.location.href); u.searchParams.delete('auth'); window.history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { /* old browser */ }
+    Cloud.whenKnown(function (up) {
+      if (!up || !Cloud.link) return;
+      Cloud.authResult().then(function (b) {
+        var o = (b && b.outcome) || m[1];
+        ui.srPending = o === 'pending';
+        App.toast(t(o === 'linked' ? 'sr.linked' : o === 'recovered' ? 'sr.recovered' : o === 'conflict' ? 'sr.conflict' : o === 'none' ? 'sr.none' : o === 'pending' ? 'sr.pendingP' : 'sr.authFail'), 6000);
+        if (o === 'recovered') { Cloud._forget(); App.applyLook(); if (App.screen() === 'menu') App.updateMenu(); }
+        refresh();
+      });
+    });
+  }
   App.sheets.srAccount = function () { return srBlock() + '<div class="row">' + btn('close', 'close') + '</div>'; };
   App.profileExtra = function () {
     var st = Cloud.status(), h = '<h3>' + t('cl.title') + '</h3><p class="note" id="clState">' + esc(stateText()) + '</p>';
@@ -11914,6 +11978,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     try { local = !/^https?:$/.test(window.location.protocol) || /[?&]cloud=off\b/.test(window.location.search); } catch (e) { local = true; }
     Cloud.init({ local: local });
     showLink();
+    authBack();
     window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); else Cloud.recheck(); });
     window.addEventListener('pagehide', function () { Cloud.flush(); });
     document.addEventListener('visibilitychange', function () {

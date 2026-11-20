@@ -1,0 +1,243 @@
+'use strict';
+// "Connect to SnowRealm Games" (server/bff.js) end to end against an in-process Postgres and a stand-in Identity:
+// the portal, POST /oauth/token and POST /v1/token/status are played by this test with keys it makes itself.
+// Nothing real is called and no real secret, token or player is used.
+const crypto = require('crypto');
+const { Readable } = require('stream');
+const dbm = require('../server/db.js');
+const app = require('../server/app.js');
+const idn = require('../server/identity.js');
+const bff = require('../server/bff.js');
+const { make } = require('../tools/pglite-db.js');
+
+let pass = 0, fail = 0;
+function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', name, extra !== undefined ? JSON.stringify(extra).slice(0, 500) : ''); } }
+const eq = (a, b, name) => ok(JSON.stringify(a) === JSON.stringify(b), name + ' got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));
+let now = Date.UTC(2026, 10, 21, 3, 0, 0);
+app.setClock(() => now);
+const pg = make(); dbm.use(pg);
+
+const ISS = 'https://identity.test.example', AUD = 'snowrealm:brickduel:api', SECRET = 'test-client-secret-'.padEnd(48, 'x');
+const ENV = { IDENTITY_ISSUER: ISS, IDENTITY_JWKS_URL: ISS + '/.well-known/jwks.json', IDENTITY_AUDIENCE: AUD, IDENTITY_LINK_ENABLED: '1', IDENTITY_BRICKDUEL_CLIENT_SECRET: SECRET };
+const K = crypto.generateKeyPairSync('ed25519');
+const jwk = Object.assign({ kid: 'p1', use: 'sig', alg: 'EdDSA' }, K.publicKey.export({ format: 'jwk' }));
+let jwksDown = false;
+idn.setFetch(async () => jwksDown ? { ok: false, status: 503, json: async () => ({}) } : { ok: true, json: async () => ({ keys: [jwk] }) });
+const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+function sign(claims) {
+  const sec = Math.floor(now / 1000), head = { alg: 'EdDSA', typ: 'JWT', kid: 'p1' };
+  const body = Object.assign({ iss: ISS, aud: AUD, sub: U1, jti: crypto.randomUUID(), iat: sec, nbf: sec, exp: sec + 300, scope: 'brickduel:account:link' }, claims || {});
+  const data = b64(head) + '.' + b64(body);
+  return data + '.' + crypto.sign(null, Buffer.from(data), K.privateKey).toString('base64url');
+}
+const U1 = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b', U2 = '0b9c8d7e-6f5a-4b3c-9d2e-1f0a9b8c7d6e';
+
+// ---------- the stand-in Identity ----------
+const codes = {}, seenBodies = [];
+let tokenMode = 'ok', statusMode = 'ok', claimsExtra = {};
+function portal(url, sub) {
+  const u = new URL(url), code = crypto.randomBytes(32).toString('base64url');
+  codes[code] = { sub, state: u.searchParams.get('state'), nonce: u.searchParams.get('nonce'), challenge: u.searchParams.get('code_challenge'), used: false };
+  return { code, state: u.searchParams.get('state') };
+}
+bff.setFetch(async (url, o) => {
+  const body = JSON.parse(o.body || '{}'), h = o.headers;
+  seenBodies.push({ url, headers: Object.assign({}, h), body });
+  const reply = (status, j) => ({ status, json: async () => j });
+  if (url === ISS + '/oauth/token') {
+    if (tokenMode === 'down') throw new Error('timeout');
+    if (tokenMode === '503') return reply(503, { error: 'authorization_unavailable' });
+    if (h['x-snowrealm-client-secret'] !== SECRET) return reply(401, { error: 'invalid_client' });
+    const c = codes[body.code];
+    if (!c || c.used || body.clientId !== 'brickduel-bff' || body.redirectUri !== 'https://brickduel.snowrealm.pet/api/auth/callback' ||
+      crypto.createHash('sha256').update(body.codeVerifier, 'ascii').digest('base64url') !== c.challenge || body.state !== c.state || body.nonce !== c.nonce) return reply(400, { error: 'invalid_grant' });
+    c.used = true;
+    return reply(200, { access_token: sign(Object.assign({ sub: c.sub }, claimsExtra)), token_type: 'Bearer', expires_in: 300, scope: 'brickduel:account:link' });
+  }
+  if (url === ISS + '/v1/token/status') {
+    if (statusMode === 'timeout') throw new Error('timeout');
+    if (h['x-snowrealm-client-secret'] !== SECRET || !/^Bearer /.test(h.Authorization)) return reply(401, { active: false });
+    if (statusMode === 'revoked') return reply(200, { active: false });
+    if (statusMode === '403') return reply(403, { active: false });
+    if (statusMode === '503') return reply(503, { active: false });
+    if (statusMode === 'weird') return reply(200, { active: 'true' });
+    return reply(200, { active: true });
+  }
+  return reply(404, {});
+});
+
+// ---------- requests ----------
+function call(name, o) {
+  o = o || {};
+  return new Promise(resolve => {
+    const req = new Readable({ read() {} });
+    req.method = o.method || 'POST'; req.url = o.url || '/api/' + name;
+    req.headers = Object.assign({ host: 'brickduel.snowrealm.pet', 'x-real-ip': '203.0.113.' + (o.ip || (1 + Math.floor(Math.random() * 250))) }, o.headers || {});
+    if (o.body !== undefined) { const t = JSON.stringify(o.body); req.headers['content-type'] = 'application/json'; req.headers['content-length'] = String(Buffer.byteLength(t)); req.push(t); }
+    req.push(null);
+    const res = { statusCode: 200, headers: {}, setHeader(k, v) { this.headers[k.toLowerCase()] = String(v); }, end(text) { let json = null; try { json = JSON.parse(text); } catch (e) { /* none */ } resolve({ status: this.statusCode, headers: this.headers, json, text }); } };
+    app.handle(name, req, res);
+  });
+}
+const auth = c => c ? { authorization: 'Bearer ' + c.id + '.' + c.key } : {};
+const rpc = (body, cred) => call('rpc', { body, headers: auth(cred) });
+async function newPlayer() { const r = await rpc({ a: 'hello' }); return { id: r.json.id, key: r.json.key }; }
+const cookieFrom = r => { const m = /__Host-zzauth=([A-Za-z0-9_-]*)/.exec(r.headers['set-cookie'] || ''); return m ? m[1] : null; };
+const startIt = (intent, cred, o) => call('authStart', Object.assign({ body: { intent }, headers: auth(cred) }, o || {}));
+const back = (q, cookie) => call('authCallback', { method: 'GET', url: '/api/auth/callback?' + q, headers: cookie ? { cookie: '__Host-zzauth=' + cookie } : {} });
+const resultOf = cookie => call('authResult', { body: {}, headers: cookie ? { cookie: 'other=1; __Host-zzauth=' + cookie } : {} });
+const where = r => r.headers.location;
+// a whole round: start, the portal, the callback; gives the cookie and the callback's answer
+async function round(intent, cred, sub, tweak) {
+  const s = await startIt(intent, cred);
+  if (s.status !== 200) return { s };
+  const cookie = cookieFrom(s), p = portal(s.json.url, sub || U1);
+  const q = tweak ? tweak(p) : 'code=' + p.code + '&state=' + p.state;
+  return { s, cookie, p, cb: await back(q, cookie) };
+}
+const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM zz.players WHERE id = $1", [id]))[0].c;
+
+(async () => {
+  // ---------- off ----------
+  let r = await startIt('recover');
+  ok(r.status === 503 && r.json.why === 'off', 'nothing set: start is 503', r.json);
+  r = await back('code=x&state=y');
+  ok(r.status === 303 && where(r) === '/?auth=off', 'callback while off goes home saying off', where(r));
+  eq((await resultOf('x'.repeat(43))).status, 503, 'result while off: 503');
+  Object.assign(process.env, ENV, { IDENTITY_LINK_ENABLED: '' });
+  eq((await startIt('recover')).status, 503, 'everything set but the enable flag: still 503');
+  Object.assign(process.env, ENV, { IDENTITY_BRICKDUEL_CLIENT_SECRET: 'short' });
+  eq((await startIt('recover')).status, 503, 'no proper client secret: still 503');
+  Object.assign(process.env, ENV);
+  eq((await call('health', { method: 'GET' })).json.link, true, 'health says linking is on only when all of it is set');
+
+  // ---------- start ----------
+  const P1 = await newPlayer(), P2 = await newPlayer();
+  eq((await startIt('link')).status, 401, 'linking needs the device\'s own key');
+  eq((await startIt('link', { id: P1.id, key: 'x'.repeat(43) })).status, 401, 'and the right one');
+  eq((await startIt('wipe', P1)).status, 400, 'only the known intents');
+  eq((await startIt('link', P1, { headers: Object.assign({ origin: 'https://evil.example' }, auth(P1)) })).status, 403, 'another site cannot start it');
+  eq((await call('authStart', { method: 'GET' })).status, 405, 'start is POST only');
+  r = await startIt('link', P1);
+  const sc = r.headers['set-cookie'];
+  ok(r.status === 200 && /^__Host-zzauth=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=600; Secure; HttpOnly; SameSite=Lax$/.test(sc), 'a __Host- cookie: Secure, HttpOnly, Lax, ten minutes', sc);
+  const u = new URL(r.json.url);
+  ok(u.origin === 'https://games.snowrealm.pet' && u.searchParams.get('sso') === 'brickduel' && u.searchParams.get('client_id') === 'brickduel-bff' && u.searchParams.get('redirect_uri') === 'https://brickduel.snowrealm.pet/api/auth/callback' && u.searchParams.get('code_challenge_method') === 'S256' && /^[A-Za-z0-9_-]{43}$/.test(u.searchParams.get('code_challenge')), 'to the portal with the fixed callback and an S256 challenge', r.json.url);
+  ok(!/verifier|secret/i.test(r.json.url) && r.json.url.indexOf(cookieFrom(r)) < 0, 'no verifier, secret or session id in the address');
+  const rowsNow = JSON.stringify(await pg.query('SELECT * FROM zz.authsess'));
+  ok(rowsNow.indexOf(cookieFrom(r)) < 0 && rowsNow.indexOf(u.searchParams.get('state')) < 0 && rowsNow.indexOf(u.searchParams.get('nonce')) < 0, 'the database has neither the session id nor the state or nonce in the clear');
+
+  // ---------- the normal link ----------
+  const coins1 = await coinsOf(P1.id);
+  let x = await round('link', P1);
+  ok(x.cb.status === 303 && where(x.cb) === '/?auth=linked', 'linked', where(x.cb));
+  const tok = seenBodies.filter(b => /oauth\/token/.test(b.url)).pop();
+  ok(tok.headers['x-snowrealm-client-secret'] === SECRET && tok.body.codeVerifier && tok.body.state === x.p.state && tok.body.nonce, 'the code went to the token endpoint with the secret, verifier, state and nonce');
+  const stat = seenBodies.filter(b => /token\/status/.test(b.url)).pop();
+  ok(stat && /^Bearer ey/.test(stat.headers.Authorization) && stat.headers['x-snowrealm-client-secret'] === SECRET, 'and the token was checked for revocation');
+  ok(where(x.cb).indexOf('ey') < 0 && where(x.cb).indexOf(x.p.code) < 0, 'no token or code in the address home');
+  r = await resultOf(x.cookie);
+  ok(r.status === 200 && r.json.outcome === 'linked' && r.json.id === P1.id && /^[A-Za-z0-9_-]{43}$/.test(r.json.key) && r.json.key !== P1.key, 'result gives this device its new key', r.json);
+  ok(/Max-Age=0/.test(r.headers['set-cookie']), 'and clears the cookie');
+  const P1b = { id: P1.id, key: r.json.key };
+  eq((await resultOf(x.cookie)).status, 404, 'the result can be read once only');
+  eq((await rpc({ a: 'sync', ops: [] }, P1)).status, 401, 'the old device key no longer works');
+  eq((await rpc({ a: 'sync', ops: [] }, P1b)).status, 200, 'the new one does');
+  eq(await coinsOf(P1.id), coins1, 'coins untouched by linking');
+  eq((await pg.query('SELECT pid FROM zz.identity WHERE platform_id = $1', [U1]))[0].pid, P1.id, 'one platform player, one save');
+  const all = JSON.stringify(await pg.query('SELECT * FROM zz.authsess'));
+  ok(!/eyJ/.test(all) && all.indexOf(P1b.key) < 0, 'no token or key left in the sessions');
+
+  // ---------- replays and wrong values ----------
+  x = await round('link', P1b);
+  // (already linked to U1 by this same save: same platform again is fine)
+  ok(where(x.cb) === '/?auth=linked', 'linking again to the same account is a plain success', where(x.cb));
+  r = await back('code=' + x.p.code + '&state=' + x.p.state, x.cookie);
+  eq(where(r), '/?auth=replay', 'the same callback twice: replay');
+  x = await round('recover', null, U1, p => 'code=' + p.code + '&state=' + 'w'.repeat(43));
+  eq(where(x.cb), '/?auth=state', 'wrong state');
+  r = await back('code=' + x.p.code + '&state=' + x.p.state, x.cookie);
+  eq(where(r), '/?auth=replay', 'and that session is used up even after a wrong state');
+  x = await round('recover', null, U1, p => { codes[p.code].nonce = 'n'.repeat(43); return 'code=' + p.code + '&state=' + p.state; });
+  eq(where(x.cb), '/?auth=token', 'wrong nonce (the token endpoint refuses)');
+  claimsExtra = { nonce: 'not-the-nonce-at-all-xxxxxxxx' };
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=token', 'wrong nonce inside the token');
+  claimsExtra = {};
+  const used = await round('recover', null, U1);
+  const s2 = await startIt('recover');
+  r = await back('code=' + used.p.code + '&state=' + new URL(s2.json.url).searchParams.get('state'), cookieFrom(s2));
+  eq(where(r), '/?auth=token', 'a code that was already exchanged is refused');
+  x = await round('recover', null, U1, p => 'code=short&state=' + p.state);
+  eq(where(x.cb), '/?auth=code', 'a malformed code');
+  x = await round('recover', null, U1, p => 'error=access_denied&state=' + p.state);
+  eq(where(x.cb), '/?auth=denied', 'the player said no at the portal');
+  x = await round('recover', null, U1, p => 'code=' + p.code + '&state=' + p.state + '&iss=' + encodeURIComponent('https://evil.example'));
+  eq(where(x.cb), '/?auth=state', 'a different issuer in the answer');
+  // expired
+  const s3 = await startIt('recover'), p3 = portal(s3.json.url, U1);
+  now += 11 * 60000;
+  eq(where(await back('code=' + p3.code + '&state=' + p3.state, cookieFrom(s3))), '/?auth=expired', 'after ten minutes: expired');
+  // another browser (換機): no cookie, or someone else's
+  const s4 = await startIt('recover'), p4 = portal(s4.json.url, U1);
+  eq(where(await back('code=' + p4.code + '&state=' + p4.state)), '/?auth=session', 'the callback in another browser (no cookie): refused');
+  const other = await startIt('recover');
+  eq(where(await back('code=' + p4.code + '&state=' + p4.state, cookieFrom(other))), '/?auth=state', 'with another browser\'s session: the state does not match');
+  eq(where(await back('code=' + p4.code + '&state=' + p4.state, 'y'.repeat(43))), '/?auth=session', 'with a made-up session id: refused');
+
+  // ---------- revocation and outages: all fail closed ----------
+  const keyCount = async () => (await pg.query('SELECT count(*)::int AS n FROM zz.keys WHERE pid = $1', [P1.id]))[0].n;
+  const keysAtStart = await keyCount();
+  for (const [mode, want] of [['revoked', 'revoked'], ['403', 'revoked'], ['503', 'unavailable'], ['timeout', 'unavailable'], ['weird', 'revoked']]) {
+    statusMode = mode;
+    x = await round('recover', null, U1);
+    eq(where(x.cb), '/?auth=' + want, 'token status ' + mode);
+  }
+  statusMode = 'ok';
+  tokenMode = '503'; x = await round('recover', null, U1); eq(where(x.cb), '/?auth=unavailable', 'token endpoint 503 (not live yet)');
+  tokenMode = 'down'; x = await round('recover', null, U1); eq(where(x.cb), '/?auth=unavailable', 'token endpoint timeout');
+  tokenMode = 'ok';
+  jwksDown = true; idn.clearCache();
+  x = await round('recover', null, U1); eq(where(x.cb), '/?auth=unavailable', 'JWKS cannot be fetched');
+  jwksDown = false; idn.clearCache();
+  eq(await keyCount(), keysAtStart, 'none of the refusals gave out a device key');
+
+  // ---------- another device gets the linked save back ----------
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=recovered', 'recovered on another device');
+  r = await resultOf(x.cookie);
+  ok(r.json.outcome === 'recovered' && r.json.id === P1.id && r.json.key && r.json.st && typeof r.json.ver === 'number', 'with the same save and a key of its own', r.json);
+  eq((await rpc({ a: 'sync', ops: [] }, { id: r.json.id, key: r.json.key })).status, 200, 'that key works');
+  x = await round('recover', null, U2);
+  eq(where(x.cb), '/?auth=none', 'a platform player with no save here: none');
+
+  // ---------- 409: never merged ----------
+  const coins2 = await coinsOf(P2.id);
+  x = await round('link', P2, U1);
+  eq(where(x.cb), '/?auth=conflict', 'a second save cannot take an account that is linked');
+  r = await resultOf(x.cookie);
+  ok(r.json.outcome === 'conflict' && r.json.why === 'taken' && r.json.other && !r.json.key, 'the result says why, without a key', r.json);
+  ok(await coinsOf(P2.id) === coins2 && await coinsOf(P1.id) === coins1, 'both saves as they were');
+  eq((await rpc({ a: 'sync', ops: [] }, P2)).status, 200, 'and the second save\'s device key still works');
+  x = await round('link', P1b, U2);
+  eq(where(x.cb), '/?auth=conflict', 'a linked save cannot be linked to a second account');
+  eq((await pg.query('SELECT platform_id FROM zz.identity WHERE pid = $1', [P1.id]))[0].platform_id, U1, 'it stays with the first');
+
+  // ---------- a save waiting to be deleted ----------
+  const P3 = await newPlayer();
+  x = await round('link', P3, U2); eq(where(x.cb), '/?auth=linked', 'a third save linked to the second account');
+  const P3b = { id: P3.id, key: (await resultOf(x.cookie)).json.key };
+  eq((await rpc({ a: 'delete' }, P3b)).status, 200, 'its player deletes it');
+  x = await round('recover', null, U2); eq(where(x.cb), '/?auth=pending', 'recover finds it waiting to be deleted');
+  x = await round('restore', null, U2); eq(where(x.cb), '/?auth=recovered', 'restore takes the deletion back (the 30 days still hold)');
+  ok((await pg.query('SELECT gone FROM zz.players WHERE id = $1', [P3.id]))[0].gone === null, 'and the save is back');
+
+  // ---------- limits ----------
+  let last = 0;
+  for (let i = 0; i < 12; i++) last = (await startIt('recover', null, { ip: 99 })).status;
+  eq(last, 429, 'starting too often from one place: 429');
+
+  console.log('bff tests: ' + pass + ' passed, ' + fail + ' failed');
+  for (const k of Object.keys(ENV)) delete process.env[k];
+  process.exit(fail ? 1 : 0);
+})().catch(e => { console.log('CRASH', e); process.exit(1); });

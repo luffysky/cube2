@@ -219,6 +219,32 @@ const SCHEMA = [
      ver text NOT NULL,
      at double precision NOT NULL
    )`,
+  // "connect to SnowRealm Games" sessions (server/bff.js): id is the hash of the cookie's session id; box and res are
+  // encrypted with a key derived from that id (so this table alone cannot read them) and cleared once used
+  `CREATE TABLE IF NOT EXISTS zz.authsess (
+     id text PRIMARY KEY,
+     intent text NOT NULL,
+     pid uuid,
+     cred text,
+     box text,
+     made double precision NOT NULL,
+     exp double precision NOT NULL,
+     used double precision,
+     outcome text,
+     res text,
+     res_exp double precision NOT NULL DEFAULT 0
+   )`,
+  // every call to the read-only admin API whose token checked out (server/admin.js): who, which token id, what, how
+  // it went. Never the token, the query string or a network address. Kept for audit; clearing old lines waits for the Owner.
+  `CREATE TABLE IF NOT EXISTS zz.admin_log (
+     id bigserial PRIMARY KEY,
+     at double precision NOT NULL,
+     sub text,
+     jti text,
+     path text NOT NULL,
+     status smallint NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS admin_log_at ON zz.admin_log (at)',
   `CREATE TABLE IF NOT EXISTS zz.adtx (
      tx text PRIMARY KEY,
      pid uuid REFERENCES zz.players(id) ON DELETE CASCADE,

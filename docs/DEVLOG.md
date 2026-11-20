@@ -734,3 +734,29 @@
 - 資料庫：`zz.files` 加欄位 `hidden_at`（`ADD COLUMN IF NOT EXISTS`）。｜刪除：排程會刪隱藏滿 30 天的 R2 物件和對應的 `zz.files` 紀錄（Owner 核准 C-034）；這次部署本身沒有刪任何東西。
 - 測試：`node test/run.js` 全過（api 380：「最近移除」列出、剩 30 天、別人不能復原、復原回清單、新圖取代舊圖、按名稱移除、未滿 30 天不刪、R2 沒刪成功就不刪紀錄、隔天補刪、`CRON_SECRET`）；瀏覽器 `r2` 13（刪歌時的提示、最近移除、復原後回到這台裝置）、`music` 10、`cloudui` 41、`legal` 439。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`5324f3a`](https://github.com/luffysky/cube2/commit/5324f3a)，Vercel `dpl_FsWNmAHutku7jvSbt186NWAMpYuz` READY；`/api/cron` 手動跑一次回 `{"ok":true,"due":0,"gone":0,"kept":0}`。
+
+## 2026-11-21 08:10（Asia/Taipei）｜唯讀營運 API 七支＋「連結 SnowRealm Games」BFF（兩者都先關著）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的 GPT 交辦「cube2《轉磚》唯讀營運 API ＋ OAuth BFF Callback」（C-035）；對照 cube1 main `12e85da` 的 `SNOWREALM_GAMES_ADMIN_API_BRICKDUEL_HANDOFF.md` v0.2、`IDENTITY_P0_PRODUCTION_VERIFICATION_zh-TW.md`、`dist/sso-flow.mjs`（只讀，沒有改 cube1）。
+- **A. 唯讀營運 API**：`/internal/admin/v1/` 下的 `overview`、`players`、`players/{id}`、`draws`、`matches`、`metrics`、`metrics/daily`。
+  - 只認 SnowRealm 機器簽發端用「管理專用 JWKS」簽的 Ed25519 短效 token，`iss`、`aud`、`scope`、`sub` 白名單、`kid/iat/nbf/exp/jti` 全部嚴格檢查；玩家 token、來源網址、IP 都不算數。
+  - 沒設白名單 503、token 不對 401、權限不夠 403、沒這條路 404、不是 GET 405、參數錯 400、每分鐘超過 60 次 429、JWKS 抓不到 503（不會假裝成 0）。
+  - 只回營運需要的欄位，沒有裝置金鑰、引繼碼、原始存檔、IP；量不到的數字回 `null`。等待刪除的存檔不出現。
+  - 每次驗過的呼叫寫進新表 `zz.admin_log`（不含 token）。
+- **B. OAuth BFF**：`/api/auth/start`、`/api/auth/callback`、`/api/auth/result`。
+  - PKCE S256、state、nonce 都在伺服器產生，加密存在新表 `zz.authsess`；瀏覽器只拿到一個 `__Host-` cookie（Secure、HttpOnly、Lax、10 分鐘）。
+  - callback 一進來就把工作階段用掉；驗 state、換 token（client secret 只在伺服器）、驗簽、再查即時撤銷，只有 `active: true` 才往下走；出任何差錯都拒絕。
+  - 綁定和找回用原本的 `idLink`／`idRecover`：一對一、jti 一次、409 不合併；匿名模式和 30 天恢復規則不變。
+  - 頁面：只有伺服器說「開了」才出現「連結」「找回」按鈕。回來的網址只帶一個結果字，頁面馬上清掉。
+  - 隱私權政策四語先寫明連結時會用的那一個必要 cookie（功能尚未開放）。
+- **沒做到、不能說通過的**：
+  - 正式 E2E：cube1 的 `/oauth/authorize`、`/oauth/token` 還是 503，`identity.snowrealm.pet` 沒有正式部署。
+  - 正式站管理 API 成功讀取：機器簽發端與 `admin-jwks.json` 沒上線，也還沒設 `BRICKDUEL_ADMIN_SUBJECTS`。
+  - `IDENTITY_LINK_ENABLED` 維持關閉。
+- 待 Owner：稽核紀錄 180 天後要不要清、過期登入暫存怎麼清（都是刪除，沒有自己加）；開綁定前要改同意畫面的「不用 cookie」。
+- 檔案：`server/admin.js`（新）、`server/bff.js`（新）、`server/app.js`、`server/db.js`、`api/admin.js`（新）、`api/auth/{start,callback,result}.js`（新）、`vercel.json`、`tools/dev-server.js`、`src/cloud.js`、`src/sw.template.js`、`legal/src/privacy.*.html`、`test/admin.test.js`（新）、`test/bff.test.js`（新）、`test/authui.js`（新）、`test/fixtures/cube1-brickduel-admin-jwt.json`（新，cube1 公開的測試 fixture）、`test/run.js`、`test/browser-run.js`、`test/api.test.js`、`docs/BRICKDUEL_ADMIN_API_ADAPTER_SPEC.md`、`docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md`、`docs/ARCHITECTURE.md`、`docs/OWNER_DECISIONS.md`、`docs/TODO.md`。
+- 資料庫：新表 `zz.admin_log`、`zz.authsess`（`CREATE TABLE IF NOT EXISTS`）。｜刪除：無。
+- 測試：`node test/run.js` 全過（新增 admin 98、bff 66；api 380）；瀏覽器 `authui` 9、`cloudui` 41、`pwa` 52、`flow` 60、`consent` 31、`r2` 13、`legal` 439。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

@@ -45,9 +45,16 @@
 - [x] 開 Cloudflare R2（照 `docs/R2_SETUP.md` 四步）
 - [x] 決定雲端檔案要不要真的刪 → 藏 30 天可復原，沒後悔才刪（C-034，已做）
 - [ ] 正式站實際上傳一次，確認 bucket CORS 與金鑰（雲端瀏覽器選不了檔案，請 Owner 自己試）
+- [ ] 決定：稽核紀錄 `zz.admin_log` 保存 180 天後清除？過期的登入暫存 `zz.authsess` 怎麼清？（都是刪除，要 Owner 核准）
+- [ ] 開綁定前：把同意畫面「不用 cookie」改寫成含連結時的必要 cookie
 - [ ] （可選）Vercel 加 `CRON_SECRET` 環境變數，讓每日清理只接受 Vercel 自己的呼叫
 
 ## 等 GPT
+
+- [x] 唯讀後台 API 七支（C-035，未設定前 503）
+- [x] OAuth BFF callback（C-035，開關關著）
+- [ ] 機器簽發端與 `admin-jwks.json` 上線 → Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS`
+- [ ] Identity `/oauth/authorize`、`/oauth/token` 上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開 `IDENTITY_LINK_ENABLED`
 
 - [ ] SnowRealm Identity 上線並通過兩帳號驗收 → 才打開「註冊／登入」綁定
 - [ ] Suno 音樂庫 → Claude 挑歌換背景音樂
