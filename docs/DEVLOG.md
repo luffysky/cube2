@@ -328,3 +328,12 @@
 - 測試：`autoi18n` 24（缺欄判斷、中文改過重翻、人工優先、空格與標籤保留、只補缺的欄、寫進資料庫、後台人工改的不覆蓋、同版本不重寫）；`api` 320（18 張表）；`i18n` 2043；`node test/run.js` 全過；瀏覽器 `drawer` 28、`sites` 25。
 - 限制：本機環境連不到 Argos 模型下載站，真正的翻譯在 GitHub Actions 第一次執行時才會跑；翻譯品質是機器翻譯等級（日、韓經英文轉譯），已標記機翻。
 - 部署：隨本次 commit 部署正式環境（SHA 與 Actions 結果見下一條紀錄）。
+- 補記：上一條的 commit 為 [`85ec6a7`](https://github.com/luffysky/cube2/commit/85ec6a7)；workflow 修正 [`702910f`](https://github.com/luffysky/cube2/commit/702910f)（第一次執行翻譯成功、回寫失敗：待翻清單沒一起加入）；手動觸發後 Actions run `44742010359` 成功，機器人自動提交 [`8766d88`](https://github.com/luffysky/cube2/commit/8766d88)（翻了 `s.mt` 一條）。
+
+## 2026-11-20 21:20（Asia/Taipei）｜`s.mt` 改人工翻譯
+
+- 專案：cube2｜執行者：Claude
+- 原因：自動翻譯的流程已在 GitHub Actions 端到端驗證成功，但 Argos 把「人工翻譯」翻成「adult translation」，品質不能上線。這條改成人寫的四語，`i18n/auto.json` 對應的機器翻譯自動作廢（人寫優先）。
+- 結論：Argos 只適合當備援；新增文字時 Claude 會照舊直接寫好四種語言，只有漏掉的才交給自動翻譯。
+- 檔案：`src/i18n.js`、`i18n/auto.json`、`i18n/todo.json`、`index.html`、`server/i18n-data.json`。｜資料庫：未異動（部署後由 `server/words.js` 同步）。｜刪除：無。
+- 測試：`node test/run.js` 全過。
