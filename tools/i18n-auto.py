@@ -76,7 +76,8 @@ def gemini():
     state = {'i': 0}
     guide = ('You translate the user-interface words of 轉磚, a casual web block-puzzle game (Taiwan, Traditional Chinese), '
              'into natural, short game UI language: English (en), Japanese (ja), Korean (ko). Keep {0} {1} blanks and '
-             '<tags> exactly as they are. Keep 轉磚 and SnowRealm untranslated. Answer only JSON: '
+             '<tags> exactly as they are. The game is called "Zhuan Zhuan" in English, Japanese and Korean (轉磚對戰: "Zhuan Zhuan Battle"); '
+             'SnowRealm stays as it is. Answer only JSON: '
              '{"<key>": {"en": "...", "ja": "...", "ko": "..."}} for every key given.')
     def batch(items):
         body = {'systemInstruction': {'parts': [{'text': guide}]},

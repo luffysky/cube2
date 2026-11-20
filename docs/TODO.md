@@ -1,6 +1,6 @@
 # 轉磚 待辦清單
 
-每做完一項就打勾，並寫上 commit。最後更新：2026-11-21 08:20（Asia/Taipei）
+每做完一項就打勾，並寫上 commit。最後更新：2026-11-21 08:50（Asia/Taipei）
 
 ## Claude 這一輪在做
 
@@ -36,7 +36,7 @@
 
 ## 要 Owner 處理
 
-- [ ] GitHub 加 `GEMINI_API_KEY` secret（自動翻譯才會跑）
+- [x] GitHub 加 `GEMINI_API_KEY` secret（已確認可用：gemini-3.6-flash）
 - [ ] 律師看地區法律文件草稿的【待確認】項目
 - [ ] 工作室登記後提供統一編號，補進條款
 - [ ] 刪掉 GitHub 的 `cloud` 分支

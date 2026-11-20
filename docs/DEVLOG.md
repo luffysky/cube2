@@ -699,3 +699,13 @@
 - 資料庫：新表 `zz.files`（`CREATE TABLE IF NOT EXISTS`）。｜刪除：無。
 - 測試：`node test/run.js` 全過（api 363：沒金鑰時關著、簽名和 boto3 相同、非會員不能傳、超過 15 MB／非音樂檔／SVG 都擋、別人碰不到、拿掉後紀錄還在）；瀏覽器 `r2` 9（真的上傳到模擬的 bucket、清空本機後從雲端取回、圖片也上傳、沒金鑰時選項關著）、`music` 10、`pwa` 52、`legal` 439、`flow` 60。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。正式站目前沒有 R2 金鑰，所以上傳選項仍是關著的。
+- 補記：上一條的 commit 為 [`d8413b8`](https://github.com/luffysky/cube2/commit/d8413b8)，Vercel `dpl_F12iMLqrhSWKP5X5hsbiWTjKVcsC` READY。
+
+## 2026-11-21 03:50（Asia/Taipei）｜Gemini 金鑰接上，自動翻譯確認可用
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「GEMINI_API_KEY加好了」
+- 過程：手動觸發自動翻譯：目前 1485 條全部已有人工翻譯，沒有待翻的，所以第一次沒有呼叫 Gemini。加一個「只檢查金鑰」的選項（手動執行時勾 `check`，翻一句測試、不提交任何東西）。檢查發現：金鑰有效（拿得到模型清單），但最新的 `gemini-3.8-flash`、`gemini-3.7-flash` 一直逾時（第一次用的是 503），改成「忙碌、逾時或不可用就換下一個模型」，並在紀錄裡列出嘗試順序；結果由 `gemini-3.6-flash` 成功翻出。
+- 另外：翻譯指示原本要求保留「轉磚」不翻，但英日韓介面上遊戲名稱是「Zhuan Zhuan」，改成照介面的名稱翻。
+- 檔案：`tools/i18n-auto.py`、`.github/workflows/i18n.yml`。｜資料庫：未異動。｜刪除：無。
+- 測試：`test/autoi18n.test.js` 24 全過；GitHub Actions 手動檢查成功（run 44803575885）。
