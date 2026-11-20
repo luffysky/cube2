@@ -386,10 +386,43 @@
       x.fillRect(s * 0.3, s * 0.58, s * 0.42, s * 0.12);
     } else if (kind === 'leaf') {
       x.beginPath(); x.moveTo(s * 0.25, s * 0.75); x.quadraticCurveTo(s * 0.25, s * 0.25, s * 0.75, s * 0.25); x.quadraticCurveTo(s * 0.75, s * 0.75, s * 0.25, s * 0.75); x.fill();
+    } else if (kind === 'lantern') {
+      x.fillRect(c - s * 0.06, s * 0.16, s * 0.12, s * 0.08);
+      x.beginPath(); x.ellipse(c, c + s * 0.02, s * 0.22, s * 0.26, 0, 0, 6.283); x.fill();
+      x.fillRect(c - s * 0.1, s * 0.76, s * 0.2, s * 0.06);
+    } else if (kind === 'moon') {
+      x.beginPath(); x.arc(c, c, s * 0.26, 0, 6.283); x.fill();
+      x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(c + s * 0.12, c - s * 0.08, s * 0.22, 0, 6.283); x.fill(); x.globalCompositeOperation = 'source-over';
+    } else if (kind === 'pumpkin') {
+      x.beginPath(); x.ellipse(c - s * 0.1, c + s * 0.05, s * 0.16, s * 0.2, 0, 0, 6.283); x.ellipse(c + s * 0.1, c + s * 0.05, s * 0.16, s * 0.2, 0, 0, 6.283); x.fill();
+      x.fillRect(c - s * 0.03, s * 0.22, s * 0.06, s * 0.12);
+    } else if (kind === 'tree') {
+      x.beginPath(); x.moveTo(c, s * 0.16); x.lineTo(c + s * 0.24, s * 0.66); x.lineTo(c - s * 0.24, s * 0.66); x.closePath(); x.fill();
+      x.fillRect(c - s * 0.05, s * 0.66, s * 0.1, s * 0.14);
+    } else if (kind === 'gift') {
+      x.fillRect(s * 0.26, s * 0.4, s * 0.48, s * 0.38); x.fillRect(s * 0.22, s * 0.3, s * 0.56, s * 0.12);
+      x.globalCompositeOperation = 'destination-out'; x.fillRect(c - s * 0.03, s * 0.3, s * 0.06, s * 0.48); x.globalCompositeOperation = 'source-over';
+    } else if (kind === 'drop') {
+      x.beginPath(); x.moveTo(c, s * 0.18); x.bezierCurveTo(c + s * 0.3, s * 0.5, c + s * 0.22, s * 0.8, c, s * 0.8); x.bezierCurveTo(c - s * 0.22, s * 0.8, c - s * 0.3, s * 0.5, c, s * 0.18); x.fill();
+    } else if (kind === 'flame') {
+      x.beginPath(); x.moveTo(c, s * 0.16); x.quadraticCurveTo(c + s * 0.28, s * 0.5, c + s * 0.12, s * 0.74); x.quadraticCurveTo(c, s * 0.82, c - s * 0.12, s * 0.74); x.quadraticCurveTo(c - s * 0.28, s * 0.5, c, s * 0.16); x.fill();
+    } else if (kind === 'clover') {
+      [[0, -0.13], [-0.13, 0.02], [0.13, 0.02]].forEach(function (p) { x.beginPath(); x.arc(c + p[0] * s, c + p[1] * s, s * 0.12, 0, 6.283); x.fill(); });
+      x.fillRect(c - s * 0.02, c + s * 0.05, s * 0.04, s * 0.24);
+    } else if (kind === 'egg') {
+      x.beginPath(); x.ellipse(c, c + s * 0.03, s * 0.2, s * 0.27, 0, 0, 6.283); x.fill();
+    } else if (kind === 'firework') {
+      x.lineWidth = Math.max(0.8, s * 0.05);
+      for (var fw = 0; fw < 8; fw++) { var af = fw * 0.785; x.beginPath(); x.moveTo(c + Math.cos(af) * s * 0.08, c + Math.sin(af) * s * 0.08); x.lineTo(c + Math.cos(af) * s * 0.3, c + Math.sin(af) * s * 0.3); x.stroke(); }
+    } else if (kind === 'flake') {
+      x.lineWidth = Math.max(0.8, s * 0.06);
+      for (var fk = 0; fk < 3; fk++) { var ak = fk * 1.0472; x.beginPath(); x.moveTo(c - Math.cos(ak) * s * 0.28, c - Math.sin(ak) * s * 0.28); x.lineTo(c + Math.cos(ak) * s * 0.28, c + Math.sin(ak) * s * 0.28); x.stroke(); }
     }
   }
   var MARK_INK = { blossom: 'rgba(255,255,255,0.78)', heart: 'rgba(255,255,255,0.7)', ribbon: 'rgba(255,255,255,0.72)', shine: 'rgba(255,255,255,0.85)', crack: 'rgba(255,255,255,0.65)',
-    star: 'rgba(255,255,255,0.7)', dots: 'rgba(255,255,255,0.5)', stripes: 'rgba(255,255,255,0.28)', check: 'rgba(0,0,0,0.14)', cloud: 'rgba(255,255,255,0.8)', leaf: 'rgba(30,80,30,0.35)' };
+    star: 'rgba(255,255,255,0.7)', dots: 'rgba(255,255,255,0.5)', lantern: 'rgba(255,255,255,0.7)', moon: 'rgba(255,255,255,0.8)', pumpkin: 'rgba(60,20,0,0.45)', tree: 'rgba(255,255,255,0.7)', gift: 'rgba(255,255,255,0.75)', drop: 'rgba(255,255,255,0.7)', flame: 'rgba(255,255,255,0.75)', clover: 'rgba(255,255,255,0.7)', egg: 'rgba(255,255,255,0.7)', firework: 'rgba(255,255,255,0.75)', flake: 'rgba(255,255,255,0.8)', stripes: 'rgba(255,255,255,0.28)', check: 'rgba(0,0,0,0.14)', cloud: 'rgba(255,255,255,0.8)', leaf: 'rgba(30,80,30,0.35)' };
+  // the holiday tiles: the holiday's own seven colours and its mark
+  ZZ.Meta.FESTIVE.forEach(function (f) { TILE_MORE[f.id] = { base: 'glaze', pal: f.pal, mark: f.mark }; });
   Object.keys(TILE_MORE).forEach(function (id) {
     var m = TILE_MORE[id];
     TILE_DRAW[id] = function (x, px, col, n) {
@@ -439,6 +472,8 @@
     lavender: { g: [[0, '#E3D5F5'], [1, '#B79BDB']], p: 'dots', c: 'rgba(255,255,255,0.35)' },
     mint: { g: [[0, '#D3F5E8'], [1, '#8FDCC0']], p: 'stripes', c: 'rgba(255,255,255,0.25)' }
   };
+  // the holiday walls: a gradient with the holiday's mark stamped across it
+  ZZ.Meta.FESTIVE.forEach(function (f) { WALL_MORE[f.id] = { g: [[0, f.wall[0][0]], [1, f.wall[0][1]]], p: 'stamp', mark: f.wall[1], c: f.wall[2] }; });
   function paintMore(x, spec, o, full, rnd) {
     var W = o.W, bx = o.bx, by = o.by, cell = o.cell, i, j, g = x.createLinearGradient(0, 0, 0, full);
     spec.g.forEach(function (s) { g.addColorStop(s[0], s[1]); });
@@ -463,6 +498,15 @@
     else if (p === 'circuit') { x.lineWidth = Math.max(1, cell * 0.05); for (i = 0; i < n; i++) { var cx = bx + Math.floor(rnd.next() * COLS) * cell, cy = Math.floor(rnd.next() * full / cell) * cell; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + cell * 2, cy); x.lineTo(cx + cell * 2, cy + cell); x.stroke(); x.beginPath(); x.arc(cx + cell * 2, cy + cell, cell * 0.1, 0, 6.283); x.fill(); } }
     else if (p === 'grid') { for (i = 0; i <= COLS; i++) x.fillRect(bx + i * cell, 0, 1, full); for (j = 0; j * cell < full; j++) x.fillRect(bx, by % cell + j * cell, W, 1); }
     else if (p === 'stars') for (i = 0; i < n * 3; i++) { var sz = rnd.next() < 0.1 ? 2 : 1; x.globalAlpha = 0.3 + rnd.next() * 0.7; x.fillRect(bx + rnd.next() * W, rnd.next() * full, sz, sz); }
+    else if (p === 'stamp') {
+      // the mark in a loose grid, every other row shifted half a step
+      // small and faint: the tiles on top must stay easy to read
+      var step = cell * 2.6, sz = cell * 0.95;
+      x.globalAlpha = 0.55;
+      for (j = 0; j * step < full + step; j++) for (i = -1; i * step < W + step; i++) {
+        x.save(); x.translate(bx + i * step + (j % 2 ? step / 2 : 0) - sz / 2, j * step - sz / 2); markShape(x, sz, spec.mark, spec.c); x.restore();
+      }
+    }
     else if (p === 'rain') { x.lineWidth = 1; for (i = 0; i < n * 2; i++) { var rx = bx + rnd.next() * W, ry = rnd.next() * full; x.beginPath(); x.moveTo(rx, ry); x.lineTo(rx - cell * 0.15, ry + cell * 0.6); x.stroke(); } }
     x.restore();
   }
@@ -672,6 +716,13 @@
     smoke: { g: -160, vx: 90, vy0: -20, vy: -80, tint: ['#B8BEC6', 0.75] }
   };
 
+  // a clear effect by its shop id: its own particles, or (a holiday effect) an existing shape in the holiday's colour
+  var FX_ALIAS = {};
+  ZZ.Meta.FESTIVE.forEach(function (f) { FX_ALIAS[f.id] = { shape: f.fx[0], tint: f.fx[1] ? [f.fx[1], f.fx[2]] : null }; });
+  function partOf(id) {
+    var al = FX_ALIAS[id], shape = al ? al.shape : PART[id] ? id : 'shard', P = PART[shape] || PART.shard;
+    return { shape: shape, P: P, tint: al ? al.tint : P.tint };
+  }
   // Item marks need no words: a short sign or a small drawing, the same in every language.
   var ITEM_MARK = [null,
     { txt: '\u22123' }, { txt: '+3' },
@@ -860,12 +911,12 @@
   BoardView.prototype.addClear = function (rows, colors, now, strong) {
     this.fx.push({ k: 'clear', rows: rows, t: now, d: 260, strong: strong });
     if (env.reduce || this.cell < 9) return;
-    var cell = this.cell, kind = this.lookOf('fx'), P = PART[kind] || PART.shard;
+    var cell = this.cell, pk = partOf(this.lookOf('fx')), kind = pk.shape, P = pk.P;
     for (var i = 0; i < rows.length; i++) {
       for (var x = 0; x < COLS; x++) {
         if (this.parts.length > 170) return;
         var p = this.cellXY(x, rows[i]), col = colors[i][x] >> 4 ? '#ffffff' : (TILE[colors[i][x] & 15] || '#ffffff');
-        if (P.tint) col = mix(col, P.tint[0], P.tint[1]);
+        if (pk.tint) col = mix(col, pk.tint[0], pk.tint[1]);
         for (var k = 0; k < 2; k++) {
           this.parts.push({
             x: p[0] + cell / 2, y: p[1] + cell / 2, vx: (Math.random() - 0.5) * P.vx, vy: P.vy0 + Math.random() * P.vy, g: P.g, k: kind,
@@ -1420,14 +1471,14 @@
       if (v) x.drawImage(tiles[v], ox + i * cell, oy + j * cell, cell, cell);
     }
     if (look.fx) {
-      var rnd = new ZZ.RNG(9), P = PART[look.fx] || PART.shard, cols = [TILE[3], TILE[5], TILE[6], TILE[1], TILE[4]];
+      var rnd = new ZZ.RNG(9), pk = partOf(look.fx), cols = [TILE[3], TILE[5], TILE[6], TILE[1], TILE[4]];
       for (i = 0; i < 12; i++) {
         var c = cols[i % cols.length];
-        if (P.tint) c = mix(c, P.tint[0], P.tint[1]);
+        if (pk.tint) c = mix(c, pk.tint[0], pk.tint[1]);
         x.save();
         x.translate(w * (0.08 + rnd.next() * 0.84), h * (0.08 + rnd.next() * 0.5));
-        x.rotate(look.fx === 'bubble' ? 0 : rnd.next() * 6);
-        drawPart(x, look.fx, cell * (0.3 + rnd.next() * 0.3), c);
+        x.rotate(pk.shape === 'bubble' ? 0 : rnd.next() * 6);
+        drawPart(x, pk.shape, cell * (0.3 + rnd.next() * 0.3), c);
         x.restore();
       }
     }

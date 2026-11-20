@@ -98,6 +98,9 @@
     // profile
     'bx.title': ['寶箱', 'Treasure boxes', '宝箱', '보물상자'],
     'it.filter': ['道具分類', 'Item kinds', 'アイテムの種類', '아이템 종류'],
+    'sh.festF': ['一般或節日', 'Regular or holiday', '通常・季節', '일반·시즌'],
+    'sh.f.all': ['全部', 'All', 'すべて', '전체'], 'sh.f.plain': ['一般', 'Regular', '通常', '일반'], 'sh.f.fest': ['節日', 'Holidays', 'イベント', '시즌'],
+    'sh.fest': ['節日', 'Holiday', 'イベント', '시즌'],
     'it.all': ['全部', 'All', 'すべて', '전체'], 'it.self': ['自己用', 'For you', '自分用', '내게 쓰기'], 'it.foe': ['打對手', 'Against rival', '相手に', '상대에게'],
     'it.combo': ['組合', 'Combos', 'コンボ', '조합'], 'it.owned': ['我有的', 'Mine', '持っている', '보유'],
     'it.count': ['共 {0} 種', '{0} kinds', '{0} 種類', '{0}종'],
@@ -273,6 +276,8 @@
     market: ['#140C24', '#22163A', '#0A0514', '#FFD23E'],
     peach: ['#FCE6DC', '#FEF8F4', '#5A2E26', '#F5B82E'], rose: ['#F9E0E6', '#FDF6F8', '#5B1F33', '#F5B82E'], lilac: ['#EEE6F7', '#FAF8FD', '#3E2A5C', '#F5B82E'], cotton: ['#FDEBF4', '#FEF9FC', '#5A3A6E', '#F5B82E'], ocean: ['#0B2236', '#1A2F42', '#020A12', '#F5B82E'], forest: ['#E4EDDF', '#F7FAF5', '#22361F', '#F5B82E'], snow: ['#EEF3F8', '#FAFBFD', '#1F3048', '#F5B82E'], sunset: ['#2A1630', '#37243C', '#120812', '#F5B82E'], lavender: ['#ECE6F5', '#F9F8FC', '#38285A', '#F5B82E'], mint: ['#E0F4EC', '#F6FCF9', '#18413A', '#F5B82E'], coffee: ['#EFE6DC', '#FAF8F4', '#3A2618', '#F5B82E'], lemon: ['#FBF6DC', '#FEFCF4', '#3F3A12', '#F5B82E'], ruby: ['#26090F', '#33181D', '#0F0306', '#F5B82E'], sky: ['#E3F1FB', '#F7FBFE', '#14385A', '#F5B82E'], sand: ['#F5EBDA', '#FCF9F4', '#4A3820', '#F5B82E'], graphite: ['#1B1E22', '#292C2F', '#08090B', '#F5B82E'], midnight: ['#0D1430', '#1C223C', '#03060F', '#F5B82E'], aurora: ['#0A1F24', '#192C31', '#020A0C', '#F5B82E'], candyland: ['#FFF0F6', '#FFFAFC', '#5C2347', '#F5B82E'], jade: ['#E2F0E8', '#F6FAF8', '#173A2A', '#F5B82E'], gold: ['#1E1708', '#2C2517', '#0B0803', '#F5B82E'], cocoa: ['#2A1C14', '#372A22', '#120B07', '#F5B82E'], berry: ['#F6E3EE', '#FCF7FA', '#4A1838', '#F5B82E']
   };
+  // the holiday themes' card colours (their names come from meta.js)
+  Meta.FESTIVE.forEach(function (f) { SWATCH[f.id] = [f.th[0], f.th[2] ? View.mix(f.th[0], '#FFFFFF', 0.06) : View.mix(f.th[0], '#FFFFFF', 0.7), f.th[1], f.pal[1]]; });
   var TABS = ['set', 'tile', 'bg', 'theme', 'fx', 'items', 'member'], tab = 'set';
   function fail(r) { App.toast(t('e.' + r.why, r.n != null ? r.n : '')); App.sfx.play('fail'); }
 
@@ -364,20 +369,32 @@
     if (st === 'sub') return '<button class="btn sm" type="button" data-tab="member">' + t('sh.member') + '</button>';
     return '<span class="tag">' + t('sh.rank', t('tier' + it.rank)) + '</span>';
   }
+  // regular looks or holiday ones, per tab
+  var lookCat = 'all';
+  function festSeg() {
+    var h = '<div class="seg" role="radiogroup" aria-label="' + esc(t('sh.festF')) + '">';
+    ['all', 'plain', 'fest'].forEach(function (c) { h += '<button type="button" role="radio" aria-checked="' + (lookCat === c) + '" data-lcat="' + c + '">' + t('sh.f.' + c) + '</button>'; });
+    return h + '</div>';
+  }
+  function festOk(it) { return lookCat === 'all' || (lookCat === 'fest') === !!it.fest; }
+  App.clicks.push(function (d) {
+    if (d.lcat == null || ['all', 'plain', 'fest'].indexOf(d.lcat) < 0) return false;
+    lookCat = d.lcat; App.openSheet('shop'); return true;
+  });
   function cardsHtml(kind) {
-    var list = Meta.CATALOG[kind], h = '<div class="cards">', i;
+    var list = Meta.CATALOG[kind].filter(festOk), h = festSeg() + '<div class="cards">', i;
     for (i = 0; i < list.length; i++) {
       var it = list[i], on = Meta.data.equip[kind] === it.id, pv;
       if (kind === 'theme') {
         var sw = SWATCH[it.id] || SWATCH.auto;
         pv = '<div class="pv sw" style="background:' + sw[0] + '"><i style="background:' + sw[2] + '"></i><i style="background:' + sw[1] + '"></i><i style="background:' + sw[3] + '"></i></div>';
       } else pv = '<canvas class="pv" data-pv="' + kind + '|' + it.id + '"></canvas>';
-      h += '<div class="card' + (on ? ' on' : '') + '">' + pv + '<b>' + esc(t('c.' + kind + '.' + it.id)) + '</b>' + stateBtn(kind, it) + '</div>';
+      h += '<div class="card' + (on ? ' on' : '') + '">' + pv + '<b>' + esc(t('c.' + kind + '.' + it.id)) + (it.fest ? ' <small class="festtag">' + t('sh.fest') + '</small>' : '') + '</b>' + stateBtn(kind, it) + '</div>';
     }
     return h + '</div>';
   }
   function setsHtml() {
-    var list = Meta.CATALOG.set, h = '<div class="cards wide">', i;
+    var list = Meta.CATALOG.set.filter(festOk), h = festSeg() + '<div class="cards wide">', i;
     for (i = 0; i < list.length; i++) {
       var st = list[i], p = Meta.setPrice(st.id), usable = Meta.setUsable(st.id), e = Meta.data.equip;
       var on = Meta.KINDS.every(function (k) { return e[k] === st.parts[k]; }), names = Meta.KINDS.map(function (k) { return t('c.' + k + '.' + st.parts[k]); }).join('・'), act;
