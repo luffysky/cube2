@@ -20,6 +20,7 @@
     bag: '<path d="M5 8h14l-1 12.5H6z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
     palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.4-1.3-1.6-1.3-2.9 0-1 .8-1.6 1.8-1.6h2.2a3.9 3.9 0 0 0 4-4c0-3.9-3.8-6.8-8.5-6.8z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 15l2 2 4-4"/>',
+    bag: '<path d="M5 9h14l-1 11.5H6z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/><path d="M9 13h6"/>',
     gift: '<rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8.5h14V12M12 8v12.5M12 8c-1-3-5.5-4-5.5-1.5S10 8 12 8zM12 8c1-3 5.5-4 5.5-1.5S14 8 12 8z"/>',
     slot: '<rect x="3.5" y="5" width="14" height="14" rx="2.5"/><path d="M8 9v6M13 9v6M17.5 9H20V6"/><circle cx="20" cy="5" r="1"/>',
     list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/>',

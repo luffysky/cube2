@@ -965,6 +965,16 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .sg-goal.got { border-color: var(--gold); }
 .sg-goal .bar { grid-column: auto; }
 
+/* 背包：道具一格一格，點了就帶進下一場 */
+.bag-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 6px 0 12px; }
+.bag-it { position: relative; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--edge); background: var(--floor); color: var(--ink); font: inherit; cursor: pointer; }
+.bag-it > :first-child { grid-row: 1 / 3; }
+.bag-it b { font-size: 13px; line-height: 1.3; }
+.bag-it small { font-size: 11px; color: var(--muted); line-height: 1.3; }
+.bag-it .bag-n { position: absolute; right: 8px; top: 6px; font: italic 800 13px var(--num); color: var(--muted); }
+.bag-it.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--floor)); }
+.bag-it:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
    into 轉磚's page (build.js) and is linked by every brick-game page (games/theme.js puts the attribute on).
@@ -1083,6 +1093,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         <button class="link" type="button" data-sheet="shop" data-t="m.shop">商店</button>
         <button class="link" type="button" data-sheet="boxes"><span data-t="bx.title">寶箱</span><i class="dot" id="mBoxDot" hidden></i></button>
         <button class="link" type="button" data-sheet="bonus"><span data-t="bn.title">福利</span></button>
+        <button class="link" type="button" data-sheet="bag"><span data-t="bag.title">背包</span></button>
         <button class="link" type="button" data-sheet="sign"><span data-t="sg.title">簽到表</span><i class="dot" id="mSignDot" hidden></i></button>
         <button class="link" type="button" data-sheet="jobs"><span data-t="m.jobs">每日任務</span><i class="dot" id="mJobsDot" hidden></i></button>
         <button class="link" type="button" data-sheet="board" data-t="m.board" id="mBoard" hidden>排行榜</button>
@@ -1129,6 +1140,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         <section class="dr-grp" data-tone="gold"><h3 data-t="dr.rewards">金幣與獎勵</h3><div class="dr-list">
           <button type="button" data-sheet="shop"><i class="ic" data-ic="bag"></i><span data-t="m.shop">商店</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="shop" data-sitepick><i class="ic" data-ic="palette"></i><span data-t="k.site">網站主題</span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="bag"><i class="ic" data-ic="bag"></i><span data-t="bag.title">背包</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="boxes"><i class="ic" data-ic="gift"></i><span data-t="bx.title">寶箱</span><i class="dot" id="drBoxDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="bonus"><i class="ic" data-ic="slot"></i><span data-t="bn.title">福利</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="sign"><i class="ic" data-ic="cal"></i><span data-t="sg.title">簽到表</span><i class="dot" id="drSignDot" hidden></i><i class="ic go" data-ic="chev"></i></button>
@@ -3707,6 +3719,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     bag: '<path d="M5 8h14l-1 12.5H6z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
     palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.4-1.3-1.6-1.3-2.9 0-1 .8-1.6 1.8-1.6h2.2a3.9 3.9 0 0 0 4-4c0-3.9-3.8-6.8-8.5-6.8z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 15l2 2 4-4"/>',
+    bag: '<path d="M5 9h14l-1 11.5H6z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/><path d="M9 13h6"/>',
     gift: '<rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8.5h14V12M12 8v12.5M12 8c-1-3-5.5-4-5.5-1.5S10 8 12 8zM12 8c1-3 5.5-4 5.5-1.5S14 8 12 8z"/>',
     slot: '<rect x="3.5" y="5" width="14" height="14" rx="2.5"/><path d="M8 9v6M13 9v6M17.5 9H20V6"/><circle cx="20" cy="5" r="1"/>',
     list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/>',
@@ -9861,6 +9874,18 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'mb.set': ['已選好', 'Set', '設定済み', '설정됨'],
     // jobs
     'p.badName': ['這個暱稱不能用，換一個吧。', 'That name cannot be used. Try another.', 'その名前は使えません。別の名前にしてください。', '이 닉네임은 쓸 수 없어요. 다른 걸로 해 주세요.'],
+    'bag.title': ['背包', 'Backpack', 'バッグ', '가방'],
+    'bag.items': ['道具', 'Items', 'アイテム', '아이템'],
+    'bag.looks': ['外觀', 'Looks', '見た目', '꾸미기'],
+    'bag.boxes': ['開箱紀錄', 'Box finds', '開封記録', '상자 기록'],
+    'bag.itemsP': ['點一下道具就帶進下一場對戰（最多 {0} 個，已選 {1} 個）。帶進去的道具開打時才扣掉。', 'Tap an item to take it into your next battle (up to {0}; {1} picked). It is used up when the match starts.', 'タップで次のバトルに持ち込み（最大{0}個、選択中{1}個）。試合開始時に消費されます。', '탭하면 다음 대전에 가져가요(최대 {0}개, {1}개 선택). 경기가 시작될 때 사용돼요.'],
+    'bag.noItems': ['還沒有道具。開寶箱、做每日任務，或到商店買。', 'No items yet. Open boxes, do daily jobs, or buy some in the shop.', 'まだアイテムがありません。宝箱、デイリー、ショップで手に入ります。', '아직 아이템이 없어요. 상자, 일일 임무, 상점에서 얻을 수 있어요.'],
+    'bag.kinds': ['{0} 種，共 {1} 個', '{0} kinds, {1} in all', '{0}種類・計{1}個', '{0}종, 총 {1}개'],
+    'bag.lookN': ['{0}：{1} 款可用', '{0}: {1} to wear', '{0}：{1}種', '{0}: {1}개'],
+    'bag.noBox': ['還沒開過寶箱。', 'No boxes opened yet.', 'まだ宝箱を開けていません。', '아직 상자를 연 적이 없어요.'],
+    'bag.lastBox': ['最近一次開箱', 'Last time', '前回の開封', '최근 개봉'],
+    'bag.toBoxes': ['去開寶箱', 'Open boxes', '宝箱へ', '상자 열기'],
+    'bag.toShop': ['去商店', 'Shop', 'ショップへ', '상점'],
     'sg.title': ['簽到表', 'Sign-in sheet', 'ログインカレンダー', '출석부'],
     'sg.month': ['{0} 年 {1} 月', '{1}/{0}', '{0}年{1}月', '{0}년 {1}월'],
     'sg.wd': ['日,一,二,三,四,五,六', 'S,M,T,W,T,F,S', '日,月,火,水,木,金,土', '일,월,화,수,목,금,토'],
@@ -10367,7 +10392,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   App.clicks.push(function (d) {
     var p, r;
     if (d.tab) { tab = d.tab; App.openSheet('shop'); App.el.sheetCard.scrollTop = 0; return true; }
-    if (d.wear) { p = d.wear.split('|'); if (Meta.equip(p[0], p[1])) { App.applyLook(); App.openSheet('shop'); } return true; }
+    if (d.wear) { p = d.wear.split('|'); if (Meta.equip(p[0], p[1])) { App.applyLook(); App.openSheet(App.sheet() === 'bag' ? 'bag' : 'shop'); } return true; }
     if (d.buy) {
       p = d.buy.split('|'); r = Meta.buy(p[0], p[1]);
       if (!r.ok) { fail(r); return true; }
@@ -10397,6 +10422,64 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (d.pick) { pickKey = d.pick; var f = $('picFile'); if (f) f.click(); return true; }
     if (d.droppic) { dropPic(d.droppic); App.openSheet('shop'); return true; }
     if (d.job != null) { r = Meta.claimJob(+d.job); if (r) { App.sfx.play('itemGet'); App.toast(t('jb.got', r)); } App.openSheet('jobs'); return true; }
+    return false;
+  });
+
+  // ---------- the backpack: everything the player has, in one place ----------
+  var bagTab = 'items', BAG_TABS = ['items', 'looks', 'boxes'];
+  App.dismiss.bag = 1;
+  App.sheets.bag = function () {
+    var d = Meta.data, h = '<div class="shop-top"><h2>' + t('bag.title') + '</h2>' + coin(d.coins) + '</div><div class="tabs" role="tablist">';
+    BAG_TABS.forEach(function (k) { h += '<button type="button" role="tab" aria-selected="' + (bagTab === k) + '" data-bagtab="' + k + '">' + t('bag.' + k) + '</button>'; });
+    h += '</div>';
+    if (bagTab === 'items') {
+      var have = [], total = 0;
+      for (var i = 1; i < ITEMS.length; i++) if ((d.items[i] || 0) > 0) { have.push(i); total += d.items[i]; }
+      if (!have.length) h += '<p>' + t('bag.noItems') + '</p><div class="row"><button class="btn" type="button" data-do="bagShop">' + t('bag.toShop') + '</button></div>';
+      else {
+        h += '<p class="note">' + esc(t('bag.kinds', have.length, total)) + '　' + t('bag.itemsP', Meta.BRING_MAX, d.bring.length) + '</p><div class="bag-items">';
+        have.forEach(function (id) {
+          var on = d.bring.indexOf(id) >= 0, it = ITEMS[id];
+          h += '<button type="button" class="bag-it' + (on ? ' on' : '') + '" data-bagbring="' + id + '" aria-pressed="' + on + '">' + App.itile(id) + '<span class="bag-n">×' + d.items[id] + '</span><b>' + esc(t('i' + id)) + ' <small class="tier t' + it.tier + '">' + '★'.repeat(it.tier) + '</small></b><small>' + esc(t('i' + id + 't')) + '</small></button>';
+        });
+        h += '</div>';
+      }
+    } else if (bagTab === 'looks') {
+      Meta.KINDS.forEach(function (kind) {
+        var list = Meta.CATALOG[kind].filter(function (it) { return Meta.state(kind, it.id) === 'ok' && (it.id !== 'custom' || d.custom[kind]); });
+        if (!list.length) return;
+        h += '<h3>' + esc(t('bag.lookN', t('k.' + kind), list.length)) + '</h3><div class="cards">';
+        list.forEach(function (it) {
+          var on = d.equip[kind] === it.id, pv;
+          if (kind === 'theme') { var sw = SWATCH[it.id] || SWATCH.auto; pv = '<div class="pv sw" style="background:' + sw[0] + '"><i style="background:' + sw[2] + '"></i><i style="background:' + sw[1] + '"></i><i style="background:' + sw[3] + '"></i></div>'; }
+          else pv = '<canvas class="pv" data-pv="' + kind + '|' + it.id + '"></canvas>';
+          h += '<div class="card' + (on ? ' on' : '') + '">' + pv + '<b>' + esc(t('c.' + kind + '.' + it.id)) + '</b>' + (on ? '<span class="tag on">' + t('sh.using') + '</span>' : '<button class="btn sm" type="button" data-wear="' + kind + '|' + it.id + '">' + t('sh.wear') + '</button>') + '</div>';
+        });
+        h += '</div>';
+      });
+      var sites = Meta.SITE.filter(function (s) { return Meta.siteState ? Meta.siteState(s.id) === 'ok' : true; });
+      if (sites.length && Meta.siteState) h += '<p class="note">' + esc(t('bag.lookN', t('k.site'), sites.length)) + '　<button class="linkish" type="button" data-do="bagSites">' + t('k.site') + '</button></p>';
+    } else {
+      var last = d.box.last;
+      if (!last || !last.boxes) h += '<p>' + t('bag.noBox') + '</p>';
+      else {
+        h += '<h3>' + t('bag.lastBox') + '</h3><div class="opened">';
+        last.boxes.forEach(function (b) { h += '<div class="bx g-' + b.grade + '"><b>' + t('bx.' + b.grade) + '</b><span>' + b.got.map(prizeText).join('　') + '</span></div>'; });
+        h += '</div>';
+      }
+      h += '<p>' + t('bx.left', Meta.drawsLeft(), Meta.isSub() ? Meta.DRAWS.sub : Meta.DRAWS.free) + '</p><div class="row"><button class="btn primary" type="button" data-sheet="boxes">' + t('bag.toBoxes') + '</button></div>';
+    }
+    return h + '<div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.opened.bag = function () {
+    var list = App.el.sheetCard.querySelectorAll('canvas[data-pv]');
+    for (var i = 0; i < list.length; i++) { var p = list[i].getAttribute('data-pv').split('|'), look = {}; look[p[0]] = p[1]; View.preview(list[i], look, list[i].clientWidth || 120, 72); }
+  };
+  App.acts.bagShop = function () { tab = 'items'; App.openSheet('shop'); };
+  App.acts.bagSites = function () { tab = 'site'; App.openSheet('shop'); };
+  App.clicks.push(function (d) {
+    if (d.bagtab && BAG_TABS.indexOf(d.bagtab) >= 0) { bagTab = d.bagtab; App.openSheet('bag'); return true; }
+    if (d.bagbring) { if (!Meta.toggleBring(+d.bagbring)) App.toast(t('bag.itemsP', Meta.BRING_MAX, Meta.data.bring.length)); else App.sfx.play('ui'); App.openSheet('bag'); return true; }
     return false;
   });
 

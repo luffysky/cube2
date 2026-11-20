@@ -62,6 +62,18 @@
     'mb.set': ['已選好', 'Set', '設定済み', '설정됨'],
     // jobs
     'p.badName': ['這個暱稱不能用，換一個吧。', 'That name cannot be used. Try another.', 'その名前は使えません。別の名前にしてください。', '이 닉네임은 쓸 수 없어요. 다른 걸로 해 주세요.'],
+    'bag.title': ['背包', 'Backpack', 'バッグ', '가방'],
+    'bag.items': ['道具', 'Items', 'アイテム', '아이템'],
+    'bag.looks': ['外觀', 'Looks', '見た目', '꾸미기'],
+    'bag.boxes': ['開箱紀錄', 'Box finds', '開封記録', '상자 기록'],
+    'bag.itemsP': ['點一下道具就帶進下一場對戰（最多 {0} 個，已選 {1} 個）。帶進去的道具開打時才扣掉。', 'Tap an item to take it into your next battle (up to {0}; {1} picked). It is used up when the match starts.', 'タップで次のバトルに持ち込み（最大{0}個、選択中{1}個）。試合開始時に消費されます。', '탭하면 다음 대전에 가져가요(최대 {0}개, {1}개 선택). 경기가 시작될 때 사용돼요.'],
+    'bag.noItems': ['還沒有道具。開寶箱、做每日任務，或到商店買。', 'No items yet. Open boxes, do daily jobs, or buy some in the shop.', 'まだアイテムがありません。宝箱、デイリー、ショップで手に入ります。', '아직 아이템이 없어요. 상자, 일일 임무, 상점에서 얻을 수 있어요.'],
+    'bag.kinds': ['{0} 種，共 {1} 個', '{0} kinds, {1} in all', '{0}種類・計{1}個', '{0}종, 총 {1}개'],
+    'bag.lookN': ['{0}：{1} 款可用', '{0}: {1} to wear', '{0}：{1}種', '{0}: {1}개'],
+    'bag.noBox': ['還沒開過寶箱。', 'No boxes opened yet.', 'まだ宝箱を開けていません。', '아직 상자를 연 적이 없어요.'],
+    'bag.lastBox': ['最近一次開箱', 'Last time', '前回の開封', '최근 개봉'],
+    'bag.toBoxes': ['去開寶箱', 'Open boxes', '宝箱へ', '상자 열기'],
+    'bag.toShop': ['去商店', 'Shop', 'ショップへ', '상점'],
     'sg.title': ['簽到表', 'Sign-in sheet', 'ログインカレンダー', '출석부'],
     'sg.month': ['{0} 年 {1} 月', '{1}/{0}', '{0}年{1}月', '{0}년 {1}월'],
     'sg.wd': ['日,一,二,三,四,五,六', 'S,M,T,W,T,F,S', '日,月,火,水,木,金,土', '일,월,화,수,목,금,토'],
@@ -568,7 +580,7 @@
   App.clicks.push(function (d) {
     var p, r;
     if (d.tab) { tab = d.tab; App.openSheet('shop'); App.el.sheetCard.scrollTop = 0; return true; }
-    if (d.wear) { p = d.wear.split('|'); if (Meta.equip(p[0], p[1])) { App.applyLook(); App.openSheet('shop'); } return true; }
+    if (d.wear) { p = d.wear.split('|'); if (Meta.equip(p[0], p[1])) { App.applyLook(); App.openSheet(App.sheet() === 'bag' ? 'bag' : 'shop'); } return true; }
     if (d.buy) {
       p = d.buy.split('|'); r = Meta.buy(p[0], p[1]);
       if (!r.ok) { fail(r); return true; }
@@ -598,6 +610,64 @@
     if (d.pick) { pickKey = d.pick; var f = $('picFile'); if (f) f.click(); return true; }
     if (d.droppic) { dropPic(d.droppic); App.openSheet('shop'); return true; }
     if (d.job != null) { r = Meta.claimJob(+d.job); if (r) { App.sfx.play('itemGet'); App.toast(t('jb.got', r)); } App.openSheet('jobs'); return true; }
+    return false;
+  });
+
+  // ---------- the backpack: everything the player has, in one place ----------
+  var bagTab = 'items', BAG_TABS = ['items', 'looks', 'boxes'];
+  App.dismiss.bag = 1;
+  App.sheets.bag = function () {
+    var d = Meta.data, h = '<div class="shop-top"><h2>' + t('bag.title') + '</h2>' + coin(d.coins) + '</div><div class="tabs" role="tablist">';
+    BAG_TABS.forEach(function (k) { h += '<button type="button" role="tab" aria-selected="' + (bagTab === k) + '" data-bagtab="' + k + '">' + t('bag.' + k) + '</button>'; });
+    h += '</div>';
+    if (bagTab === 'items') {
+      var have = [], total = 0;
+      for (var i = 1; i < ITEMS.length; i++) if ((d.items[i] || 0) > 0) { have.push(i); total += d.items[i]; }
+      if (!have.length) h += '<p>' + t('bag.noItems') + '</p><div class="row"><button class="btn" type="button" data-do="bagShop">' + t('bag.toShop') + '</button></div>';
+      else {
+        h += '<p class="note">' + esc(t('bag.kinds', have.length, total)) + '　' + t('bag.itemsP', Meta.BRING_MAX, d.bring.length) + '</p><div class="bag-items">';
+        have.forEach(function (id) {
+          var on = d.bring.indexOf(id) >= 0, it = ITEMS[id];
+          h += '<button type="button" class="bag-it' + (on ? ' on' : '') + '" data-bagbring="' + id + '" aria-pressed="' + on + '">' + App.itile(id) + '<span class="bag-n">×' + d.items[id] + '</span><b>' + esc(t('i' + id)) + ' <small class="tier t' + it.tier + '">' + '★'.repeat(it.tier) + '</small></b><small>' + esc(t('i' + id + 't')) + '</small></button>';
+        });
+        h += '</div>';
+      }
+    } else if (bagTab === 'looks') {
+      Meta.KINDS.forEach(function (kind) {
+        var list = Meta.CATALOG[kind].filter(function (it) { return Meta.state(kind, it.id) === 'ok' && (it.id !== 'custom' || d.custom[kind]); });
+        if (!list.length) return;
+        h += '<h3>' + esc(t('bag.lookN', t('k.' + kind), list.length)) + '</h3><div class="cards">';
+        list.forEach(function (it) {
+          var on = d.equip[kind] === it.id, pv;
+          if (kind === 'theme') { var sw = SWATCH[it.id] || SWATCH.auto; pv = '<div class="pv sw" style="background:' + sw[0] + '"><i style="background:' + sw[2] + '"></i><i style="background:' + sw[1] + '"></i><i style="background:' + sw[3] + '"></i></div>'; }
+          else pv = '<canvas class="pv" data-pv="' + kind + '|' + it.id + '"></canvas>';
+          h += '<div class="card' + (on ? ' on' : '') + '">' + pv + '<b>' + esc(t('c.' + kind + '.' + it.id)) + '</b>' + (on ? '<span class="tag on">' + t('sh.using') + '</span>' : '<button class="btn sm" type="button" data-wear="' + kind + '|' + it.id + '">' + t('sh.wear') + '</button>') + '</div>';
+        });
+        h += '</div>';
+      });
+      var sites = Meta.SITE.filter(function (s) { return Meta.siteState ? Meta.siteState(s.id) === 'ok' : true; });
+      if (sites.length && Meta.siteState) h += '<p class="note">' + esc(t('bag.lookN', t('k.site'), sites.length)) + '　<button class="linkish" type="button" data-do="bagSites">' + t('k.site') + '</button></p>';
+    } else {
+      var last = d.box.last;
+      if (!last || !last.boxes) h += '<p>' + t('bag.noBox') + '</p>';
+      else {
+        h += '<h3>' + t('bag.lastBox') + '</h3><div class="opened">';
+        last.boxes.forEach(function (b) { h += '<div class="bx g-' + b.grade + '"><b>' + t('bx.' + b.grade) + '</b><span>' + b.got.map(prizeText).join('　') + '</span></div>'; });
+        h += '</div>';
+      }
+      h += '<p>' + t('bx.left', Meta.drawsLeft(), Meta.isSub() ? Meta.DRAWS.sub : Meta.DRAWS.free) + '</p><div class="row"><button class="btn primary" type="button" data-sheet="boxes">' + t('bag.toBoxes') + '</button></div>';
+    }
+    return h + '<div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.opened.bag = function () {
+    var list = App.el.sheetCard.querySelectorAll('canvas[data-pv]');
+    for (var i = 0; i < list.length; i++) { var p = list[i].getAttribute('data-pv').split('|'), look = {}; look[p[0]] = p[1]; View.preview(list[i], look, list[i].clientWidth || 120, 72); }
+  };
+  App.acts.bagShop = function () { tab = 'items'; App.openSheet('shop'); };
+  App.acts.bagSites = function () { tab = 'site'; App.openSheet('shop'); };
+  App.clicks.push(function (d) {
+    if (d.bagtab && BAG_TABS.indexOf(d.bagtab) >= 0) { bagTab = d.bagtab; App.openSheet('bag'); return true; }
+    if (d.bagbring) { if (!Meta.toggleBring(+d.bagbring)) App.toast(t('bag.itemsP', Meta.BRING_MAX, Meta.data.bring.length)); else App.sfx.play('ui'); App.openSheet('bag'); return true; }
     return false;
   });
 
