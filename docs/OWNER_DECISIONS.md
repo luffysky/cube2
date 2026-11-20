@@ -27,6 +27,7 @@
 | C-021 | 11-20 | cube1 Issue #4（P0：部署 SnowRealm Identity，驗收後才能啟用《轉磚》正式綁定）與 `SNOWREALM_IDENTITY_LAUNCH_GATE_zh-TW.md` | cube2 維持 `IDENTITY_LINK_ENABLED` 關閉；等 GPT 完成平台 UUID、授權服務、JWKS、撤銷查詢與雙帳號驗收。兩項待決已由 C-022 定案 | 等 GPT |
 | C-022 | 11-20 | 玩家按刪除那刻保留 30 天，30 天後刪除；用 snowrealm 網址；所有網址都綁自己的網域 snowrealm.pet | 刪除雲端資料改為立即停用、保留 30 天後自動刪除（Owner 核准 30 天後的刪除）；正式網址與 Identity 回呼改為 `https://brickduel.snowrealm.pet`（已在 Vercel 綁定並驗證），舊網址保留 | 已上線 |
 | C-023 | 11-20 | cube1 `BRICKDUEL_ACCOUNT_LINK_AND_DELETION_POLICY_zh-TW.md`（30 天刪除狀態機、期內可恢復、綁定期內保留、到期刪除、回呼 brickduel.snowrealm.pet） | 照規格補齊：期內封鎖改動、裝置或 SnowRealm 登入可取消刪除、綁定期內保留、到期清理留不具名紀錄、五語介面 | 已上線（Identity 仍關閉） |
+| C-024 | 11-20 | 加自動翻譯模組：偵測整個專案沒翻的新文字就自動翻、寫回字典並存進資料庫；用免費開源工具；機翻直接上線並標記；法律文件應該依各國客製而不是翻譯 | 用 Argos Translate（開源、在 GitHub Actions 上跑、不送外部服務）；`i18n/auto.json`＋`zz.i18n`（後台改過的不覆蓋）；法律文件不機翻，另案依地區客製 | 已上線（等第一次自動翻譯跑完） |
 | C-016 | 11-19 | 律師審閱、統一編號登記的提醒 | 記在待辦；正式商用前完成 | 待辦 |
 | C-017 | 11-19 | 中國大陸版號等事項之後交給暖寶處理 | 不在 cube2 範圍內處理 | 待辦 |
 

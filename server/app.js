@@ -12,6 +12,7 @@
 
 const crypto = require('crypto');
 const db = require('./db.js');
+const words = require('./words.js');
 const core = require('./core.js');
 const ads = require('./ads.js');
 const rules = require('./rules.js');
@@ -118,6 +119,7 @@ const routes = {
     if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
     if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
     const body = await readBody(req, MAX_SYNC), now = clock(), cred = core.readCred(header(req, 'authorization'));
+    await words.sync(now, log);     // the first save an instance handles after a deployment copies the words into the database (once)
     let out;
     switch (body.a) {
       case 'hello':

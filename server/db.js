@@ -177,6 +177,23 @@ const SCHEMA = [
    )`,
   'CREATE INDEX IF NOT EXISTS ledger_at ON zz.ledger (at)',
   // every rewarded-ad callback the network vouched for, so one ad never pays twice
+  // the game's words in every language, copied from the build (server/i18n-data.json) so the admin side can read
+  // them. src: human (written in the code), machine (tools/i18n-auto.py), hans (made from 繁體 by the character
+  // table), zh (no translation yet: the Chinese is shown), admin (edited in the database: never overwritten here)
+  `CREATE TABLE IF NOT EXISTS zz.i18n (
+     k text NOT NULL,
+     lang text NOT NULL,
+     text text NOT NULL,
+     src text NOT NULL,
+     zh text NOT NULL,
+     at double precision NOT NULL,
+     PRIMARY KEY (k, lang)
+   )`,
+  `CREATE TABLE IF NOT EXISTS zz.i18nmeta (
+     id integer PRIMARY KEY,
+     ver text NOT NULL,
+     at double precision NOT NULL
+   )`,
   `CREATE TABLE IF NOT EXISTS zz.adtx (
      tx text PRIMARY KEY,
      pid uuid REFERENCES zz.players(id) ON DELETE CASCADE,

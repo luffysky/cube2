@@ -28,6 +28,27 @@ for (const f of ['modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'l
   const s = src(f), a = s.indexOf('L.add({'), b = s.indexOf('});', a);
   if (a >= 0) new Function('L', s.slice(a, b + 3))(L);
 }
+// words written only in Chinese get their machine translation (i18n/auto.json, made by tools/i18n-auto.py)
+const DICT = require('./tools/dict.js');
+const auto = DICT.merged(DICT.raw().dict, DICT.readAuto());
+const filled = {};
+for (const k of Object.keys(auto.dict)) if (DICT.missing(DICT.raw().dict[k]).length) filled[k] = auto.dict[k];
+L.add(filled);
+// every word in every language, with where it came from, for the database (server/words.js copies it in)
+{
+  const rawDict = DICT.raw().dict, rows = [], cols = ['zh-Hant', 'en', 'ja', 'ko'];
+  for (const k of Object.keys(auto.dict).sort()) {
+    if (k === 'sep') continue;
+    const e = auto.dict[k], zh = DICT.zhOf(e), mach = auto.machine[k] || [];
+    cols.forEach((lang, i) => {
+      const own = i === 0 ? zh : Array.isArray(e) ? e[i] : null;
+      rows.push({ k, lang, text: own || zh, src: i === 0 ? 'human' : !own ? 'zh' : mach.indexOf(lang) >= 0 ? 'machine' : 'human', zh });
+    });
+    rows.push({ k, lang: 'zh-Hans', text: L.hans(zh), src: 'hans', zh });
+  }
+  const ver = crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex').slice(0, 16);
+  fs.writeFileSync(path.join(root, 'server', 'i18n-data.json'), JSON.stringify({ ver, rows }));
+}
 L.set('zh-Hant');
 const t = k => L.t(k);
 const LANGS = L.LANGS.map(x => x[0]);
@@ -63,6 +84,10 @@ html = html.replace(/\{\{(\w+)\}\}/g, (all, k) => {
 // ---------- the page: scripts and stylesheet go in last, so nothing above can touch their text ----------
 const parts = { MINIREWARDS: '../games/rewards.js', ICONS: '../games/drawer-icons.js', CSS: 'style.css', ENGINE: 'engine.js', HANS: 'hans-map.js', I18N: 'i18n.js', BOT: 'bot.js', DRILLS: 'drills.js', OPENERS: 'openers.js', LEVELS: 'levels.js', WEATHER: 'weather.js', META: 'meta.js',
   SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', PWA: 'pwa.js', SHOP: 'shop.js', CLOUD: 'cloud.js', CONSENT: 'consent.js', BONUS: 'bonus.js', LEVELMODE: 'levelmode.js', WXMODE: 'wxmode.js', MINIS: 'minis.js', DRAWER: 'drawer.js' };
+// the machine-filled words, and which of them a machine wrote (L.machine), go into the page after every dictionary
+const autoPart = 'ZZ.L.add(' + JSON.stringify(filled) + ');ZZ.L.machine=' + JSON.stringify(auto.machine) + ';';
+if (!html.includes('/*__AUTOI18N__*/')) throw new Error('missing marker /*__AUTOI18N__*/');
+html = html.split('/*__AUTOI18N__*/').join(autoPart.replace(/</g, '\\u003c'));
 for (const [k, f] of Object.entries(parts)) {
   const body = src(f) + (k === 'CSS' ? '\n' + src('site-themes.css') + '\n' + src('drawer-items.css') : '');      // the site themes go in after the page's own colours
   if (body.includes('</script')) throw new Error(f + ' contains a closing script tag');

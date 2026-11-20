@@ -315,3 +315,16 @@
 - 測試（測試資料庫＋注入時鐘，不碰正式資料）：`api` 320（申請後資料仍在、期內封鎖、重複申請以第一次為準、別人的密鑰或沒密鑰不能恢復、第 29 天恢復且之後不會被清、再刪一次從新時間起算、到期前 1 秒還在、到期後 410 且全部表清空、清理紀錄只有時間與份數、沒東西可清不留紀錄）；`identity` 55（等待期間綁定保留、另一份存檔不能搶綁、用 SnowRealm 登入可取消刪除）；`cloud` 92、`tabs` 40、瀏覽器 `cloudui` 41（申請、另一台得知、恢復、放棄後開新存檔）；`node test/run.js` 全過。
 - 未完成：隱私政策目前只有繁中版（原本就是），規格要求五語，待 Owner 決定是否翻譯；清理沒有用定時服務（依賴新帳號建立或刪除申請時順帶執行），流量低時可能晚於 30 天才真的刪除，要準時可加 Vercel Cron（需 Owner 確認方案費用）；正式雙帳號驗收要等 SnowRealm Identity 上線。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`b258459`](https://github.com/luffysky/cube2/commit/b258459)，Vercel `dpl_6jAGBm5FUzuYf7fmKkRdvV8vccaM` READY，2 小時內無執行錯誤。
+
+## 2026-11-20 21:15（Asia/Taipei）｜自動翻譯模組（Argos Translate＋GitHub Actions＋資料庫）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-024
+- 實際變更：見 `docs/ARCHITECTURE.md`「自動翻譯」。新增 `tools/dict.js`、`tools/i18n-scan.js`、`tools/i18n-auto.py`、`tools/i18n-requirements.txt`、`i18n/auto.json`、`i18n/todo.json`、`.github/workflows/i18n.yml`、`server/words.js`、`server/i18n-data.json`（建置產生）、`test/autoi18n.test.js`；修改 `build.js`、`src/i18n.js`、`src/ui.js`、`server/app.js`、`server/db.js`、`test/i18n.test.js`、`test/api.test.js`、`test/run.js`、`.vercelignore`。
+- 第一條只寫中文的字：設定頁的「有些文字是機器自動翻譯的…」（`s.mt`），用來驗證整條流程。
+- 資料庫：新表 `zz.i18n`、`zz.i18nmeta`（非破壞性，18 張表）。刪除：無。
+- 費用：Argos Translate 免費開源；翻譯在 GitHub Actions 上執行（使用 repo 的 Actions 額度），不呼叫付費 API、不需要新金鑰。
+- 測試：`autoi18n` 24（缺欄判斷、中文改過重翻、人工優先、空格與標籤保留、只補缺的欄、寫進資料庫、後台人工改的不覆蓋、同版本不重寫）；`api` 320（18 張表）；`i18n` 2043；`node test/run.js` 全過；瀏覽器 `drawer` 28、`sites` 25。
+- 限制：本機環境連不到 Argos 模型下載站，真正的翻譯在 GitHub Actions 第一次執行時才會跑；翻譯品質是機器翻譯等級（日、韓經英文轉譯），已標記機翻。
+- 部署：隨本次 commit 部署正式環境（SHA 與 Actions 結果見下一條紀錄）。

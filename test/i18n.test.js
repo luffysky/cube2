@@ -24,13 +24,21 @@ for (const f of ['i18n.js', 'modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bo
 const keys = Object.keys(dict);
 ok(keys.length > 400, 'dictionary size ' + keys.length);
 const ph = s => (s.match(/\{\d\}/g) || []).sort().join('');
+// A word may be written in Chinese only: the machine translation (i18n/auto.json) fills the other columns. What the
+// page ends up with is checked: every column that is there keeps the same blanks as the Chinese.
+const DICT = require('../tools/dict.js'), filled = DICT.merged(dict, DICT.readAuto());
+let waiting = 0;
 for (const k of keys) {
-  const e = dict[k];
-  if (!Array.isArray(e) || e.length !== 4 || e.some(v => typeof v !== 'string')) { ok(false, k + ' needs four strings'); continue; }
-  if (k !== 'sep' && e.some(v => !v)) ok(false, k + ' has an empty string');
-  if (new Set(e.map(ph)).size !== 1) ok(false, k + ' placeholders differ: ' + e.map(ph).join(' | '));
+  const e = filled.dict[k];
+  if (!(typeof dict[k] === 'string' || Array.isArray(dict[k])) || (Array.isArray(dict[k]) && dict[k].length > 4)) { ok(false, k + ' must be a string or up to four strings'); continue; }
+  if (!Array.isArray(e) || (!e[0] && k !== 'sep')) { ok(false, k + ' needs its Chinese'); continue; }
+  if (e.some(v => v === null)) waiting++;
+  const have = e.filter(v => typeof v === 'string' && v);
+  if (k !== 'sep' && Array.isArray(dict[k]) && dict[k].length === 4 && dict[k].some(v => v === '')) ok(false, k + ' has an empty string (leave it out instead)');
+  if (new Set(have.map(ph)).size !== 1) ok(false, k + ' placeholders differ: ' + have.map(ph).join(' | '));
   pass++;
 }
+if (waiting) console.log('note: ' + waiting + ' words still waiting for a machine translation (tools/i18n-scan.js)');
 // keys used in code
 const used = new Set();
 for (const f of ['ui.js', 'modes.js', 'shop.js', 'net.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'minis.js', 'drawer.js']) {

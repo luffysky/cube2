@@ -37,6 +37,7 @@
   }
   var L = {
     LANGS: LANGS, lang: 'zh-Hant',
+    machine: {},      // key → the columns a machine translated (filled in by the page's last script)
     add: function (o) { for (var k in o) D[k] = o[k]; },
     has: function (k) { return D[k] != null; },
     detect: function () {
@@ -362,6 +363,8 @@
     's.ghost': ['顯示落點', 'Show landing shadow', '落下位置を表示', '착지 위치 표시'],
     's.radar': ['對戰和競速也開旋轉雷達', 'Spin radar in matches and sprint too', '対戦とスプリントでもスピンレーダー', '대전과 스프린트에서도 스핀 레이더'],
     's.lang': ['語言', 'Language', '言語', '언어'],
+    // written in Chinese only on purpose: the auto-translate workflow fills the rest (and proves it works)
+    's.mt': '有些文字是機器自動翻譯的，可能不太自然；我們會陸續改成人工翻譯。',
     's.auto': ['跟著系統', 'Follow system', 'システムに合わせる', '시스템 설정'],
     's.touch': ['觸控按鍵', 'Touch keys', 'タッチキー', '터치 키'],
     's.padH': ['按鍵高度', 'Key height', 'キーの高さ', '키 높이'],
