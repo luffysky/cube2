@@ -760,3 +760,4 @@
 - 資料庫：新表 `zz.admin_log`、`zz.authsess`（`CREATE TABLE IF NOT EXISTS`）。｜刪除：無。
 - 測試：`node test/run.js` 全過（新增 admin 98、bff 66；api 380）；瀏覽器 `authui` 9、`cloudui` 41、`pwa` 52、`flow` 60、`consent` 31、`r2` 13、`legal` 439。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`0ff7364`](https://github.com/luffysky/cube2/commit/0ff7364)，Vercel `dpl_2LzfqAfQNy5RqVHFGHc2jnKEhiz6` READY，CI run 44835328522 成功。正式站實測：`/internal/admin/v1/overview` 與 `/internal/admin/v1/metrics/daily` 回 503 `disabled`、`GET /api/auth/start` 回 405、`/api/auth/callback` 回 303 到 `/?auth=off`、`/api/health` 的 `link: false`；部署後 30 分鐘沒有 runtime error。給 cube1 Issue #2、#4 的回覆整理在 `docs/CUBE1_REPLY_20261121.md`。
