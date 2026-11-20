@@ -50,16 +50,17 @@ def gemini():
     def call(path, body=None):
         req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body else None,
                                      headers={'x-goog-api-key': key, 'Content-Type': 'application/json'})
-        for tries in range(5):
+        for tries in range(3):
             try:
                 with urllib.request.urlopen(req, timeout=120) as r:
                     return json.loads(r.read().decode())
             except urllib.error.HTTPError as e:
-                if e.code in (429, 500, 503) and tries < 4:
-                    time.sleep(10 * (tries + 1))
+                if e.code in (429, 500, 503) and tries < 2:
+                    time.sleep(6 * (tries + 1))
                     continue
                 raise
     model = os.environ.get('GEMINI_MODEL', '')
+    order = [model] if model else []
     if not model:
         names = [m['name'].split('/')[-1] for m in call('models?pageSize=200').get('models', [])
                  if 'generateContent' in m.get('supportedGenerationMethods', [])]
@@ -69,7 +70,9 @@ def gemini():
             return (float(m.group(1)) if m else 0, 'lite' not in n, n)
         if not flash:
             sys.exit('no Gemini flash model available to this key')
-        model = sorted(flash, key=ver)[-1]
+        # newest first; one that keeps answering "busy" or "not here" gives way to the next
+        order = sorted(flash, key=ver, reverse=True)
+    state = {'i': 0}
     guide = ('You translate the user-interface words of 轉磚, a casual web block-puzzle game (Taiwan, Traditional Chinese), '
              'into natural, short game UI language: English (en), Japanese (ja), Korean (ko). Keep {0} {1} blanks and '
              '<tags> exactly as they are. Keep 轉磚 and SnowRealm untranslated. Answer only JSON: '
@@ -78,10 +81,20 @@ def gemini():
         body = {'systemInstruction': {'parts': [{'text': guide}]},
                 'contents': [{'role': 'user', 'parts': [{'text': json.dumps({i['k']: i['zh'] for i in items}, ensure_ascii=False)}]}],
                 'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0.2}}
-        out = call('models/%s:generateContent' % model, body)
+        while True:
+            name = order[state['i']]
+            try:
+                out = call('models/%s:generateContent' % name, body)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code in (404, 429, 500, 503) and state['i'] + 1 < len(order):
+                    print('gemini: %s answered %d, trying %s' % (name, e.code, order[state['i'] + 1]))
+                    state['i'] += 1
+                    continue
+                raise
         text = out['candidates'][0]['content']['parts'][0]['text']
         return json.loads(text)
-    return batch, 'gemini:' + model
+    return batch, lambda: 'gemini:' + order[state['i']]
 
 
 def marker():
@@ -118,7 +131,7 @@ def check():
     batch, version = gemini()
     got = batch([{'k': 'check.hello', 'zh': '歡迎來玩轉磚！'}]).get('check.hello') or {}
     ok = all(isinstance(got.get(l), str) and got[l].strip() for l in ('en', 'ja', 'ko'))
-    print('check', version, 'ok' if ok else 'FAILED', json.dumps(got, ensure_ascii=False))
+    print('check', version(), 'ok' if ok else 'FAILED', json.dumps(got, ensure_ascii=False))
     sys.exit(0 if ok else 1)
 
 
@@ -146,7 +159,7 @@ def main():
                     continue
                 for c in item['langs']:
                     row[c] = t[c].strip()
-                row['by'] = version
+                row['by'] = version() if callable(version) else version
                 row['at'] = time.strftime('%Y-%m-%d')
                 auto[k] = row
                 done += 1
@@ -170,7 +183,7 @@ def main():
     with open(AUTO, 'w', encoding='utf-8') as f:
         json.dump(dict(sorted(auto.items())), f, ensure_ascii=False, indent=1)
         f.write('\n')
-    print('i18n: %d machine-translated (%s)' % (done, version))
+    print('i18n: %d machine-translated (%s)' % (done, version() if callable(version) else version))
 
 
 if __name__ == '__main__':
