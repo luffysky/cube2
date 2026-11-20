@@ -26,6 +26,7 @@ function wav() {
     ok(await p.evaluate(() => !document.getElementById('muFile') && !!document.querySelector('#sheetCard [data-tab="member"]') && document.querySelectorAll('[data-muplay]').length === 5), 'a non-member sees the five built-in tracks and the members button, no file picker');
     await p.evaluate(() => { ZZ.Meta.data.sub.until = ZZ.Meta.now() + 864e5; ZZ.App.openSheet('music'); }); await sleep(300);
     ok(await p.evaluate(() => !!document.getElementById('muFile')), 'a member gets the file picker');
+    ok(await p.evaluate(() => { const c = document.querySelector('[data-dswhere="music:cloud"]'); return c && c.disabled && document.querySelector('[data-dswhere="music:local"]').getAttribute('aria-checked') === 'true' && /關掉瀏覽器、重開機都還在/.test(document.getElementById('sheetCard').textContent); }), 'the member sees where the music is kept: this device only for now, and what that means');
     await p.setInputFiles('#muFile', [{ name: '我的歌.wav', mimeType: 'audio/wav', buffer: wav() }, { name: 'notes.wav', mimeType: 'audio/wav', buffer: Buffer.from('this is not a sound') }]);
     ok(await (async () => { for (let i = 0; i < 40; i++) { if (await p.evaluate(() => document.querySelectorAll('[data-mudel]').length === 1)) return true; await sleep(150); } return false; })(), 'only the real sound file is kept');
     ok(await p.evaluate(() => /我的歌/.test(document.getElementById('sheetCard').textContent)), 'it shows under its own name');

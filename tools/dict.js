@@ -4,7 +4,7 @@
 // "only Chinese so far": tools/i18n-auto.py fills the rest into i18n/auto.json.
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
-const FILES = ['i18n.js', 'modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'minis.js', 'drawer.js', 'music.js', 'games-dict.js'];
+const FILES = ['i18n.js', 'modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'minis.js', 'drawer.js', 'devstore.js', 'music.js', 'games-dict.js'];
 const GAMES_FILE = 'games-dict.js';    // the brick games' words: they go to games/words.js, not into 轉磚's page
 const COLS = ['en', 'ja', 'ko'];           // the columns after Chinese, in order
 const AUTO = path.join(ROOT, 'i18n', 'auto.json');

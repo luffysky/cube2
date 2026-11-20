@@ -276,6 +276,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .key[data-k="HD"] { grid-area: HD; } .key[data-k="CW"] { grid-area: CW; } .key[data-k="CCW"] { grid-area: CCW; }
 .key[data-k="HD"] svg, .key[data-k="D"] svg { width: 26px; height: 26px; }
 
+/* 單手：六個鍵集中在拇指那一側（右手放右邊、左手放左邊），另一側留空 */
+#pad.oneR { grid-template-columns: minmax(0, .55fr) 1fr 1fr 1fr; grid-template-areas: ". CCW CW HD" ". L D R"; }
+#pad.oneL { grid-template-columns: 1fr 1fr 1fr minmax(0, .55fr); grid-template-areas: "CCW CW HD ." "L D R ."; }
+#play.land #pad.oneR { grid-template-columns: minmax(0, 1fr) var(--mid, 320px) minmax(0, .34fr) minmax(0, .34fr) minmax(0, .34fr); grid-template-areas: ". . CCW CW HD" ". . L D R"; }
+#play.land #pad.oneL { grid-template-columns: minmax(0, .34fr) minmax(0, .34fr) minmax(0, .34fr) var(--mid, 320px) minmax(0, 1fr); grid-template-areas: "CCW CW HD . ." "L D R . ."; }
+
+/* 橫拿的手機：牆在中間，移動鍵在左、旋轉和落下鍵在右（交換左右時相反），兩組鍵之間空出牆的寬度 */
+#play.land { position: relative; }
+#play.land #pad {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--padH, 200px); min-height: 0 !important; max-height: none; max-width: none; margin: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--mid, 320px) minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 1fr 1fr;
+  padding: 0 max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); gap: 8px; pointer-events: none;
+}
+#play.land #pad .key { pointer-events: auto; }
+#play.land #stage { padding-bottom: 4px; }
+
 /* ---------- 彈出面板 ---------- */
 /* 蓋住整個畫面（不只是中間那一欄），手機的瀏海和底部橫條留給邊距 */
 #sheet {
@@ -2266,6 +2282,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     's.pad0': ['矮', 'Low', '低', '낮게'],
     's.pad1': ['中', 'Mid', '中', '중간'],
     's.pad2': ['高', 'Tall', '高', '높게'],
+    's.hand': ['按鍵配置', 'Key layout', 'キー配置', '키 배치'],
+    's.handtwo': ['雙手', 'Two hands', '両手', '양손'],
+    's.handR': ['單手（右手）', 'One hand (right)', '片手（右）', '한 손 (오른손)'],
+    's.handL': ['單手（左手）', 'One hand (left)', '片手（左）', '한 손 (왼손)'],
+    's.handP': ['所有按鍵集中在同一邊，一根拇指就按得到；暫存、道具鍵也移到那一邊。', 'Every key sits on one side, in reach of one thumb; hold and the item key move there too.', 'すべてのキーを片側に集めて、親指1本で届きます。ホールドとアイテムも同じ側へ。', '모든 키가 한쪽에 모여 엄지 하나로 닿아요. 홀드와 아이템 키도 그쪽으로 옮겨요.'],
     's.swap': ['移動鍵放右手邊', 'Move keys on the right', '移動キーを右側に', '이동 키를 오른쪽에'],
     's.half': ['多一顆「半圈」鍵（轉 180 度）', 'Add a 180° key', '180°キーを追加', '180° 키 추가'],
     's.haptic': ['震動回饋', 'Vibration', '振動', '진동'],
@@ -6654,7 +6675,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   var KEY_MAX = 4;
   var DEF = {
     das: 140, arr: 20, sdf: 80, lock: 500, smooth: !env.reduce, ghost: true, radar: false, hint: true,
-    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, lang: '', ai: 0
+    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', lang: '', ai: 0
   };
   // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
   var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0 };
@@ -7135,13 +7156,16 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   // on a touch screen the item key also shows what is in the bag, so the item box at the top is not needed there.
   function sideKeys() {
     var items = itemsOn(), k = S ? S.kind : '';
-    var spin = set.swap ? el.sideL : el.sideR, move = set.swap ? el.sideR : el.sideL;
+    // one-handed: hold, the half turn and the item key all go to the side of that hand
+    var one = set.hand === 'R' ? el.sideR : set.hand === 'L' ? el.sideL : null;
+    var spin = one || (set.swap ? el.sideL : el.sideR), move = one || (set.swap ? el.sideR : el.sideL);
     if (el.holdKey.parentNode !== spin) { spin.appendChild(el.halfKey); spin.appendChild(el.holdKey); }
     if (el.itemKey.parentNode !== move) move.appendChild(el.itemKey);
     el.itemBox.hidden = !items || env.touch;
     el.itemKey.hidden = !items;
     el.halfKey.hidden = !set.half;
     el.holdKey.hidden = k === 'dojo' || k === 'lesson';   // nothing to hold in a drill or a lesson
+    if (one) { var other = one === el.sideR ? el.sideL : el.sideR; other.hidden = true; one.hidden = !env.touch || (el.holdKey.hidden && el.halfKey.hidden && el.itemKey.hidden); return; }
     spin.hidden = !env.touch || (el.holdKey.hidden && el.halfKey.hidden);
     move.hidden = !env.touch || el.itemKey.hidden;
   }
@@ -7725,7 +7749,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
         (env.touch ? '' : '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>') +
         '<h3>' + t('s.touch') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('s.padH') + '">' +
         [0, 1, 2].map(function (j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + t('s.pad' + j) + '</button>'; }).join('') + '</div>' +
-        toggle('sSwap', t('s.swap')) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
+        '<div class="seg" role="radiogroup" aria-label="' + t('s.hand') + '">' + ['two', 'R', 'L'].map(function (j) { return '<button type="button" role="radio" aria-checked="' + ((set.hand || 'two') === j) + '" data-hand="' + j + '">' + t('s.hand' + j) + '</button>'; }).join('') + '</div>' +
+        (set.hand === 'R' || set.hand === 'L' ? '<p class="note">' + t('s.handP') + '</p>' : toggle('sSwap', t('s.swap'))) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
         (env.touch ? '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>' : '') +
         '<h3>' + t('s.sound') + '</h3><div class="row"><button class="btn sm" type="button" data-do="musicOpen">' + t('mu.title') + '</button></div>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
         (App.settingsExtra ? App.settingsExtra() : '') +
@@ -7780,13 +7805,16 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   function syncSettings() {
     var id;
     for (id in FIELDS) { $(id).value = set[FIELDS[id]]; $(id + 'O').textContent = fieldText(FIELDS[id]); }
-    for (id in TOGGLES) $(id).checked = !!set[TOGGLES[id]];
+    for (id in TOGGLES) if ($(id)) $(id).checked = !!set[TOGGLES[id]];
     $('sLang').value = set.lang;
     $('sAi').value = String(aiStep());
   }
   function aiKey(n) { return n < 0 ? 'M' + (-n) : n > 0 ? 'P' + n : '0'; }
   function applySettings() {
-    el.pad.classList.toggle('swap', set.swap);
+    var one = set.hand === 'R' || set.hand === 'L';
+    el.pad.classList.toggle('swap', !one && set.swap);
+    el.pad.classList.toggle('oneR', set.hand === 'R');
+    el.pad.classList.toggle('oneL', set.hand === 'L');
     sideKeys();
     sfx.vol();
     if (S && S.me) {
@@ -7940,6 +7968,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       else if (d.bring) { Meta.toggleBring(+d.bring); openSheet('battle'); }
       else if (d.drill) begin('dojo', { drill: +d.drill });
       else if (d.pad) { set.pad = +d.pad; saveStore(); openSheet('settings'); applySettings(); }
+      else if (d.hand) { set.hand = ['R', 'L'].indexOf(d.hand) >= 0 ? d.hand : 'two'; saveStore(); openSheet('settings'); applySettings(); layout(); }
       else if (d.bind) startCapture(d.bind);
       else if (d.unbind) {
         var p = d.unbind.split('|');
@@ -8008,14 +8037,17 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   function layout() {
     if (screen !== 'play' || !S) return;
     var W = el.app.clientWidth, H = el.app.clientHeight, hasOpp = !!S.opp;
-    var wide = W >= 820 && W > H * 1.05, flip = wide && hasOpp;
+    // a phone held sideways: the keys go to the left and right of the wall instead of under it
+    var land = env.touch && W > H && H < 600;
+    var wide = !land && W >= 820 && W > H * 1.05, flip = wide && hasOpp;
+    el.play.classList.toggle('land', land);
     if (S.flip !== flip) { S.flip = flip; setupHud(); }
     el.pad.hidden = !env.touch;
     sideKeys();
     el.stage.classList.toggle('wide', flip);
     var hudH = el.hud.offsetHeight || 48, stripH = el.strip.hidden ? 0 : el.strip.offsetHeight + 6;
     // a tablet held upright has room for bigger keys
-    var padMin = env.touch ? (W >= 600 && H >= 900 ? [160, 190, 226] : [128, 152, 184])[set.pad] : 0;
+    var padMin = env.touch && !land ? (W >= 600 && H >= 900 ? [160, 190, 226] : [128, 152, 184])[set.pad] : 0;
     el.pad.style.minHeight = padMin + 'px';
     // on a tall screen the wall does not run edge to edge
     var availH = H - hudH - stripH - padMin - 22 - (H >= 1000 ? 26 : 0), cell, oppCell = 0;
@@ -8030,10 +8062,15 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     } else {
       // phones stop at 34 px tiles, as before; tablets and tall windows go on to 56
       cell = clamp(Math.min(byH, Math.floor((W - 2 * 66 - 36) / 10.3)), 10, W >= 600 ? 56 : 34);
-      side = clamp(Math.floor((W - cell * 10.3 - 40) / 2), 58, Math.max(124, Math.round(cell * 3.3)));
+      side = land ? clamp(Math.round(cell * 4.4), 60, 110) : clamp(Math.floor((W - cell * 10.3 - 40) / 2), 58, Math.max(124, Math.round(cell * 3.3)));
       if (hasOpp) oppCell = Math.max(4, Math.floor((side - 8) / 10));
     }
     el.stage.style.setProperty('--side', side + 'px');
+    // sideways: the gap between the two groups of keys is the wall and its side columns
+    if (land) {
+      el.play.style.setProperty('--mid', Math.round(cell * 10.3 + 2 * side + 40) + 'px');
+      el.play.style.setProperty('--padH', Math.round(Math.min(H * [0.5, 0.58, 0.66][set.pad || 0], 300)) + 'px');
+    }
     V.me.resize(cell);
     // Both side columns are as tall as the wall. What must be there takes its room first (hold, the side keys, tools);
     // the other player's little wall and the queue of coming pieces then share what is left.
@@ -8096,9 +8133,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     } else {
       el.hud.style.marginLeft = el.hud.style.width = el.strip.style.marginLeft = el.strip.style.width = '';
     }
-    var short = env.touch && H < 470 && W > H;
-    el.rotate.hidden = !short;
-    if (short && S.mode !== 'net' && (S.state === 'play' || S.state === 'count')) { S.prev = S.state; S.state = 'pause'; input.clear(); openSheet('pause'); }
+    // a phone held sideways plays sideways (the keys are beside the wall), so there is nothing to turn
+    el.rotate.hidden = true;
   }
   var lookKey = '';
   function drawSide() {
@@ -10171,7 +10207,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';
     h += '<div class="levels">' + picRow('bg', 'mb.wall') + picRow('tile', 'mb.tile') + '</div>' +
       '<div class="field"><label for="cDim">' + t('mb.dim') + '</label><output id="cDimO" for="cDim"></output><input type="range" id="cDim" min="0" max="85" step="5"></div>' +
-      '<p class="note">' + t('mb.picNote') + '</p><input type="file" id="picFile" accept="image/*" hidden>';
+      (ZZ.DevStore ? ZZ.DevStore.html('pics') : '<p class="note">' + t('mb.picNote') + '</p>') + '<input type="file" id="picFile" accept="image/*" hidden>';
     return h;
   }
   App.dismiss.shop = 1; App.dismiss.jobs = 1; App.dismiss.profile = 1;
@@ -10199,7 +10235,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     }
     var dim = $('cDim'), file = $('picFile');
     if (dim) { dim.value = Meta.data.custom.dim; $('cDimO').textContent = Meta.data.custom.dim + '%'; }
-    if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
+    if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey && ZZ.DevStore) ZZ.DevStore.persist();
+      if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
   };
   App.acts.subStart = function () { Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop'); };
   App.acts.subEnd = function () { Meta.cancelSub(); if (ZZ.Replay) ZZ.Replay.trim(5); App.applyLook(); App.openSheet('shop'); };
@@ -12436,6 +12473,65 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 })();
 </script>
 <script>
+/* 轉磚 where a member's own files live: their pictures (shop.js) and music (music.js).
+
+   For now everything stays on this device (IndexedDB). The player picks, per kind, whether to keep it only here or
+   also upload it to their cloud space; the upload choice is shown but switched off until the file storage (R2) is
+   connected, so nothing is ever sent today. Whatever they pick, the sheet says plainly what "only on this device"
+   means: it survives closing the browser, but not clearing the site's data, a private window, another device, or
+   (on iPhone Safari) a week without opening the game. We also ask the browser to keep the data for good. */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t;
+  var KEY = 'zhuanzhuan.upload.v1';
+  var CLOUD_READY = false;      // flips on once the R2 storage and its API are in place
+
+  L.add({
+    'ds.where': ['存在哪裡', 'Where they are kept', '保存場所', '저장 위치'],
+    'ds.local': ['只存這台裝置', 'This device only', 'この端末だけ', '이 기기에만'],
+    'ds.cloud': ['也上傳到雲端', 'Also upload to the cloud', 'クラウドにも保存', '클라우드에도 업로드'],
+    'ds.soon': ['雲端上傳準備中，現在全部只存在這台裝置。', 'Cloud upload is on its way; for now everything stays on this device.', 'クラウド保存は準備中です。今はすべてこの端末にだけ保存されます。', '클라우드 업로드는 준비 중이에요. 지금은 모두 이 기기에만 저장돼요.'],
+    'ds.localP': ['只存在這台裝置：關掉瀏覽器、重開機都還在；但清除網站資料、用無痕視窗、換手機或電腦就不會有。iPhone 的 Safari 超過 7 天沒打開遊戲，也可能被系統清掉。', 'On this device only: they stay after closing the browser or restarting, but not after clearing the site\'s data, in a private window, or on another phone or computer. On iPhone Safari, a week without opening the game can also clear them.', 'この端末だけに保存：ブラウザを閉じても再起動しても残りますが、サイトデータの削除、プライベートウィンドウ、別の端末では使えません。iPhone の Safari では7日間ゲームを開かないと消えることもあります。', '이 기기에만 저장: 브라우저를 닫거나 재부팅해도 남지만, 사이트 데이터를 지우거나 시크릿 창, 다른 기기에서는 없어요. iPhone Safari에서는 7일 동안 게임을 열지 않으면 지워질 수도 있어요.'],
+    'ds.kept': ['瀏覽器已同意長期保存這些檔案。', 'The browser has agreed to keep these for good.', 'ブラウザがこれらを長期保存することに同意しました。', '브라우저가 이 파일들을 오래 보관하기로 했어요.'],
+    'ds.notKept': ['瀏覽器沒有答應長期保存，空間不夠時可能先被清掉。', 'The browser did not promise to keep them; it may clear them when space runs low.', 'ブラウザは長期保存を約束していません。空き容量が少ないと消えることがあります。', '브라우저가 오래 보관하겠다고 하지 않았어요. 공간이 부족하면 지워질 수 있어요.']
+  });
+
+  var st = { pics: 'local', music: 'local' }, kept = null;
+  try { var v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v) { if (v.pics === 'cloud') st.pics = 'cloud'; if (v.music === 'cloud') st.music = 'cloud'; } } catch (e) { /* first visit */ }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage off */ } }
+
+  // ask once to keep the files; the answer is shown in the note
+  function persist() {
+    var s = navigator.storage;
+    if (!s || !s.persist) return;
+    (s.persisted ? s.persisted() : Promise.resolve(false)).then(function (yes) {
+      if (yes) { kept = true; return; }
+      return s.persist().then(function (ok) { kept = !!ok; });
+    }).then(null, function () { kept = false; });
+  }
+  if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(function (yes) { kept = yes; }, function () {});
+
+  // the choice and the note, for a sheet; kind: 'pics' or 'music'
+  function html(kind) {
+    var cur = CLOUD_READY ? st[kind] : 'local', h = '<h3>' + t('ds.where') + '</h3><div class="seg" role="radiogroup" aria-label="' + App.esc(t('ds.where')) + '">';
+    ['local', 'cloud'].forEach(function (w) {
+      h += '<button type="button" role="radio" aria-checked="' + (cur === w) + '" data-dswhere="' + kind + ':' + w + '"' + (w === 'cloud' && !CLOUD_READY ? ' disabled' : '') + '>' + t('ds.' + w) + '</button>';
+    });
+    h += '</div>';
+    if (!CLOUD_READY) h += '<p class="note">' + t('ds.soon') + '</p>';
+    if (cur === 'local') h += '<p class="note ds-local">' + t('ds.localP') + (kept === true ? ' ' + t('ds.kept') : kept === false ? ' ' + t('ds.notKept') : '') + '</p>';
+    return h;
+  }
+  App.clicks.push(function (d) {
+    if (!d.dswhere) return false;
+    var p = String(d.dswhere).split(':');
+    if ((p[0] === 'pics' || p[0] === 'music') && (p[1] === 'local' || (p[1] === 'cloud' && CLOUD_READY))) { st[p[0]] = p[1]; save(); }
+    if (App.sheet()) App.openSheet(App.sheet());
+    return true;
+  });
+
+  ZZ.DevStore = { html: html, persist: persist, choice: function (kind) { return CLOUD_READY ? st[kind] : 'local'; }, cloudReady: function () { return CLOUD_READY; } };
+})();
 /* 轉磚 music player: the player picks the background music.
    - Auto (the default): each screen plays its own track, as before.
    - My playlist: the tracks the player ticked play one after another (in order or shuffled, or one on repeat) on every
@@ -12477,7 +12573,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     'mu.b.battle3': ['對戰 3', 'Battle 3', 'バトル 3', '대전 3'],
     'mu.builtin': ['遊戲內建', 'Built in', 'ゲーム内蔵', '기본 제공'],
     'mu.own': ['我的音樂', 'My music', 'マイミュージック', '내 음악'],
-    'mu.ownP': ['會員可以加入自己的音樂檔（每首最多 15 MB、最多 30 首）。檔案只存在這台裝置，不會上傳到我們的伺服器，也不會跟著雲端存檔走；清除瀏覽器資料就會一起消失。請只加入你有權使用的音樂。', 'Members can add their own music files (up to 15 MB each, 30 tracks). They are kept only on this device: never uploaded to our server and not part of the cloud save, and they go if you clear the browser\'s data. Please add only music you have the right to use.', 'メンバーは自分の音楽ファイルを追加できます（1 曲 15 MB まで、30 曲まで）。ファイルはこの端末にだけ保存され、サーバーにはアップロードされず、クラウドセーブにも含まれません。ブラウザのデータを消すと消えます。使用する権利のある音楽だけを追加してください。', '멤버는 자기 음악 파일을 넣을 수 있어요(곡당 15MB, 최대 30곡). 파일은 이 기기에만 저장되고 서버에 올라가지 않으며 클라우드 저장에도 포함되지 않아요. 브라우저 데이터를 지우면 함께 사라져요. 사용할 권리가 있는 음악만 넣어 주세요.'],
+    'mu.ownP': ['會員可以加入自己的音樂檔（每首最多 15 MB、最多 30 首、共 200 MB）。請只加自己有權使用的音樂。', 'Members can add their own music files (up to 15 MB each, 30 files, 200 MB in all). Only add music you have the right to use.', 'メンバーは自分の音楽ファイルを追加できます（1曲15MBまで、30曲・合計200MBまで）。使用する権利のある音楽だけを追加してください。', '멤버는 자기 음악 파일을 넣을 수 있어요(곡당 15MB, 최대 30곡, 합계 200MB). 사용할 권리가 있는 음악만 넣어 주세요.'],
     'mu.add': ['加入音樂檔', 'Add music files', '音楽ファイルを追加', '음악 파일 추가'],
     'mu.adding': ['正在讀取…', 'Reading…', '読み込み中…', '읽는 중…'],
     'mu.added': ['加入了 {0} 首', 'Added {0}', '{0} 曲追加しました', '{0}곡 추가했어요'],
@@ -12593,6 +12689,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   // ---------- adding files ----------
   function addFiles(files) {
     if (!canOwn()) { App.toast(t('mu.member')); return; }
+    if (ZZ.DevStore) ZZ.DevStore.persist();
     var list = Array.prototype.slice.call(files || []), added = 0, total = st.own.reduce(function (a, o) { return a + (o.size || 0); }, 0);
     App.toast(t('mu.adding'), 1500);
     (function next() {
@@ -12644,7 +12741,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       if (!queue().length) h += '<p class="note">' + t('mu.listEmpty') + '</p>';
     }
     h += '<h3>' + t('mu.builtin') + '</h3><div class="mu-list">' + BUILT.map(trackRow).join('') + '</div>';
-    h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>';
+    h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>' + (ZZ.DevStore && canOwn() ? ZZ.DevStore.html('music') : '');
     if (st.own.length) h += (canOwn() ? '' : '<p class="note">' + t('mu.lapsed') + '</p>') + '<div class="mu-list">' + st.own.map(function (o) { return trackRow('own:' + o.id); }).join('') + '</div>';
     h += canOwn() ? '<div class="row"><label class="btn" for="muFile">' + t('mu.add') + '</label><input id="muFile" type="file" accept="audio/*" multiple hidden></div>'
       : '<p class="note">' + t('mu.member') + '</p><div class="row"><button class="btn" type="button" data-tab="member">' + t('k.member') + '</button></div>';

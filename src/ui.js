@@ -19,7 +19,7 @@
   var KEY_MAX = 4;
   var DEF = {
     das: 140, arr: 20, sdf: 80, lock: 500, smooth: !env.reduce, ghost: true, radar: false, hint: true,
-    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, lang: '', ai: 0
+    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', lang: '', ai: 0
   };
   // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
   var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0 };
@@ -500,13 +500,16 @@
   // on a touch screen the item key also shows what is in the bag, so the item box at the top is not needed there.
   function sideKeys() {
     var items = itemsOn(), k = S ? S.kind : '';
-    var spin = set.swap ? el.sideL : el.sideR, move = set.swap ? el.sideR : el.sideL;
+    // one-handed: hold, the half turn and the item key all go to the side of that hand
+    var one = set.hand === 'R' ? el.sideR : set.hand === 'L' ? el.sideL : null;
+    var spin = one || (set.swap ? el.sideL : el.sideR), move = one || (set.swap ? el.sideR : el.sideL);
     if (el.holdKey.parentNode !== spin) { spin.appendChild(el.halfKey); spin.appendChild(el.holdKey); }
     if (el.itemKey.parentNode !== move) move.appendChild(el.itemKey);
     el.itemBox.hidden = !items || env.touch;
     el.itemKey.hidden = !items;
     el.halfKey.hidden = !set.half;
     el.holdKey.hidden = k === 'dojo' || k === 'lesson';   // nothing to hold in a drill or a lesson
+    if (one) { var other = one === el.sideR ? el.sideL : el.sideR; other.hidden = true; one.hidden = !env.touch || (el.holdKey.hidden && el.halfKey.hidden && el.itemKey.hidden); return; }
     spin.hidden = !env.touch || (el.holdKey.hidden && el.halfKey.hidden);
     move.hidden = !env.touch || el.itemKey.hidden;
   }
@@ -1090,7 +1093,8 @@
         (env.touch ? '' : '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>') +
         '<h3>' + t('s.touch') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('s.padH') + '">' +
         [0, 1, 2].map(function (j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + t('s.pad' + j) + '</button>'; }).join('') + '</div>' +
-        toggle('sSwap', t('s.swap')) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
+        '<div class="seg" role="radiogroup" aria-label="' + t('s.hand') + '">' + ['two', 'R', 'L'].map(function (j) { return '<button type="button" role="radio" aria-checked="' + ((set.hand || 'two') === j) + '" data-hand="' + j + '">' + t('s.hand' + j) + '</button>'; }).join('') + '</div>' +
+        (set.hand === 'R' || set.hand === 'L' ? '<p class="note">' + t('s.handP') + '</p>' : toggle('sSwap', t('s.swap'))) + toggle('sHalf', t('s.half')) + toggle('sHaptic', t('s.haptic')) +
         (env.touch ? '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>' : '') +
         '<h3>' + t('s.sound') + '</h3><div class="row"><button class="btn sm" type="button" data-do="musicOpen">' + t('mu.title') + '</button></div>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
         (App.settingsExtra ? App.settingsExtra() : '') +
@@ -1145,13 +1149,16 @@
   function syncSettings() {
     var id;
     for (id in FIELDS) { $(id).value = set[FIELDS[id]]; $(id + 'O').textContent = fieldText(FIELDS[id]); }
-    for (id in TOGGLES) $(id).checked = !!set[TOGGLES[id]];
+    for (id in TOGGLES) if ($(id)) $(id).checked = !!set[TOGGLES[id]];
     $('sLang').value = set.lang;
     $('sAi').value = String(aiStep());
   }
   function aiKey(n) { return n < 0 ? 'M' + (-n) : n > 0 ? 'P' + n : '0'; }
   function applySettings() {
-    el.pad.classList.toggle('swap', set.swap);
+    var one = set.hand === 'R' || set.hand === 'L';
+    el.pad.classList.toggle('swap', !one && set.swap);
+    el.pad.classList.toggle('oneR', set.hand === 'R');
+    el.pad.classList.toggle('oneL', set.hand === 'L');
     sideKeys();
     sfx.vol();
     if (S && S.me) {
@@ -1305,6 +1312,7 @@
       else if (d.bring) { Meta.toggleBring(+d.bring); openSheet('battle'); }
       else if (d.drill) begin('dojo', { drill: +d.drill });
       else if (d.pad) { set.pad = +d.pad; saveStore(); openSheet('settings'); applySettings(); }
+      else if (d.hand) { set.hand = ['R', 'L'].indexOf(d.hand) >= 0 ? d.hand : 'two'; saveStore(); openSheet('settings'); applySettings(); layout(); }
       else if (d.bind) startCapture(d.bind);
       else if (d.unbind) {
         var p = d.unbind.split('|');
@@ -1373,14 +1381,17 @@
   function layout() {
     if (screen !== 'play' || !S) return;
     var W = el.app.clientWidth, H = el.app.clientHeight, hasOpp = !!S.opp;
-    var wide = W >= 820 && W > H * 1.05, flip = wide && hasOpp;
+    // a phone held sideways: the keys go to the left and right of the wall instead of under it
+    var land = env.touch && W > H && H < 600;
+    var wide = !land && W >= 820 && W > H * 1.05, flip = wide && hasOpp;
+    el.play.classList.toggle('land', land);
     if (S.flip !== flip) { S.flip = flip; setupHud(); }
     el.pad.hidden = !env.touch;
     sideKeys();
     el.stage.classList.toggle('wide', flip);
     var hudH = el.hud.offsetHeight || 48, stripH = el.strip.hidden ? 0 : el.strip.offsetHeight + 6;
     // a tablet held upright has room for bigger keys
-    var padMin = env.touch ? (W >= 600 && H >= 900 ? [160, 190, 226] : [128, 152, 184])[set.pad] : 0;
+    var padMin = env.touch && !land ? (W >= 600 && H >= 900 ? [160, 190, 226] : [128, 152, 184])[set.pad] : 0;
     el.pad.style.minHeight = padMin + 'px';
     // on a tall screen the wall does not run edge to edge
     var availH = H - hudH - stripH - padMin - 22 - (H >= 1000 ? 26 : 0), cell, oppCell = 0;
@@ -1395,10 +1406,15 @@
     } else {
       // phones stop at 34 px tiles, as before; tablets and tall windows go on to 56
       cell = clamp(Math.min(byH, Math.floor((W - 2 * 66 - 36) / 10.3)), 10, W >= 600 ? 56 : 34);
-      side = clamp(Math.floor((W - cell * 10.3 - 40) / 2), 58, Math.max(124, Math.round(cell * 3.3)));
+      side = land ? clamp(Math.round(cell * 4.4), 60, 110) : clamp(Math.floor((W - cell * 10.3 - 40) / 2), 58, Math.max(124, Math.round(cell * 3.3)));
       if (hasOpp) oppCell = Math.max(4, Math.floor((side - 8) / 10));
     }
     el.stage.style.setProperty('--side', side + 'px');
+    // sideways: the gap between the two groups of keys is the wall and its side columns
+    if (land) {
+      el.play.style.setProperty('--mid', Math.round(cell * 10.3 + 2 * side + 40) + 'px');
+      el.play.style.setProperty('--padH', Math.round(Math.min(H * [0.5, 0.58, 0.66][set.pad || 0], 300)) + 'px');
+    }
     V.me.resize(cell);
     // Both side columns are as tall as the wall. What must be there takes its room first (hold, the side keys, tools);
     // the other player's little wall and the queue of coming pieces then share what is left.
@@ -1461,9 +1477,8 @@
     } else {
       el.hud.style.marginLeft = el.hud.style.width = el.strip.style.marginLeft = el.strip.style.width = '';
     }
-    var short = env.touch && H < 470 && W > H;
-    el.rotate.hidden = !short;
-    if (short && S.mode !== 'net' && (S.state === 'play' || S.state === 'count')) { S.prev = S.state; S.state = 'pause'; input.clear(); openSheet('pause'); }
+    // a phone held sideways plays sideways (the keys are beside the wall), so there is nothing to turn
+    el.rotate.hidden = true;
   }
   var lookKey = '';
   function drawSide() {

@@ -498,7 +498,7 @@
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';
     h += '<div class="levels">' + picRow('bg', 'mb.wall') + picRow('tile', 'mb.tile') + '</div>' +
       '<div class="field"><label for="cDim">' + t('mb.dim') + '</label><output id="cDimO" for="cDim"></output><input type="range" id="cDim" min="0" max="85" step="5"></div>' +
-      '<p class="note">' + t('mb.picNote') + '</p><input type="file" id="picFile" accept="image/*" hidden>';
+      (ZZ.DevStore ? ZZ.DevStore.html('pics') : '<p class="note">' + t('mb.picNote') + '</p>') + '<input type="file" id="picFile" accept="image/*" hidden>';
     return h;
   }
   App.dismiss.shop = 1; App.dismiss.jobs = 1; App.dismiss.profile = 1;
@@ -526,7 +526,8 @@
     }
     var dim = $('cDim'), file = $('picFile');
     if (dim) { dim.value = Meta.data.custom.dim; $('cDimO').textContent = Meta.data.custom.dim + '%'; }
-    if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
+    if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey && ZZ.DevStore) ZZ.DevStore.persist();
+      if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
   };
   App.acts.subStart = function () { Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop'); };
   App.acts.subEnd = function () { Meta.cancelSub(); if (ZZ.Replay) ZZ.Replay.trim(5); App.applyLook(); App.openSheet('shop'); };

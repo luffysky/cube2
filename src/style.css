@@ -226,6 +226,22 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .key[data-k="HD"] { grid-area: HD; } .key[data-k="CW"] { grid-area: CW; } .key[data-k="CCW"] { grid-area: CCW; }
 .key[data-k="HD"] svg, .key[data-k="D"] svg { width: 26px; height: 26px; }
 
+/* 單手：六個鍵集中在拇指那一側（右手放右邊、左手放左邊），另一側留空 */
+#pad.oneR { grid-template-columns: minmax(0, .55fr) 1fr 1fr 1fr; grid-template-areas: ". CCW CW HD" ". L D R"; }
+#pad.oneL { grid-template-columns: 1fr 1fr 1fr minmax(0, .55fr); grid-template-areas: "CCW CW HD ." "L D R ."; }
+#play.land #pad.oneR { grid-template-columns: minmax(0, 1fr) var(--mid, 320px) minmax(0, .34fr) minmax(0, .34fr) minmax(0, .34fr); grid-template-areas: ". . CCW CW HD" ". . L D R"; }
+#play.land #pad.oneL { grid-template-columns: minmax(0, .34fr) minmax(0, .34fr) minmax(0, .34fr) var(--mid, 320px) minmax(0, 1fr); grid-template-areas: "CCW CW HD . ." "L D R . ."; }
+
+/* 橫拿的手機：牆在中間，移動鍵在左、旋轉和落下鍵在右（交換左右時相反），兩組鍵之間空出牆的寬度 */
+#play.land { position: relative; }
+#play.land #pad {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--padH, 200px); min-height: 0 !important; max-height: none; max-width: none; margin: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--mid, 320px) minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 1fr 1fr;
+  padding: 0 max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); gap: 8px; pointer-events: none;
+}
+#play.land #pad .key { pointer-events: auto; }
+#play.land #stage { padding-bottom: 4px; }
+
 /* ---------- 彈出面板 ---------- */
 /* 蓋住整個畫面（不只是中間那一欄），手機的瀏海和底部橫條留給邊距 */
 #sheet {

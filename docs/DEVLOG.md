@@ -396,3 +396,18 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過（weather 62）；瀏覽器 `skies` 46（每種天氣與災害都實際跑一次、截圖）、`wxnet` 19、`rwd` 232、`flow` 60、`music` 9。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`85166a9`](https://github.com/luffysky/cube2/commit/85166a9)，Vercel `dpl_Dt2Bj7KwAkstdYuoz695FqzNPGmk` READY。
+
+## 2026-11-21 00:10（Asia/Taipei）｜單手模式、手機橫放可玩、自己檔案的存放選擇、待辦清單
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030
+- 實際變更：
+  - 單手模式：設定 → 觸控按鍵 → 按鍵配置（雙手／單手右手／單手左手）。六個鍵集中在拇指那一側（3×2），暫存、半圈、道具鍵也移到同一側；選單手時不顯示「移動鍵放右手邊」。
+  - 手機橫放：不再暫停並要求轉直；橫放時按鍵分在牆的左右兩邊（單手時全部在同一邊），牆用滿整個高度。`#play.land`、`--mid`、`--padH`。
+  - 自己的圖片與音樂：新增 `src/devstore.js`，會員畫面顯示「存在哪裡：只存這台裝置／也上傳到雲端」，雲端在 R2 接好前停用；說明關掉瀏覽器、重開機都還在，清除網站資料、無痕視窗、換裝置、iPhone Safari 7 天沒開會不見；加入檔案時向瀏覽器申請長期保存（`navigator.storage.persist`），結果顯示在說明裡。
+  - 新增 `docs/TODO.md` 待辦清單，做完打勾。
+- 檔案：`src/ui.js`、`src/style.css`、`src/i18n.js`、`src/devstore.js`（新）、`src/shop.js`、`src/music.js`、`src/index.template.html`、`build.js`、`tools/dict.js`、`test/i18n.test.js`、`test/rwd.js`、`test/music.js`、`test/onehand.js`（新）、`docs/TODO.md`（新）。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `rwd` 258（新增 667×375 橫放、按鍵不蓋到牆）、`onehand` 15、`music` 10、`flow` 60、`drawer` 28。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

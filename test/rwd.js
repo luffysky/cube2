@@ -14,7 +14,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
 // name, width, height, touch, menu layout expected ('one' column, 'two' panes), smallest tile expected in a match (0: asks to turn the phone)
 const SIZES = [
   ['p320', 320, 568, 1, 'one', 13], ['p360', 360, 740, 1, 'one', 16], ['p390', 390, 844, 1, 'one', 19], ['p430', 430, 932, 1, 'one', 22],
-  ['land844', 844, 390, 1, 'two', 0], ['land932', 932, 430, 1, 'two', 0],
+  ['land844', 844, 390, 1, 'two', 14], ['land932', 932, 430, 1, 'two', 16], ['land667', 667, 375, 1, 'two', 13],
   ['t600', 600, 960, 1, 'one', 28], ['t768', 768, 1024, 1, 'one', 30], ['t820', 820, 1180, 1, 'one', 38], ['t1024l', 1024, 768, 1, 'two', 22], ['t1180l', 1180, 820, 1, 'two', 24], ['t1366l', 1366, 1024, 1, 'two', 30],
   ['d1000', 1000, 700, 0, 'one', 26], ['d1280', 1280, 720, 0, 'two', 27], ['d1366', 1366, 768, 0, 'two', 29], ['d1440', 1440, 900, 0, 'two', 35], ['d1920', 1920, 1080, 0, 'two', 42], ['d2560', 2560, 1440, 0, 'two', 56], ['d3440', 3440, 1440, 0, 'two', 56]
 ];
@@ -70,9 +70,11 @@ const only = (process.argv[2] || '').split(',').filter(Boolean);
       ok(!p.rot && p.state === 'play', name + ': the match runs', p.state);
       ok(left >= -1 && p.colR.r <= w + 1 && bottom <= h + 1 && p.hud.t >= -1, name + ': the match stays inside the screen', { left, right: p.colR.r, bottom });
       ok(p.cell >= minCell, name + ': tiles of at least ' + minCell + ' px', p.cell);
-      ok(p.well.h >= h * (touch ? 0.5 : 0.82) || p.cell >= 34, name + ': the wall uses the height it has', [p.well.h, h]);
+      ok(p.well.h >= h * (touch && w < h ? 0.5 : touch ? 0.7 : 0.82) || p.cell >= 34, name + ': the wall uses the height it has', [p.well.h, h]);
       if (touch) ok(p.pad && p.keyMin >= 40 && !p.keyOut, name + ': touch keys are big enough and on screen', [p.keyMin, p.keyOut]);
       else ok(!p.pad, name + ': no touch keys with a mouse');
+      // held sideways: the keys sit beside the wall and its side columns, never on them
+      if (touch && w > h) ok(await page.evaluate(() => { const R = e => e.getBoundingClientRect(), cols = ['colL', 'wellWrap', 'colR'].map(id => R(document.getElementById(id))); return [...document.querySelectorAll('#pad .key')].every(k => { const b = R(k); return cols.every(c => b.right <= c.left || b.left >= c.right || b.bottom <= c.top || b.top >= c.bottom); }); }), name + ': sideways, the keys are beside the wall, not over it');
       lastCell[name] = p.cell;
     }
     await page.screenshot({ path: path.join(OUT, 'rwd-play-' + name + '.png') });

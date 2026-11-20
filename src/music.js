@@ -39,7 +39,7 @@
     'mu.b.battle3': ['對戰 3', 'Battle 3', 'バトル 3', '대전 3'],
     'mu.builtin': ['遊戲內建', 'Built in', 'ゲーム内蔵', '기본 제공'],
     'mu.own': ['我的音樂', 'My music', 'マイミュージック', '내 음악'],
-    'mu.ownP': ['會員可以加入自己的音樂檔（每首最多 15 MB、最多 30 首）。檔案只存在這台裝置，不會上傳到我們的伺服器，也不會跟著雲端存檔走；清除瀏覽器資料就會一起消失。請只加入你有權使用的音樂。', 'Members can add their own music files (up to 15 MB each, 30 tracks). They are kept only on this device: never uploaded to our server and not part of the cloud save, and they go if you clear the browser\'s data. Please add only music you have the right to use.', 'メンバーは自分の音楽ファイルを追加できます（1 曲 15 MB まで、30 曲まで）。ファイルはこの端末にだけ保存され、サーバーにはアップロードされず、クラウドセーブにも含まれません。ブラウザのデータを消すと消えます。使用する権利のある音楽だけを追加してください。', '멤버는 자기 음악 파일을 넣을 수 있어요(곡당 15MB, 최대 30곡). 파일은 이 기기에만 저장되고 서버에 올라가지 않으며 클라우드 저장에도 포함되지 않아요. 브라우저 데이터를 지우면 함께 사라져요. 사용할 권리가 있는 음악만 넣어 주세요.'],
+    'mu.ownP': ['會員可以加入自己的音樂檔（每首最多 15 MB、最多 30 首、共 200 MB）。請只加自己有權使用的音樂。', 'Members can add their own music files (up to 15 MB each, 30 files, 200 MB in all). Only add music you have the right to use.', 'メンバーは自分の音楽ファイルを追加できます（1曲15MBまで、30曲・合計200MBまで）。使用する権利のある音楽だけを追加してください。', '멤버는 자기 음악 파일을 넣을 수 있어요(곡당 15MB, 최대 30곡, 합계 200MB). 사용할 권리가 있는 음악만 넣어 주세요.'],
     'mu.add': ['加入音樂檔', 'Add music files', '音楽ファイルを追加', '음악 파일 추가'],
     'mu.adding': ['正在讀取…', 'Reading…', '読み込み中…', '읽는 중…'],
     'mu.added': ['加入了 {0} 首', 'Added {0}', '{0} 曲追加しました', '{0}곡 추가했어요'],
@@ -155,6 +155,7 @@
   // ---------- adding files ----------
   function addFiles(files) {
     if (!canOwn()) { App.toast(t('mu.member')); return; }
+    if (ZZ.DevStore) ZZ.DevStore.persist();
     var list = Array.prototype.slice.call(files || []), added = 0, total = st.own.reduce(function (a, o) { return a + (o.size || 0); }, 0);
     App.toast(t('mu.adding'), 1500);
     (function next() {
@@ -206,7 +207,7 @@
       if (!queue().length) h += '<p class="note">' + t('mu.listEmpty') + '</p>';
     }
     h += '<h3>' + t('mu.builtin') + '</h3><div class="mu-list">' + BUILT.map(trackRow).join('') + '</div>';
-    h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>';
+    h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>' + (ZZ.DevStore && canOwn() ? ZZ.DevStore.html('music') : '');
     if (st.own.length) h += (canOwn() ? '' : '<p class="note">' + t('mu.lapsed') + '</p>') + '<div class="mu-list">' + st.own.map(function (o) { return trackRow('own:' + o.id); }).join('') + '</div>';
     h += canOwn() ? '<div class="row"><label class="btn" for="muFile">' + t('mu.add') + '</label><input id="muFile" type="file" accept="audio/*" multiple hidden></div>'
       : '<p class="note">' + t('mu.member') + '</p><div class="row"><button class="btn" type="button" data-tab="member">' + t('k.member') + '</button></div>';
