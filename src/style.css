@@ -924,3 +924,8 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
 .bag-it .bag-n { position: absolute; right: 8px; top: 6px; font: italic 800 13px var(--num); color: var(--muted); }
 .bag-it.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--floor)); }
 .bag-it:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+/* 開場的操作方式 */
+table.ht th { text-align: left; font-weight: 700; white-space: nowrap; padding-right: 12px; }
+table.ht td { text-align: left; }
+kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; border: 1px solid var(--edge); border-bottom-width: 3px; border-radius: 6px; background: var(--floor); font: 700 12px/1.5 var(--num, inherit); text-align: center; }

@@ -19,7 +19,7 @@
   var KEY_MAX = 4;
   var DEF = {
     das: 140, arr: 20, sdf: 80, lock: 500, smooth: !env.reduce, ghost: true, radar: false, hint: true,
-    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', lang: '', ai: 0
+    vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', howto: true, lang: '', ai: 0
   };
   // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
   var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0 };
@@ -387,11 +387,33 @@
     if (K && K.started) K.started();
     sfx.setDuck(1);
     sfx.music(kind === 'battle' ? TRACK[S.level] : kind === 'sprint' ? 'battle1' : 'calm');
-    if (!env.touch && !save.tip) {
-      save.tip = 1; saveStore();
-      toast(t('tip.keys', key1('L'), key1('R'), key1('CW'), key1('CCW'), key1('D'), key1('HD'), key1('HOLD')), 6500);
+    // how to play, before every match (the player closes it; the setting turns it off). An online match cannot
+    // wait, so there it stays up during the countdown and closes itself at "go".
+    // (automated tests skip it, like the consent screen, unless they ask for it with window.__zzHowto)
+    if (set.howto !== false && kind !== 'dojo' && kind !== 'lesson' && (!navigator.webdriver || window.__zzHowto)) {
+      if (S.mode !== 'net') { S.howtoPrev = S.state; S.state = 'howto'; }
+      openSheet('howto');
     }
   }
+  App.closed.howto = function () { if (S && S.state === 'howto') { S.state = S.howtoPrev || 'count'; S.howtoPrev = null; } };
+  function howtoHtml() {
+    var touch = env.touch, items = itemsOn(), h = '<h2>' + t('ht.title') + '</h2>';
+    var rows = touch ? [['L', 'R'], ['D'], ['HD'], ['CW'], ['CCW']].concat(set.half ? [['180']] : []).concat([['HOLD']]).concat(items ? [['ITEM']] : [])
+      : [['L', 'R'], ['D'], ['HD'], ['CW'], ['CCW'], ['180'], ['HOLD']].concat(items ? [['ITEM']] : []).concat([['PAUSE']]);
+    h += '<table class="cmp ht"><tbody>';
+    rows.forEach(function (r) {
+      var what = r.map(function (a) { return t('a.' + a); }).join(' / ');
+      var how = touch ? r.map(function (a) { return padName(PAD_KEY[a]); }).join(' ') : r.map(function (a) { return set.keys[a].filter(Boolean).map(function (c) { return '<kbd>' + esc(keyName(c)) + '</kbd>'; }).join(' '); }).join('　');
+      h += '<tr><th>' + esc(what) + '</th><td>' + how + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    if (touch) h += '<p class="note">' + t('ht.touch') + '</p>';
+    if (items) h += '<h3>' + t('ht.itemsH') + '</h3><p>' + t(touch ? 'ht.itemsT' : 'ht.itemsK', touch ? padName('k.bag') : '<kbd>' + esc(key1('ITEM')) + '</kbd>') + '</p>';
+    if (S && S.mode === 'net') h += '<p class="note">' + t('ht.net') + '</p>';
+    h += '<label class="toggle" for="htOff">' + t('ht.off') + '<input type="checkbox" id="htOff"></label>';
+    return h + '<div class="row">' + btn('close', 'ht.go', true) + '</div>';
+  }
+  var PAD_KEY = { L: 'a.L', R: 'a.R', D: 'k.soft', HD: 'k.hard', CW: 'k.cw', CCW: 'k.ccw', '180': 'k.half', HOLD: 'hold', ITEM: 'k.bag' };
 
   // ---------- three or four players ----------
   function enemy(seat) { var M = S && S.multi; return !!M && !!M.foes[seat] && (!M.teams || M.teams[seat] !== M.myTeam); }
@@ -1109,7 +1131,7 @@
         '<h3>' + t('s.feel') + '</h3>' +
         field('sDas', t('s.das'), 60, 300, 5, t('s.dasN')) + field('sArr', t('s.arr'), 0, 80, 5, t('s.arrN')) +
         field('sSdf', t('s.sdf'), 10, 125, 5, t('s.sdfN')) + field('sLock', t('s.lock'), 200, 1000, 50, t('s.lockN')) +
-        '<h3>' + t('s.screen') + '</h3>' + toggle('sSmooth', t('s.smooth')) + toggle('sGhost', t('s.ghost')) + toggle('sRadar', t('s.radar')) +
+        '<h3>' + t('s.screen') + '</h3>' + toggle('sHowto', t('ht.setting')) + toggle('sSmooth', t('s.smooth')) + toggle('sGhost', t('s.ghost')) + toggle('sRadar', t('s.radar')) +
         (env.touch ? '' : '<h3>' + t('s.kb') + '</h3><div class="row">' + btn('keys', 's.keys') + '</div>') +
         '<h3>' + t('s.touch') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('s.padH') + '">' +
         [0, 1, 2].map(function (j) { return '<button type="button" role="radio" aria-checked="' + (set.pad === j) + '" data-pad="' + j + '">' + t('s.pad' + j) + '</button>'; }).join('') + '</div>' +
@@ -1119,6 +1141,8 @@
         '<h3>' + t('s.sound') + '</h3><div class="row"><button class="btn sm" type="button" data-do="musicOpen">' + t('mu.title') + '</button></div>' + field('sMvol', t('s.mvol'), 0, 100, 5, '') + field('sVol', t('s.vol'), 0, 100, 5, '') + toggle('sReal', t('s.real')) +
         (App.settingsExtra ? App.settingsExtra() : '') +
         '<div class="row">' + btn('defaults', 's.defaults') + btn('close', 'done', true) + '</div>';
+    } else if (name === 'howto') {
+      h = howtoHtml();
     } else if (name === 'keys') {
       h = '<h2>' + t('kb.title') + '</h2><p>' + t('kb.hint') + '</p><div class="binds">';
       for (i = 0; i < ACTIONS.length; i++) {
@@ -1160,7 +1184,7 @@
   function toggle(id, label) { return '<label class="toggle" for="' + id + '">' + label + '<input type="checkbox" id="' + id + '"></label>'; }
 
   var FIELDS = { sDas: 'das', sArr: 'arr', sSdf: 'sdf', sLock: 'lock', sVol: 'vol', sMvol: 'mvol' };
-  var TOGGLES = { sSmooth: 'smooth', sGhost: 'ghost', sRadar: 'radar', sSwap: 'swap', sHalf: 'half', sHaptic: 'haptic', sReal: 'real' };
+  var TOGGLES = { sSmooth: 'smooth', sGhost: 'ghost', sRadar: 'radar', sSwap: 'swap', sHalf: 'half', sHaptic: 'haptic', sReal: 'real', sHowto: 'howto' };
   function fieldText(k) {
     if (k === 'sdf') return set.sdf >= 125 ? t('u.instant') : t('u.cps', set.sdf);
     if (k === 'vol' || k === 'mvol') return set[k] ? String(set[k]) : t('u.off');
@@ -1344,6 +1368,7 @@
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
+      if (id === 'htOff') { set.howto = !e.target.checked; saveStore(); return; }
       if (id === 'sLang') { if (e.type !== 'change') return; setLang(e.target.value); openSheet('settings'); return; }
       if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
       if (FIELDS[id]) {
@@ -1628,6 +1653,7 @@
     S.shown = n;
     if (n > 0) { banner(String(n), 'num'); sfx.play('count'); }
     else {
+      if (sheetName === 'howto') closeSheet(true);
       banner(t('b.go'), '', 520);
       sfx.play('go');
       S.state = 'play';
