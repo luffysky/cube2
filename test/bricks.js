@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 9 && (await page.$$('.card.soon')).length === 1, 'nine playable, one coming');
+    ok((await page.$$('a.card')).length === 10 && (await page.$$('.card.soon')).length === 0, 'all ten playable');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -151,7 +151,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     sp.on('pageerror', e => problems.push('stack phone: ' + e.message));
     await sp.goto(BASE + 'games/stack/'); await sleep(400);
     await sp.tap('#go'); await sleep(150);
-    for (let i = 0; i < 14; i++) { await sp.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + (Math.random() * 20 - 10); }); await sp.tap('#cv'); await sleep(140); }
+    for (let i = 0; i < 14; i++) { await sp.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + 2; g.cfg = Object.assign({}, g.cfg, { speed: 0, up: 0 }); }); await sp.tap('#cv'); await sleep(140); }
     const fitS = await sp.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { b: r.bottom, vh: innerHeight, floors: window.__stack().g.floors() }; });
     ok(fitS.b <= fitS.vh && fitS.floors === 14, 'on a phone taps drop bricks and the field fits', fitS);
     await sleep(500);
@@ -324,6 +324,39 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await pph.evaluate(t => window.__pipes().g.taps === t + 1, t0), 'a tap turns a tile');
     await pph.screenshot({ path: path.join(OUT, 'pipes-phone.png') });
     await ctx8.close();
+    // 掃磚
+    const sw2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    sw2.on('pageerror', e => problems.push('sweep: ' + e.message));
+    await sw2.goto(BASE + 'games/sweep/'); await sleep(400);
+    await sw2.click('[data-lv="easy"]'); await sw2.click('#go'); await sleep(300);
+    const sg = await sw2.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(), g = window.__sweep().g; return { x: r.left, y: r.top, s: r.width / g.W, W: g.W, H: g.H }; });
+    const at = i => [sg.x + (i % sg.W + 0.5) * sg.s, sg.y + (Math.floor(i / sg.W) + 0.5) * sg.s];
+    await sw2.mouse.click(...at(27)); await sleep(150);
+    ok(await sw2.evaluate(() => { const g = window.__sweep().g; return !g.crack[27] && g.open.filter(Boolean).length >= 9; }), 'the first click is safe and opens an area');
+    const cracks = await sw2.evaluate(() => window.__sweep().g.crack.map((c, i) => c ? i : -1).filter(i => i >= 0));
+    await sw2.mouse.click(...at(cracks[0]), { button: 'right' }); await sleep(80);
+    ok(await sw2.evaluate(i => window.__sweep().g.flag[i], cracks[0]), 'a right click plants a flag');
+    await sw2.screenshot({ path: path.join(OUT, 'sweep-play.png') });
+    const safe = await sw2.evaluate(() => { const g = window.__sweep().g; return g.crack.map((c, i) => !c && !g.open[i] ? i : -1).filter(i => i >= 0); });
+    for (const i of safe) { if (await sw2.evaluate(j => !window.__sweep().g.open[j], i)) await sw2.mouse.click(...at(i)); }
+    await sleep(1200);
+    ok(await sw2.evaluate(() => window.__sweep().state === 'won' && !document.getElementById('end').hidden && !!JSON.parse(localStorage.getItem('snowrealm.sweep.bests')).easy), 'every sound brick out: done, time kept');
+    await sw2.screenshot({ path: path.join(OUT, 'sweep-done.png') });
+    const ctx9 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const swp = await ctx9.newPage();
+    swp.on('pageerror', e => problems.push('sweep phone: ' + e.message));
+    await swp.goto(BASE + 'games/sweep/'); await sleep(400);
+    await swp.tap('[data-lv="hard"]'); await swp.tap('#go'); await sleep(300);
+    const sfit3 = await swp.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { r: r.right, b: r.bottom, vw: innerWidth, vh: innerHeight, w: r.width }; });
+    ok(sfit3.r <= sfit3.vw && sfit3.b <= sfit3.vh && sfit3.w >= 260, 'on a phone the 10 by 14 wall fits', sfit3);
+    await swp.tap('#cv', { position: { x: sfit3.w / 2, y: 100 } }); await sleep(150);
+    ok(await swp.evaluate(() => window.__sweep().g.open.some(Boolean)), 'a tap knocks bricks out');
+    await swp.tap('#modeFlag'); const fi = await swp.evaluate(() => window.__sweep().g.open.findIndex(o => !o));
+    const fpos = await swp.evaluate(i => { const r = document.getElementById('cv').getBoundingClientRect(), g = window.__sweep().g, s = r.width / g.W; return { x: (i % g.W + 0.5) * s, y: (Math.floor(i / g.W) + 0.5) * s }; }, fi);
+    await swp.tap('#cv', { position: fpos }); await sleep(100);
+    ok(await swp.evaluate(i => window.__sweep().g.flag[i], fi), 'flag mode plants a flag with a tap');
+    await swp.screenshot({ path: path.join(OUT, 'sweep-phone.png') });
+    await ctx9.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
