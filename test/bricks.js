@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 6 && (await page.$$('.card.soon')).length === 4, 'six playable, four coming');
+    ok((await page.$$('a.card')).length === 7 && (await page.$$('.card.soon')).length === 3, 'seven playable, three coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -229,6 +229,41 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await mp.evaluate(() => !!window.__merge().g.grid[0][0]), 'a tap drops into the column tapped');
     await mp.screenshot({ path: path.join(OUT, 'merge-phone.png') });
     await ctx5.close();
+    // 分磚
+    const so = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    so.on('pageerror', e => problems.push('sort: ' + e.message));
+    await so.goto(BASE + 'games/sort/'); await sleep(400);
+    ok(await so.evaluate(() => document.querySelectorAll('.lv').length === 60 && document.querySelector('[data-lv="1"]').disabled), 'the list: sixty levels, only the first open');
+    await so.click('[data-lv="0"]'); await sleep(300);
+    // solve level 1 with a search in the page, then play it with the number keys
+    const sroute = await so.evaluate(() => {
+      const S = window.Sort, L = window.SORT_LEVELS[0], key = g => g.st.map(s => s.join('')).join('|');
+      const q = [[[]]], seen = new Set();
+      while (q.length) { const [path] = q.shift(); const g = new S(L.m); path.forEach(([a, b]) => g.move(a, b)); if (g.solved()) return path; const k = key(g); if (seen.has(k)) continue; seen.add(k); for (let a = 0; a < g.st.length; a++) for (let b = 0; b < g.st.length; b++) if (g.can(a, b)) q.push([path.concat([[a, b]])]); }
+      return null;
+    });
+    ok(sroute && sroute.length === await so.evaluate(() => window.SORT_LEVELS[0].p), 'level 1 can be done in its stated moves', sroute && sroute.length);
+    await so.screenshot({ path: path.join(OUT, 'sort-play.png') });
+    for (const [a, b] of sroute) { await so.keyboard.press(String(a + 1)); await so.keyboard.press(String(b + 1)); await sleep(60); }
+    await sleep(700);
+    ok(await so.evaluate(() => window.__sort().state === 'won' && /★★★/.test(document.getElementById('winStars').textContent)), 'done in the fewest moves: three stars');
+    await so.screenshot({ path: path.join(OUT, 'sort-win.png') });
+    const ctx6 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const sph = await ctx6.newPage();
+    sph.on('pageerror', e => problems.push('sort phone: ' + e.message));
+    await sph.goto(BASE + 'games/sort/'); await sleep(400);
+    await sph.evaluate(() => { localStorage.setItem('snowrealm.sort.done', JSON.stringify(Object.fromEntries(Array.from({ length: 59 }, (_, i) => [i, { s: 1, m: 99 }])))); });
+    await sph.reload(); await sleep(400);
+    await sph.tap('[data-lv="59"]'); await sleep(300);
+    const sfit = await sph.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { r: r.right, b: r.bottom, vw: innerWidth, vh: innerHeight, n: window.__sort().g.st.length }; });
+    ok(sfit.r <= sfit.vw && sfit.b <= sfit.vh && sfit.n === 9, 'on a phone nine stacks fit', sfit);
+    const before = await sph.evaluate(() => window.__sort().g.moves);
+    const box6 = await sph.$eval('#cv', c => { const r = c.getBoundingClientRect(); return { w: r.width, h: r.height }; });
+    await sph.tap('#cv', { position: { x: box6.w * 0.12, y: box6.h * 0.3 } }); await sleep(100);
+    ok(await sph.evaluate(() => window.__sort().state === 'play'), 'a tap selects a stack');
+    await sph.screenshot({ path: path.join(OUT, 'sort-phone.png') });
+    void before;
+    await ctx6.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
