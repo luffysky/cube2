@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 19, 'nineteen tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 20, 'twenty tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -836,6 +836,35 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     x = await sync(L1, [op('endless', [900])]);
     r = await call('board', { url: '/api/board?b=lve&me=' + L1.pub });
     ok(r.json.me.v === 12, 'a stage too far for the time played stays off the board', r.json.me);
+  }
+
+  // ---------- a member's own files in the cloud (R2) ----------
+  {
+    const files = require('../server/files.js');
+    const F = await newPlayer(null, '198.51.100.246'), G = await newPlayer(null, '198.51.100.247');
+    ok(!files.configured() && (await rpc({ a: 'fileList', kind: 'music' }, F)).status === 503, 'off while the R2 keys are not set');
+    Object.assign(process.env, { R2_ACCOUNT_ID: 'acct123', R2_ACCESS_KEY_ID: 'AKIDEXAMPLE', R2_SECRET_ACCESS_KEY: 'SECRETEXAMPLE', R2_BUCKET: 'zzb' });
+    // the same signed addresses that AWS's own library (boto3) makes for these inputs
+    eq(files.presign('GET', 'u/abc/music/x1', 3600, Date.parse('2026-11-20T17:53:00Z')).split('Signature=')[1], '80594d6389584b296df9335e8d3333e95d9942b31bcff0ab245ae88c5efaa193', 'a read address signed exactly as AWS signs it');
+    eq(files.presign('PUT', 'u/abc/music/x1', 600, Date.parse('2026-11-20T17:53:06Z'), { 'content-type': 'audio/mpeg' }).split('Signature=')[1], 'cd3d2b90ecbee6057ed63c8beb87af3693e886967125068af7cdf04b08901740', 'and an upload address with its content type');
+    ok((await call('health')).json.files === true, 'health says uploads are on');
+    let x = await rpc({ a: 'fileUp', kind: 'music', name: 'song.mp3', size: 3e6, type: 'audio/mpeg' }, F);
+    ok(x.status === 403 && x.json.why === 'member', 'members only', x.json);
+    await sync(F, [op('sub')]);
+    x = await rpc({ a: 'fileUp', kind: 'music', name: '<b>my song</b>.mp3', size: 3e6, type: 'audio/mpeg' }, F);
+    ok(x.status === 200 && /^https:\/\/acct123\.r2\.cloudflarestorage\.com\/zzb\/u\/[0-9a-f-]{36}\/music\//.test(x.json.url) && /X-Amz-SignedHeaders=content-type%3Bhost/.test(x.json.url), 'a member gets an address to put the file straight into the bucket', x.json);
+    const fid = x.json.id;
+    eq((await rpc({ a: 'fileList', kind: 'music' }, F)).json.files.length, 0, 'not on the list until the upload is done');
+    ok((await rpc({ a: 'fileOk', id: fid }, F)).json.ok, 'the upload is reported done');
+    x = await rpc({ a: 'fileList', kind: 'music' }, F);
+    ok(x.json.files.length === 1 && x.json.files[0].name === 'bmy song/b.mp3' && /X-Amz-Expires=3600/.test(x.json.files[0].url), 'then listed, name cleaned, with an address to read it', x.json.files);
+    eq((await rpc({ a: 'fileUp', kind: 'music', name: 'big', size: 16 * 1024 * 1024, type: 'audio/mpeg' }, F)).json.why, 'big', 'a file over 15 MB is refused');
+    eq((await rpc({ a: 'fileUp', kind: 'music', name: 'x.exe', size: 1000, type: 'application/x-msdownload' }, F)).json.why, 'type', 'only sound files for music');
+    eq((await rpc({ a: 'fileUp', kind: 'pics', name: 'p', size: 1000, type: 'image/svg+xml' }, F)).json.why, 'type', 'and only plain pictures (no SVG) for pictures');
+    eq((await rpc({ a: 'fileOk', id: fid }, G)).status, 404, 'nobody else can touch the file');
+    ok((await rpc({ a: 'fileHide', id: fid }, F)).json.ok && (await rpc({ a: 'fileList', kind: 'music' }, F)).json.files.length === 0, 'taken off the list');
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE id = $1', [fid]))[0].n, 1, 'but the record stays (nothing is deleted without the Owner)');
+    for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']) delete process.env[k];
   }
 
   // ---------- random matching: keyboards with keyboards, touch screens with touch screens, mixed only after a wait ----------

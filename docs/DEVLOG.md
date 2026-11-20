@@ -683,3 +683,19 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `bricks` 73、`gameslang` 113、`minipay` 10、`drawer` 28；截圖確認畫面、日文頁載好後消失。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`58cf9a9`](https://github.com/luffysky/cube2/commit/58cf9a9)。
+
+## 2026-11-21 08:20（Asia/Taipei）｜會員雲端上傳（R2）的程式，等金鑰就開
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（之後接 R2）、「繼續後面的」
+- 實際變更：
+  - 伺服器 `server/files.js`：會員要上傳時，伺服器檢查會員身分、大小、種類、總量後，發一個 10 分鐘有效的簽名網址，瀏覽器直接把檔案放進 R2；做完回報 `fileOk` 才列入清單；`fileList` 給 1 小時有效的讀取網址；`fileHide` 只是從清單拿掉。簽名用標準 AWS SigV4（自己寫、不加套件），和 AWS 官方 boto3 對同一組輸入算出的簽名逐字相同。
+  - 新表 `zz.files`；`/api/health` 多一個 `files`（有沒有設好 R2 金鑰）；CSP 的 `connect-src` 加上 `https://*.r2.cloudflarestorage.com`。
+  - 頁面：伺服器說可以上傳、而且有雲端存檔時，「也上傳到雲端」才會打開；選了以後新加的音樂和圖片會在存到本機之後另外上傳（音樂旁邊顯示 ☁），失敗會說檔案還在本機；另一台裝置按「從雲端取回」把雲端的檔案拿回來（音樂照樣先檢查能不能播，圖片取最新的牆面和方塊圖）。
+  - 隱私權政策四語加上「選擇上傳時」這一條。給 Owner 的開啟步驟：`docs/R2_SETUP.md`（開 bucket、建只限這個 bucket 的金鑰、CORS、四個 Vercel 環境變數）。
+  - 沒有刪除：從清單拿掉只隱藏，bucket 裡的檔案不刪，要不要刪請 Owner 決定。
+- 檔案：`server/files.js`（新）、`server/app.js`、`server/core.js`、`server/db.js`、`src/cloud.js`、`src/devstore.js`、`src/music.js`、`src/shop.js`、`build.js`、`vercel.json`、`legal/`、`privacy.html`、`test/api.test.js`、`test/r2.js`（新）、`test/browser-run.js`、`docs/R2_SETUP.md`（新）。
+- 資料庫：新表 `zz.files`（`CREATE TABLE IF NOT EXISTS`）。｜刪除：無。
+- 測試：`node test/run.js` 全過（api 363：沒金鑰時關著、簽名和 boto3 相同、非會員不能傳、超過 15 MB／非音樂檔／SVG 都擋、別人碰不到、拿掉後紀錄還在）；瀏覽器 `r2` 9（真的上傳到模擬的 bucket、清空本機後從雲端取回、圖片也上傳、沒金鑰時選項關著）、`music` 10、`pwa` 52、`legal` 439、`flow` 60。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。正式站目前沒有 R2 金鑰，所以上傳選項仍是關著的。

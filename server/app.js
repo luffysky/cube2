@@ -17,6 +17,7 @@ const core = require('./core.js');
 const ads = require('./ads.js');
 const rules = require('./rules.js');
 const identity = require('./identity.js');
+const files = require('./files.js');
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
@@ -71,7 +72,7 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), region: process.env.VERCEL_REGION || '', now: clock() };
     if (url.searchParams.get('deep') && out.db) {
       // a look at the database itself: is it reachable, how long does one round trip take
       const t0 = Date.now();
@@ -147,6 +148,16 @@ const routes = {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.restore(d, cred, clock()));
         break;
+      // a member's own files in the cloud (R2; off until its keys are set, see server/files.js)
+      case 'fileUp': case 'fileOk': case 'fileList': case 'fileHide': {
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(async d => {
+          const row = await core.findPlayer(d, cred);
+          if (!row || row.pending) return { status: 401, body: { ok: false, why: 'auth' } };
+          return body.a === 'fileUp' ? files.up(d, row, body, now) : body.a === 'fileOk' ? files.done(d, row, body) : body.a === 'fileList' ? files.list(d, row, body, now) : files.hide(d, row, body);
+        });
+        break;
+      }
       // SnowRealm Identity (off until IDENTITY_LINK_ENABLED is set and the service is live; see server/identity.js)
       case 'idStatus':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });

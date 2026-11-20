@@ -163,7 +163,7 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
   "media-src 'self' data: blob:",
-  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://*.r2.cloudflarestorage.com",      // members' own files, through signed addresses (server/files.js)
   "worker-src 'self'", "manifest-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"
 ].join('; ');
 const vfile = path.join(root, 'vercel.json'), vj = JSON.parse(fs.readFileSync(vfile, 'utf8'));

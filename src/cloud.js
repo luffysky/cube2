@@ -300,7 +300,7 @@
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
         if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true; Cloud.nodb = false;
+        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true;      // files: members may upload their own pictures and music (R2)
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
@@ -363,6 +363,24 @@
     return Cloud.flush().then(function () { return !!Cloud.cred; });
   };
   Cloud.restart = Cloud.ensure;
+  // a member's own files in the cloud: a = 'fileUp' | 'fileOk' | 'fileList' | 'fileHide' (see server/files.js)
+  Cloud.file = function (body) {
+    return Cloud.ensure().then(function (ok) {
+      if (!ok) return null;
+      return call('POST', 'rpc', body, true).then(function (r) { return r.status === 200 && r.body && r.body.ok ? r.body : null; }, function () { return null; });
+    });
+  };
+  // puts one file (a Blob or ArrayBuffer) into the cloud: asks for an address, sends it straight there, reports it done
+  Cloud.upload = function (kind, name, data, type) {
+    var size = data.byteLength != null ? data.byteLength : data.size;
+    return Cloud.file({ a: 'fileUp', kind: kind, name: name, size: size, type: type }).then(function (b) {
+      if (!b || !b.url) return null;
+      return root.fetch(b.url, { method: 'PUT', body: data, headers: { 'Content-Type': type } }).then(function (res) {
+        if (!res.ok) return null;
+        return Cloud.file({ a: 'fileOk', id: b.id }).then(function (d) { return d ? b.id : null; });
+      }, function () { return null; });
+    });
+  };
   Cloud.code = function () {
     return Cloud.ensure().then(function (ok) {
       if (!ok) return offline();

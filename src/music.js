@@ -172,7 +172,12 @@
           var id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
           putFile(id, data, function (okk) {
             if (!okk) { App.toast(t('mu.noStore')); list = []; return next(); }
-            st.own.push({ id: id, name: String(f.name).replace(/\.[a-z0-9]{2,4}$/i, '').slice(0, 60), size: f.size });
+            var entry = { id: id, name: String(f.name).replace(/\.[a-z0-9]{2,4}$/i, '').slice(0, 60), size: f.size };
+            st.own.push(entry);
+            // chosen "also upload": a copy goes to the player's cloud space too (the local copy is already safe)
+            if (ZZ.DevStore && ZZ.DevStore.choice('music') === 'cloud' && ZZ.Cloud && ZZ.Cloud.upload) {
+              ZZ.Cloud.upload('music', f.name, data, f.type || 'audio/mpeg').then(function (cid) { if (cid) { entry.cid = cid; keep(); if (App.sheet() === 'music') App.openSheet('music'); } else App.toast(t('ds.upFail'), 3000); });
+            }
             st.list.push('own:' + id);
             total += f.size; added++;
             next();
@@ -184,11 +189,13 @@
     })();
   }
 
+  function ownOf(id) { var k = String(id).replace(/^own:/, ''); for (var i = 0; i < st.own.length; i++) if (st.own[i].id === k) return st.own[i]; return null; }
   // ---------- the sheet ----------
   function trackRow(id) {
     var on = st.list.indexOf(id) >= 0, own = /^own:/.test(id), locked = own && !canOwn(), playing = App.sfx.mname === id;
     return '<div class="mu-row' + (playing ? ' on' : '') + '"><label class="mu-check"><input type="checkbox" data-mulist="' + App.esc(id) + '"' + (on ? ' checked' : '') + (locked ? ' disabled' : '') + '><span>' + App.esc(nameOf(id)) + '</span></label>' +
       (locked ? '<span class="tag lock">' + t('st.sub') + '</span>' : '<button class="btn sm" type="button" data-muplay="' + App.esc(id) + '">' + (playing ? '♪' : t('mu.playNow')) + '</button>') +
+      (own && ownOf(id) && ownOf(id).cid ? '<span class="tag" title="' + App.esc(t('ds.cloud')) + '">☁</span>' : '') +
       (own ? '<button class="btn sm plain" type="button" data-mudel="' + App.esc(id) + '">' + t('mu.del') + '</button>' : '') + '</div>';
   }
   App.dismiss = App.dismiss || {};
@@ -209,7 +216,7 @@
     h += '<h3>' + t('mu.builtin') + '</h3><div class="mu-list">' + BUILT.map(trackRow).join('') + '</div>';
     h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>' + (ZZ.DevStore && canOwn() ? ZZ.DevStore.html('music') : '');
     if (st.own.length) h += (canOwn() ? '' : '<p class="note">' + t('mu.lapsed') + '</p>') + '<div class="mu-list">' + st.own.map(function (o) { return trackRow('own:' + o.id); }).join('') + '</div>';
-    h += canOwn() ? '<div class="row"><label class="btn" for="muFile">' + t('mu.add') + '</label><input id="muFile" type="file" accept="audio/*" multiple hidden></div>'
+    h += canOwn() ? '<div class="row"><label class="btn" for="muFile">' + t('mu.add') + '</label><input id="muFile" type="file" accept="audio/*" multiple hidden>' + (ZZ.DevStore && ZZ.DevStore.choice('music') === 'cloud' ? '<button class="btn" type="button" data-do="muPull">' + t('ds.pull') + '</button>' : '') + '</div>'
       : '<p class="note">' + t('mu.member') + '</p><div class="row"><button class="btn" type="button" data-tab="member">' + t('k.member') + '</button></div>';
     return h + '<div class="row">' + App.btn('close', 'done', true) + '</div>';
   };
@@ -235,6 +242,29 @@
   App.acts.muNext = function () { App.sfx.wake(); if (st.mode === 'list' && queue().length) step(1); App.openSheet('music'); };
   App.acts.muPrev = function () { App.sfx.wake(); if (st.mode === 'list' && queue().length) step(-1); App.openSheet('music'); };
   App.acts.musicOpen = function () { App.openSheet('music'); };
+  // another device: what is in the cloud and not here yet comes down, is checked like any added file, and is kept here
+  App.acts.muPull = function () {
+    if (!canOwn() || !ZZ.Cloud || !ZZ.Cloud.file) return;
+    App.toast(t('mu.adding'), 1500);
+    ZZ.Cloud.file({ a: 'fileList', kind: 'music' }).then(function (b) {
+      var want = (b && b.files || []).filter(function (f) { return !st.own.some(function (o) { return o.cid === f.id; }); }), got = 0;
+      (function next() {
+        var f = want.shift();
+        if (!f || st.own.length >= MAX_COUNT) { keep(); App.toast(t('ds.pulled', got)); if (App.sheet() === 'music') App.openSheet('music'); return; }
+        fetch(f.url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (data) {
+          if (!data) return next();
+          App.sfx.wake();
+          App.sfx.decode(data.slice(0), function () {
+            var id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+            putFile(id, data, function (okk) {
+              if (okk) { st.own.push({ id: id, name: String(f.name).replace(/\.[a-z0-9]{2,4}$/i, '').slice(0, 60), size: f.size, cid: f.id }); st.list.push('own:' + id); got++; }
+              next();
+            });
+          }, next);
+        }, next);
+      })();
+    });
+  };
   App.clicks.push(function (d) {
     if (d.mumode) { st.mode = d.mumode === 'list' ? 'list' : 'auto'; keep(); App.sfx.wake(); replay(); App.openSheet('music'); return true; }
     if (d.muorder) { st.order = d.muorder; keep(); replay(); App.openSheet('music'); return true; }

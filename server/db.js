@@ -137,6 +137,19 @@ const SCHEMA = [
   "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS pool text NOT NULL DEFAULT ''",
   // what the waiting player plays on ('pc' keyboard, 'touch' phone or tablet): the same kind are matched first
   "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS dev text NOT NULL DEFAULT ''",
+  // a member's own pictures and music uploaded to R2 (server/files.js): one row per file; hidden ones are off the list
+  `CREATE TABLE IF NOT EXISTS zz.files (
+     id text PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     kind text NOT NULL,
+     name text NOT NULL,
+     size bigint NOT NULL,
+     type text NOT NULL,
+     at double precision NOT NULL,
+     ready boolean NOT NULL,
+     hidden boolean NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS files_pid ON zz.files (pid, kind)',
   // ranked matches against people: the two reports (zz.matches ids) of one match, put together once by the server.
   // ok says whether they agreed (then both ratings moved); a pair that disagreed changes nothing.
   `CREATE TABLE IF NOT EXISTS zz.pvp (

@@ -448,9 +448,38 @@
       Meta.equip(key, 'custom');
       Meta.save();
       useUrl(key, data, function () { if (App.sheet() === 'shop') App.openSheet('shop'); });
+      upPic(key, data);
     };
     im.src = url;
   }
+  // chosen "also upload": the picture (already shrunk to a JPEG) goes to the player's cloud space too
+  function upPic(key, data) {
+    if (!ZZ.DevStore || ZZ.DevStore.choice('pics') !== 'cloud' || !ZZ.Cloud || !ZZ.Cloud.upload) return;
+    // the data: address turned into bytes by hand (the page may not fetch data: addresses)
+    var bin = atob(String(data).split(',')[1] || ''), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    ZZ.Cloud.upload('pics', key, new Blob([bytes], { type: 'image/jpeg' }), 'image/jpeg').then(function (cid) { if (!cid) App.toast(t('ds.upFail'), 3000); }, function () { App.toast(t('ds.upFail'), 3000); });
+  }
+  // another device: the newest wall and tile pictures from the cloud become this device's own
+  App.acts.picPull = function () {
+    if (!Meta.isSub() || !ZZ.Cloud || !ZZ.Cloud.file) return;
+    ZZ.Cloud.file({ a: 'fileList', kind: 'pics' }).then(function (b) {
+      var newest = {}, got = 0;
+      (b && b.files || []).forEach(function (f) { if ((f.name === 'bg' || f.name === 'tile') && (!newest[f.name] || f.at > newest[f.name].at)) newest[f.name] = f; });
+      var keys = Object.keys(newest);
+      (function next() {
+        var k = keys.shift();
+        if (!k) { App.toast(t('ds.pulled', got)); if (App.sheet() === 'shop') App.openSheet('shop'); return; }
+        fetch(newest[k].url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (blob) {
+          if (!blob) return next();
+          var rd = new FileReader();
+          rd.onload = function () { Pics.put(k, rd.result); Meta.data.custom[k] = true; Meta.equip(k, 'custom'); Meta.save(); got++; useUrl(k, rd.result, next); };
+          rd.onerror = next;
+          rd.readAsDataURL(blob);
+        }, next);
+      })();
+    });
+  };
   function dropPic(key) {
     Pics.del(key);
     Meta.data.custom[key] = false;
@@ -555,7 +584,7 @@
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';
     h += '<div class="levels">' + picRow('bg', 'mb.wall') + picRow('tile', 'mb.tile') + '</div>' +
       '<div class="field"><label for="cDim">' + t('mb.dim') + '</label><output id="cDimO" for="cDim"></output><input type="range" id="cDim" min="0" max="85" step="5"></div>' +
-      (ZZ.DevStore ? ZZ.DevStore.html('pics') : '<p class="note">' + t('mb.picNote') + '</p>') + '<input type="file" id="picFile" accept="image/*" hidden>';
+      (ZZ.DevStore ? ZZ.DevStore.html('pics') : '<p class="note">' + t('mb.picNote') + '</p>') + (ZZ.DevStore && ZZ.DevStore.choice('pics') === 'cloud' ? '<div class="row"><button class="btn" type="button" data-do="picPull">' + t('ds.pull') + '</button></div>' : '') + '<input type="file" id="picFile" accept="image/*" hidden>';
     return h;
   }
   App.dismiss.shop = 1; App.dismiss.jobs = 1; App.dismiss.profile = 1;
