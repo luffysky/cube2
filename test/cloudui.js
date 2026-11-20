@@ -135,16 +135,24 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(await ev(B, 'return !!C.cred'), 'cancel keeps it');
   await B.page.tap('[data-do="cloudDel"]'); await sleep(150);
   await B.page.tap('[data-do="cloudDelYes"]'); await sleep(800);
-  ok(await ev(B, 'return C.status() === "gone" && !C.cred && M.data.name === "阿明"'), 'deleted; local progress stays', await ev(B, 'return [C.status(), M.data.name]'));
+  ok(await ev(B, 'return C.status() === "pend" && !C.cred && !!C.del && M.data.name === "阿明"'), 'deleted: waiting 30 days; local progress stays', await ev(B, 'return [C.status(), M.data.name]'));
+  ok(await B.page.evaluate(() => !!document.querySelector('[data-do="cloudRestore"]') && /2026|20\d\d/.test(document.getElementById('sheetCard').textContent)), 'the sheet offers to take it back and says until when');
   await shot(B, '9-deleted-en');
   await ev(A, 'M.claimLogin(); M.buyItem(2); return 1'); await sleep(1300); await idle(A);
-  ok(await ev(A, 'return C.status()') === 'gone', 'the other device finds out on its next save', await ev(A, 'return C.status()'));
-  ok(await A.page.evaluate(() => /雲端存檔已經不在了/.test(document.getElementById('mtoast').textContent) || /雲端存檔已經不在了/.test(document.getElementById('toast').textContent)), 'and tells the player');
+  ok(await ev(A, 'return C.status()') === 'pend', 'the other device finds out on its next save', await ev(A, 'return C.status()'));
+  ok(await A.page.evaluate(() => /申請刪除/.test(document.getElementById('mtoast').textContent) || /申請刪除/.test(document.getElementById('toast').textContent)), 'and tells the player it can be taken back');
   await A.page.tap('[data-do="close"]').catch(() => {}); await sleep(150);
   await A.page.tap('.me').catch(() => {}); await sleep(250);
-  ok(await A.page.evaluate(() => !!document.querySelector('[data-do="cloudStart"]')), 'the profile offers to start a cloud save again');
-  await A.page.tap('[data-do="cloudStart"]'); await sleep(900); await idle(A);
-  ok(await ev(A, 'return C.status() === "ok" && !!C.cred && C.cred.id !== ' + JSON.stringify(idA)), 'a new save starts from what the device has', await ev(A, 'return C.status()'));
+  ok(await A.page.evaluate(() => /取消刪除/.test(document.getElementById('sheetCard').textContent)), 'the profile offers to take it back');
+  await A.page.evaluate(() => ZZ.App.openSheet('cloud')); await sleep(200);
+  await shot(A, '9b-pending');
+  await A.page.tap('[data-do="cloudRestore"]'); await sleep(900); await idle(A);
+  ok(await ev(A, 'return C.status() === "ok" && !!C.cred && C.cred.id === ' + JSON.stringify(idA)), 'taken back: the same save again', await ev(A, 'return C.status()'));
+  // deleted again, and this time left to go: a new save starts from what the device has
+  await A.page.evaluate(() => ZZ.App.openSheet('cloud')); await sleep(200);
+  await A.page.tap('[data-do="cloudDel"]'); await sleep(150); await A.page.tap('[data-do="cloudDelYes"]'); await sleep(800);
+  await A.page.tap('[data-do="cloudLetGo"]'); await sleep(900); await idle(A);
+  ok(await ev(A, 'return C.status() === "ok" && !!C.cred && C.cred.id !== ' + JSON.stringify(idA) + ' && !C.del'), 'letting it go starts a new save from what the device has', await ev(A, 'return C.status()'));
 
   // ---------- what went over the network ----------
   const api = calls.filter(c => /\/api\//.test(c));

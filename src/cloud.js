@@ -22,6 +22,7 @@
     dead: false,      // this host has no API: stay local, do not keep asking
     unsure: false,    // …or so it seemed: nothing answered, which a dead network also looks like
     seen: false,      // the API has answered from this address before
+    del: null,        // { id, key, until }: the save this device asked to delete, while it can still be taken back
     nodb: false,      // the API is here but has no database linked
     gone: false,      // this device was unlinked on purpose; do not make a new account by itself
     cred: null,       // { id, key }
@@ -59,7 +60,7 @@
   function persist() {
     if (!Cloud.cred && !Cloud.gone) theirs();   // never write over an account another tab has just made
     var st = storage(), c = Cloud.cred;
-    var v = { id: c ? c.id : '', key: c ? c.key : '', pub: Cloud.pub, gone: Cloud.gone, seen: Cloud.seen, base: c ? null : Cloud.base,
+    var v = { id: c ? c.id : '', key: c ? c.key : '', pub: Cloud.pub, gone: Cloud.gone, seen: Cloud.seen, base: c ? null : Cloud.base, del: Cloud.del,
       q: Cloud.q.map(function (o) { return { i: o.i, k: o.k, a: o.a }; }) };
     try { if (st) st.setItem(KEY, JSON.stringify(v)); } catch (e) { /* kept in memory for this visit */ }
   }
@@ -68,9 +69,12 @@
     Cloud.cred = typeof v.id === 'string' && v.id && typeof v.key === 'string' && v.key ? { id: v.id, key: v.key } : null;
     Cloud.pub = typeof v.pub === 'string' ? v.pub : '';
     Cloud.gone = !!v.gone; Cloud.seen = !!v.seen;
+    Cloud.del = readDel(v.del);
     Cloud.q = Array.isArray(v.q) ? v.q.filter(function (o) { return o && typeof o.i === 'string' && typeof o.k === 'string' && Array.isArray(o.a); }).slice(-QUEUE_MAX) : [];
     Cloud.base = !Cloud.cred && v.base && typeof v.base === 'object' && Cloud.q.length ? v.base : null;
   }
+  // a cloud save this device asked to delete, still in its 30 days: kept so the player can take it back from here
+  function readDel(d) { return d && typeof d.id === 'string' && typeof d.key === 'string' && typeof d.until === 'number' ? { id: d.id, key: d.key, until: d.until } : null; }
   function snapshot() { return JSON.parse(JSON.stringify(Meta.data)); }
   function changed() { if (Cloud.onChange) Cloud.onChange(); }
   function opId() {
@@ -143,7 +147,7 @@
     var join = !!id && !mine;                                  // it made the account this tab was about to make
     Cloud.cred = id ? { id: v.id, key: v.key } : null;
     Cloud.pub = id && typeof v.pub === 'string' ? v.pub : '';
-    Cloud.gone = gone; Cloud.want = false;
+    Cloud.gone = gone; Cloud.want = false; Cloud.del = readDel(v.del);
     if (!join) Cloud.q = [];                                   // a different save, or none: what waited here was meant for the old one
     Cloud.base = Cloud.cred || gone ? null : snapshot();
     if (Cloud.cred && Cloud.on) Cloud.flush(true);
@@ -192,6 +196,13 @@
     persist();
     if (Cloud.onNote) Cloud.onNote('lost');
   }
+  // the save this device is on is waiting to be deleted: nothing goes to it any more; it can still be taken back
+  function waits(until) {
+    if (Cloud.cred) Cloud.del = { id: Cloud.cred.id, key: Cloud.cred.key, until: +until || 0 };
+    Cloud.cred = null; Cloud.pub = ''; Cloud.q = []; Cloud.base = null; Cloud.gone = true;
+    persist();
+    if (Cloud.onNote) Cloud.onNote('pending');
+  }
   function unmark() { Cloud.q.forEach(function (o) { delete o.s; }); }
 
   // One request. Answers 'more' (go on), 'done' or 'wait' (try again later).
@@ -235,6 +246,7 @@
         return Cloud.q.length ? 'more' : 'done';
       }
       if (r.status === 401) { lost(); return 'done'; }
+      if (r.status === 409 && b && b.why === 'pending') { waits(b.until); return 'done'; }   // deleted from another device: it is waiting
       if (r.status === 400 || r.status === 413 || r.status === 415) { drop(); persist(); return Cloud.q.length ? 'more' : 'done'; }   // the server will never take these as they are
       unmark();
       return 'wait';
@@ -334,7 +346,7 @@
     if (Cloud.dead) return 'none';
     if (!known) return 'busy';          // still finding out whether a server is here
     if (!Cloud.on && !Cloud.cred && !Cloud.seen) return 'none';
-    if (Cloud.gone) return 'gone';
+    if (Cloud.gone) return Cloud.del && Cloud.del.until > Cloud.now() ? 'pend' : 'gone';
     if (Cloud.busy) return 'busy';
     if (!Cloud.on || Cloud.fails) return 'wait';
     return Cloud.cred ? 'ok' : 'new';
@@ -376,14 +388,36 @@
     return call('POST', 'rpc', { a: 'delete' }, true).then(function (r) {
       var b = answer(r);
       if ((r.status === 200 && b.ok) || r.status === 401) {
+        Cloud.del = r.status === 200 && typeof b.until === 'number' ? { id: Cloud.cred.id, key: Cloud.cred.key, until: b.until } : null;
         Cloud.cred = null; Cloud.pub = ''; Cloud.q = []; Cloud.base = null; Cloud.gone = true; Cloud.want = false;
         persist();
         changed();
-        return { ok: true };
+        return { ok: true, until: Cloud.del ? Cloud.del.until : 0 };
       }
       return b;
     }, offline);
   };
+  // Takes back the deletion of the save this device was on. The cloud save comes back as it was and becomes this
+  // device's progress again.
+  Cloud.restore = function () {
+    var d = Cloud.del;
+    if (!d) return Promise.resolve({ ok: false, why: 'none' });
+    if (!Cloud.on) return Promise.resolve(offline());
+    return call('POST', 'rpc', { a: 'restore' }, { id: d.id, key: d.key }).then(function (r) {
+      var b = answer(r);
+      if (r.status === 200 && b.ok && b.st) {
+        Cloud.del = null; Cloud.q = [];
+        take({ id: d.id, key: d.key, pub: b.pub, now: b.now });
+        adopt(b.st);
+        changed();
+        return { ok: true };
+      }
+      if (r.status === 410 || r.status === 401) { Cloud.del = null; persist(); changed(); return { ok: false, why: 'purged' }; }
+      return b;
+    }, offline);
+  };
+  // The player does not want it back: this device forgets it (the server still removes it when the 30 days are up).
+  Cloud.letGo = function () { Cloud.del = null; persist(); changed(); };
   var boards = {};
   Cloud.board = function (b, scope) {
     var key = b + '|' + scope + '|' + Cloud.pub, hit = boards[key];
@@ -464,6 +498,15 @@
     'cl.err': ['現在連不上伺服器，等一下再試。', 'The server cannot be reached right now. Try again in a moment.', '現在サーバーに接続できません。少し待ってからお試しください。', '지금 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.'],
     'cl.stale': ['剛剛那場伺服器沒有採計。請重新整理頁面換成最新版再打。', 'The server did not count that match. Reload the page to get the latest version, then play again.', 'さっきの試合はサーバーで記録されませんでした。ページを再読み込みして最新版にしてください。', '방금 경기는 서버에 기록되지 않았습니다. 페이지를 새로 고쳐 최신 버전으로 바꿔 주세요.'],
     'cl.privacy': ['隱私說明：存了什麼、怎麼刪', 'Privacy: what is stored and how to delete it', 'プライバシー：保存される内容と削除方法', '개인정보: 저장되는 내용과 삭제 방법'],
+    'cl.pend': ['雲端存檔等待刪除中，已暫停使用。', 'Your cloud save is waiting to be deleted and is switched off.', 'クラウドセーブは削除待ちで、停止しています。', '클라우드 저장 데이터가 삭제 대기 중이며 중지되었습니다.'],
+    'cl.pendWhen': ['{0} 以前可以恢復，之後永久刪除。', 'You can take it back until {0}; after that it is deleted for good.', '{0} までは元に戻せます。その後は完全に削除されます。', '{0}까지 복구할 수 있으며 그 이후에는 영구 삭제됩니다.'],
+    'cl.pendP': ['恢復後，雲端存檔會回到刪除前的樣子，並取代這台裝置現在的進度（{0}、{1} 金幣）。不恢復的話，這台裝置的進度不受影響，到期後雲端那份永久刪除。', 'Taking it back brings the cloud save back as it was and replaces the progress now on this device ({0}, {1} coins). If you leave it, progress here is not touched and the cloud copy is deleted for good when the time is up.', '元に戻すと、クラウドセーブは削除前の状態に戻り、この端末の現在の進行状況（{0}、{1}コイン）と置き換わります。そのままにすると、この端末の進行状況はそのままで、期限後にクラウドの分は完全に削除されます。', '복구하면 클라우드 저장 데이터가 삭제 전 상태로 돌아오고 이 기기의 현재 진행 상황({0}, {1}코인)을 대체합니다. 그대로 두면 이 기기의 진행 상황은 그대로이고 기한 후 클라우드 데이터는 영구 삭제됩니다.'],
+    'cl.restore': ['取消刪除，恢復雲端存檔', 'Take it back', '削除を取り消して復元', '삭제 취소하고 복구'],
+    'cl.restored': ['雲端存檔已經恢復。', 'Your cloud save is back.', 'クラウドセーブを復元しました。', '클라우드 저장 데이터를 복구했습니다.'],
+    'cl.letGo': ['不恢復，改開新的雲端存檔', 'Leave it and start a new cloud save', '復元せず新しいクラウドセーブを始める', '복구하지 않고 새 클라우드 저장 시작'],
+    'cl.purged': ['這份雲端存檔已經超過 30 天，永久刪除了。', 'That cloud save is past its 30 days and has been deleted for good.', 'そのクラウドセーブは 30 日を過ぎ、完全に削除されました。', '그 클라우드 저장 데이터는 30일이 지나 영구 삭제되었습니다.'],
+    'cl.pending': ['這份雲端存檔在別台裝置申請刪除了，到「雲端存檔」可以恢復。', 'This cloud save was put up for deletion on another device. You can take it back in Cloud save.', 'このクラウドセーブは別の端末で削除申請されました。「クラウドセーブ」から復元できます。', '이 클라우드 저장 데이터는 다른 기기에서 삭제 신청되었습니다. "클라우드 저장"에서 복구할 수 있어요.'],
+    'cl.delWhen': ['按下確定後立刻暫停使用、從排行榜移除，所有裝置斷開。{0} 以前可以在這裡恢復；之後雲端存檔、排行榜成績和 SnowRealm 綁定紀錄永久刪除。這台裝置上的進度不受影響。', 'Once you confirm, it is switched off at once, taken off the leaderboards and every device is unlinked. You can take it back here until {0}; after that the cloud save, your leaderboard scores and your SnowRealm link are deleted for good. Progress on this device is not touched.', '確定すると、すぐに停止してランキングから外れ、すべての端末の接続を解除します。{0} まではここで元に戻せます。その後、クラウドセーブ、ランキングの記録、SnowRealm 連携の記録は完全に削除されます。この端末の進行状況には影響しません。', '확인하면 즉시 중지되고 랭킹에서 빠지며 모든 기기의 연결이 해제됩니다. {0}까지는 여기에서 복구할 수 있고, 그 이후에는 클라우드 저장 데이터, 랭킹 기록, SnowRealm 연결 기록이 영구 삭제됩니다. 이 기기의 진행 상황에는 영향이 없습니다.'],
     'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
     'cl.delP': ['雲端上的存檔和排行榜成績會立刻停用，所有連著的裝置都會斷開；資料先保留 30 天，之後永久刪除。這台裝置上的進度不受影響。', 'Your cloud save and leaderboard scores are switched off at once and every device is unlinked. The data is kept for 30 days, then deleted for good. Progress on this device is not touched.', 'クラウドのセーブとランキングの記録はすぐに停止し、すべての端末の接続を解除します。データは 30 日間保管したあと完全に削除します。この端末の進行状況には影響しません。', '클라우드 저장 데이터와 랭킹 기록은 즉시 중지되고 모든 기기의 연결이 해제됩니다. 데이터는 30일 동안 보관한 뒤 영구 삭제됩니다. 이 기기의 진행 상황에는 영향이 없습니다.'],
     'cl.delYes': ['確定刪除', 'Yes, delete', '削除する', '삭제'],
@@ -477,7 +520,12 @@
 
   function stateText() {
     var st = Cloud.status();
-    return t('cl.' + st);
+    return st === 'pend' ? t('cl.pend') + ' ' + t('cl.pendWhen', when(Cloud.del.until)) : t('cl.' + st);
+  }
+  // a moment in the player's own time zone, to the minute
+  function when(ms) {
+    try { return new Date(ms).toLocaleString(L.lang === 'en' ? 'en' : L.lang, { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch (e) { return new Date(ms).toLocaleString(); }
   }
   function rankText(rp) { return App.rankName(Meta.rankOf(rp)); }
   function nameOf(n, pub) { return n || t('lb.anon', String(pub || '').slice(0, 4).toUpperCase()); }
@@ -494,7 +542,7 @@
   App.sheets.srAccount = function () { return srBlock() + '<div class="row">' + btn('close', 'close') + '</div>'; };
   App.profileExtra = function () {
     var st = Cloud.status(), h = '<h3>' + t('cl.title') + '</h3><p class="note" id="clState">' + esc(stateText()) + '</p>';
-    if (st !== 'none') h += '<div class="row">' + (st === 'gone' ? btn('cloudStart', 'cl.start') : btn('cloud', 'cl.manage')) + '</div>';
+    if (st !== 'none') h += '<div class="row">' + (st === 'gone' ? btn('cloudStart', 'cl.start') : st === 'pend' ? btn('cloud', 'cl.restore') : btn('cloud', 'cl.manage')) + '</div>';
     return h + srBlock();
   };
   App.acts.cloud = function () { ui.msg = ''; ui.peek = null; ui.del = false; App.openSheet('cloud'); };
@@ -514,21 +562,27 @@
     h += '<p>' + t('cl.what') + '</p>';
     if (st === 'none') return h + srBlock() + '<div class="row">' + btn('close', 'close') + '</div>';
     if (ui.msg) h += '<p class="warn" role="status">' + esc(ui.msg) + '</p>';
+    if (st === 'pend') {
+      h += '<div class="plan"><b>' + t('cl.pend') + '</b><p>' + esc(t('cl.pendWhen', when(Cloud.del.until))) + '</p><p class="note">' + esc(t('cl.pendP', rankText(d.rp), L.num(d.coins))) + '</p>' +
+        '<div class="row">' + btn('cloudLetGo', 'cl.letGo') + btn('cloudRestore', 'cl.restore', true) + '</div></div>';
+    }
     h += srBlock();
-    h += '<h3>' + t('cl.move') + '</h3><p>' + t('cl.moveP') + '</p>';
-    if (ui.code && ui.codeExp > Date.now()) {
-      h += '<p class="note">' + esc(t('cl.codeIs', 10)) + '</p><div class="roomcode xfer" aria-label="' + esc(ui.code) + '">' + esc(ui.code) + '</div><p class="warn">' + t('cl.codeWarn') + '</p>';
-    } else h += '<div class="row">' + btn('cloudCode', 'cl.getCode') + '</div>';
-    h += '<h3>' + t('cl.enter') + '</h3><div class="joinrow"><input id="clCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="' + esc(t('cl.enterPh')) + '" value="' + esc(ui.entered) + '">' +
-      btn('cloudPeek', 'cl.check') + '</div>';
-    if (ui.peek) {
-      var p = ui.peek;
-      h += '<div class="plan"><b>' + t('cl.found') + '</b><p>' + esc(t('cl.foundRow', nameOf(p.name, p.pub), rankText(p.rp), L.num(p.coins), p.games)) + '</p>';
-      if (p.same) h += '<p class="note">' + t('cl.same') + '</p></div>';
-      else h += '<p class="warn">' + esc(t('cl.replace', rankText(d.rp), L.num(d.coins))) + '</p><div class="row">' + btn('cloudUse', 'cl.use', true) + '</div></div>';
+    if (st !== 'pend') {
+      h += '<h3>' + t('cl.move') + '</h3><p>' + t('cl.moveP') + '</p>';
+      if (ui.code && ui.codeExp > Date.now()) {
+        h += '<p class="note">' + esc(t('cl.codeIs', 10)) + '</p><div class="roomcode xfer" aria-label="' + esc(ui.code) + '">' + esc(ui.code) + '</div><p class="warn">' + t('cl.codeWarn') + '</p>';
+      } else h += '<div class="row">' + btn('cloudCode', 'cl.getCode') + '</div>';
+      h += '<h3>' + t('cl.enter') + '</h3><div class="joinrow"><input id="clCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="' + esc(t('cl.enterPh')) + '" value="' + esc(ui.entered) + '">' +
+        btn('cloudPeek', 'cl.check') + '</div>';
+      if (ui.peek) {
+        var p = ui.peek;
+        h += '<div class="plan"><b>' + t('cl.found') + '</b><p>' + esc(t('cl.foundRow', nameOf(p.name, p.pub), rankText(p.rp), L.num(p.coins), p.games)) + '</p>';
+        if (p.same) h += '<p class="note">' + t('cl.same') + '</p></div>';
+        else h += '<p class="warn">' + esc(t('cl.replace', rankText(d.rp), L.num(d.coins))) + '</p><div class="row">' + btn('cloudUse', 'cl.use', true) + '</div></div>';
+      }
     }
     if (Cloud.cred) {
-      h += '<h3>' + t('cl.del') + '</h3><p class="note">' + t('cl.delP') + '</p><div class="row">' +
+      h += '<h3>' + t('cl.del') + '</h3><p class="note">' + esc(ui.del ? t('cl.delWhen', when(Cloud.now() + 30 * 86400000)) : t('cl.delP')) + '</p><div class="row">' +
         (ui.del ? btn('cloudDelNo', 'cancel') + btn('cloudDelYes', 'cl.delYes') : btn('cloudDel', 'cl.del')) + '</div>';
     }
     h += '<p class="note"><a href="privacy.html" target="_blank" rel="noopener">' + t('cl.privacy') + '</a></p>';
@@ -571,6 +625,17 @@
       if (App.sheet() === 'cloud') App.openSheet('cloud');
     });
   };
+  App.acts.cloudRestore = function () {
+    if (ui.wait) return;
+    ui.wait = true; ui.msg = '';
+    Cloud.restore().then(function (b) {
+      ui.wait = false;
+      if (b && b.ok) { App.sfx.play('win'); App.toast(t('cl.restored'), 3200); Cloud._forget(); App.applyLook(); }
+      else ui.msg = b && b.why === 'purged' ? t('cl.purged') : say(b);
+      refresh();
+    });
+  };
+  App.acts.cloudLetGo = function () { Cloud.letGo(); App.acts.cloudStart(); };
   App.acts.cloudDel = function () { ui.del = true; App.openSheet('cloud'); };
   App.acts.cloudDelNo = function () { ui.del = false; App.openSheet('cloud'); };
   App.acts.cloudDelYes = function () {
@@ -659,7 +724,7 @@
       if (App.sheet() === 'online' && net && (net.state === 'idle' || net.state === 'error') && !(active && active.id === 'nCode')) App.openSheet('online');
     }
   };
-  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : kind === 'stale' ? 'cl.stale' : 'cl.rejected'), kind === 'stale' ? 7000 : 4600); };
+  Cloud.onNote = function (kind) { App.toast(t(kind === 'lost' ? 'cl.lost' : kind === 'pending' ? 'cl.pending' : kind === 'stale' ? 'cl.stale' : 'cl.rejected'), kind === 'stale' || kind === 'pending' ? 7000 : 4600); };
   Cloud.onAdopt = function (any, look) {
     // progress kept with the settings follows the record: drills passed, so a second device does not start the dojo over
     var done = Meta.data.first.drills, sv = App.save, top = 0, i;

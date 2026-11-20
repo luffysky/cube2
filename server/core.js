@@ -49,12 +49,21 @@ async function bump(db, what, who, windowMs, now) {
     [key, (slot + 2) * windowMs]);
   return rows[0].n;
 }
-async function findPlayer(db, cred) {
+// The player behind a device key. A save waiting to be deleted is not used: the caller answers pending() for it.
+async function findPlayer(db, cred, any) {
   const rows = await db.query(
-    'SELECT p.id, p.pub, p.state, p.srv, p.ver FROM zz.keys k JOIN zz.players p ON p.id = k.pid WHERE k.hash = $1 AND p.id = $2 AND p.gone IS NULL',
+    'SELECT p.id, p.pub, p.state, p.srv, p.ver, p.gone FROM zz.keys k JOIN zz.players p ON p.id = k.pid WHERE k.hash = $1 AND p.id = $2',
     [cred.hash, cred.id]);
-  return rows[0] || null;
+  const row = rows[0] || null;
+  return row && row.gone != null && !any ? { pending: row.gone } : row;
 }
+// a deleted save in its 30 days: nothing can change it until the player takes the deletion back
+const untilOf = gone => gone + LIMIT.GONE_KEEP;
+function pending(gone) { return fail(409, 'pending', { until: untilOf(gone) }); }
+// Removes saves whose 30 days are over, all in one statement (a save taken back a moment before is no longer
+// matched), and notes how many went. Runs on the server's own clock only.
+const PURGE = ['WITH d AS (DELETE FROM zz.players WHERE gone IS NOT NULL AND gone < $1 RETURNING 1) INSERT INTO zz.purges (at, n) SELECT $2, count(*)::int FROM d HAVING count(*) > 0 ON CONFLICT (at) DO NOTHING'];
+function purge(now) { return [PURGE[0], [now - LIMIT.GONE_KEEP, now]]; }
 const INSERT_PLAYER = 'INSERT INTO zz.players (id, pub, name, state, srv, rp, season, made, seen) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $8)';
 
 // ---------- a new account ----------
@@ -71,7 +80,7 @@ async function hello(db, body, ip, now) {
         ['DELETE FROM zz.rate WHERE exp < $1', [now]],
         ['DELETE FROM zz.matches WHERE at < $1', [now - LIMIT.MATCHES_KEEP]],
         // saves deleted by their players more than 30 days ago go for good (their keys, scores and links with them)
-        ['DELETE FROM zz.players WHERE gone IS NOT NULL AND gone < $1', [now - LIMIT.GONE_KEEP]]
+        purge(now)
       ]);
       return good({ id, key: secret, pub, st: state, ver: 1, now });
     } catch (e) {
@@ -121,6 +130,7 @@ async function sync(db, cred, ops, now) {
   for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
     const row = await findPlayer(db, cred);
     if (!row) return fail(401, 'auth');
+    if (row.pending) return pending(row.pending);
     if (!ops.length) return good({ st: rules.current(row.state, now), ver: row.ver, pub: row.pub, res: [], now });
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
@@ -144,6 +154,7 @@ function readCode(v) {
 async function makeCode(db, cred, now) {
   const row = await findPlayer(db, cred);
   if (!row) return fail(401, 'auth');
+  if (row.pending) return pending(row.pending);
   const code = pick(CODE_ABC, 8), exp = now + LIMIT.CODE_TTL;
   await db.batch([
     ['DELETE FROM zz.codes WHERE pid = $1 OR exp < $2', [row.id, now]],
@@ -182,11 +193,28 @@ async function redeem(db, body, old, ip, now) {
   if (!row) return fail(404, 'code');
   return good({ id: row.id, key: secret, pub: row.pub, st: rules.current(row.state, now), ver: row.ver, now });
 }
-// The player deletes their cloud save: it is hidden at once (no device, board or link reaches it any more) and kept
-// 30 days, so a mistake can still be undone by hand; after that hello() removes it for good.
+// The player deletes their cloud save (C-022): from this moment it is off every board, nothing can change it, and it
+// waits 30 days, during which any of its devices (or its SnowRealm link) can take the deletion back. After that the
+// purge removes it, with its keys, scores and link. Asking twice changes nothing: the first moment counts.
 async function wipe(db, cred, now) {
-  const rows = await db.query('UPDATE zz.players p SET gone = $3 FROM zz.keys k WHERE k.pid = p.id AND k.hash = $1 AND p.id = $2 AND p.gone IS NULL RETURNING p.id', [cred.hash, cred.id, now]);
-  return rows[0] ? good({}) : fail(401, 'auth');
+  const row = await findPlayer(db, cred, true);
+  if (!row) return fail(401, 'auth');
+  let gone = row.gone;
+  if (gone == null) {
+    const r = await db.query('UPDATE zz.players SET gone = $2 WHERE id = $1 AND gone IS NULL RETURNING gone', [row.id, now]);
+    gone = r[0] ? r[0].gone : (await findPlayer(db, cred, true)).gone;
+  }
+  await db.query(PURGE[0], purge(now)[1]);
+  return good({ until: untilOf(gone), now });
+}
+// Takes the deletion back, from a device of that save, while the 30 days last.
+async function restore(db, cred, now) {
+  const row = await findPlayer(db, cred, true);
+  if (!row) return fail(401, 'auth');
+  if (row.gone == null) return good({ restored: false, st: rules.current(row.state, now), ver: row.ver, pub: row.pub, now });
+  const r = await db.query('UPDATE zz.players SET gone = NULL, restored = $2 WHERE id = $1 AND gone IS NOT NULL AND gone >= $3 RETURNING state, ver, pub', [row.id, now, now - LIMIT.GONE_KEEP]);
+  if (!r[0]) return fail(410, 'purged');
+  return good({ restored: true, st: rules.current(r[0].state, now), ver: r[0].ver, pub: r[0].pub, now });
 }
 
 // ---------- leaderboards ----------
@@ -393,6 +421,7 @@ async function useJti(db, claims) {
 async function idStatus(db, cred, on) {
   const p = await findPlayer(db, cred);
   if (!p) return fail(401, 'auth');
+  if (p.pending) return pending(p.pending);
   if (!on) return good({ enabled: false, linked: false });
   const r = await db.query('SELECT linked_at FROM zz.identity WHERE pid = $1', [p.id]);
   return good({ enabled: true, linked: !!r[0], linkedAt: r[0] ? r[0].linked_at : 0 });
@@ -400,21 +429,21 @@ async function idStatus(db, cred, on) {
 async function idLink(db, cred, claims, now) {
   const p = await findPlayer(db, cred);
   if (!p) return fail(401, 'auth');
+  if (p.pending) return pending(p.pending);
   if (!(await useJti(db, claims))) return fail(409, 'replay');
   const mine = await db.query('SELECT platform_id FROM zz.identity WHERE pid = $1', [p.id]);
   const theirs = await db.query('SELECT i.pid, p.pub, p.state, p.gone FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
   if (mine[0] && mine[0].platform_id === claims.sub) return good({ linked: true, same: true });
   // never merged or overwritten: the player chooses, and both saves stay as they are
   if (mine[0]) return fail(409, 'linked');
-  // the platform account's old save was deleted by its player: the link moves to this save (the old one stays kept
-  // until its 30 days are up, unlinked)
-  const moved = !!(theirs[0] && theirs[0].gone != null);
-  if (theirs[0] && !moved) { const d = rules.current(theirs[0].state, now); return fail(409, 'taken', { other: { pub: theirs[0].pub, name: d.name, coins: d.coins, games: d.tot.games } }); }
+  // the platform account's save is waiting to be deleted: the link stays with it for the 30 days (so signing in again
+  // finds it and can take the deletion back); a new link has to wait until it is gone
+  if (theirs[0] && theirs[0].gone != null) return pending(theirs[0].gone);
+  if (theirs[0]) { const d = rules.current(theirs[0].state, now); return fail(409, 'taken', { other: { pub: theirs[0].pub, name: d.name, coins: d.coins, games: d.tot.games } }); }
   const secret = newSecret();
   try {
     await db.batch([
-      moved ? ['UPDATE zz.identity SET pid = $2, linked_at = $3 WHERE platform_id = $1', [claims.sub, p.id, now]]
-        : ['INSERT INTO zz.identity (platform_id, pid, linked_at, provider_hint) VALUES ($1, $2, $3, $4)', [claims.sub, p.id, now, 'snowrealm']],
+      ['INSERT INTO zz.identity (platform_id, pid, linked_at, provider_hint) VALUES ($1, $2, $3, $4)', [claims.sub, p.id, now, 'snowrealm']],
       // this device gets a fresh key; its old key and any open transfer codes stop working
       ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), p.id, now]],
       ['DELETE FROM zz.keys WHERE hash = $1 AND pid = $2', [cred.hash, p.id]],
@@ -427,11 +456,17 @@ async function idLink(db, cred, claims, now) {
   return good({ linked: true, id: p.id, key: secret, now });
 }
 // another device: the platform player's 轉磚 save, with a key of its own for this device
-async function idRecover(db, claims, now) {
+// back: true takes back a deletion that is waiting (the player signed in to SnowRealm again and chose to keep the save).
+async function idRecover(db, claims, now, back) {
   if (!(await useJti(db, claims))) return fail(409, 'replay');
-  const r = await db.query('SELECT p.id, p.pub, p.state, p.ver, p.ban FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1 AND p.gone IS NULL', [claims.sub]);
+  const r = await db.query('SELECT p.id, p.pub, p.state, p.ver, p.ban, p.gone FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
   if (!r[0]) return fail(404, 'none');
   if (r[0].ban) return fail(403, 'ban');
+  if (r[0].gone != null) {
+    if (!back) return pending(r[0].gone);
+    const u = await db.query('UPDATE zz.players SET gone = NULL, restored = $2 WHERE id = $1 AND gone IS NOT NULL AND gone >= $3 RETURNING 1', [r[0].id, now, now - LIMIT.GONE_KEEP]);
+    if (!u[0]) return fail(410, 'purged');
+  }
   const secret = newSecret(), pid = r[0].id;
   await db.batch([
     ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), pid, now]],
@@ -440,4 +475,4 @@ async function idRecover(db, claims, now) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

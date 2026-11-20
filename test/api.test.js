@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 15, 'fifteen tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 16, 'sixteen tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -396,18 +396,45 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await rpc({ a: 'delete' }, null)).status, 401, 'delete needs credentials');
   eq((await rpc({ a: 'delete' }, { id: C.id, key: D.key })).status, 401, "cannot delete someone else's");
   r = await rpc({ a: 'delete' }, C);
-  ok(r.json.ok && (await sync(C)).status === 401, 'account deleted: no device reaches it');
-  ok(!(await call('board', { url: '/api/board?b=score&s=all' })).json.top.some(x => x.p === C.pub) && !(await call('board', { url: '/api/board?b=rp' })).json.top.some(x => x.p === C.pub), 'and it is off every board at once');
-  eq((await rpc({ a: 'delete' }, C)).status, 401, 'deleting twice finds nothing');
+  const askedAt = now;
+  ok(r.json.ok && r.json.until === askedAt + 30 * DAY, 'deletion asked: kept until exactly 30 days (server time) from now', r.json);
+  r = await sync(C);
+  ok(r.status === 409 && r.json.why === 'pending' && r.json.until === askedAt + 30 * DAY, 'the save is waiting: nothing can change it', r.json);
+  eq((await sync(C, [op('name', ['不准'])])).status, 409, 'not even a name change');
+  eq((await rpc({ a: 'code' }, C)).status, 409, 'and no transfer code can be made for it');
+  ok(!(await call('board', { url: '/api/board?b=score&s=all' })).json.top.some(x => x.p === C.pub) && !(await call('board', { url: '/api/board?b=rp' })).json.top.some(x => x.p === C.pub), 'it is off every board at once');
+  now += HOUR;
+  r = await rpc({ a: 'delete' }, C);
+  ok(r.json.ok && r.json.until === askedAt + 30 * DAY, 'asking again changes nothing: the first moment counts');
+  eq((await rpc({ a: 'restore' }, { id: C.id, key: D.key })).status, 401, "another player's key cannot take it back");
+  eq((await rpc({ a: 'restore' }, null)).status, 401, 'nor can no key');
   let left = await dump();
-  ok(left.indexOf(C.id) >= 0, 'kept for 30 days');
-  const wasNow = now;
-  now += 30 * DAY - 1000; await newPlayer({ name: '清理一' }, '203.0.113.71');
-  ok((await dump()).indexOf(C.id) >= 0, 'still there a moment before the 30 days are up');
-  now += 2000; await newPlayer({ name: '清理二' }, '203.0.113.72');
+  ok(left.indexOf(C.id) >= 0, 'everything is still kept');
+  // day 29: taken back, and the purge leaves it alone
+  now = askedAt + 29 * DAY;
+  r = await rpc({ a: 'restore' }, C);
+  ok(r.json.ok && r.json.restored === true && r.json.st.name === '小釉', 'day 29: taken back, the save as it was', r.json);
+  ok((await sync(C)).json.ok, 'and it plays again');
+  now = askedAt + 31 * DAY; await newPlayer({ name: '清理零' }, '203.0.113.70');
+  ok((await dump()).indexOf(C.id) >= 0, 'a save taken back is not purged later');
+  eq((await rpc({ a: 'restore' }, C)).json.restored, false, 'taking back a save that is not waiting is harmless');
+  // asked again, and this time left to run out
+  const askedAgain = now;
+  ok((await rpc({ a: 'delete' }, C)).json.until === askedAgain + 30 * DAY, 'deleted again: a new 30 days from the new moment');
+  now = askedAgain + 30 * DAY - 1000; await newPlayer({ name: '清理一' }, '203.0.113.71');
+  ok((await dump()).indexOf(C.id) >= 0, 'still there a second before the 30 days are up');
+  now = askedAgain + 30 * DAY + 1000;
+  eq((await rpc({ a: 'restore' }, C)).status, 410, 'once the 30 days are up it cannot be taken back');
+  await newPlayer({ name: '清理二' }, '203.0.113.72');
   left = await dump();
   ok(left.indexOf(C.id) < 0 && left.indexOf(C.pub) < 0 && left.indexOf('小釉') < 0 && left.indexOf(E.id) < 0, 'after 30 days nothing of it is left in any table');
-  now = wasNow;
+  eq((await rpc({ a: 'delete' }, C)).status, 401, 'and asking about it finds nothing');
+  const pr = await pg.query('SELECT * FROM zz.purges ORDER BY at');
+  ok(pr.length >= 1 && pr.every(x => Object.keys(x).join() === 'at,n' && x.n >= 1), 'each purge leaves only when and how many', pr);
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.purges WHERE at = $1', [now]))[0].n, 1, 'one record for that purge');
+  await rpc({ a: 'delete' }, C); await newPlayer({ name: '清理三' }, '203.0.113.73');
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.purges'))[0].n, pr.length, 'a purge with nothing to remove leaves no record');
+  now = askedAt;
   await pg.query('DELETE FROM zz.rate WHERE exp > $1', [now + 2 * DAY]);   // (the two sign-ups a month ahead: their counters would outlive the tests below)
 
   // ---------- rooms for online matches ----------

@@ -55,6 +55,12 @@ const SCHEMA = [
   // a save its player asked to delete: hidden at once, kept 30 days, then removed (Owner decision C-022)
   'ALTER TABLE zz.players ADD COLUMN IF NOT EXISTS gone double precision',
   'CREATE INDEX IF NOT EXISTS players_gone ON zz.players (gone) WHERE gone IS NOT NULL',
+  'ALTER TABLE zz.players ADD COLUMN IF NOT EXISTS restored double precision',
+  // what a purge leaves behind: when, and how many saves; nothing that points to a player
+  `CREATE TABLE IF NOT EXISTS zz.purges (
+     at double precision PRIMARY KEY,
+     n integer NOT NULL
+   )`,
   `CREATE TABLE IF NOT EXISTS zz.keys (
      hash text PRIMARY KEY,
      pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,

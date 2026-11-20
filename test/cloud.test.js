@@ -289,13 +289,24 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
   await open(A);
   const mine = JSON.stringify(M.data);
   const del = await C.wipe();
-  ok(del.ok && C.status() === 'gone' && !C.cred && JSON.stringify(M.data) === mine, 'deleted; the progress on the device is untouched', C.status());
-  eq(await players(), 0, 'nothing is left on the server');
+  ok(del.ok && C.status() === 'pend' && !C.cred && C.del && del.until > Date.now() && JSON.stringify(M.data) === mine, 'deleted: waiting 30 days, the progress on the device is untouched', C.status());
+  eq(await players(), 0, 'no live save is left on the server');
+  ok(JSON.parse(A.mem['zhuanzhuan.cloud.v1']).del.until === del.until, 'the device remembers what it can take back');
   M.buyItem(7); fin(match());
   await send();
   ok(C.q.length === 0 && (await players()) === 0, 'an unlinked device does not make a new account by itself');
   await open(B);
-  ok(C.status() === 'gone' && notes.indexOf('B:lost') >= 0 && M.data.coins > 0, 'the other device learns the save is gone and keeps its copy', [C.status(), notes]);
+  ok(C.status() === 'pend' && notes.indexOf('B:pending') >= 0 && M.data.coins > 0, 'the other device learns the save is waiting to be deleted and keeps its copy', [C.status(), notes]);
+  // taken back from that other device: the cloud save as it was before
+  let rb = await C.restore();
+  ok(rb.ok && C.cred && C.status() !== 'pend' && !C.del, 'B takes the deletion back', rb);
+  eq(await players(), 1, 'the save is live again');
+  await send();
+  ok(C.cred && C.q.length === 0, 'and B plays on it again');
+  // deleted again; this time B lets it go
+  ok((await C.wipe()).ok && C.status() === 'pend', 'deleted again');
+  C.letGo();
+  ok(C.status() === 'gone' && !C.del, 'letting it go: back to an unlinked device');
   // starting again
   const mineB = M.data.coins;
   ok(await C.ensure(), 'start a cloud save again');

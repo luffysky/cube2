@@ -135,6 +135,18 @@ async function newPlayer() { const r = await rpc({ a: 'hello' }); return { id: r
   ok(r.status === 404 && r.json.why === 'none', 'a platform player with no save gets nothing');
   r = await rpc({ a: 'idStatus' }, P1b);
   ok(r.json.enabled && r.json.linked, 'the status shows it linked');
+  // a linked save waiting to be deleted (C-022): the link stays for the 30 days, signing in finds it and can take it back
+  r = await rpc({ a: 'delete' }, P1b);
+  ok(r.json.ok && r.json.until > 0, 'the linked save is put up for deletion');
+  ok((await pg.query('SELECT count(*)::int AS n FROM zz.identity WHERE platform_id = $1', [U1]))[0].n === 1, 'its link is not removed that day');
+  r = await rpc({ a: 'idRecover', idt: sign({}, { sub: U1 }) });
+  ok(r.status === 409 && r.json.why === 'pending' && r.json.until > 0, 'signing in again says it is waiting to be deleted, and until when', r.json);
+  const P9 = await newPlayer();
+  r = await rpc({ a: 'idLink', idt: sign({}, { sub: U1 }) }, P9);
+  ok(r.status === 409 && r.json.why === 'pending', 'another save cannot take the link while the old one waits', r.json);
+  r = await rpc({ a: 'idRecover', idt: sign({}, { sub: U1 }), back: true });
+  ok(r.status === 200 && r.json.id === P1.id && r.json.key, 'signing in and choosing to keep it takes the deletion back', r.json && r.json.why);
+  ok((await rpc({ a: 'sync' }, P1b)).status === 200, 'and its devices work again');
   // the identity service is down: linking refused, the game itself untouched
   jwksDown = true; idn.clearCache();
   r = await rpc({ a: 'idRecover', idt: sign({}, { sub: U1 }) });

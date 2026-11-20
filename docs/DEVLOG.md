@@ -295,3 +295,23 @@
 - 測試：`node test/api.test.js` 305（含：刪除後裝置與排行榜都看不到、資料保留、30 天前一刻還在、過了 30 天全部清掉）；`node test/run.js` 全過；瀏覽器 `cloudui` 39、`pwa` 47。
 - 風險、回滾：回滾 commit 會恢復立即刪除；`gone` 欄位留著無害。注意：瀏覽器本機進度按網址分開，舊網址玩家要換到新網址請用「雲端存檔 → 引繼碼」搬。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`1a38b3b`](https://github.com/luffysky/cube2/commit/1a38b3b)，Vercel `dpl_62998ut8rg2JudfnMMBdUBFyg1sp` READY。
+
+## 2026-11-20 20:48（Asia/Taipei）｜照 cube1 刪除政策補齊 30 天狀態機（可恢復、期內封鎖、綁定保留）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-022、C-023（cube1 `docs/BRICKDUEL_ACCOUNT_LINK_AND_DELETION_POLICY_zh-TW.md`，cube1 `effca49`）
+- 與上一版差異（上一版只做到「停用＋30 天後刪」，不符規格的部分）：
+  - **期內可恢復**：新 API `restore`（同一份存檔任一裝置的密鑰）；`idRecover` 加 `back: true` 可用已綁定的 SnowRealm 帳號取消刪除。公開代碼與引繼碼都不能取回。期滿回 410。
+  - **期內封鎖**：`sync`、引繼碼、`idStatus`、`idLink` 對等待刪除的存檔回 409 `pending`（附截止時間），不再當作「不存在」。
+  - **綁定期內保留**：撤掉上一版「綁定改指向新存檔」的做法；等待期間該平台帳號不能綁別份存檔（回 409 `pending`），避免誤綁。
+  - **冪等**：重複申請刪除以第一次時間為準；清理是單一 SQL，與取消刪除以列鎖互斥，可重複執行。
+  - **不具名稽核**：新表 `zz.purges(at, n)`，每次清理有刪到東西才記「時間、份數」。
+  - 新欄位 `zz.players.restored`（取消刪除時間）。
+  - 用戶端：申請刪除前顯示確切截止時間（玩家時區）與後果；申請後顯示「等待刪除中」、「取消刪除，恢復雲端存檔」、「不恢復，改開新的雲端存檔」；另一台裝置同步時也會轉成這個狀態並提示可恢復。四語字串＋簡中自動轉換＝五語。
+  - 隱私政策補上：伺服器時間計算、期內不能改動、可自行恢復、期滿連綁定一起刪、只留不具名紀錄、不影響 SnowRealm 帳號與其他遊戲。
+- 檔案：`server/db.js`、`server/core.js`、`server/app.js`、`src/cloud.js`、`privacy.html`、`index.html`、`docs/ARCHITECTURE.md`、`docs/OWNER_DECISIONS.md`、`test/api.test.js`、`test/identity.test.js`、`test/cloud.test.js`、`test/tabs.test.js`、`test/cloudui.js`。
+- 資料庫：新增欄位 `restored`、新表 `zz.purges`（非破壞性，16 張表）。刪除：只有 Owner 核准的「玩家本人申請＋滿 30 天」自動清理；本次部署不刪任何資料。
+- 測試（測試資料庫＋注入時鐘，不碰正式資料）：`api` 320（申請後資料仍在、期內封鎖、重複申請以第一次為準、別人的密鑰或沒密鑰不能恢復、第 29 天恢復且之後不會被清、再刪一次從新時間起算、到期前 1 秒還在、到期後 410 且全部表清空、清理紀錄只有時間與份數、沒東西可清不留紀錄）；`identity` 55（等待期間綁定保留、另一份存檔不能搶綁、用 SnowRealm 登入可取消刪除）；`cloud` 92、`tabs` 40、瀏覽器 `cloudui` 41（申請、另一台得知、恢復、放棄後開新存檔）；`node test/run.js` 全過。
+- 未完成：隱私政策目前只有繁中版（原本就是），規格要求五語，待 Owner 決定是否翻譯；清理沒有用定時服務（依賴新帳號建立或刪除申請時順帶執行），流量低時可能晚於 30 天才真的刪除，要準時可加 Vercel Cron（需 Owner 確認方案費用）；正式雙帳號驗收要等 SnowRealm Identity 上線。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

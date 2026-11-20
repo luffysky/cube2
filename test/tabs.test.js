@@ -210,7 +210,7 @@ const hellos = () => net.calls.filter(c => c === 'POST rpc hello').length;
     await a.C.flush(); await B.quiet();
     ok((await a.C.wipe()).ok, 'tab a deletes the cloud data');
     await B.quiet();
-    eq([a.C.status(), b.C.status(), !!b.C.cred, (await players()).length], ['gone', 'gone', false, 0], 'both tabs are unlinked');
+    eq([a.C.status(), b.C.status(), !!b.C.cred, (await players()).length], ['pend', 'pend', false, 0], 'both tabs see the save waiting to be deleted');
     b.M.finish(match());
     await b.C.flush(); await B.quiet();
     eq([(await players()).length, b.C.q.length], [0, 0], 'and neither makes a new account by itself');

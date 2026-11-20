@@ -141,6 +141,10 @@ const routes = {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.wipe(d, cred, clock()));
         break;
+      case 'restore':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.restore(d, cred, clock()));
+        break;
       // SnowRealm Identity (off until IDENTITY_LINK_ENABLED is set and the service is live; see server/identity.js)
       case 'idStatus':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
@@ -151,7 +155,7 @@ const routes = {
         if (body.a === 'idLink' && !cred) return send(res, 401, { ok: false, why: 'auth' });
         const v = await identity.verify(body.idt, { now, need: identity.LINK_SCOPE });
         if (!v.ok) return send(res, v.why === 'jwks' ? 503 : 401, { ok: false, why: 'identity', detail: v.why });
-        out = await db.run(d => body.a === 'idLink' ? core.idLink(d, cred, v, now) : core.idRecover(d, v, now));
+        out = await db.run(d => body.a === 'idLink' ? core.idLink(d, cred, v, now) : core.idRecover(d, v, now, body.back === true));
         break;
       }
       default:
