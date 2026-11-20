@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>疊磚塔 · SnowRealm 磚塊遊戲</title>
+<meta name="description" content="疊磚塔：看準時機放下磚塊，對不齊的地方會被切掉，看你能疊多高。打開瀏覽器就能玩。">
+<link rel="icon" href="../../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../games.css">
+</head>
+<body>
+<main class="game">
+  <div class="bar">
+    <a href="../">← 磚塊遊戲</a>
+    <h1>疊磚塔</h1>
+    <button type="button" id="pause">暫停</button>
+  </div>
+  <div class="stats">
+    <div><b id="score">0</b><span>分數</span></div>
+    <div class="hearts-box"><b id="hearts" aria-label="剩下的命">♥♥♥♥♥</b><span><i id="stage">0</i> 層</span></div>
+    <div><b id="best">0</b><span>最佳</span></div>
+  </div>
+  <div class="board" id="board">
+    <canvas id="cv" aria-label="疊磚塔的場地"></canvas>
+    <div class="over" id="intro">
+      <h2>疊磚塔</h2>
+      <p>磚塊會左右滑，看準時機放下去。超出下面那塊的部分會被切掉，塔會越來越窄。</p>
+      <p>剛好對齊就是「完美」，不會被切；連續 3 次完美磚塊會變寬一點。整塊沒放到塔上少一條命，有 5 條命。越高滑得越快，10 層以後磚塊會從兩邊來。</p>
+      <div class="seg" role="radiogroup" aria-label="難度">
+        <button type="button" role="radio" data-lv="easy">簡單</button>
+        <button type="button" role="radio" data-lv="normal">普通</button>
+        <button type="button" role="radio" data-lv="hard">困難</button>
+      </div>
+      <div class="row"><button class="btn" type="button" id="go">開始</button></div>
+      <p id="keysHint">空白鍵、Enter 或點一下場地放下磚塊</p>
+    </div>
+    <div class="over" id="end" hidden>
+      <h2>命用完了</h2>
+      <div class="big" id="endScore">0</div>
+      <p id="endNote"></p>
+      <div class="row"><button class="btn" type="button" id="again">再玩一次</button><button class="btn plain" type="button" id="toIntro">換難度</button><a class="btn plain" href="../">其他遊戲</a></div>
+    </div>
+    <div class="over soft" id="ouch" hidden><h2 id="ouchT"></h2><p id="ouchP"></p></div>
+    <div class="over" id="paused" hidden>
+      <h2>暫停中</h2>
+      <div class="row"><button class="btn" type="button" id="resume">繼續</button></div>
+    </div>
+  </div>
+</main>
+<script src="stack.js"></script>
+</body>
+</html>

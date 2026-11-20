@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 3 && (await page.$$('.card.soon')).length === 7, 'three playable, seven coming');
+    ok((await page.$$('a.card')).length === 4 && (await page.$$('.card.soon')).length === 6, 'four playable, six coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -123,6 +123,39 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await bp.evaluate(() => !window.__breakout().g.held && Math.abs(window.__breakout().g.paddle.x - 252) < 6), 'a tap moves the paddle there and serves', await bp.evaluate(() => window.__breakout().g.paddle.x));
     await bp.screenshot({ path: path.join(OUT, 'breakout-phone.png') });
     await ctx2.close();
+    // 疊磚塔
+    const st = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    st.on('pageerror', e => problems.push('stack: ' + e.message));
+    await st.goto(BASE + 'games/stack/'); await sleep(400);
+    ok(await st.evaluate(() => !document.getElementById('intro').hidden && document.querySelectorAll('[data-lv]').length === 3), '疊磚塔 opens on its start card with three difficulties');
+    await st.click('#go'); await sleep(200);
+    // drop right on top five times (perfects), then once well off (a cut)
+    for (let i = 0; i < 5; i++) { await st.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + 1; }); await st.keyboard.press(' '); await sleep(120); }
+    let sr = await st.evaluate(() => ({ floors: window.__stack().g.floors(), combo: window.__stack().g.combo, shown: +document.getElementById('stage').textContent }));
+    ok(sr.floors === 5 && sr.combo === 5 && sr.shown === 5, 'space drops the brick; five perfects', sr);
+    await st.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + 50; });
+    await st.mouse.click(640, 400); await sleep(300);
+    ok(await st.evaluate(() => window.__stack().g.top().w === 150), 'a click drops it too; fifty over is cut off');
+    await st.screenshot({ path: path.join(OUT, 'stack-play.png') });
+    await st.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x > 180 ? 0 : 360 - g.cur.w; g.cur.w = Math.min(g.cur.w, 60); g.tower[g.tower.length - 1].w = 60; g.cur.x = g.top().x > 150 ? 0 : 300; });
+    await st.keyboard.press(' '); await sleep(200);
+    ok(await st.evaluate(() => window.__stack().g.lives === 4 && /還剩 4 條命/.test(document.getElementById('ouch').textContent)), 'a miss costs a heart');
+    await st.waitForFunction(() => window.__stack().state === 'play', null, { timeout: 3000 });
+    await st.evaluate(() => { const { g } = window.__stack(); g.lives = 1; g.cur.x = g.top().x > 150 ? 0 : 300; });
+    await st.keyboard.press(' '); await sleep(300);
+    ok(await st.evaluate(() => window.__stack().state === 'over' && JSON.parse(localStorage.getItem('snowrealm.stack.bests')).normal === window.__stack().g.score), 'the last heart ends it and keeps the best');
+    await st.screenshot({ path: path.join(OUT, 'stack-over.png') });
+    const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const sp = await ctx3.newPage();
+    sp.on('pageerror', e => problems.push('stack phone: ' + e.message));
+    await sp.goto(BASE + 'games/stack/'); await sleep(400);
+    await sp.tap('#go'); await sleep(150);
+    for (let i = 0; i < 14; i++) { await sp.evaluate(() => { const { g } = window.__stack(); g.cur.x = g.top().x + (Math.random() * 20 - 10); }); await sp.tap('#cv'); await sleep(140); }
+    const fitS = await sp.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { b: r.bottom, vh: innerHeight, floors: window.__stack().g.floors() }; });
+    ok(fitS.b <= fitS.vh && fitS.floors === 14, 'on a phone taps drop bricks and the field fits', fitS);
+    await sleep(500);
+    await sp.screenshot({ path: path.join(OUT, 'stack-phone.png') });
+    await ctx3.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
