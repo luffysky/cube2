@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 2 && (await page.$$('.card.soon')).length === 8, 'two playable, eight coming');
+    ok((await page.$$('a.card')).length === 3 && (await page.$$('.card.soon')).length === 7, 'three playable, seven coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -89,6 +89,40 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(dark[0] === 'rgb(27, 37, 48)' && dark[1] !== dark[0], 'in dark mode the light buttons keep dark writing', dark);
     await ph.screenshot({ path: path.join(OUT, 'snake-over-dark.png') });
     await ctx.close();
+    // 打磚塊
+    const bk = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    bk.on('pageerror', e => problems.push('breakout: ' + e.message));
+    await bk.goto(BASE + 'games/breakout/'); await sleep(400);
+    ok(await bk.evaluate(() => !document.getElementById('intro').hidden && document.querySelectorAll('[data-lv]').length === 3), '打磚塊 opens on its start card with three difficulties');
+    await bk.click('[data-lv="easy"]'); await bk.click('#go'); await sleep(200);
+    ok(await bk.evaluate(() => window.__breakout().state === 'play' && window.__breakout().g.held && window.__breakout().g.level === 'easy'), 'the ball waits on the paddle');
+    await bk.screenshot({ path: path.join(OUT, 'breakout-serve.png') });
+    const box = await bk.$eval('#cv', c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await bk.mouse.move(box.x + box.w * 0.3, box.y + box.h * 0.8); await sleep(100);
+    ok(await bk.evaluate(() => Math.abs(window.__breakout().g.paddle.x - 108) < 4), 'the mouse moves the paddle', await bk.evaluate(() => window.__breakout().g.paddle.x));
+    await bk.keyboard.press(' '); await sleep(100);
+    ok(await bk.evaluate(() => !window.__breakout().g.held), 'space launches the ball');
+    // keep the paddle under the ball for a few seconds
+    for (let i = 0; i < 60; i++) { await bk.evaluate(() => { const { g } = window.__breakout(); if (g.balls[0]) g.move(g.balls[0].x); }); await sleep(50); }
+    const run = await bk.evaluate(() => ({ score: window.__breakout().g.score, shown: +document.getElementById('score').textContent, lives: window.__breakout().g.lives }));
+    ok(run.score > 0 && run.shown === run.score && run.lives === 5, 'bricks break and the score shows', run);
+    await bk.screenshot({ path: path.join(OUT, 'breakout-play.png') });
+    await bk.evaluate(() => { const { g } = window.__breakout(); g.lives = 1; g.paddle.x = 20; g.balls = [{ x: 340, y: 520, vx: 0, vy: 400 }]; });
+    await bk.waitForFunction(() => window.__breakout().state === 'over', null, { timeout: 5000 });
+    ok(await bk.evaluate(() => JSON.parse(localStorage.getItem('snowrealm.breakout.bests')).easy === window.__breakout().g.score), 'the end keeps the best for that difficulty');
+    await bk.screenshot({ path: path.join(OUT, 'breakout-over.png') });
+    const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const bp = await ctx2.newPage();
+    bp.on('pageerror', e => problems.push('breakout phone: ' + e.message));
+    await bp.goto(BASE + 'games/breakout/'); await sleep(400);
+    await bp.tap('#go'); await sleep(150);
+    const fit = await bp.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { b: r.bottom, w: r.width, vh: innerHeight }; });
+    ok(fit.b <= fit.vh && fit.w >= 300, 'on a phone the whole field fits on screen', fit);
+    const pb = await bp.$eval('#cv', c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await bp.tap('#cv', { position: { x: pb.w * 0.7, y: pb.h * 0.5 } }); await sleep(150);
+    ok(await bp.evaluate(() => !window.__breakout().g.held && Math.abs(window.__breakout().g.paddle.x - 252) < 6), 'a tap moves the paddle there and serves', await bp.evaluate(() => window.__breakout().g.paddle.x));
+    await bp.screenshot({ path: path.join(OUT, 'breakout-phone.png') });
+    await ctx2.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
