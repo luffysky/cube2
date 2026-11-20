@@ -139,7 +139,7 @@ const routes = {
         break;
       case 'delete':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
-        out = await db.run(d => core.wipe(d, cred));
+        out = await db.run(d => core.wipe(d, cred, clock()));
         break;
       // SnowRealm Identity (off until IDENTITY_LINK_ENABLED is set and the service is live; see server/identity.js)
       case 'idStatus':

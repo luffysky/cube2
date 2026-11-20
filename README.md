@@ -2,7 +2,7 @@
 
 兩分鐘對戰的落磚遊戲。把方塊轉進洞裡，送對手一面水泥牆。
 
-- 線上玩：<https://cube2-xi.vercel.app/>（Vercel，推到 `main` 會自動部署；有雲端存檔和排行榜）
+- 線上玩：<https://brickduel.snowrealm.pet/>（Vercel，舊網址 cube2-xi.vercel.app 仍可用，推到 `main` 會自動部署；有雲端存檔和排行榜）
 - 本機玩（含雲端功能，資料庫在記憶體裡）：`npm install` 之後 `npm run dev`，打開 `http://127.0.0.1:8770/`
 - 本機玩（純前端）：`python3 -m http.server 8765`，打開 `http://127.0.0.1:8765/`
 - 也可以丟到任何靜態空間（例如 GitHub Pages）：沒有 API 的地方遊戲照常運作，只是進度留在裝置上、沒有排行榜

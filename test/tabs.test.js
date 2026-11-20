@@ -77,7 +77,7 @@ function browser(locks) {
   B.stored = () => (mem[KEY] ? JSON.parse(mem[KEY]) : {});
   return B;
 }
-const players = async () => (await pg.query('SELECT id, state, ver FROM zz.players ORDER BY made, id'));
+const players = async () => (await pg.query('SELECT id, state, ver FROM zz.players WHERE gone IS NULL ORDER BY made, id'));
 const wipeAll = async () => { await pg.query('DELETE FROM zz.players'); await pg.query('DELETE FROM zz.rate'); net.calls = []; };
 const match = o => Object.assign({ mode: 'net', result: 0, level: 0, ko: 0, koOpp: 0, itemsUsed: 0, ms: 60000, stats: { score: 24, spins: 0, minis: 0, sent: 0, quads: 0, maxCombo: 0, xspins: 0, lines: 0, pieces: 4 } }, o || {});
 const hellos = () => net.calls.filter(c => c === 'POST rpc hello').length;

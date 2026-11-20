@@ -360,8 +360,9 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   r = await rpc({ a: 'redeem', code: r.json.code, go: true }, E, { ip: '198.51.100.2' });
   const A3 = { id: r.json.id, key: r.json.key };
   ok(r.json.ok && A3.id === A.id && (await sync(E)).status === 401, 'the old account is gone once its only device has moved', r.json);
-  eq((await pg.query('SELECT count(*)::int AS n FROM zz.players WHERE id = $1', [E.id]))[0].n, 0, 'its row is deleted');
-  eq((await pg.query('SELECT count(*)::int AS n FROM zz.scores WHERE pid = $1', [E.id]))[0].n, 0, 'and its scores with it');
+  ok((await pg.query('SELECT gone FROM zz.players WHERE id = $1', [E.id]))[0].gone === now, 'its row is put aside (kept 30 days), not deleted at once');
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.scores WHERE pid = $1', [E.id]))[0].n, 2, 'and its scores are kept with it');
+  ok(!(await call('board', { url: '/api/board?b=score&s=all' })).json.top.some(x => x.p === E.pub), 'but it is off the boards');
   // at most five devices: the oldest drops off
   const devs = [];
   for (let i = 0; i < 4; i++) { now += 1000; r = await rpc({ a: 'code' }, A3); r = await rpc({ a: 'redeem', code: r.json.code, go: true }, null, { ip: '198.51.100.' + (10 + i) }); devs.push({ id: r.json.id, key: r.json.key }); }
@@ -395,9 +396,19 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   eq((await rpc({ a: 'delete' }, null)).status, 401, 'delete needs credentials');
   eq((await rpc({ a: 'delete' }, { id: C.id, key: D.key })).status, 401, "cannot delete someone else's");
   r = await rpc({ a: 'delete' }, C);
-  ok(r.json.ok && (await sync(C)).status === 401, 'account deleted');
-  const left = await dump();
-  ok(left.indexOf(C.id) < 0 && left.indexOf(C.pub) < 0 && left.indexOf('小釉') < 0, 'nothing of it is left in any table');
+  ok(r.json.ok && (await sync(C)).status === 401, 'account deleted: no device reaches it');
+  ok(!(await call('board', { url: '/api/board?b=score&s=all' })).json.top.some(x => x.p === C.pub) && !(await call('board', { url: '/api/board?b=rp' })).json.top.some(x => x.p === C.pub), 'and it is off every board at once');
+  eq((await rpc({ a: 'delete' }, C)).status, 401, 'deleting twice finds nothing');
+  let left = await dump();
+  ok(left.indexOf(C.id) >= 0, 'kept for 30 days');
+  const wasNow = now;
+  now += 30 * DAY - 1000; await newPlayer({ name: '清理一' }, '203.0.113.71');
+  ok((await dump()).indexOf(C.id) >= 0, 'still there a moment before the 30 days are up');
+  now += 2000; await newPlayer({ name: '清理二' }, '203.0.113.72');
+  left = await dump();
+  ok(left.indexOf(C.id) < 0 && left.indexOf(C.pub) < 0 && left.indexOf('小釉') < 0 && left.indexOf(E.id) < 0, 'after 30 days nothing of it is left in any table');
+  now = wasNow;
+  await pg.query('DELETE FROM zz.rate WHERE exp > $1', [now + 2 * DAY]);   // (the two sign-ups a month ahead: their counters would outlive the tests below)
 
   // ---------- rooms for online matches ----------
   const room = (body, o) => call('room', Object.assign({ method: 'POST', body }, o || {}));

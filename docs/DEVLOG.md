@@ -277,3 +277,21 @@
 - 實際變更：只更新文件。`IDENTITY_LINK_ENABLED` 維持未設定（關閉）。
 - 待 Owner 決定：正式回呼網域（`brickduel.snowrealm.pet` 或 `cube2-xi.vercel.app`）；玩家自刪雲端資料時綁定紀錄是否一併刪除。後者若要改成不連帶刪除，需要改資料表約束（屬刪除類變更），未經核准不動。
 - 檔案：`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除操作：無。｜測試：不適用（僅文件）。
+- 補記：上一條的 commit 為 [`ef6a9c2`](https://github.com/luffysky/cube2/commit/ef6a9c2)。
+
+## 2026-11-20 19:51（Asia/Taipei）｜刪除雲端資料改為保留 30 天；正式網址改 brickduel.snowrealm.pet
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-022（玩家按刪除那刻保留 30 天、30 天後刪除；用 snowrealm 網址；所有網址都綁自己的網域 snowrealm.pet）
+- 實際變更：
+  - `zz.players` 新增欄位 `gone`（非破壞性 `ADD COLUMN IF NOT EXISTS`）＋索引 `players_gone`。
+  - 「刪除雲端資料」由 `DELETE` 改成記下 `gone` 時間：立刻斷開所有裝置、引繼碼失效、從所有排行榜消失、SnowRealm 綁定查不到；換裝置後沒人能打開的舊存檔也一樣先保留。
+  - 例行清理（新帳號建立時順帶執行）刪除 `gone` 超過 30 天的存檔，密鑰、成績、綁定紀錄跟著刪。**此自動刪除經 Owner C-022 明確核准。**
+  - 已刪存檔的平台帳號重新綁定時，綁定紀錄改指向新存檔（舊存檔仍保留到期滿）。
+  - 畫面與隱私政策改寫：刪除後「立即停用、保留 30 天、期間可聯絡復原、之後永久刪除」。
+  - 正式網址（canonical、sitemap、robots、分享圖）改為 `https://brickduel.snowrealm.pet`（Vercel 專案已綁定且驗證）；Identity 回呼定為 `https://brickduel.snowrealm.pet/api/auth/callback`。`cube2-xi.vercel.app` 保留可用。
+- 檔案：`server/db.js`、`server/core.js`、`server/app.js`、`src/cloud.js`、`privacy.html`、`build.js`、`index.html`、`sitemap.xml`、`robots.txt`、`README.md`、`docs/ARCHITECTURE.md`、`docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md`、`docs/OWNER_DECISIONS.md`、`test/api.test.js`、`test/cloud.test.js`、`test/tabs.test.js`。
+- 資料庫：新增欄位與索引（非破壞性），部署後第一次建表檢查時套用。刪除：玩家觸發後 30 天的自動刪除（Owner 核准）；本次部署本身不刪任何資料。
+- 測試：`node test/api.test.js` 305（含：刪除後裝置與排行榜都看不到、資料保留、30 天前一刻還在、過了 30 天全部清掉）；`node test/run.js` 全過；瀏覽器 `cloudui` 39、`pwa` 47。
+- 風險、回滾：回滾 commit 會恢復立即刪除；`gone` 欄位留著無害。注意：瀏覽器本機進度按網址分開，舊網址玩家要換到新網址請用「雲端存檔 → 引繼碼」搬。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

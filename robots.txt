@@ -8,4 +8,4 @@ Disallow: /tools/
 Disallow: /docs/
 Disallow: /vendor/
 
-Sitemap: https://cube2-xi.vercel.app/sitemap.xml
+Sitemap: https://brickduel.snowrealm.pet/sitemap.xml

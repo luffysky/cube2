@@ -62,13 +62,13 @@ async function open(dev) {
 }
 const send = async () => { await C.flush(); await settle(); };
 const pull = async () => { await C.flush(true); await settle(); };
-const server = async dev => { const c = JSON.parse(dev.mem['zhuanzhuan.cloud.v1']); const r = await pg.query('SELECT state, ver FROM zz.players WHERE id = $1', [c.id]); return r[0] ? r[0].state : null; };
+const server = async dev => { const c = JSON.parse(dev.mem['zhuanzhuan.cloud.v1']); const r = await pg.query('SELECT state, ver FROM zz.players WHERE id = $1 AND gone IS NULL', [c.id]); return r[0] ? r[0].state : null; };
 // the same record, whatever order the keys come back in (jsonb sorts them its own way); pictures are per device
 const canon = v => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.keys(v).sort().reduce((o, k) => { o[k] = canon(v[k]); return o; }, {}) : v;
 const same = (a, b) => { const x = canon(JSON.parse(JSON.stringify(a))), y = canon(JSON.parse(JSON.stringify(b))); delete x.custom; delete y.custom; return JSON.stringify(x) === JSON.stringify(y); };
 // test set-up only: put coins into the server's copy, then let the device fetch it
 const grant = async (dev, coins) => { const c = JSON.parse(dev.mem['zhuanzhuan.cloud.v1']); await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{coins}', to_jsonb($2::int)), ver = ver + 1 WHERE id = $1", [c.id, coins]); await C.flush(true); await settle(); };
-const players = async () => { try { return (await pg.query('SELECT count(*)::int AS n FROM zz.players'))[0].n; } catch (e) { return 0; } };
+const players = async () => { try { return (await pg.query('SELECT count(*)::int AS n FROM zz.players WHERE gone IS NULL'))[0].n; } catch (e) { return 0; } };
 const TAPE = require('./tape.js'); TAPE.stub(require('../server/rules.js').ZZ);
 const fin = m => M.finish(m, TAPE.fake(m));      // a match the way the page ends one: the report and a tape (a stand-in here, see test/tape.js)
 const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp: 0, itemsUsed: 0, ms: 120000, stats: { score: 12000, spins: 3, minis: 0, sent: 30, quads: 1, maxCombo: 2, xspins: 0, lines: 40, pieces: 120 } }, o || {});

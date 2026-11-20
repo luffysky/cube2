@@ -465,9 +465,9 @@
     'cl.stale': ['剛剛那場伺服器沒有採計。請重新整理頁面換成最新版再打。', 'The server did not count that match. Reload the page to get the latest version, then play again.', 'さっきの試合はサーバーで記録されませんでした。ページを再読み込みして最新版にしてください。', '방금 경기는 서버에 기록되지 않았습니다. 페이지를 새로 고쳐 최신 버전으로 바꿔 주세요.'],
     'cl.privacy': ['隱私說明：存了什麼、怎麼刪', 'Privacy: what is stored and how to delete it', 'プライバシー：保存される内容と削除方法', '개인정보: 저장되는 내용과 삭제 방법'],
     'cl.del': ['刪除雲端資料', 'Delete cloud data', 'クラウドのデータを削除', '클라우드 데이터 삭제'],
-    'cl.delP': ['會刪掉雲端上的存檔和排行榜成績，所有連著的裝置都會斷開。這台裝置上的進度不受影響。刪了就救不回來。', 'This deletes your cloud save and your leaderboard scores and unlinks every device. Progress on this device is not touched. It cannot be undone.', 'クラウドのセーブとランキングの記録を削除し、すべての端末の接続を解除します。この端末の進行状況には影響しません。元に戻せません。', '클라우드 저장 데이터와 랭킹 기록을 삭제하고 모든 기기의 연결을 해제합니다. 이 기기의 진행 상황에는 영향이 없습니다. 되돌릴 수 없습니다.'],
+    'cl.delP': ['雲端上的存檔和排行榜成績會立刻停用，所有連著的裝置都會斷開；資料先保留 30 天，之後永久刪除。這台裝置上的進度不受影響。', 'Your cloud save and leaderboard scores are switched off at once and every device is unlinked. The data is kept for 30 days, then deleted for good. Progress on this device is not touched.', 'クラウドのセーブとランキングの記録はすぐに停止し、すべての端末の接続を解除します。データは 30 日間保管したあと完全に削除します。この端末の進行状況には影響しません。', '클라우드 저장 데이터와 랭킹 기록은 즉시 중지되고 모든 기기의 연결이 해제됩니다. 데이터는 30일 동안 보관한 뒤 영구 삭제됩니다. 이 기기의 진행 상황에는 영향이 없습니다.'],
     'cl.delYes': ['確定刪除', 'Yes, delete', '削除する', '삭제'],
-    'cl.deleted': ['雲端資料已經刪除。', 'Cloud data deleted.', 'クラウドのデータを削除しました。', '클라우드 데이터를 삭제했습니다.'],
+    'cl.deleted': ['雲端資料已停用，30 天後永久刪除。', 'Cloud data switched off; it will be deleted for good in 30 days.', 'クラウドのデータを停止しました。30 日後に完全に削除します。', '클라우드 데이터를 중지했습니다. 30일 후 영구 삭제됩니다.'],
     'cl.lost': ['雲端存檔已經不在了，可能是在別台裝置刪掉的。進度還留在這台裝置。', 'The cloud save no longer exists. It may have been deleted from another device. Your progress is still on this device.', 'クラウドセーブはもう存在しません。別の端末で削除された可能性があります。進行状況はこの端末に残っています。', '클라우드 저장 데이터가 더 이상 없습니다. 다른 기기에서 삭제했을 수 있습니다. 진행 상황은 이 기기에 남아 있습니다.'],
     'cl.rejected': ['有一筆紀錄伺服器沒有收，進度以雲端為準。', 'The server did not accept one of your results. Your progress follows the cloud copy.', 'サーバーが受け付けなかった記録があります。進行状況はクラウドの内容に合わせました。', '서버가 받지 않은 기록이 있습니다. 진행 상황은 클라우드 기준으로 맞췄습니다.']
   });

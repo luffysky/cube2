@@ -13,7 +13,7 @@
    written into the page (canonical link, preview picture) and into robots.txt and sitemap.xml. When the game moves to
    its own domain, change it here (or set ZZ_SITE) and build again. */
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
-const SITE = (process.env.ZZ_SITE || 'https://cube2-xi.vercel.app').replace(/\/+$/, '');
+const SITE = (process.env.ZZ_SITE || 'https://brickduel.snowrealm.pet').replace(/\/+$/, '');
 const root = __dirname;
 const src = f => fs.readFileSync(path.join(root, 'src', f), 'utf8');
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

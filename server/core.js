@@ -11,6 +11,7 @@ const DAY = 86400000;
 
 const LIMIT = {
   NEW_PER_IP_DAY: 40,
+  GONE_KEEP: 30 * 86400000,       // a deleted save is kept this long before it is really removed
   MATCHES_KEEP: 365 * 86400000,   // the match log is kept a year        // accounts one address may create in a day
   CODE_TRIES: 12, CODE_WINDOW: 10 * 60000,   // code guesses one address may make in ten minutes
   CODE_TTL: 10 * 60000,
@@ -50,7 +51,7 @@ async function bump(db, what, who, windowMs, now) {
 }
 async function findPlayer(db, cred) {
   const rows = await db.query(
-    'SELECT p.id, p.pub, p.state, p.srv, p.ver FROM zz.keys k JOIN zz.players p ON p.id = k.pid WHERE k.hash = $1 AND p.id = $2',
+    'SELECT p.id, p.pub, p.state, p.srv, p.ver FROM zz.keys k JOIN zz.players p ON p.id = k.pid WHERE k.hash = $1 AND p.id = $2 AND p.gone IS NULL',
     [cred.hash, cred.id]);
   return rows[0] || null;
 }
@@ -68,7 +69,9 @@ async function hello(db, body, ip, now) {
         ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), id, now]],
         ["INSERT INTO zz.ledger (pid, key, kind, why, delta, bal, at) VALUES ($1, 'open', 'open', $2, $3, $3, $4)", [id, body.st ? 'import' : 'new', state.coins, now]],
         ['DELETE FROM zz.rate WHERE exp < $1', [now]],
-        ['DELETE FROM zz.matches WHERE at < $1', [now - LIMIT.MATCHES_KEEP]]
+        ['DELETE FROM zz.matches WHERE at < $1', [now - LIMIT.MATCHES_KEEP]],
+        // saves deleted by their players more than 30 days ago go for good (their keys, scores and links with them)
+        ['DELETE FROM zz.players WHERE gone IS NOT NULL AND gone < $1', [now - LIMIT.GONE_KEEP]]
       ]);
       return good({ id, key: secret, pub, st: state, ver: 1, now });
     } catch (e) {
@@ -101,7 +104,7 @@ const SAVE = `
 async function adReward(db, tag, tx, now) {
   if ((await db.query('SELECT 1 FROM zz.adtx WHERE tx = $1', [tx])).length) return good({ paid: false, why: 'dup' });
   for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
-    const rows = await db.query('SELECT id, pub, state, srv, ver FROM zz.players WHERE pub = $1 AND NOT ban', [tag]);
+    const rows = await db.query('SELECT id, pub, state, srv, ver FROM zz.players WHERE pub = $1 AND NOT ban AND gone IS NULL', [tag]);
     const row = rows[0];
     if (!row) return good({ paid: false, why: 'who' });
     const out = rules.applyOps(row.state, row.srv, [{ i: 'ad:' + tx.slice(0, 60), k: 'adGrant', a: [], srv: true }], now), d = out.state;
@@ -155,7 +158,7 @@ async function redeem(db, body, old, ip, now) {
   if (!code) return fail(404, 'code');
   const hash = sha(code);
   if (!body.go) {
-    const rows = await db.query('SELECT p.id, p.pub, p.state FROM zz.codes c JOIN zz.players p ON p.id = c.pid WHERE c.hash = $1 AND c.exp > $2', [hash, now]);
+    const rows = await db.query('SELECT p.id, p.pub, p.state FROM zz.codes c JOIN zz.players p ON p.id = c.pid WHERE c.hash = $1 AND c.exp > $2 AND p.gone IS NULL', [hash, now]);
     if (!rows[0]) return fail(404, 'code');
     const d = rules.current(rows[0].state, now);
     return good({ peek: { pub: rows[0].pub, name: d.name, rp: d.rp, coins: d.coins, games: d.tot.games, same: !!old && old.id === rows[0].id }, now });
@@ -168,19 +171,21 @@ async function redeem(db, body, old, ip, now) {
   if (!used[0]) return fail(404, 'code');
   const pid = used[0].pid, q = [
     ['DELETE FROM zz.keys WHERE pid = $1 AND hash NOT IN (SELECT hash FROM zz.keys WHERE pid = $1 ORDER BY made DESC, hash LIMIT ' + LIMIT.DEVICES + ')', [pid]],
-    ['SELECT id, pub, state, ver FROM zz.players WHERE id = $1', [pid]]
+    ['SELECT id, pub, state, ver FROM zz.players WHERE id = $1 AND gone IS NULL', [pid]]
   ];
   if (old && old.id !== pid) {
     // this device leaves the account it was on; an account no device can reach any more is removed
     q.push(['DELETE FROM zz.keys WHERE hash = $1 AND pid = $2', [old.hash, old.id]]);
-    q.push(['DELETE FROM zz.players p WHERE p.id = $1 AND NOT EXISTS (SELECT 1 FROM zz.keys k WHERE k.pid = p.id)', [old.id]]);
+    q.push(['UPDATE zz.players p SET gone = $2 WHERE p.id = $1 AND p.gone IS NULL AND NOT EXISTS (SELECT 1 FROM zz.keys k WHERE k.pid = p.id)', [old.id, now]]);
   }
   const out = await db.batch(q), row = out[1][0];
   if (!row) return fail(404, 'code');
   return good({ id: row.id, key: secret, pub: row.pub, st: rules.current(row.state, now), ver: row.ver, now });
 }
-async function wipe(db, cred) {
-  const rows = await db.query('DELETE FROM zz.players p USING zz.keys k WHERE k.pid = p.id AND k.hash = $1 AND p.id = $2 RETURNING p.id', [cred.hash, cred.id]);
+// The player deletes their cloud save: it is hidden at once (no device, board or link reaches it any more) and kept
+// 30 days, so a mistake can still be undone by hand; after that hello() removes it for good.
+async function wipe(db, cred, now) {
+  const rows = await db.query('UPDATE zz.players p SET gone = $3 FROM zz.keys k WHERE k.pid = p.id AND k.hash = $1 AND p.id = $2 AND p.gone IS NULL RETURNING p.id', [cred.hash, cred.id, now]);
   return rows[0] ? good({}) : fail(401, 'auth');
 }
 
@@ -191,17 +196,17 @@ async function board(db, b, scope, me, now) {
   const season = rules.seasonOf(now), mine = typeof me === 'string' && PUB.test(me) ? me : '';
   let top, own;
   if (b === 'rp') {
-    top = ["SELECT pub AS p, name AS n, rp AS v, COALESCE(state->>'xp', '0') AS x, COALESCE(state->>'title', '') AS t FROM zz.players WHERE season = $1 AND rg > 0 AND NOT ban ORDER BY rp DESC, seen LIMIT " + LIMIT.BOARD_ROWS, [season]];
-    own = [`SELECT me.rp AS v, 1 + (SELECT count(*)::int FROM zz.players o WHERE o.season = $1 AND o.rg > 0 AND NOT o.ban AND (o.rp > me.rp OR (o.rp = me.rp AND o.seen < me.seen))) AS rank
-            FROM zz.players me WHERE me.pub = $2 AND me.season = $1 AND me.rg > 0 AND NOT me.ban`, [season, mine]];
+    top = ["SELECT pub AS p, name AS n, rp AS v, COALESCE(state->>'xp', '0') AS x, COALESCE(state->>'title', '') AS t FROM zz.players WHERE season = $1 AND rg > 0 AND NOT ban AND gone IS NULL ORDER BY rp DESC, seen LIMIT " + LIMIT.BOARD_ROWS, [season]];
+    own = [`SELECT me.rp AS v, 1 + (SELECT count(*)::int FROM zz.players o WHERE o.season = $1 AND o.rg > 0 AND NOT o.ban AND o.gone IS NULL AND (o.rp > me.rp OR (o.rp = me.rp AND o.seen < me.seen))) AS rank
+            FROM zz.players me WHERE me.pub = $2 AND me.season = $1 AND me.rg > 0 AND NOT me.ban AND me.gone IS NULL`, [season, mine]];
     scope = 'season';
   } else {
     scope = scope === 'all' ? 'all' : 'season';
     const s = scope === 'all' ? 'all' : season;
-    top = ["SELECT p.pub AS p, p.name AS n, s.val AS v, COALESCE(p.state->>'xp', '0') AS x, COALESCE(p.state->>'title', '') AS t FROM zz.scores s JOIN zz.players p ON p.id = s.pid WHERE s.board = $1 AND s.season = $2 AND NOT p.ban ORDER BY s.val DESC, s.at LIMIT " + LIMIT.BOARD_ROWS, [b, s]];
+    top = ["SELECT p.pub AS p, p.name AS n, s.val AS v, COALESCE(p.state->>'xp', '0') AS x, COALESCE(p.state->>'title', '') AS t FROM zz.scores s JOIN zz.players p ON p.id = s.pid WHERE s.board = $1 AND s.season = $2 AND NOT p.ban AND p.gone IS NULL ORDER BY s.val DESC, s.at LIMIT " + LIMIT.BOARD_ROWS, [b, s]];
     own = [`SELECT ms.val AS v, 1 + (SELECT count(*)::int FROM zz.scores o JOIN zz.players op ON op.id = o.pid
-              WHERE o.board = $1 AND o.season = $2 AND NOT op.ban AND (o.val > ms.val OR (o.val = ms.val AND o.at < ms.at))) AS rank
-            FROM zz.scores ms JOIN zz.players mp ON mp.id = ms.pid WHERE mp.pub = $3 AND ms.board = $1 AND ms.season = $2 AND NOT mp.ban`, [b, s, mine]];
+              WHERE o.board = $1 AND o.season = $2 AND NOT op.ban AND op.gone IS NULL AND (o.val > ms.val OR (o.val = ms.val AND o.at < ms.at))) AS rank
+            FROM zz.scores ms JOIN zz.players mp ON mp.id = ms.pid WHERE mp.pub = $3 AND ms.board = $1 AND ms.season = $2 AND NOT mp.ban AND mp.gone IS NULL`, [b, s, mine]];
   }
   const out = await db.batch(mine ? [top, own] : [top]), flip = b === 'sprint' ? -1 : 1;
   const row = mine && out[1][0];
@@ -397,15 +402,19 @@ async function idLink(db, cred, claims, now) {
   if (!p) return fail(401, 'auth');
   if (!(await useJti(db, claims))) return fail(409, 'replay');
   const mine = await db.query('SELECT platform_id FROM zz.identity WHERE pid = $1', [p.id]);
-  const theirs = await db.query('SELECT i.pid, p.pub, p.state FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
+  const theirs = await db.query('SELECT i.pid, p.pub, p.state, p.gone FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
   if (mine[0] && mine[0].platform_id === claims.sub) return good({ linked: true, same: true });
   // never merged or overwritten: the player chooses, and both saves stay as they are
   if (mine[0]) return fail(409, 'linked');
-  if (theirs[0]) { const d = rules.current(theirs[0].state, now); return fail(409, 'taken', { other: { pub: theirs[0].pub, name: d.name, coins: d.coins, games: d.tot.games } }); }
+  // the platform account's old save was deleted by its player: the link moves to this save (the old one stays kept
+  // until its 30 days are up, unlinked)
+  const moved = !!(theirs[0] && theirs[0].gone != null);
+  if (theirs[0] && !moved) { const d = rules.current(theirs[0].state, now); return fail(409, 'taken', { other: { pub: theirs[0].pub, name: d.name, coins: d.coins, games: d.tot.games } }); }
   const secret = newSecret();
   try {
     await db.batch([
-      ['INSERT INTO zz.identity (platform_id, pid, linked_at, provider_hint) VALUES ($1, $2, $3, $4)', [claims.sub, p.id, now, 'snowrealm']],
+      moved ? ['UPDATE zz.identity SET pid = $2, linked_at = $3 WHERE platform_id = $1', [claims.sub, p.id, now]]
+        : ['INSERT INTO zz.identity (platform_id, pid, linked_at, provider_hint) VALUES ($1, $2, $3, $4)', [claims.sub, p.id, now, 'snowrealm']],
       // this device gets a fresh key; its old key and any open transfer codes stop working
       ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), p.id, now]],
       ['DELETE FROM zz.keys WHERE hash = $1 AND pid = $2', [cred.hash, p.id]],
@@ -420,7 +429,7 @@ async function idLink(db, cred, claims, now) {
 // another device: the platform player's 轉磚 save, with a key of its own for this device
 async function idRecover(db, claims, now) {
   if (!(await useJti(db, claims))) return fail(409, 'replay');
-  const r = await db.query('SELECT p.id, p.pub, p.state, p.ver, p.ban FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
+  const r = await db.query('SELECT p.id, p.pub, p.state, p.ver, p.ban FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1 AND p.gone IS NULL', [claims.sub]);
   if (!r[0]) return fail(404, 'none');
   if (r[0].ban) return fail(403, 'ban');
   const secret = newSecret(), pid = r[0].id;

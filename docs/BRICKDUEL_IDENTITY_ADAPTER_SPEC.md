@@ -58,7 +58,7 @@
 ## 5. 需要 GPT 交付／確認
 
 - Identity 正式網域、issuer、JWKS URL、轉磚 audience，以及可用的非機密測試金鑰或測試簽發端。
-- BFF 用的授權端點、token 端點、client 註冊方式與允許的 callback（轉磚預定 `https://cube2-xi.vercel.app/api/auth/callback`，**TBD**）。
+- BFF 用的授權端點、token 端點、client 註冊方式與允許的 callback（轉磚預定 `https://brickduel.snowrealm.pet/api/auth/callback`（Owner C-022 定案））。
 - 平台登入入口能否支援從外部連結直接打開註冊（例如 `https://games.snowrealm.pet/?member=register`）。目前首頁沒有這種連結，轉磚只能帶到首頁並說明「右上角登入 → 註冊」。
 - 綁定（link）用的授權流程端點與回呼網址規則（PKCE、state、允許的 redirect URI）。
 - 停權／撤銷的查詢或通知方式。
