@@ -103,8 +103,21 @@
     });
     return h + '</g><circle r="16" fill="#1B2530"/><path d="M-10 -122 L10 -122 L0 -100 Z" fill="#1B2530"/></svg>';
   }
-  var SYM = ['#FF9DB5', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#F1EADB'], GOLD = 'gold';
-  function symHtml(s) { return s === GOLD ? '<span class="sym gold"><i class="coin"></i></span>' : '<span class="sym" style="--c:' + s + '"></span>'; }
+  // the reels show the game's own pieces (and a gold coin, the jackpot)
+  var SYM = ['T', 'O', 'S', 'L', 'J', 'Z'], GOLD = 'gold', symCache = {};
+  function pieceSvg(type) {
+    var cells = ZZ.SHAPES[type][0], col = ZZ.View.TILE[ZZ.TID[type]], key = type + col, x0 = 9, x1 = -9, y0 = 9, y1 = -9, i, h = '';
+    for (i = 0; i < 4; i++) { x0 = Math.min(x0, cells[i][0]); x1 = Math.max(x1, cells[i][0]); y0 = Math.min(y0, cells[i][1]); y1 = Math.max(y1, cells[i][1]); }
+    if (symCache[key]) return symCache[key];
+    var w = x1 - x0 + 1, hh = y1 - y0 + 1, ox = (4 - w) / 2, oy = (4 - hh) / 2;
+    for (i = 0; i < 4; i++) {
+      var x = (cells[i][0] - x0 + ox) * 10 + 1, y = (cells[i][1] - y0 + oy) * 10 + 1;
+      h += '<rect x="' + x + '" y="' + y + '" width="8.6" height="8.6" rx="2.2" fill="' + col + '" stroke="rgba(0,0,0,0.18)" stroke-width="0.8"/>' +
+        '<rect x="' + (x + 1.6) + '" y="' + (y + 1.4) + '" width="3" height="1.6" rx="0.8" fill="rgba(255,255,255,0.65)"/>';
+    }
+    return (symCache[key] = '<svg viewBox="0 0 40 40" aria-hidden="true">' + h + '</svg>');
+  }
+  function symHtml(s) { return s === GOLD ? '<span class="sym gold"><i class="coin"></i></span>' : '<span class="sym">' + pieceSvg(s) + '</span>'; }
   function shuffle(list) { var a = list.slice(), i, j, x; for (i = a.length - 1; i > 0; i--) { j = Math.floor(Math.random() * (i + 1)); x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
   // what the three reels show for a result the server drew (the picture only; the prize is already decided)
   function reelsFor(out) {
