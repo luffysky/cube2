@@ -17,7 +17,7 @@
   </div>
   <div class="stats">
     <div><b id="score">0</b><span>分數</span></div>
-    <div><b id="len">3</b><span>長度</span></div>
+    <div class="hearts-box"><b id="hearts" aria-label="剩下的命">♥♥♥♥♥</b><span>命</span></div>
     <div><b id="best">0</b><span>最佳</span></div>
   </div>
   <div class="board" id="board">
@@ -25,7 +25,12 @@
     <div class="over" id="intro">
       <h2>磚蛇</h2>
       <p>吃磚會變長，吃到的磚接在頭後面。身上同一個顏色的磚連成 3 塊以上就會消掉，蛇變短、分數加倍。</p>
-      <p>撞到牆、水泥或自己就結束。金磚過幾秒會消失，吃到加 100 分。</p>
+      <p>有 5 條命，撞到牆、水泥、豎起的尖刺或自己會少一條。吃到一定數量後會出現尖刺和傳送門：尖刺會輪流豎起來，出現黃色斜紋就是快豎起了；鑽進一個傳送門會從另一個出來。</p>
+      <div class="seg" role="radiogroup" aria-label="難度">
+        <button type="button" role="radio" data-lv="easy">簡單</button>
+        <button type="button" role="radio" data-lv="normal">普通</button>
+        <button type="button" role="radio" data-lv="hard">困難</button>
+      </div>
       <div class="row"><button class="btn" type="button" id="go">開始</button></div>
       <p id="keysHint">方向鍵或 WASD 控制，空白鍵暫停</p>
     </div>
@@ -33,8 +38,9 @@
       <h2 id="endTitle">撞到了</h2>
       <div class="big" id="endScore">0</div>
       <p id="endNote"></p>
-      <div class="row"><button class="btn" type="button" id="again">再玩一次</button><a class="btn plain" href="../">其他遊戲</a></div>
+      <div class="row"><button class="btn" type="button" id="again">再玩一次</button><button class="btn plain" type="button" id="toIntro">換難度</button><a class="btn plain" href="../">其他遊戲</a></div>
     </div>
+    <div class="over soft" id="ouch" hidden><h2 id="ouchT">撞到了</h2><p id="ouchP"></p></div>
     <div class="over" id="paused" hidden>
       <h2>暫停中</h2>
       <div class="row"><button class="btn" type="button" id="resume">繼續</button></div>

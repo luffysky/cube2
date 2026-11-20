@@ -24,8 +24,11 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
     await page.screenshot({ path: path.join(OUT, 'snake-intro.png') });
+    ok(await page.evaluate(() => document.querySelectorAll('[data-lv]').length === 3 && document.querySelector('[data-lv="normal"]').getAttribute('aria-checked') === 'true'), 'three difficulties, normal picked');
+    await page.click('[data-lv="easy"]');
     await page.click('#go'); await sleep(200);
-    ok(await page.evaluate(() => window.__snake().state === 'play'), 'start');
+    ok(await page.evaluate(() => window.__snake().state === 'play' && window.__snake().g.level === 'easy' && window.__snake().g.speed() === 260), 'start on easy: slower');
+    ok(await page.evaluate(() => document.getElementById('hearts').textContent === '♥♥♥♥♥'), 'five hearts');
     // steer toward the food for a while with the arrow keys
     for (let i = 0; i < 120; i++) {
       const s = await page.evaluate(() => { const { g, state } = window.__snake(); return state === 'play' ? { h: g.body[0], f: g.food, dir: g.dir } : null; });
@@ -44,17 +47,33 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => window.__snake().state === 'pause' && !document.getElementById('paused').hidden), 'space pauses');
     await page.click('#resume'); await sleep(150);
     ok(await page.evaluate(() => window.__snake().state === 'play'), 'and it carries on');
-    // run into the wall
-    await page.evaluate(() => { const { g } = window.__snake(); g.cement = []; g.food = null; g.gold = null; g.turns = []; g.body = g.body.slice(0, 3); g.body.forEach((p, i) => { p.x = 8 - i; p.y = 8; }); g.dir = 'right'; });
+    // run into the wall: a heart goes and the snake comes back
+    const wall = () => page.evaluate(() => { const { g } = window.__snake(); g.cement = []; g.spikes = []; g.portals = null; g.food = null; g.gold = null; g.turns = []; g.body = g.body.slice(0, 3); g.body.forEach((p, i) => { p.x = 12 - i; p.y = 8; }); g.dir = 'right'; });
+    await wall();
+    await page.waitForFunction(() => window.__snake().state === 'ouch', null, { timeout: 8000 });
+    ok(await page.evaluate(() => window.__snake().g.lives === 4 && document.getElementById('hearts').textContent === '♥♥♥♥♡' && /還剩 4 條命/.test(document.getElementById('ouch').textContent)), 'a wall costs a heart');
+    await page.screenshot({ path: path.join(OUT, 'snake-ouch.png') });
+    await page.waitForFunction(() => window.__snake().state === 'play', null, { timeout: 4000 });
+    ok(true, 'and play goes on');
+    // traps on screen
+    await page.evaluate(() => { const { g } = window.__snake(); g.eaten = 10; g.addTraps(); });
+    await sleep(300);
+    await page.screenshot({ path: path.join(OUT, 'snake-traps.png') });
+    ok(await page.evaluate(() => window.__snake().g.spikes.length === 1 && !!window.__snake().g.portals), 'easy has one spike and a pair of portals');
+    await page.evaluate(() => { window.__snake().g.lives = 1; });
+    await wall();
     await page.waitForFunction(() => window.__snake().state === 'over', null, { timeout: 8000 });
     const end = await page.evaluate(() => ({ text: document.getElementById('end').textContent, best: +localStorage.getItem('snowrealm.snake.best'), score: window.__snake().g.score }));
-    ok(/撞到牆了/.test(end.text) && end.best === end.score && end.best > 0, 'hitting the wall ends it and keeps the best', end);
+    ok(/命用完了/.test(end.text) && end.score > 0, 'the last heart ends it', end);
+    ok(await page.evaluate(() => JSON.parse(localStorage.getItem('snowrealm.snake.bests')).easy === window.__snake().g.score), 'the best is kept for that difficulty');
+    const contrast = await page.evaluate(() => [...document.querySelectorAll('#end .btn')].map(b => { const s = getComputedStyle(b); return [s.color, s.backgroundColor]; }));
+    ok(contrast.length === 3 && contrast.every(([c, b]) => c !== b) && contrast.filter(([c]) => c === 'rgb(27, 37, 48)').length === 2, 'every button on the end card can be read', contrast);
     await page.screenshot({ path: path.join(OUT, 'snake-over.png') });
     await page.reload(); await sleep(400);
-    ok(await page.evaluate(() => +document.getElementById('best').textContent > 0), 'the best is still there after a reload');
+    ok(await page.evaluate(() => +document.getElementById('best').textContent > 0 && document.querySelector('[data-lv="easy"]').getAttribute('aria-checked') === 'true'), 'the best and the difficulty are still there after a reload');
 
     // a phone: the pad and swiping
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, colorScheme: 'dark' });
     const ph = await ctx.newPage();
     ph.on('pageerror', e => problems.push('phone: ' + e.message));
     await ph.goto(BASE + 'games/snake/'); await sleep(500);
@@ -64,6 +83,11 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await ph.tap('[data-d="up"]'); await sleep(400);
     ok(await ph.evaluate(() => window.__snake().g.dir === 'up'), 'the pad turns the snake');
     await ph.screenshot({ path: path.join(OUT, 'snake-phone.png') });
+    await ph.evaluate(() => { const { g } = window.__snake(); g.lives = 1; g.cement = []; g.spikes = []; g.portals = null; g.food = null; g.turns = []; g.dir = 'up'; });
+    await ph.waitForFunction(() => window.__snake().state === 'over', null, { timeout: 8000 });
+    const dark = await ph.evaluate(() => { const b = document.querySelector('#end .btn.plain'), s = getComputedStyle(b); return [s.color, s.backgroundColor]; });
+    ok(dark[0] === 'rgb(27, 37, 48)' && dark[1] !== dark[0], 'in dark mode the light buttons keep dark writing', dark);
+    await ph.screenshot({ path: path.join(OUT, 'snake-over-dark.png') });
     await ctx.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }

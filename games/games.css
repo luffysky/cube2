@@ -52,6 +52,7 @@ a.card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
 .bar h1 { margin: 0; font-size: 20px; }
 .stats { width: 100%; max-width: 560px; display: flex; justify-content: space-between; }
 .stats div { display: flex; flex-direction: column; align-items: flex-start; }
+.stats div.hearts-box { align-items: center; }
 .stats div:last-child { align-items: flex-end; }
 .stats b { font-family: var(--num); font-size: 30px; font-style: italic; line-height: 1; font-variant-numeric: tabular-nums; }
 .stats span { font-size: 12px; color: var(--muted); }
@@ -63,7 +64,14 @@ a.card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
 .over p { margin: 0; max-width: 34ch; font-size: 14px; color: #C9D2DB; }
 .over .big { font-family: var(--num); font-size: 44px; font-style: italic; color: #fff; }
 .btn { padding: 12px 22px; border-radius: 14px; border: 0; background: var(--gold); color: #3B2A00; font-weight: 800; font-size: 17px; box-shadow: 0 3px 0 #B8861A; cursor: pointer; }
-.btn.plain { background: #F2F5F8; color: var(--ink); box-shadow: 0 3px 0 #9AA5B2; }
+.btn.plain { background: #F2F5F8; color: #1B2530; box-shadow: 0 3px 0 #9AA5B2; text-decoration: none; display: inline-block; }
+.over.soft { background: rgba(20, 26, 33, 0.45); pointer-events: none; }
+.seg { display: flex; gap: 6px; background: rgba(255,255,255,0.08); padding: 4px; border-radius: 14px; }
+.seg button { padding: 8px 16px; border-radius: 10px; border: 0; background: transparent; color: #C9D2DB; font-weight: 700; cursor: pointer; }
+.seg button[aria-checked="true"] { background: #F2F5F8; color: #1B2530; }
+.hearts-box b { color: #E04F5F; font-style: normal; font-size: 22px; letter-spacing: 1px; font-family: var(--display); }
+.hearts-box b.hit { animation: hit 0.5s; }
+@keyframes hit { 0%, 100% { transform: none; } 30% { transform: scale(1.25); } }
 .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .pad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 8px; }
 .pad button { border-radius: 14px; background: var(--panel); border: 1px solid var(--edge); box-shadow: 0 3px 0 var(--edge); font-size: 22px; touch-action: manipulation; cursor: pointer; }
