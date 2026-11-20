@@ -56,3 +56,12 @@
   dr.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
   dr.addEventListener('touchend', function (e) { if (sx != null && sx - e.changedTouches[0].clientX > 60) show(false); sx = null; }, { passive: true });
 })();
+
+// the loading screen goes once the page has everything (a short moment at least, so it does not just flicker)
+(function () {
+  var b = document.getElementById('gboot');
+  if (!b) return;
+  var t0 = (window.performance && performance.timing && performance.timing.navigationStart) || Date.now();
+  function done() { setTimeout(function () { b.classList.add('done'); setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 350); }, Math.max(0, 450 - (Date.now() - t0))); }
+  if (document.readyState === 'complete') done(); else window.addEventListener('load', done);
+})();

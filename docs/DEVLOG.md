@@ -672,3 +672,14 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `pwa` 52、`rwd` 258、`consent` 31、`howto` 11、`flow` 60；關掉 JavaScript 截圖確認動畫畫面、正常開啟時啟動後消失。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`e95a57c`](https://github.com/luffysky/cube2/commit/e95a57c)。
+
+## 2026-11-21 07:40（Asia/Taipei）｜九款小遊戲也有載入動畫
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「繼續後面的」（接上一則：小遊戲也加載入畫面）
+- 實際變更：每款小遊戲頁面一開就顯示四塊磚依序掉下來排成一排（顏色跟著那款遊戲），下面「載入中…」（五語，字典 `g.loading`）。頁面全部載好就淡出（至少停 0.45 秒，避免一閃而過）；萬一出錯 10 秒後自己淡掉。減少動態時不動。
+- 檔案：`games/*/index.html`（9 款）、`games/games.css`、`games/nav.js`、`src/games-dict.js`、`games/words.js`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `bricks` 73、`gameslang` 113、`minipay` 10、`drawer` 28；截圖確認畫面、日文頁載好後消失。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
