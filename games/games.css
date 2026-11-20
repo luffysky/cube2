@@ -78,6 +78,9 @@ a.card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
 .seg button[aria-checked="true"] { background: #F2F5F8; color: #1B2530; }
 .hearts-box b { color: #E04F5F; font-style: normal; font-size: 22px; letter-spacing: 1px; font-family: var(--display); }
 .hearts-box b.hit { animation: hit 0.5s; }
+.hearts-box b.heal { animation: heal 0.6s; }
+@keyframes heal { 0% { transform: scale(1); } 40% { transform: scale(1.35); color: #FF4F7B; text-shadow: 0 0 12px rgba(255, 79, 123, .8); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .hearts-box b.heal { animation: none; } }
 @keyframes hit { 0%, 100% { transform: none; } 30% { transform: scale(1.25); } }
 .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .pad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 8px; }

@@ -566,3 +566,14 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：本機 `node test/browser-run.js` 18 個全過（約 10 分鐘）。GitHub 上第一次執行結果要等這次推上去才知道。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`b9fbf5a`](https://github.com/luffysky/cube2/commit/b9fbf5a)。
+
+## 2026-11-21 04:30（Asia/Taipei）｜磚蛇加補命的愛心
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「貪吃蛇加上可以補愛心的」
+- 實際變更：少了命的時候，每吃 5 塊磚有機會在場上出現一顆愛心（同時只有一顆，不會出現在蛇身、食物、水泥或陷阱上），停留 60 步，快消失前閃爍；吃到補回一條命（最多 5 條）、加 20 分，上方的愛心跳一下、有提示音和「+♥」。滿命時不會出現。說明文字四語更新。
+- 檔案：`games/snake/snake.js`、`games/games.css`、`src/games-dict.js`、`games/words.js`、`test/snake.test.js`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過（snake 41：滿命不出現、少命會出現、不壓在蛇或食物上、吃到補一條加 20 分、不超過 5 條、沒吃到會消失）；瀏覽器 `bricks` 全過，截圖確認愛心畫面。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

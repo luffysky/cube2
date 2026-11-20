@@ -112,5 +112,30 @@ g = new Snake(16);
 let bad = 0; for (let i = 0; i < 200; i++) { g.placeFood(); if (g.body.some(p => p.x === g.food.x && p.y === g.food.y)) bad++; }
 ok(bad === 0, 'food never appears on the snake');
 
+// hearts: none while all five are left; with one missing a heart appears now and then, eating it gives one back
+{
+  const h = new Snake(7);
+  // eat bricks without moving far: put the food right ahead each time
+  const feed = (k) => { for (let i = 0; i < k; i++) { const d = h.dir === 'right' ? 1 : -1; h.food = { x: h.body[0].x + d, y: h.body[0].y, c: 1 + (i % 5) }; if (h.food.x < 0 || h.food.x >= N) { h.turn('down'); h.step(); h.turn(h.dir === 'down' && h.body[0].x > N / 2 ? 'left' : 'right'); continue; } h.step(); } };
+  feed(Snake.HEART.every * 2);
+  ok(!h.heart, 'no heart while every life is there');
+  h.lives = 3;
+  let tries = 0;
+  while (!h.heart && tries++ < 40 && !h.over) feed(1);
+  ok(!!h.heart && h.heartLeft > 0, 'with lives missing a heart turns up', { lives: h.lives, eaten: h.eaten });
+  const at = h.heart;
+  ok(!h.body.some(b => b.x === at.x && b.y === at.y) && !(h.food && h.food.x === at.x && h.food.y === at.y), 'not on the snake or the food');
+  // steer the head onto it: put it right ahead
+  h.heart = { x: h.body[0].x + (h.dir === 'right' ? 1 : h.dir === 'left' ? -1 : 0), y: h.body[0].y + (h.dir === 'down' ? 1 : h.dir === 'up' ? -1 : 0) };
+  h.food = null;
+  const before = h.score; h.step();
+  ok(h.lives === 4 && !h.heart && h.score === before + 20 && h.events.some(e => e.type === 'heal'), 'eating it gives a life back, and 20 points');
+  h.lives = 5; h.heart = { x: h.body[0].x + (h.dir === 'right' ? 1 : -1), y: h.body[0].y }; h.food = null; h.step();
+  ok(h.lives === 5, 'never more than five');
+  // a heart left alone goes away
+  h.lives = 2; h.heart = { x: 0, y: 0 }; h.heartLeft = 3; for (let i = 0; i < 3; i++) { h.food = null; h.turns = []; if (h.body[0].x + 1 >= N) h.turn('down'); h.step(); }
+  ok(!h.heart, 'an uneaten heart disappears after a while');
+}
+
 console.log('snake: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

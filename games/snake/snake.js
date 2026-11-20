@@ -5,6 +5,8 @@
    each chain). Cement blocks appear as the snake eats, and now and then a gold brick that is gone in a few seconds.
    Hitting a wall, cement, a raised spike or itself costs a heart (five to start); the snake comes back somewhere safe
    and the run ends with the last heart. Faster with every brick eaten, how fast set by the difficulty picked.
+   With a heart missing, now and then a heart appears on the field for a while (blinking before it goes): eating it
+   gives one heart back, up to five.
 
    Traps, a few at most: spikes that rise and sink in turn (a stripe shows on one just before it rises), and a pair of
    portals that sends the head out of the other one.
@@ -33,6 +35,7 @@
   };
   var LIVES = 5;
   var SPIKE = { up: 12, down: 20, warn: 5 };     // in steps
+  var HEART = { every: 5, stay: 60 };            // a heart may come every 5 bricks while one is missing; it stays 60 steps
 
   function Snake(seed, level) {
     this.level = LEVELS[level] ? level : 'normal';
@@ -45,13 +48,13 @@
     this.body = [{ x: mid, y: mid, c: 0 }, { x: mid - 1, y: mid, c: 1 + this.int(COLORS) }, { x: mid - 2, y: mid, c: 1 + this.int(COLORS) }];
     while (this.body[1].c === this.body[2].c) this.body[2].c = 1 + this.int(COLORS);
     this.dir = 'right'; this.turns = [];
-    this.cement = []; this.food = null; this.gold = null; this.goldLeft = 0;
+    this.cement = []; this.food = null; this.gold = null; this.goldLeft = 0; this.heart = null; this.heartLeft = 0; this.healed = 0;
     this.ticks = 0;
     this.eaten = 0; this.score = 0; this.cleared = 0; this.chainBest = 0; this.over = false; this.why = '';
     this.events = [];
     this.placeFood();
   }
-  Snake.N = N; Snake.CEMENT = CEMENT; Snake.GOLD = GOLD; Snake.COLORS = COLORS; Snake.LEVELS = LEVELS; Snake.LIVES = LIVES; Snake.SPIKE = SPIKE;
+  Snake.N = N; Snake.CEMENT = CEMENT; Snake.GOLD = GOLD; Snake.COLORS = COLORS; Snake.LEVELS = LEVELS; Snake.LIVES = LIVES; Snake.SPIKE = SPIKE; Snake.HEART = HEART;
   Snake.prototype.int = function (n) { return Math.floor(this.rng.next() * n); };
   Snake.prototype.taken = function (x, y) {
     var i;
@@ -59,6 +62,7 @@
     for (i = 0; i < this.cement.length; i++) if (this.cement[i].x === x && this.cement[i].y === y) return true;
     if (this.food && this.food.x === x && this.food.y === y) return true;
     if (this.gold && this.gold.x === x && this.gold.y === y) return true;
+    if (this.heart && this.heart.x === x && this.heart.y === y) return true;
     for (i = 0; i < this.spikes.length; i++) if (this.spikes[i].x === x && this.spikes[i].y === y) return true;
     if (this.portals) for (i = 0; i < 2; i++) if (this.portals[i].x === x && this.portals[i].y === y) return true;
     return false;
@@ -128,7 +132,7 @@
     }
     for (i = 0; i < this.cement.length; i++) if (this.cement[i].x === x && this.cement[i].y === y) return this.crash('cement');
     for (i = 0; i < this.spikes.length; i++) if (this.spikes[i].x === x && this.spikes[i].y === y && this.spikeState(this.spikes[i]) === 'up') return this.crash('spike');
-    var eat = this.food && this.food.x === x && this.food.y === y, gold = this.gold && this.gold.x === x && this.gold.y === y;
+    var eat = this.food && this.food.x === x && this.food.y === y, gold = this.gold && this.gold.x === x && this.gold.y === y, heal = this.heart && this.heart.x === x && this.heart.y === y;
     // the tail moves away this step unless the snake grows, so the head may go where the tail just was
     var grows = eat;
     for (i = 1; i < this.body.length - (grows ? 0 : 1); i++) if (this.body[i].x === x && this.body[i].y === y) return this.crash('self');
@@ -150,7 +154,11 @@
       if (this.eaten % 6 === 0) { var cp = this.freeCell(); if (cp) { this.cement.push(cp); this.events.push({ type: 'cement', x: cp.x, y: cp.y }); } }
       if (!this.trapped && this.eaten >= this.cfg.trapAt) { this.trapped = true; this.addTraps(); }
       if (!this.gold && this.eaten % 7 === 3) { var gp = this.freeCell(); if (gp) { this.gold = gp; this.goldLeft = 40; } }
+      // a heart, only while one is missing
+      if (!this.heart && this.lives < LIVES && this.eaten % HEART.every === 0) { var hp = this.freeCell(); if (hp) { this.heart = hp; this.heartLeft = HEART.stay; this.events.push({ type: 'heartUp', x: hp.x, y: hp.y }); } }
     }
+    if (heal) { this.lives = Math.min(LIVES, this.lives + 1); this.healed++; this.score += 20; this.events.push({ type: 'heal', lives: this.lives, x: x, y: y }); this.heart = null; }
+    if (this.heart && --this.heartLeft <= 0) this.heart = null;
     if (gold) { this.score += 100; this.events.push({ type: 'gold', x: x, y: y }); this.gold = null; }
     if (this.gold && --this.goldLeft <= 0) this.gold = null;
   };
@@ -266,6 +274,7 @@
       var blink = g.goldLeft < 12 && Math.floor(Date.now() / 150) % 2;
       if (!blink) tile(g.gold.x, g.gold.y, GOLD, 0.92);
     }
+    if (g.heart && !(g.heartLeft < 14 && Math.floor(Date.now() / 150) % 2)) heartAt(g.heart.x, g.heart.y);
     var blinkOff = state === 'ouch' && Math.floor(Date.now() / 120) % 2;
     if (!blinkOff) {
     for (i = g.body.length - 1; i >= 1; i--) tile(g.body[i].x, g.body[i].y, g.body[i].c);
@@ -289,6 +298,16 @@
       else { x.fillStyle = '#FFFFFF'; x.font = '800 ' + Math.round(cell * 0.8) + 'px sans-serif'; x.textAlign = 'center'; x.fillText(f.text, f.x, f.y - k * cell); }
       x.globalAlpha = 1;
     }
+    x.restore();
+  }
+  // a heart to pick up: red, beating gently, with a soft glow
+  function heartAt(cx, cy) {
+    var px = cx * cell + cell / 2, py = cy * cell + cell / 2, s = cell * 0.36 * (reduce ? 1 : 1 + Math.sin(Date.now() / 180) * 0.08);
+    x.save(); x.translate(px, py + s * 0.12);
+    x.shadowColor = '#FF4F7B'; x.shadowBlur = cell * 0.5;
+    x.beginPath(); x.moveTo(0, s); x.bezierCurveTo(-s * 1.7, -s * 0.15, -s * 0.7, -s * 1.45, 0, -s * 0.5); x.bezierCurveTo(s * 0.7, -s * 1.45, s * 1.7, -s * 0.15, 0, s); x.closePath();
+    x.fillStyle = '#FF4F7B'; x.fill();
+    x.shadowBlur = 0; x.fillStyle = 'rgba(255,255,255,0.7)'; x.beginPath(); x.arc(-s * 0.45, -s * 0.5, s * 0.18, 0, 6.283); x.fill();
     x.restore();
   }
   // a spike: a plate when sunk, yellow stripes just before it rises, steel points when up
@@ -352,7 +371,8 @@
       for (var i = 0; i < Snake.LIVES; i++) h += i < n ? '♥' : '♡';
       var el = $('hearts');
       el.textContent = h; el.setAttribute('aria-label', T('g.livesN', n));
-      if (heartsShown > n) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
+      if (heartsShown > n) { el.classList.remove('hit', 'heal'); void el.offsetWidth; el.classList.add('hit'); }
+      else if (heartsShown >= 0 && heartsShown < n) { el.classList.remove('hit', 'heal'); void el.offsetWidth; el.classList.add('heal'); }
       heartsShown = n;
     }
   }
@@ -406,6 +426,8 @@
         g.events.forEach(function (e) {
           if (e.type === 'eat') { tone(SCALE[Math.min(7, g.eaten % 8)], 0.07, 'sine', 0.06); }
           else if (e.type === 'gold') { pop('+100', e.x, e.y); tone(1320, 0.18, 'sine', 0.08, 1760); }
+          else if (e.type === 'heartUp') { tone(880, 0.1, 'sine', 0.05, 1175); }
+          else if (e.type === 'heal') { pop('+♥', e.x, e.y); tone(784, 0.12, 'sine', 0.08, 1047); setTimeout(function () { tone(1175, 0.16, 'sine', 0.07, 1568); }, 110); }
           else if (e.type === 'cement') { tone(140, 0.12, 'square', 0.03); }
           else if (e.type === 'portal') { tone(440, 0.16, 'sine', 0.06, 1320); }
           else if (e.type === 'trap') { if (e.kind === 'portal') pop(T('sn.portal'), N / 2 - 0.5, 2); else pop(T('sn.spikes'), e.x, e.y); }
