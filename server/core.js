@@ -20,6 +20,10 @@ const LIMIT = {
   SAVE_TRIES: 4
 };
 const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1, wxr: 1 };
+// the brick games: m_<game>_<0|1|2> for scores and times, m_<game> for the level games' stars
+const MINI_BOARD = /^m_(?:(?:snake|breakout|stack|merge|pipes|sweep)_[012]|push|sort|picross)$/;
+const okBoard = b => typeof b === 'string' && (BOARDS.hasOwnProperty(b) || MINI_BOARD.test(b));
+const lowWins = b => b === 'sprint' || /^m_(?:pipes|sweep)_/.test(b);      // kept negative, shown as a time
 const TITLE_ID = /^[a-z0-9]{1,12}$/;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: nothing to misread
 const PUB_ABC = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -220,7 +224,7 @@ async function restore(db, cred, now) {
 // ---------- leaderboards ----------
 const PUB = /^[a-z0-9]{8}$/;
 async function board(db, b, scope, me, now) {
-  if (!BOARDS.hasOwnProperty(b)) return fail(400, 'board');
+  if (!okBoard(b)) return fail(400, 'board');
   const season = rules.seasonOf(now), mine = typeof me === 'string' && PUB.test(me) ? me : '';
   let top, own;
   if (b === 'rp') {
@@ -236,7 +240,7 @@ async function board(db, b, scope, me, now) {
               WHERE o.board = $1 AND o.season = $2 AND NOT op.ban AND op.gone IS NULL AND (o.val > ms.val OR (o.val = ms.val AND o.at < ms.at))) AS rank
             FROM zz.scores ms JOIN zz.players mp ON mp.id = ms.pid WHERE mp.pub = $3 AND ms.board = $1 AND ms.season = $2 AND NOT mp.ban AND mp.gone IS NULL`, [b, s, mine]];
   }
-  const out = await db.batch(mine ? [top, own] : [top]), flip = b === 'sprint' ? -1 : 1;
+  const out = await db.batch(mine ? [top, own] : [top]), flip = lowWins(b) ? -1 : 1;
   const row = mine && out[1][0];
   return good({ b, scope, season, top: out[0].map(r => ({ p: r.p, n: r.n, v: r.v * flip, lv: rules.Meta.levelOf(+r.x || 0).lv, t: TITLE_ID.test(r.t) ? r.t : '' })), me: row ? { rank: row.rank, v: row.v * flip } : null, now });
 }

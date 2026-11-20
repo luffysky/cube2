@@ -121,7 +121,10 @@ function applyOps(state, srv, ops, now) {
       // a brick game: it cannot have taken less time than it says, and the time comes out of the allowance
       const ms = Math.max(0, Math.floor(+(op.a && op.a[4])) || 0), cost = Math.max(3000, ms);
       if (srv.bud < cost) r = { ok: false, why: 'fast' };
-      else { r = Meta.run(op.k, op.a); if (r && r.ok) srv.bud -= cost; }
+      else {
+        r = Meta.run(op.k, op.a);
+        if (r && r.ok) { srv.bud -= cost; miniMark(op.a, ms, mark); }
+      }
     }
     else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
@@ -135,6 +138,18 @@ function applyOps(state, srv, ops, now) {
   const d = Meta.data, list = [];
   for (const board in marks) { list.push({ board, season: d.season, val: marks[board] }, { board, season: 'all', val: marks[board] }); }
   return { state: clone(d), srv, res, marks: list, draws, matches, ledger, touched: applied > 0 || res.length > 0 };
+}
+// The brick games' boards: a score per game and difficulty (no faster than MINI_RATE points a second could be made),
+// a time per game and difficulty (kept as a negative number, so higher is better like every other board), and the
+// stars of a level game added up.
+const MINI_RATE = 1500;
+function miniMark(a, ms, mark) {
+  const game = a && a[0], G = Meta.MINI_INFO && Meta.MINI_INFO[game];
+  if (!G) return;
+  const lv = Math.max(0, Math.min(2, Math.floor(+a[1]) || 0)), v = Math.max(0, Math.floor(+a[2]) || 0);
+  if (G.kind === 'score' && v > 0 && v <= ms / 1000 * MINI_RATE + 500) mark('m_' + game + '_' + lv, v);
+  else if (G.kind === 'time' && v >= 1000 && v <= ms + 2000) mark('m_' + game + '_' + lv, -v);
+  else if (G.kind === 'levels') mark('m_' + game, String(Meta.data.mini[game] || '').split('').reduce((n, c) => n + (+c || 0), 0));
 }
 // Does the tape back up what the match report says? Gives what the tape shows, or null.
 function proven(m, tape, srv) {

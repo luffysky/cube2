@@ -780,6 +780,24 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(p2.json.seat === 1 && p2.json.code === plain.json.code, 'and an ordinary one with the ordinary room', p2.json);
   }
 
+    // ---------- the brick games' boards ----------
+    {
+      const mh = await rpc({ a: 'hello' }, null, { ip: '198.51.100.230' });
+      const M = { id: mh.json.id, key: mh.json.key, pub: mh.json.pub };
+      now += 3600000;      // a fresh hour of play time
+      r = await sync(M, [op('mini', ['snake', 1, 800, 0, 60000]), op('mini', ['pipes', 0, 45000, 0, 50000]), op('mini', ['push', 0, 3, 2, 30000]), op('mini', ['breakout', 2, 9e8, 0, 4000])]);
+      ok(r.json.res.slice(0, 3).every(x => x.ok), 'brick game results are taken', r.json.res);
+      r = await call('board', { url: '/api/board?b=m_snake_1&me=' + M.pub });
+      ok(r.json.top.some(x => x.p === M.pub && x.v === 800) && r.json.me.v === 800, 'a snake score is on its board (normal difficulty)', r.json);
+      r = await call('board', { url: '/api/board?b=m_pipes_0' });
+      ok(r.json.top.some(x => x.p === M.pub && x.v === 45000), 'a time is shown as the time it took', r.json.top);
+      r = await call('board', { url: '/api/board?b=m_push' });
+      ok(r.json.top.some(x => x.p === M.pub && x.v === 2), 'a level game counts its stars', r.json.top);
+      r = await call('board', { url: '/api/board?b=m_breakout_2' });
+      ok(!r.json.top.some(x => x.p === M.pub), 'a score too big for the time played stays off the board', r.json.top);
+      eq((await call('board', { url: '/api/board?b=m_tetris_0' })).status, 400, 'a board that does not exist');
+    }
+
   // ---------- random matching: keyboards with keyboards, touch screens with touch screens, mixed only after a wait ----------
   {
     let ipn = 120;

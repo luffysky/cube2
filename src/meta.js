@@ -629,6 +629,7 @@
   };
   // A brick game finished (games/rewards.js says what it pays). r: { game, lv, value, stars, ms }
   Meta.MINI_GAMES = Object.keys(MINI.GAMES);
+  Meta.MINI_INFO = MINI.GAMES;
   Meta.miniDone = function (r) {
     r = r && typeof r === 'object' ? r : {};
     if (!MINI.GAMES.hasOwnProperty(r.game)) return { ok: false, why: 'game' };

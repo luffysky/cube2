@@ -443,6 +443,20 @@
   L.add({
     'm.board': ['排行榜', 'Leaderboards', 'ランキング', '랭킹'],
     'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
+    'lb.mini': ['小遊戲', 'Brick games', 'ミニゲーム', '미니게임'],
+    'lb.lv0': ['簡單', 'Easy', 'かんたん', '쉬움'], 'lb.lv1': ['普通', 'Normal', 'ふつう', '보통'], 'lb.lv2': ['困難', 'Hard', 'むずかしい', '어려움'],
+    'lb.stars': ['★ {0}', '★ {0}', '★ {0}', '★ {0}'],
+    'lb.none.mini': ['玩一場這個小遊戲就會上榜（要有雲端存檔）。', 'Play this game once to get on this board (with a cloud save).', 'このゲームを1回遊ぶと載ります（クラウドセーブが必要）。', '이 게임을 한 번 하면 등록돼요(클라우드 저장 필요).'],
+    'lb.miniP': ['分數比高、時間比快、關卡遊戲比星星總數。', 'Scores: highest. Times: fastest. Level games: most stars.', 'スコアは高い順、タイムは速い順、ステージ制は星の合計。', '점수는 높은 순, 시간은 빠른 순, 스테이지 게임은 별 합계.'],
+    'lb.g.snake': ['磚蛇', 'Brick Snake', 'ブロックスネーク', '블록 스네이크'],
+    'lb.g.breakout': ['打磚塊', 'Brick Breaker', 'ブロック崩し', '벽돌깨기'],
+    'lb.g.stack': ['疊磚塔', 'Brick Tower', 'ブロックタワー', '블록 타워'],
+    'lb.g.merge': ['磚塊合成', 'Brick Merge', 'ブロック合体', '블록 합치기'],
+    'lb.g.pipes': ['磚道', 'Brick Pipes', 'ブロック水路', '블록 수로'],
+    'lb.g.sweep': ['掃磚', 'Brick Sweeper', 'ブロックスイーパー', '블록 찾기'],
+    'lb.g.push': ['推磚倉庫', 'Brick Warehouse', 'ブロック倉庫', '블록 창고'],
+    'lb.g.sort': ['分磚', 'Brick Sort', 'ブロック仕分け', '블록 정리'],
+    'lb.g.picross': ['磚畫謎', 'Brick Picross', 'ブロックお絵かきロジック', '블록 그림 퍼즐'],
     'lb.score': ['單場最高分', 'Best score', '最高スコア', '최고 점수'],
     'lb.sprint': ['40 行競速', '40-line sprint', '40ライン', '40줄 스프린트'],
     'lb.wx': ['挑戰大自然', 'Weather', '大自然チャレンジ', '대자연 도전'],
@@ -654,13 +668,18 @@
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'score', 'sprint', 'wx', 'wxr'];
+  var BOARDS = ['rp', 'score', 'sprint', 'wx', 'wxr', 'mini'];
+  // the brick games: one board per game and difficulty (scores and times), one per level game (stars)
+  var MG = ['snake', 'breakout', 'stack', 'merge', 'pipes', 'sweep', 'push', 'sort', 'picross'], MG_LV = { push: 1, sort: 1, picross: 1 }, MG_TIME = { pipes: 1, sweep: 1 };
+  var mini = { g: 'snake', lv: 1 };
+  function boardId() { return lb.b !== 'mini' ? lb.b : 'm_' + mini.g + (MG_LV[mini.g] ? '' : '_' + mini.lv); }
   function valueOf(b, v) {
     if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
+    if (b === 'mini') return MG_LV[mini.g] ? esc(t('lb.stars', v)) : MG_TIME[mini.g] ? App.fmtTime(v) : L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);
   }
   function fetchBoard() {
-    var ask = ++lb.ask, b = lb.b, scope = b === 'rp' ? 'season' : lb.scope;
+    var ask = ++lb.ask, b = boardId(), scope = b === 'rp' ? 'season' : lb.scope;
     lb.state = 'load'; lb.data = null;
     Cloud.board(b, scope).then(function (data) {
       if (ask !== lb.ask) return;
@@ -673,6 +692,11 @@
     var h = '<h2>' + t('m.board') + '</h2><div class="tabs" role="tablist">', i, b = lb.b;
     for (i = 0; i < BOARDS.length; i++) h += '<button type="button" role="tab" aria-selected="' + (b === BOARDS[i]) + '" data-lb="' + BOARDS[i] + '">' + t('lb.' + BOARDS[i]) + '</button>';
     h += '</div>';
+    if (b === 'mini') {
+      h += '<div class="seg wrap" role="radiogroup" aria-label="' + esc(t('lb.mini')) + '">' + MG.map(function (g) { return '<button type="button" role="radio" aria-checked="' + (mini.g === g) + '" data-lbg="' + g + '">' + esc(t('lb.g.' + g)) + '</button>'; }).join('') + '</div>';
+      if (!MG_LV[mini.g]) h += '<div class="seg" role="radiogroup" aria-label="' + esc(t('lb.lv1')) + '">' + [0, 1, 2].map(function (k) { return '<button type="button" role="radio" aria-checked="' + (mini.lv === k) + '" data-lbl="' + k + '">' + t('lb.lv' + k) + '</button>'; }).join('') + '</div>';
+      h += '<p class="note">' + t('lb.miniP') + '</p>';
+    }
     if (b !== 'rp') {
       h += '<div class="seg" role="radiogroup" aria-label="' + esc(t('lb.season')) + '">' +
         ['season', 'all'].map(function (s) { return '<button type="button" role="radio" aria-checked="' + (lb.scope === s) + '" data-lbs="' + s + '">' + t('lb.' + s) + '</button>'; }).join('') + '</div>';
@@ -708,6 +732,8 @@
   App.clicks.push(function (d) {
     if (d.lb) { if (d.lb !== lb.b) { lb.b = d.lb; fetchBoard(); App.openSheet('board'); App.el.sheetCard.scrollTop = 0; } return true; }
     if (d.lbs) { if (d.lbs !== lb.scope) { lb.scope = d.lbs; fetchBoard(); App.openSheet('board'); } return true; }
+    if (d.lbg) { if (MG.indexOf(d.lbg) >= 0 && d.lbg !== mini.g) { mini.g = d.lbg; fetchBoard(); App.openSheet('board'); } return true; }
+    if (d.lbl != null) { var k = +d.lbl; if (k >= 0 && k <= 2 && k !== mini.lv) { mini.lv = k; fetchBoard(); App.openSheet('board'); } return true; }
     return false;
   });
 
