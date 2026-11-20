@@ -70,6 +70,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <tr><th>對局紀錄</th><td>有雲端存檔時，每場的模式、勝負、擊倒數、分數、送出行數、時間長度、核對結果，連線對戰另外記房間代碼和人數。用來處理客服與作弊檢舉、看遊戲平衡。</td><td>防作弊、客服、改善遊戲</td></tr>
 <tr><th>寶箱、轉盤、拉霸紀錄</th><td>每次開箱、轉盤、拉霸的時間和結果，用來核對公布的機率。</td><td>公布機率的義務與消費爭議處理</td></tr>
 <tr><th>連線對戰的房間與訊息</th><td>房間代碼和雙方互傳的遊戲畫面資料。對方收到就刪除，房間最久三小時後清掉。</td><td>提供服務</td></tr>
+<tr><th>好友房間的直接連線</th><td>用房間代碼和朋友對戰時，兩邊的瀏覽器會嘗試直接連線（WebRTC），讓動作傳得更快。直接連線時，對方的瀏覽器會看得到你的網路位址（IP），反之亦然；為了找到連線路徑，瀏覽器會詢問 Cloudflare 或 Google 的公開 STUN 伺服器你的對外位址。隨機配對不使用直接連線。不想直接連線可以在網址加上 <code>?rtc=off</code>。</td><td>提供服務</td></tr>
 <tr><th>網路位址（不存原文）</th><td>擋濫用（例如一直猜引繼碼、大量建帳號），只存加了密鑰、無法還原的雜湊值。</td><td>安全</td></tr>
 <tr><th>一般連線紀錄</th><td>網站主機（Vercel）依它的規則記錄請求，用於維運與除錯。</td><td>維運、安全</td></tr>
 </tbody>
@@ -182,6 +183,7 @@ hr { border: 0; border-top: 1px solid var(--edge); margin: 3rem 0 2rem; }
 <li><strong>Leaderboard results</strong>, shown publicly.</li>
 <li><strong>Each match's piece placements</strong>, checked against the reported score to stop cheating and then discarded (only the match number is remembered, so it cannot be sent twice).</li>
 <li><strong>A coin ledger</strong>: with a cloud save, the server records each change to your coins (what it was for, how much, the balance after, and when), for support, cheating checks and the game's economy.</li>
+<li><strong>Direct connection in friends' rooms</strong>: when you play a friend through a room code, the two browsers try to connect directly (WebRTC) so moves arrive faster. While connected directly, your friend's browser can see your network (IP) address and you theirs; to find a route, the browser asks a public STUN server (Cloudflare or Google) for your outside address. Random matching never connects directly. Add <code>?rtc=off</code> to the address to turn it off.</li>
 <li><strong>A match log</strong>: with a cloud save, each match's mode, result, knockouts, score, lines sent, length and whether the placements checked out, plus the room code and player count for online matches. Used for support, cheating reports and game balance.</li>
 <li><strong>Treasure box, wheel and slot records</strong>: when each box was opened and what was in it, so the published odds can be checked.</li>
 <li><strong>Online room messages</strong>, deleted once delivered; rooms are removed after three hours at most.</li>

@@ -37,6 +37,8 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     const a = await st(A), b = await st(B);
     ok(both, 'they found each other and the match started by itself', [a, b]);
     ok(a.host !== b.host && a.matched && b.matched, 'one hosts, one joined', [a, b]);
+    await sleep(3000);
+    ok(!(await A.evaluate(() => ZZ.Net.direct())) && !(await B.evaluate(() => ZZ.Net.direct())), 'strangers from random matching never connect directly (no network addresses shared)');
     // a few seconds of play goes across
     await sleep(3500);
     for (const k of ['Space', 'Space', 'Space']) { await A.keyboard.press(k); await sleep(200); }

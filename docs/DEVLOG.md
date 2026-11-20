@@ -639,3 +639,17 @@
 - 資料庫：未改結構（`zz.scores` 多 `lvs`、`lve` 兩個榜名）。｜刪除：無。
 - 測試：`node test/run.js` 全過（api 348：星星加總上榜、無限挑戰上榜、跑太快的關數不上榜）；瀏覽器 `cloudui` 41。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`dd09e64`](https://github.com/luffysky/cube2/commit/dd09e64)。
+
+## 2026-11-21 06:50（Asia/Taipei）｜好友房 WebRTC 直連
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（待辦 19）、「RTC接著」
+- 實際變更：
+  - 兩人好友房（代碼開的）進房後自動嘗試直連：房主建 WebRTC 資料通道，offer／answer／位址經由原本的房間信件傳遞。通道開了以後每封信同時從通道送出，收的一方依編號只收一次、照順序；中繼繼續慢慢跑當備援（對戰中 1.5 秒一輪），通道斷了或 12 秒內沒開成就全靠中繼，什麼都不會漏。房間畫面顯示「已和對手直接連線」。
+  - 隱私：直連時雙方瀏覽器看得到彼此的網路位址（IP），瀏覽器也會向 Cloudflare／Google 的公開 STUN 伺服器問自己的對外位址。所以只在好友房用，隨機配對（陌生人）不直連；四語隱私權政策加上這一條；網址加 `?rtc=off` 可以關掉。
+  - 三、四人房不直連。沒有 TURN（行動網路之間常常打不通，就走中繼）。
+- 檔案：`src/net.js`、`src/modes.js`、`legal/src/privacy.*.html`、`legal/`（重建）、`privacy.html`、`test/rtc.js`（新）、`test/quick.js`、`test/browser-run.js`、`docs/ARCHITECTURE.md`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `rtc` 11（兩人直連、房間顯示、對戰經通道、伺服器請求每秒不到 2 次、通道斷掉後改走中繼不漏、`?rtc=off` 不直連）、`quick` 13（隨機配對不直連）、`wxnet` 24、`legal` 439。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

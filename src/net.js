@@ -132,6 +132,7 @@
     this.h = {}; this.out = []; this.nOut = 0; this.acks = [0, 0, 0, 0, 0, 0, 0, 0]; this.ack = 0;      // ack: has anybody said anything yet
     this.seats = 1; this.near = 0;
     this.ws = null; this.wsUp = false; this.wsTries = 0; this.wsT = 0; this.wsWait = {}; this.wsN = 0;
+    this.pc = null; this.dc = null; this.dcUp = false; this.dcBuf = {}; this.rtcTries = 0;
     this.open = false; this.dead = false; this.busy = false; this.fails = 0; this.t = 0; this.due = 0;
     this.heard = Date.now(); this.said = Date.now(); this.born = Date.now();
     this.pump(0);
@@ -145,7 +146,8 @@
   Relay.prototype.pace = function () {
     // with everyone else on the same machine as this socket, their letters are pushed here the moment they are
     // written, and the rounds are only a safety net
-    if (Net.state === 'playing') return this.wsUp && this.near >= this.seats - 1 ? 450 : 110;
+    // a direct line to the other player carries the match; the rounds only back it up (and pass on the acks)
+    if (Net.state === 'playing') return this.dcUp ? 1500 : this.wsUp && this.near >= this.seats - 1 ? 450 : 110;
     if (this.open) return this.ack || Date.now() - this.heard < 10000 ? 500 : 1500;
     var waited = Date.now() - this.born;      // nobody has joined yet: look less often the longer the room sits open
     return waited < 120000 ? 1300 : waited < 600000 ? 2500 : 5000;
@@ -156,9 +158,13 @@
     var last = this.out[this.out.length - 1], one = { n: 0, m: m };
     if (typeof to === 'number') one.to = to;
     // only the newest picture of the wall is worth sending
-    if (m && m.t === 's' && last && !last.s && last.m.t === 's' && last.to === one.to) last.m = m;
+    // (not with a direct line: each picture goes down it at once, under its own number)
+    if (m && m.t === 's' && last && !last.s && last.m.t === 's' && last.to === one.to && !this.dcUp) last.m = m;
     else { one.n = ++this.nOut; this.out.push(one); }
     this.said = Date.now();
+    if (this.dcUp && one.n && one.to === undefined) {
+      try { this.dc.send(JSON.stringify({ n: one.n, m: m })); return this.pump(this.pace()); } catch (e) { this.rtcDown(); }
+    }
     this.pump(m && (m.t === 's' || m.t === 'e') ? (this.wsUp ? 30 : 90) : 0);
   };
   // ---------- the open socket (when the server offers one): the same rounds without a new request each time ----------
@@ -203,7 +209,77 @@
   };
   Relay.prototype.take = function (it) {
     this.acks[it.f] = it.n; this.ack = 1; this.heard = Date.now();
-    this.fire('data', it.m, it.f);
+    if (it.m && it.m.t === '$rtc') this.rtcSignal(it.m);      // setting up the direct line: not for the game
+    else this.fire('data', it.m, it.f);
+    // letters that came down the direct line ahead of this one
+    var nx;
+    while ((nx = this.dcBuf[this.acks[it.f] + 1]) && !this.dead) { delete this.dcBuf[this.acks[it.f] + 1]; this.take(nx); }
+  };
+  // ---------- the direct line (WebRTC), two players only ----------
+  // Once both are in, the host offers a data channel; the offer, the answer and the network addresses travel as
+  // ordinary letters through the room ('$rtc'). When the channel opens, every letter also goes straight down it under
+  // its usual number, and the receiver takes each number once, in order, whichever way it came first. The room's rounds
+  // carry on slowly underneath, so nothing is lost if the line drops (phones on mobile networks often cannot connect
+  // directly at all: then the room simply does all the work, as before). ?rtc=off leaves it out.
+  var ICE = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
+  Relay.prototype.rtcStart = function () {
+    // only between friends (a room opened with a code): a direct line shows each side the other's network address, which
+    // strangers from random matching should not get
+    if (this.pc || this.dead || Net.matched || this.seats !== 2 || this.seat !== 0 || this.rtcTries > 1 || qs.get('rtc') === 'off' || typeof window.RTCPeerConnection !== 'function') return;
+    this.rtcTries++;
+    var self = this, pc = this.rtcMake();
+    if (!pc) return;
+    this.rtcChannel(pc.createDataChannel('zz', { ordered: true }));
+    pc.createOffer().then(function (o) { return pc.setLocalDescription(o); }).then(function () {
+      if (self.pc === pc) self.send({ t: '$rtc', k: 'offer', d: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+    }).then(null, function () { self.rtcDown(); });
+  };
+  Relay.prototype.rtcMake = function () {
+    var self = this, pc;
+    try { pc = new window.RTCPeerConnection({ iceServers: ICE }); } catch (e) { return null; }
+    this.pc = pc;
+    pc.onicecandidate = function (e) { if (self.pc === pc && e.candidate) self.send({ t: '$rtc', k: 'ice', d: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate }); };
+    pc.onconnectionstatechange = function () { if (self.pc === pc && /failed|closed/.test(pc.connectionState)) self.rtcDown(); };
+    pc.ondatachannel = function (e) { if (self.pc === pc) self.rtcChannel(e.channel); };
+    // a line that has not opened within 12 seconds is not going to: leave it to the room
+    setTimeout(function () { if (self.pc === pc && !self.dcUp) self.rtcDown(); }, 12000);
+    return pc;
+  };
+  Relay.prototype.rtcChannel = function (dc) {
+    var self = this;
+    this.dc = dc;
+    dc.onopen = function () { if (self.dc !== dc) return; self.dcUp = true; if (link === self) changed(); };
+    dc.onclose = function () { if (self.dc === dc) self.rtcDown(); };
+    dc.onmessage = function (e) {
+      var f = 1 - self.seat, it = null;
+      if (self.dc !== dc || self.dead) return;
+      try { it = JSON.parse(e.data); } catch (er) { return; }
+      if (!it || typeof it.n !== 'number' || it.n <= self.acks[f]) return;
+      it.f = f;
+      if (it.n === self.acks[f] + 1) self.take(it);
+      else { self.dcBuf[it.n] = it; self.pump(0); }      // an earlier letter is still on its way through the room
+    };
+  };
+  Relay.prototype.rtcSignal = function (m) {
+    var self = this, pc = this.pc;
+    if (this.dead || Net.matched || qs.get('rtc') === 'off' || typeof window.RTCPeerConnection !== 'function' || !m.d || typeof m.d !== 'object') return;
+    if (m.k === 'offer' && this.seat !== 0) {
+      if (pc) { try { pc.close(); } catch (e) { /* gone */ } }
+      pc = this.rtcMake();
+      if (!pc) return;
+      pc.setRemoteDescription(m.d).then(function () { return pc.createAnswer(); }).then(function (a) { return pc.setLocalDescription(a); }).then(function () {
+        if (self.pc === pc) self.send({ t: '$rtc', k: 'answer', d: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+      }).then(null, function () { self.rtcDown(); });
+    } else if (m.k === 'answer' && pc && this.seat === 0) pc.setRemoteDescription(m.d).then(null, function () { self.rtcDown(); });
+    else if (m.k === 'ice' && pc) pc.addIceCandidate(m.d).then(null, function () { /* one address fewer */ });
+  };
+  Relay.prototype.rtcDown = function () {
+    var pc = this.pc, dc = this.dc, was = this.dcUp;
+    this.pc = null; this.dc = null; this.dcUp = false;
+    try { if (dc) dc.close(); } catch (e) { /* gone */ }
+    try { if (pc) pc.close(); } catch (e2) { /* gone */ }
+    if (!this.dead) this.pump(0);
+    if (was && link === this) changed();
   };
   // one round, over the socket when it is up
   Relay.prototype.xchg = function (body, last) {
@@ -261,7 +337,7 @@
       self.near = b.near || 0;
       var seats = b.seats || (b.paired ? 2 : 1), grew = seats !== self.seats;
       self.seats = seats;
-      if (seats > 1 && !self.open) { self.open = true; self.heard = Date.now(); self.wsOpen(); self.fire('open'); }
+      if (seats > 1 && !self.open) { self.open = true; self.heard = Date.now(); self.wsOpen(); self.fire('open'); self.rtcStart(); }
       else if (grew) self.fire('seats', seats);
       var got = Array.isArray(b.in) ? b.in : [], any = false;
       for (var k = 0; k < got.length && !self.dead; k++) {
@@ -291,6 +367,7 @@
     this.dead = true; this.out = [];
     clearTimeout(this.t); this.t = 0;
     this.wsShut();
+    this.rtcDown();
     if (!rest.length && this.seat !== 0) return;
     rpc({ a: 'x', code: this.code, key: this.key, seat: this.seat, acks: this.acks.slice(), out: rest, end: true }, true).then(null, function () { /* the room runs out by itself */ });
   };
@@ -410,6 +487,9 @@
   };
   // is the open socket carrying this room right now (the lobby says so)
   Net.fast = function () { return !!(link && link.wsUp); };
+  // a direct line (WebRTC) to the other player is open
+  Net.direct = function () { return !!(link && link.dcUp); };
+  Net._link = function () { return link; };      // for the browser tests
   // for looking into a connection that will not come up (?wsdebug=1 shows it in the lobby)
   Net.wsInfo = function () { return link && link.wsOpen ? 'tries ' + link.wsTries + ' · up ' + (link.wsUp ? 1 : 0) + ' · socket ' + (link.ws ? link.ws.readyState : '-') + ' · last ' + (link.wsWhy || '-') + ' · near ' + link.near + '/' + link.seats : 'no relay'; };
   // ---------- random matchmaking ----------
