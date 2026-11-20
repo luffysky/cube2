@@ -254,7 +254,7 @@
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
 - 補記：上一條的 commit 為 [`3d6fbcc`](https://github.com/luffysky/cube2/commit/3d6fbcc)，Vercel `dpl_GqbU4vgQgn6Z89VJKLfN4F4LM5Rm` READY。
 
-## 2026-11-20 19:45（Asia/Taipei）｜整套風格：方塊與牆面對比修正
+## 2026-11-20 19:25（Asia/Taipei）｜整套風格：方塊與牆面對比修正
 
 - 專案：cube2｜執行者：Claude
 - 關聯 Owner 指令：整套主題有些背景跟方塊同色、材質跟背景太像，要注意對比
