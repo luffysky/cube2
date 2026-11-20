@@ -170,3 +170,19 @@
 - 風險、回滾：關閉 `IDENTITY_LINK_ENABLED` 即全部停用；移除資料表屬刪除，需 Owner 核准。
 - 未完成／阻塞：BFF（授權碼 + PKCE、callback、HttpOnly 工作階段）等 GPT 提供授權端點與 client 註冊；登入後的「綁定／找回」畫面；排位與開房的登入閘門。
 - 交接對方的事項（GPT）：Identity 正式 issuer／JWKS／audience、授權與 token 端點、允許的 callback（預定 `https://cube2-xi.vercel.app/api/auth/callback`，TBD）、停權查詢方式；平台首頁若能提供直達註冊的網址，轉磚會改連過去。
+
+## 2026-11-20 18:40（Asia/Taipei）｜側邊選單：轉磚與磚塊小遊戲
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-018（功能太發散，做側邊欄集中管理；原本的留著、複製到側邊欄；加登入、登出、個人資料）
+- 原因與目標：主選單入口太多、分散在頁面各處；集中到一個側邊選單，頁面原本的按鈕全部保留。
+- 實際變更：
+  - 轉磚主選單左上加「☰」，打開側邊選單：頭像、名字、等級段位、金幣、帳號狀態；分組「我的帳號（個人資料、登入／註冊、雲端存檔、登出）／對戰／練功／金幣與獎勵／磚塊遊戲／其他」。
+  - 「登出」：目前存檔跟著裝置、沒有帳號密碼，登出會讓這台找不回存檔，所以畫面說明要等綁定 SnowRealm 帳號後才能登出，並導到雲端存檔（引繼碼）。
+  - 九款小遊戲與遊戲目錄也加同款側邊選單（`games/nav.js`）：轉磚、全部遊戲、九款遊戲（標示目前這款）、個人資料／登入註冊（連回轉磚 `?go=profile`、`?go=signin`）、待入帳金幣；打開時遊戲自動暫停。
+  - 小遊戲頂部返回鍵文字縮成「← 遊戲」，讓小手機放得下。
+- 檔案／API／UI：`src/index.template.html`、`src/drawer.js`（新）、`src/style.css`、`build.js`、`games/nav.js`（新）、`games/games.css`、`games/*/index.html`、`test/drawer.js`（新）、`test/i18n.test.js`。
+- 資料庫：未異動。｜刪除操作：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `drawer` 28、`flow` 60、`rwd` 232、`consent` 31、`cloudui` 39、`minipay` 10、`bricks` 73、`pwa` 47。手機實機未驗。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 未完成：登出要等 SnowRealm 帳號綁定開放。

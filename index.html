@@ -888,6 +888,32 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 /* links styled as menu links or buttons */
 a.link { color: inherit; }
 a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+
+/* ---------- side menu ---------- */
+.burger { flex: none; width: 40px; height: 40px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; border-radius: 12px; background: var(--panel); border: 1px solid var(--edge); box-shadow: 0 2px 0 var(--edge); cursor: pointer; }
+.burger i { display: block; width: 18px; height: 2.5px; border-radius: 2px; background: var(--ink); }
+.topbar .me { margin-right: auto; }
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(15, 20, 26, 0.45); }
+.scrim[hidden] { display: none; }
+.drawer { position: fixed; z-index: 41; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); background: var(--floor); border-right: 1px solid var(--edge); box-shadow: 8px 0 30px rgba(0, 0, 0, 0.18); transform: translateX(-102%); transition: transform 0.22s ease; display: flex; flex-direction: column; visibility: hidden; padding-left: env(safe-area-inset-left); }
+.drawer.open { transform: none; visibility: visible; }
+.dr-head { padding: 14px 14px 12px; background: var(--panel); border-bottom: 1px solid var(--edge); display: flex; flex-direction: column; gap: 10px; position: relative; }
+.dr-close { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--edge); background: var(--floor); cursor: pointer; font-size: 15px; }
+.dr-me { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; padding-right: 40px; }
+.dr-av { flex: none; width: 46px; height: 46px; border-radius: 14px; background: var(--gold); color: #3B2A00; font-style: normal; font-weight: 900; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -4px 0 rgba(0,0,0,0.15); }
+.dr-me span { display: flex; flex-direction: column; min-width: 0; }
+.dr-me b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-me small { color: var(--muted); font-size: 12px; }
+.dr-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.dr-coins { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
+.dr-coins .coin { width: 16px; height: 16px; }
+.dr-acct { color: var(--muted); font-size: 12px; text-align: right; }
+.dr-body { flex: 1; overflow-y: auto; padding: 6px 8px 20px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.dr-body h3 { margin: 14px 8px 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.dr-body button, .dr-body a { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 10px; border-radius: 10px; border: 0; background: none; color: inherit; font: inherit; font-size: 15px; text-align: left; text-decoration: none; cursor: pointer; }
+.dr-body button:hover, .dr-body a:hover { background: var(--panel); }
+.dr-body button[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
 </style>
 </head>
 <body>
@@ -896,6 +922,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   <section id="menu" class="screen">
     <div class="menu-in">
       <div class="topbar">
+        <button class="burger" type="button" id="mDrawer" aria-controls="drawer" aria-expanded="false" data-ta="dr.open"><i></i><i></i><i></i></button>
         <button class="me" type="button" data-sheet="profile"><b id="mName"></b><span id="mRank"></span></button>
         <button class="purse" type="button" data-sheet="shop" data-ta="m.shop"><i class="coin"></i><b id="mCoins">0</b></button>
       </div>
@@ -937,6 +964,49 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
       <p class="about cn-notice" id="cnNotice" hidden></p>
       <p class="about legal"><a href="privacy.html" data-t="lg.privacy">隱私政策</a>　<a href="terms.html" data-t="lg.terms">服務條款</a></p>
     </div>
+    <!-- the side menu: everything on the page in one place (the page itself keeps all of it too) -->
+    <div class="scrim" id="drawerScrim" hidden></div>
+    <aside class="drawer" id="drawer" aria-hidden="true" data-ta="dr.title" tabindex="-1">
+      <div class="dr-head">
+        <button class="dr-close" type="button" id="drClose" data-ta="close">✕</button>
+        <button class="dr-me" type="button" data-sheet="profile"><i class="dr-av" id="drAv"></i><span><b id="drName"></b><small id="drRank"></small></span></button>
+        <div class="dr-row"><span class="dr-coins"><i class="coin"></i><b id="drCoins">0</b></span><span class="dr-acct" id="drAcct"></span></div>
+      </div>
+      <nav class="dr-body">
+        <h3 data-t="dr.account">我的帳號</h3>
+        <button type="button" data-sheet="profile"><span data-t="dr.profile">個人資料</span></button>
+        <button type="button" data-sheet="srAccount" id="drSignin"><span data-t="sr.menu">登入／註冊</span></button>
+        <button type="button" data-sheet="cloud"><span data-t="cl.title">雲端存檔</span></button>
+        <button type="button" data-sheet="drLogout"><span data-t="dr.logout">登出</span></button>
+        <h3 data-t="m.battle">對戰</h3>
+        <button type="button" data-go="rank"><span data-t="m.rank">排位賽</span></button>
+        <button type="button" data-go="battle"><span data-t="m.battle">對戰</span></button>
+        <button type="button" data-go="online"><span data-t="m.online">連線對戰</span></button>
+        <button type="button" data-go="ghost"><span data-t="m.ghost">分身對戰</span></button>
+        <h3 data-t="m.train">練功</h3>
+        <button type="button" data-go="levels"><span data-t="lv.menuT">關卡挑戰</span></button>
+        <button type="button" data-go="weather"><span data-t="wx.menuT">挑戰大自然</span></button>
+        <button type="button" data-go="dojo"><span data-t="m.dojo">旋轉道場</span></button>
+        <button type="button" data-go="openers"><span data-t="m.open">開局定式</span></button>
+        <button type="button" data-go="practice"><span data-t="m.practice">自由練習</span></button>
+        <button type="button" data-go="sprint"><span data-t="m.sprint">40 行競速</span></button>
+        <h3 data-t="dr.rewards">金幣與獎勵</h3>
+        <button type="button" data-sheet="shop"><span data-t="m.shop">商店</span></button>
+        <button type="button" data-sheet="boxes"><span data-t="bx.title">寶箱</span><i class="dot" id="drBoxDot" hidden></i></button>
+        <button type="button" data-sheet="bonus"><span data-t="bn.title">福利</span></button>
+        <button type="button" data-sheet="jobs"><span data-t="m.jobs">每日任務</span><i class="dot" id="drJobsDot" hidden></i></button>
+        <button type="button" data-sheet="board" id="drBoard" hidden><span data-t="m.board">排行榜</span></button>
+        <h3 data-t="dr.games">磚塊遊戲</h3>
+        <a href="games/"><span data-t="dr.allGames">全部遊戲</span></a>
+        <a href="games/snake/">磚蛇</a><a href="games/breakout/">打磚塊</a><a href="games/stack/">疊磚塔</a><a href="games/push/">推磚倉庫</a><a href="games/merge/">磚塊合成</a>
+        <a href="games/sort/">分磚</a><a href="games/picross/">磚畫謎</a><a href="games/pipes/">磚道</a><a href="games/sweep/">掃磚</a>
+        <h3 data-t="dr.more">其他</h3>
+        <button type="button" data-sheet="settings"><span data-t="m.settings">設定</span></button>
+        <button type="button" data-sheet="help"><span data-t="m.help">操作與規則</span></button>
+        <a href="privacy.html"><span data-t="lg.privacy">隱私政策</span></a>
+        <a href="terms.html"><span data-t="lg.terms">服務條款</span></a>
+      </nav>
+    </aside>
   </section>
 
   <section id="play" class="screen" hidden>
@@ -11427,6 +11497,84 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
   // a moment after opening, so a cloud save has been looked for first; and again when the tab comes back
   App.boot.push(function () { setTimeout(settle, 1500); });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) settle(); });
+})();
+</script>
+<script>
+/* 轉磚 side menu: everything the menu page offers, gathered in one panel that slides in from the left, with the
+   player's own corner on top (profile, SnowRealm sign-in, cloud save, sign out). The page keeps all its own buttons;
+   the panel's buttons use the same data-go / data-sheet names, so the menu's own click handler runs them. */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta;
+  L.add({
+    'dr.open': ['打開選單', 'Open the menu', 'メニューを開く', '메뉴 열기'],
+    'dr.title': ['選單', 'Menu', 'メニュー', '메뉴'],
+    'dr.account': ['我的帳號', 'My account', 'アカウント', '내 계정'],
+    'dr.profile': ['個人資料', 'Profile', 'プロフィール', '프로필'],
+    'dr.logout': ['登出', 'Sign out', 'ログアウト', '로그아웃'],
+    'dr.rewards': ['金幣與獎勵', 'Coins and rewards', 'コインと報酬', '코인과 보상'],
+    'dr.games': ['磚塊遊戲', 'Brick games', 'ブロックゲーム', '블록 게임'],
+    'dr.allGames': ['全部遊戲', 'All games', 'すべてのゲーム', '모든 게임'],
+    'dr.more': ['其他', 'More', 'その他', '기타'],
+    'dr.guest': ['訪客・存在這台裝置', 'Guest · saved on this device', 'ゲスト・この端末に保存', '게스트 · 이 기기에 저장'],
+    'dr.cloud': ['訪客・雲端存檔', 'Guest · cloud save', 'ゲスト・クラウド保存', '게스트 · 클라우드 저장'],
+    'dr.linked': ['已連結 SnowRealm 帳號', 'Linked to SnowRealm', 'SnowRealm と連携済み', 'SnowRealm 연결됨'],
+    'dr.logoutT': ['登出', 'Sign out', 'ログアウト', '로그아웃'],
+    'dr.logoutP': ['轉磚現在不用帳號密碼，你的存檔是跟著這台裝置走的。這時候登出，這台就找不回存檔了，所以要等存檔綁好 SnowRealm 帳號以後才能登出（登出後用帳號登入就能找回來）。', '轉磚 has no password today: your save goes with this device. Signing out now would leave this device unable to find it again, so signing out opens once the save is linked to a SnowRealm account (sign back in to get it back).', '現在の轉磚にはパスワードがなく、セーブはこの端末に紐づいています。今ログアウトすると見つけられなくなるため、SnowRealm アカウント連携後に利用できます。', '지금 轉磚는 비밀번호 없이 이 기기에 저장돼요. 지금 로그아웃하면 다시 찾을 수 없어서, SnowRealm 계정 연결 후에 로그아웃할 수 있어요.'],
+    'dr.logoutMove': ['想換裝置的話，用「雲端存檔」裡的引繼碼。', 'To move to another device, use a transfer code in "Cloud save".', '端末を移すにはクラウドセーブの引き継ぎコードを使ってください。', '기기를 옮기려면 클라우드 저장의 이전 코드를 쓰세요.']
+  });
+  var $ = function (id) { return document.getElementById(id); };
+  var open = false, lastFocus = null;
+  function fill() {
+    var d = Meta.data, r = Meta.rankOf(d.rp), name = d.name || t('player');
+    App.txt('drName', name);
+    App.txt('drRank', t('xp.lv', Meta.level().lv) + ' · ' + App.rankName(r));
+    App.txt('drCoins', L.num(d.coins));
+    $('drAv').textContent = Array.from(name)[0] || '磚';
+    var C = ZZ.Cloud, st = C && C.status ? C.status() : 'none';
+    App.txt('drAcct', t(st === 'ok' || st === 'busy' || st === 'wait' ? 'dr.cloud' : 'dr.guest'));
+    $('drJobsDot').hidden = !(Meta.loginDue() || Meta.jobsReady() > 0);
+    $('drBoxDot').hidden = !(Meta.drawsLeft && Meta.drawsLeft() > 0);
+    $('drBoard').hidden = $('mBoard') ? $('mBoard').hidden : true;
+  }
+  function show(on) {
+    var dr = $('drawer'), sc = $('drawerScrim'), btn = $('mDrawer');
+    if (on === open) return;
+    open = on;
+    if (on) { fill(); lastFocus = document.activeElement; }
+    dr.classList.toggle('open', on);
+    dr.setAttribute('aria-hidden', String(!on));
+    sc.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+    // the rest of the page cannot be tabbed into while the panel is open
+    var inert = document.querySelector('#menu .menu-in');
+    if (inert) { if (on) inert.setAttribute('inert', ''); else inert.removeAttribute('inert'); }
+    if (on) setTimeout(function () { $('drClose').focus(); }, 30);
+    else if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  App.drawer = show;
+  App.sheets.drLogout = function () {
+    return '<h2>' + t('dr.logoutT') + '</h2><p>' + t('dr.logoutP') + '</p><p class="note">' + t('dr.logoutMove') + '</p>' +
+      '<div class="row">' + App.btn('cloud', 'cl.title') + App.btn('close', 'close', true) + '</div>';
+  };
+  App.boot.push(function () {
+    $('mDrawer').addEventListener('click', function () { show(true); });
+    $('drClose').addEventListener('click', function () { show(false); });
+    $('drawerScrim').addEventListener('click', function () { show(false); });
+    // any entry closes the panel; the menu's own handler then does what the entry says
+    $('drawer').addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('button[data-sheet], button[data-go], a'); if (b) show(false); });
+    document.addEventListener('keydown', function (e) { if (open && e.key === 'Escape') { show(false); e.stopPropagation(); } }, true);
+    // swipe the panel back to the left to close it
+    var sx = null;
+    $('drawer').addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+    $('drawer').addEventListener('touchend', function (e) { if (sx != null && sx - e.changedTouches[0].clientX > 60) show(false); sx = null; }, { passive: true });
+    if (Meta.onChange) { var was = Meta.onChange; Meta.onChange = function () { was.apply(this, arguments); if (open) fill(); }; }
+    // links from the brick games: ?go=profile, ?go=signin
+    try {
+      var go = new URLSearchParams(window.location.search).get('go');
+      if (go === 'profile' || go === 'signin') setTimeout(function () { if (!App.sheet()) App.openSheet(go === 'profile' ? 'profile' : 'srAccount'); }, 300);
+    } catch (e) { /* no query */ }
+  });
 })();
 </script>
 <script>
