@@ -100,7 +100,7 @@
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.stack.bests', LVKEY = 'snowrealm.stack.level';
   var g = null, state = 'intro', last = 0, scale = 1, dpr = 1, fx = [], bits = [], shake = 0, ac = null, wait = 0, cam = 0, flash = 0;
-  var level = 'normal', bests = {};
+  var level = 'normal', bests = {}, startAt = 0;
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
   var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
@@ -207,7 +207,7 @@
     hud();
   }
   function start() {
-    g = new Stacker(null, level); state = 'play'; fx = []; bits = []; cam = 0; heartsShown = -1;
+    g = new Stacker(null, level); startAt = Date.now(); state = 'play'; fx = []; bits = []; cam = 0; heartsShown = -1;
     show('intro', false); show('end', false); show('paused', false); show('ouch', false);
     $('pause').disabled = false;
     hud();
@@ -221,6 +221,7 @@
     $('endScore').textContent = g.score;
     $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・疊了 ' + g.floors() + ' 層・完美 ' + g.perfects + ' 次' + (g.bestCombo > 1 ? '・最多連續 ' + g.bestCombo + ' 次' : '');
     show('end', true);
+    if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'stack', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
     hud();
     tone(330, 0.3, 'triangle', 0.09, 160); shake = 8;

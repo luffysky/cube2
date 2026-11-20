@@ -53,9 +53,11 @@
   var $ = function (id) { return document.getElementById(id); };
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.sort.done';
-  var g = null, n = 0, state = 'list', dpr = 1, ac = null, done = {}, sel = -1, last = 0, shake = { i: -1, t: 0 }, fly = null;
+  var startAt = 0, g = null, n = 0, state = 'list', dpr = 1, ac = null, done = {}, sel = -1, last = 0, shake = { i: -1, t: 0 }, fly = null;
   var L = { bw: 44, bh: 24, gap: 14, per: 5, W: 340, H: 300 };
   try { done = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
+  // stars kept in 轉磚's record (a cloud save brings them from other devices) count too
+  if (root.SnowRealmMini) { var fromRec = root.SnowRealmMini.stars('sort'); for (var lvk in fromRec) if (!done[lvk] || done[lvk].s < fromRec[lvk]) done[lvk] = Object.assign({}, done[lvk], { s: fromRec[lvk] }); }
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function starsOf(i) { return done[i] ? done[i].s : 0; }
   function open(i) { return i === 0 || !!done[i] || !!done[i - 1]; }
@@ -167,7 +169,7 @@
   }
   function play(i) {
     if (i < 0 || i >= LEVELS.length || !open(i)) return;
-    n = i; g = new Sort(LEVELS[i].m); state = 'play'; sel = -1; fly = null;
+    n = i; g = new Sort(LEVELS[i].m); startAt = Date.now(); state = 'play'; sel = -1; fly = null;
     show('list', false); show('win', false);
     layout(); hud();
   }
@@ -191,6 +193,7 @@
     try { window.localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* no storage */ }
     $('winStars').textContent = stars(s);
     $('winNote').textContent = '用了 ' + g.moves + ' 步（最少 ' + LEVELS[n].p + ' 步）' + (s < 3 ? '・步數再少一點就能拿更多星' : '');
+    if (root.SnowRealmMini) root.SnowRealmMini.show($('winNote'), { game: 'sort', value: n, stars: s, ms: Date.now() - startAt });
     $('next').hidden = n + 1 >= LEVELS.length;
     setTimeout(function () { if (state === 'won') { show('win', true); $(n + 1 < LEVELS.length ? 'next' : 'toList').focus(); } }, reduce ? 0 : 400);
     [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone([523, 587, 659, 784, 880, 1047, 1175, 1319][k], 0.2, 'sine', 0.07); }, j * 90); });

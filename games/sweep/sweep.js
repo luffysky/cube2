@@ -205,6 +205,8 @@
     $('endTitle').textContent = won ? '全部敲完了！' : '命用完了';
     $('endScore').textContent = fmt(time);
     $('endNote').textContent = LV_NAME[level] + (won ? '・踩到 ' + g.hits + ' 次裂縫・' + (nb ? '新紀錄！' : '最快 ' + fmt(bests[level])) : '・還剩 ' + g.left + ' 塊沒敲');
+    var cn = document.querySelector('#end p.coins'); if (cn) cn.remove();
+    if (won && root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'sweep', lv: ['easy', 'normal', 'hard'].indexOf(level), value: Math.round(time), ms: Math.round(time) });
     setTimeout(function () { show('end', true); $('again').focus(); }, reduce ? 200 : 900);
     if (won) [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone([523, 587, 659, 784, 880, 1047, 1175, 1319][k], 0.2, 'sine', 0.07); }, j * 90); });
     else tone(330, 0.3, 'triangle', 0.09, 160);

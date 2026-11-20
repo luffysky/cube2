@@ -55,9 +55,11 @@
   var $ = function (id) { return document.getElementById(id); };
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.picross.done';
-  var g = null, n = 0, state = 'list', dpr = 1, ac = null, done = {}, mode = 'fill', drag = null, last = 0, flashCell = null, reveal = 0;
+  var startAt = 0, g = null, n = 0, state = 'list', dpr = 1, ac = null, done = {}, mode = 'fill', drag = null, last = 0, flashCell = null, reveal = 0;
   var Lo = { cell: 28, cl: 60, ct: 60, W: 340, H: 340 };
   try { done = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
+  // stars kept in 轉磚's record (a cloud save brings them from other devices) count too
+  if (root.SnowRealmMini) { var fromRec = root.SnowRealmMini.stars('picross'); for (var lvk in fromRec) if (!done[lvk] || done[lvk].s < fromRec[lvk]) done[lvk] = Object.assign({}, done[lvk], { s: fromRec[lvk] }); }
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function starsOf(i) { return done[i] ? done[i].s : 0; }
   function open(i) { return i === 0 || !!done[i] || !!done[i - 1] || i === GROUPS[1].from; }
@@ -157,7 +159,7 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function play(i) {
     if (i < 0 || i >= PICS.length || !open(i)) return;
-    n = i; g = new Picross(PICS[i]); state = 'play'; reveal = 0; heartsShown = -1; flashCell = null;
+    n = i; g = new Picross(PICS[i]); startAt = Date.now(); state = 'play'; reveal = 0; heartsShown = -1; flashCell = null;
     show('list', false); show('win', false); show('lost', false);
     layout(); hud();
   }
@@ -179,6 +181,7 @@
     $('winName').textContent = '是「' + g.pic.n + '」！';
     $('winStars').textContent = stars(s);
     $('winNote').textContent = g.mistakes ? '填錯 ' + g.mistakes + ' 格' + (s < 3 ? '・不填錯就能拿 3 顆星' : '') : '一格都沒填錯';
+    if (root.SnowRealmMini) root.SnowRealmMini.show($('winNote'), { game: 'picross', value: n, stars: s, ms: Date.now() - startAt });
     $('next').hidden = n + 1 >= PICS.length;
     setTimeout(function () { if (state === 'won') { show('win', true); $(n + 1 < PICS.length ? 'next' : 'toList').focus(); } }, reduce ? 300 : 1500);
     [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone([523, 587, 659, 784, 880, 1047, 1175, 1319][k], 0.2, 'sine', 0.07); }, j * 90); });

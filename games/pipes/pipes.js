@@ -177,6 +177,7 @@
       if (nb) { bests[level] = time; try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (e) { /* no storage */ } }
       $('endScore').textContent = fmt(time);
       $('endNote').textContent = LV_NAME[level] + '・轉了 ' + g.taps + ' 下・' + (nb ? '新紀錄！' : '最快 ' + fmt(bests[level]));
+      if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'pipes', lv: ['easy', 'normal', 'hard'].indexOf(level), value: Math.round(time), ms: Math.round(time) });
       setTimeout(function () { if (state === 'won') { show('end', true); $('again').focus(); } }, reduce ? 200 : 900);
       [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone([523, 587, 659, 784, 880, 1047, 1175, 1319][k], 0.2, 'sine', 0.07); }, j * 90); });
       hud();

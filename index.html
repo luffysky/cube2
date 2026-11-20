@@ -885,6 +885,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .wxres b { font-size: 22px; }
 .wxres em { font-style: normal; color: var(--accent); font-weight: 700; }
 @media (max-width: 420px) { .wxpick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* links styled as menu links or buttons */
+a.link { color: inherit; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 </style>
 </head>
 <body>
@@ -924,6 +927,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         <button class="link" type="button" data-sheet="bonus"><span data-t="bn.title">福利</span></button>
         <button class="link" type="button" data-sheet="jobs"><span data-t="m.jobs">每日任務</span><i class="dot" id="mJobsDot" hidden></i></button>
         <button class="link" type="button" data-sheet="board" data-t="m.board" id="mBoard" hidden>排行榜</button>
+        <button class="link" type="button" data-sheet="srAccount" data-t="sr.menu">登入／註冊</button>
         <button class="link" type="button" data-sheet="settings" data-t="m.settings">設定</button>
         <button class="link" type="button" data-sheet="help" data-t="m.help">操作與規則</button>
         <button class="link" type="button" data-t="pwa.install" id="mInstall" hidden>安裝成 App</button>
@@ -3082,6 +3086,119 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
+/* What the brick games pay into 轉磚's coins, and how a finished game gets there.
+
+   The same rules run in three places: the mini game (to show what is coming), 轉磚's page (Meta.miniDone, which
+   pays it) and the server (which repeats Meta.miniDone on its own copy; its answer is the one that counts).
+
+   A mini game is a page of its own, so it does not touch the record itself: it leaves the result in a queue in this
+   browser's storage. The next time 轉磚 opens (here, on the same site) it takes the queue, pays each result through
+   Meta, and, when the player has a cloud save, the server checks it: a result may not claim more than the time it
+   says it took could produce, and mini games pay at most DAY_CAP coins a day.
+
+   Kinds of game:
+     score   paid by the score, more on harder difficulties            (snake, breakout, stack, merge)
+     time    paid for finishing, by difficulty, and a little for a new best time   (pipes, sweep)
+     levels  paid once for the first clear of a level, and again for more stars    (push, sort, picross) */
+(function (root) {
+  'use strict';
+  var DAY_CAP = 300, QUEUE = 'snowrealm.mini.queue', QUEUE_MAX = 40;
+  var GAMES = {
+    snake: { kind: 'score', per: 40, name: '磚蛇' },
+    breakout: { kind: 'score', per: 60, name: '打磚塊' },
+    stack: { kind: 'score', per: 3, name: '疊磚塔' },
+    merge: { kind: 'score', per: 150, name: '磚塊合成' },
+    pipes: { kind: 'time', name: '磚道' },
+    sweep: { kind: 'time', name: '掃磚' },
+    push: { kind: 'levels', count: 60, name: '推磚倉庫' },
+    sort: { kind: 'levels', count: 60, name: '分磚' },
+    picross: { kind: 'levels', count: 26, name: '磚畫謎' }
+  };
+  var LV = ['easy', 'normal', 'hard'], MULT = [0.6, 1, 1.5], TIME_PAY = [5, 10, 20], SCORE_CAP = 30;
+  function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
+
+  // The coins one result is worth, before the daily cap. prev: what the record already holds for this game
+  // (score games: best per difficulty [e, n, h]; time games: best time per difficulty in ms; levels: a string of stars).
+  //   r: { game, lv (0 1 2), value (score, time in ms, or level number from 0), stars (levels), ms (how long it took) }
+  function coins(r, prev) {
+    var g = GAMES[r.game];
+    if (!g) return 0;
+    var lv = int(r.lv, 0, 2), ms = Math.max(0, +r.ms || 0);
+    // nothing earns faster than one coin per three seconds played
+    var limit = Math.floor(ms / 3000);
+    if (g.kind === 'score') return Math.min(limit, SCORE_CAP, Math.floor(Math.max(0, +r.value || 0) / g.per * MULT[lv]));
+    if (g.kind === 'time') {
+      var best = prev && +prev[lv] || 0, t = Math.max(0, +r.value || 0);
+      return Math.min(limit + 5, TIME_PAY[lv] + (best && t < best ? 5 : 0));
+    }
+    var n = int(r.value, 0, g.count - 1), had = prev ? +String(prev).charAt(n) || 0 : 0, st = int(r.stars, 1, 3);
+    if (st <= had) return 0;
+    return Math.min(limit + 5, (had ? 0 : 10) + (st - had) * 5);
+  }
+  // the record a result leaves behind (best score, best time, stars)
+  function record(r, prev) {
+    var g = GAMES[r.game], lv = int(r.lv, 0, 2);
+    if (g.kind === 'levels') {
+      var s = String(prev || ''), n = int(r.value, 0, g.count - 1), st = int(r.stars, 1, 3);
+      while (s.length < n + 1) s += '0';
+      if (st > +s.charAt(n)) s = s.slice(0, n) + st + s.slice(n + 1);
+      return s;
+    }
+    var out = (prev && prev.length === 3 ? prev : [0, 0, 0]).slice(), v = Math.max(0, Math.round(+r.value || 0));
+    if (g.kind === 'score') { if (v > out[lv]) out[lv] = v; }
+    else if (v > 0 && (!out[lv] || v < out[lv])) out[lv] = v;
+    return out;
+  }
+
+  // ---------- the queue (in the browser) ----------
+  function store() { try { return root.localStorage || null; } catch (e) { return null; } }
+  function readQueue() { var s = store(); try { var q = JSON.parse((s && s.getItem(QUEUE)) || '[]'); return Array.isArray(q) ? q : []; } catch (e) { return []; } }
+  // 轉磚's own record on this device, read only, for showing what a result is likely to pay
+  function localRecord() { var s = store(); try { return JSON.parse((s && s.getItem('zhuanzhuan.meta.v1')) || 'null'); } catch (e) { return null; } }
+  // A mini game calls this when a game ends. Gives the coins it should bring (an estimate until 轉磚 pays it).
+  function report(r) {
+    var g = GAMES[r.game];
+    if (!g) return 0;
+    var rec = localRecord(), mini = rec && rec.mini || {}, prev = mini[r.game], q = readQueue();
+    // results already waiting in the queue count as if paid, so the estimate does not pay the same thing twice
+    q.forEach(function (o) { if (o.game === r.game) prev = record(o, prev); });
+    var c = coins(r, prev);
+    var today = rec && rec.daily ? rec.daily.mini || 0 : 0, waiting = q.reduce(function (a, o) { return a + (o.est || 0); }, 0);
+    c = Math.max(0, Math.min(c, DAY_CAP - today - waiting));
+    q.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c });
+    var s = store();
+    try { if (s) s.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX))); } catch (e) { /* not kept */ }
+    return c;
+  }
+  // 轉磚 takes the queue (and empties it) when it opens
+  function take() { var q = readQueue(), s = store(); try { if (s) s.removeItem(QUEUE); } catch (e) { /* fine */ } return q; }
+  function waiting() { return readQueue().reduce(function (a, o) { return a + (o.est || 0); }, 0); }
+  function balance() { var rec = localRecord(); return rec && typeof rec.coins === 'number' ? rec.coins : null; }
+
+  // In a mini game's result card: report the result and say what it brings, under the element given.
+  function show(after, r) {
+    var c = report(r), doc = root.document;
+    if (!doc || !after || !after.parentNode) return c;
+    var old = after.parentNode.querySelector('.coins');
+    if (old) old.remove();
+    var p = doc.createElement('p');
+    p.className = 'coins';
+    p.innerHTML = c ? '<b>+' + c + ' 金幣</b>・<a href="../../?from=games">回到轉磚入帳</a>' : '<a href="../../?from=games">轉磚</a>的金幣：這場沒有' + (r && GAMES[r.game] && GAMES[r.game].kind === 'levels' ? '新的星星' : '更多金幣') + '（磚塊小遊戲每天最多 ' + DAY_CAP + '）';
+    after.parentNode.insertBefore(p, after.nextSibling);
+    return c;
+  }
+  // stars a level game already has in 轉磚's record (from another device through the cloud save), as { level: stars }
+  function stars(game) {
+    var rec = localRecord(), v = rec && rec.mini && rec.mini[game], out = {};
+    String(v || '').split('').forEach(function (c, i) { if (+c > 0) out[i] = +c; });
+    return out;
+  }
+  var api = { GAMES: GAMES, LV: LV, DAY_CAP: DAY_CAP, QUEUE: QUEUE, coins: coins, record: record, report: report, show: show, stars: stars, take: take, waiting: waiting, balance: balance };
+  root.SnowRealmMini = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
 /* 轉磚 meta: coins, ranked ladder, daily jobs, the shop catalogue and what the player owns.
    Pure logic plus one localStorage record. Runs in the page, in Node tests and on the server:
    the page works out every change at once so nothing waits on the network, and when a cloud save is linked
@@ -3089,6 +3206,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 (function (root) {
   'use strict';
   var ZZ = root.ZZ || require('./engine.js');
+  var MINI = root.SnowRealmMini || require('../games/rewards.js');      // what the brick games pay (games/rewards.js)
   var KEY = 'zhuanzhuan.meta.v1', DAY = 86400000;
   var TZ = 480;   // the game's day and season turn over at midnight UTC+8 for every player, on every device and on the server
   function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
@@ -3377,6 +3495,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
     { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } },
     { id: 'wx', need: 2, coin: 50, ev: 'wx', on: function () { return 0; } },
+    { id: 'mini', need: 3, coin: 40, ev: 'mini', on: function () { return 0; } },
     // level jobs
     { id: 'lv3', cat: 'lvl', need: 3, coin: 60, ev: 'lvl', on: function () { return 0; } },
     { id: 'lvNew', cat: 'lvl', need: 1, coin: 50, ev: 'lvlNew', on: function () { return 0; } },
@@ -3436,7 +3555,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
+      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
+      // the brick games: best score or time per difficulty, stars per level
+      mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
       box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0, wxr: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
@@ -3508,7 +3629,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var d = Meta.data.daily, day = Meta.dayNo();
     if (d.day === day && d.jobs.length) return;
     // the first wave of the day, picked by the date so everyone gets the same set
-    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
+    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -3626,6 +3747,24 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     Meta.save();
     emit('wxb', [result, net ? 1 : 0]);
     return { ok: true, before: before, after: d.lv.wxr, delta: d.lv.wxr - before };
+  };
+  // A brick game finished (games/rewards.js says what it pays). r: { game, lv, value, stars, ms }
+  Meta.MINI_GAMES = Object.keys(MINI.GAMES);
+  Meta.miniDone = function (r) {
+    r = r && typeof r === 'object' ? r : {};
+    if (!MINI.GAMES.hasOwnProperty(r.game)) return { ok: false, why: 'game' };
+    var d = Meta.data, g = MINI.GAMES[r.game];
+    r = { game: r.game, lv: int(r.lv, 0, 2), value: g.kind === 'levels' ? int(r.value, 0, g.count - 1) : int(r.value, 0, 1e9), stars: int(r.stars, 0, 3), ms: int(r.ms, 0, 3600000) };
+    if (g.kind === 'levels' && r.stars < 1) return { ok: false, why: 'stars' };
+    if (g.kind === 'time' && r.value < 1000) return { ok: false, why: 'fast' };
+    var prev = d.mini[r.game], c = Math.max(0, Math.min(MINI.coins(r, prev), MINI.DAY_CAP - d.daily.mini));
+    var best = g.kind === 'levels' ? r.stars > (+String(prev).charAt(r.value) || 0) : g.kind === 'score' ? r.value > prev[r.lv] : !prev[r.lv] || r.value < prev[r.lv];
+    d.mini[r.game] = MINI.record(r, prev);
+    if (c) { d.daily.mini += c; Meta.earn(c); }
+    jobEvent('mini', 1);
+    Meta.save();
+    emit('mini', [r.game, r.lv, r.value, r.stars, r.ms]);
+    return { ok: true, coins: c, best: best };
   };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
@@ -3773,6 +3912,11 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     d.lv.wx = Math.max(0, Math.floor(+d.lv.wx) || 0);
     d.lv.wxs = Math.max(0, Math.min(3600, Math.floor(+d.lv.wxs) || 0));
     d.lv.wxr = Math.max(0, Math.min(99999, Math.floor(+d.lv.wxr) || 0));
+    Object.keys(MINI.GAMES).forEach(function (k) {
+      var g = MINI.GAMES[k], v = d.mini[k];
+      if (g.kind === 'levels') d.mini[k] = String(v || '').replace(/[^0-3]/g, '').slice(0, g.count);
+      else d.mini[k] = [0, 1, 2].map(function (i) { return Array.isArray(v) ? Math.max(0, Math.min(1e9, Math.floor(+v[i]) || 0)) : 0; });
+    });
   };
 
   // ---------- items carried into a match ----------
@@ -4100,6 +4244,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     custom: function () { return Meta.customPlayed(); },
     wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
     wxb: function (a) { return Meta.wxBattle(a[0], a[1] === 1); },
+    mini: function (a) { return Meta.miniDone({ game: a[0], lv: a[1], value: a[2], stars: a[3], ms: a[4] }); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },
@@ -8970,6 +9115,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'j.sprint90': ['40 行競速 90 秒內完成', 'Finish 40 lines in under 90 s', '40ラインを90秒以内', '40줄을 90초 안에'],
     'j.box': ['開 3 個寶箱', 'Open 3 boxes', '宝箱を3個開ける', '보물상자 3개 열기'],
     'j.wheel': ['轉 1 次轉盤', 'Spin the wheel once', 'ルーレットを1回', '룰렛 1번 돌리기'],
+    'j.mini': ['玩 3 場磚塊小遊戲', 'Play 3 brick games', 'ブロックゲームを3回', '블록 게임 3판'],
     'j.wx': ['玩 2 場挑戰大自然', 'Play 2 weather runs', '大自然チャレンジを2回', '대자연 도전 2판'],
     'j.lv3': ['過 3 個關卡', 'Clear 3 levels', 'ステージを3つクリア', '스테이지 3개 클리어'],
     'j.lvNew': ['過一個沒過過的關卡', 'Clear a level you have not cleared yet', '未クリアのステージをクリア', '처음 깨는 스테이지 클리어'],
@@ -9991,6 +10137,12 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'lb.seasonNote': ['{0} 賽季。每月一號換季（台灣時間），段位榜和本季成績會重新開始。', 'Season {0}. A new season starts on the 1st of each month (Taiwan time); the rating board and season scores start over.', 'シーズン {0}。毎月1日（台湾時間）に切り替わり、レートと今シーズンの記録はリセットされます。', '{0} 시즌. 매월 1일(대만 시간)에 새 시즌이 시작되며 레이팅과 이번 시즌 기록이 초기화됩니다.'],
     'lb.open': ['看排行榜', 'See the leaderboards', 'ランキングを見る', '랭킹 보기'],
     // cloud save
+    'sr.title': ['SnowRealm Games 帳號', 'SnowRealm Games account', 'SnowRealm Games アカウント', 'SnowRealm Games 계정'],
+    'sr.p': ['轉磚不用註冊就能玩。想用同一個帳號玩 SnowRealm 的每一款遊戲，請到 SnowRealm Games 註冊：打開後按右上角的「登入」，再選「註冊」。', 'You can play 轉磚 without an account. To use one account across every SnowRealm game, sign up at SnowRealm Games: open it, press "Sign in" at the top right, then choose "Register".', '轉磚は登録なしで遊べます。SnowRealm の全ゲームで同じアカウントを使うには、SnowRealm Games で登録してください（右上の「ログイン」から「登録」）。', '轉磚는 가입 없이 즐길 수 있어요. SnowRealm의 모든 게임을 한 계정으로 즐기려면 SnowRealm Games에서 가입하세요(오른쪽 위 "로그인" → "회원가입").'],
+    'sr.kid': ['13 歲以下先不用註冊帳號，直接玩就可以，進度會存在這台裝置。', 'Under 13 there is no need for an account: just play, and progress stays on this device.', '13歳未満の方はアカウント登録なしでそのまま遊べます。', '13세 미만은 계정 없이 그대로 즐기면 돼요.'],
+    'sr.menu': ['登入／註冊', 'Sign in / Register', 'ログイン／登録', '로그인/가입'],
+    'sr.go': ['到 SnowRealm Games 註冊', 'Sign up at SnowRealm Games', 'SnowRealm Games で登録', 'SnowRealm Games 가입'],
+    'sr.soon': ['註冊好之後，轉磚這邊的綁定會在 SnowRealm 統一登入上線時開放；你在轉磚的進度、金幣都會保留，綁定時再接上去。', 'Linking 轉磚 to that account opens when SnowRealm sign-in goes live; your progress and coins here stay as they are and carry over when you link.', 'アカウント連携は SnowRealm の統一ログイン開始時に開放されます。ここでの進行状況とコインはそのまま引き継げます。', '계정 연결은 SnowRealm 통합 로그인이 열리면 가능해요. 여기의 진행 상황과 코인은 그대로 유지되고 연결할 때 이어집니다.'],
     'cl.title': ['雲端存檔', 'Cloud save', 'クラウドセーブ', '클라우드 저장'],
     'cl.none': ['這個版本沒有連上伺服器，進度只存在這台裝置。', 'This copy of the game is not connected to a server. Progress stays on this device.', 'このバージョンはサーバーに接続していません。進行状況はこの端末にだけ保存されます。', '이 버전은 서버에 연결되어 있지 않습니다. 진행 상황은 이 기기에만 저장됩니다.'],
     'cl.new': ['打完第一場，或買了第一樣東西，就會自動開始存到雲端。', 'Your progress starts saving to the cloud after your first match or purchase.', '最初の対戦か買い物のあと、自動でクラウドに保存されます。', '첫 대전이나 첫 구매 후 자동으로 클라우드에 저장됩니다.'],
@@ -10040,10 +10192,19 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   function nameOf(n, pub) { return n || t('lb.anon', String(pub || '').slice(0, 4).toUpperCase()); }
 
   // ---------- the cloud block in the profile ----------
+  // the platform account: sign-up happens on SnowRealm Games; linking opens when SnowRealm Identity is live
+  var SR_URL = 'https://games.snowrealm.pet/';
+  function srBlock() {
+    // under 13: no sign-up push (accounts for children need a parent's consent, which is not in place)
+    if (ZZ.Consent && ZZ.Consent.child()) return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.kid') + '</p>';
+    return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.p') + '</p><div class="row"><a class="btn main" href="' + SR_URL + '" target="_blank" rel="noopener" data-sr="signup">' + esc(t('sr.go')) + ' ↗</a></div><p class="note">' + t('sr.soon') + '</p>';
+  }
+  App.srBlock = srBlock;
+  App.sheets.srAccount = function () { return srBlock() + '<div class="row">' + btn('close', 'close') + '</div>'; };
   App.profileExtra = function () {
     var st = Cloud.status(), h = '<h3>' + t('cl.title') + '</h3><p class="note" id="clState">' + esc(stateText()) + '</p>';
-    if (st === 'none') return h;
-    return h + '<div class="row">' + (st === 'gone' ? btn('cloudStart', 'cl.start') : btn('cloud', 'cl.manage')) + '</div>';
+    if (st !== 'none') h += '<div class="row">' + (st === 'gone' ? btn('cloudStart', 'cl.start') : btn('cloud', 'cl.manage')) + '</div>';
+    return h + srBlock();
   };
   App.acts.cloud = function () { ui.msg = ''; ui.peek = null; ui.del = false; App.openSheet('cloud'); };
   App.acts.cloudStart = function () {
@@ -10060,8 +10221,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var st = Cloud.status(), d = Meta.data, h = '<h2>' + t('cl.title') + '</h2><p class="note" id="clState">' + esc(stateText()) + '</p>';
     if (Cloud.pub) h += '<p class="note">' + esc(t('cl.tag', Cloud.pub.toUpperCase())) + '</p>';
     h += '<p>' + t('cl.what') + '</p>';
-    if (st === 'none') return h + '<div class="row">' + btn('close', 'close') + '</div>';
+    if (st === 'none') return h + srBlock() + '<div class="row">' + btn('close', 'close') + '</div>';
     if (ui.msg) h += '<p class="warn" role="status">' + esc(ui.msg) + '</p>';
+    h += srBlock();
     h += '<h3>' + t('cl.move') + '</h3><p>' + t('cl.moveP') + '</p>';
     if (ui.code && ui.codeExp > Date.now()) {
       h += '<p class="note">' + esc(t('cl.codeIs', 10)) + '</p><div class="roomcode xfer" aria-label="' + esc(ui.code) + '">' + esc(ui.code) + '</div><p class="warn">' + t('cl.codeWarn') + '</p>';
@@ -11238,6 +11400,33 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       return { k: k, x: anywhere ? Math.random() * w : dir > 0 ? -60 : w + 60, y: Math.random() * h, vx: dir * (300 + Math.random() * 300), vy: 0, len: cell * (1.5 + Math.random() * 2) };
     }
   };
+})();
+</script>
+<script>
+/* 轉磚 and the brick games (games/): when 轉磚 opens, it pays the results the brick games left in this browser's
+   queue (games/rewards.js) through Meta, so they reach the player's record, and the server with a cloud save. */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta, MINI = window.SnowRealmMini;
+  L.add({
+    'mg.paid': ['磚塊小遊戲：+{0} 金幣入帳', 'Brick games: +{0} coins', 'ブロックゲーム：+{0}コイン', '블록 게임: +{0} 코인'],
+    'mg.cap': ['磚塊小遊戲今天的金幣已經拿滿了（每天最多 {0}）', 'Brick games have paid their most for today ({0})', 'ブロックゲームの今日のコインは上限です（{0}）', '오늘 블록 게임 코인을 다 받았어요 ({0})']
+  });
+  function settle() {
+    if (!MINI) return;
+    var q = MINI.take(), got = 0, capped = false;
+    q.forEach(function (r) {
+      var res = Meta.miniDone({ game: r.game, lv: r.lv, value: r.value, stars: r.stars, ms: r.ms });
+      if (res && res.ok) { got += res.coins; if (!res.coins && r.est) capped = true; }
+    });
+    if (got) App.toast(t('mg.paid', got), 3600);
+    else if (capped && Meta.data.daily.mini >= MINI.DAY_CAP) App.toast(t('mg.cap', MINI.DAY_CAP), 3600);
+    if (q.length && App.refreshMenu) App.refreshMenu();
+  }
+  App.settleMinis = settle;
+  // a moment after opening, so a cloud save has been looked for first; and again when the tab comes back
+  App.boot.push(function () { setTimeout(settle, 1500); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) settle(); });
 })();
 </script>
 <script>

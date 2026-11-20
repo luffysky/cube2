@@ -43,7 +43,9 @@ a.card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
 .card.soon svg { filter: grayscale(0.7); }
 .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--floor); color: var(--muted); margin-left: 6px; vertical-align: 2px; }
 .tag.new { background: var(--gold); color: #3B2A00; }
-.foot { margin-top: 36px; color: var(--muted); font-size: 13px; }
+.intro { color: var(--muted); font-size: 14px; line-height: 1.7; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.wallet[hidden] { display: none; }
+.foot { line-height: 1.8; margin-top: 36px; color: var(--muted); font-size: 13px; }
 
 /* ---------- a mini game ---------- */
 .game { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
@@ -114,3 +116,11 @@ a.card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--edge); }
 .over .big.stars { color: #F5B82E; }
 /* the finished picture stays visible behind the result */
 .over.reveal { background: rgba(20, 26, 33, 0.6); }
+
+/* coins for 轉磚 on a result card, and on the directory */
+.over p.coins { color: #F2F5F8; }
+.over p.coins b { color: #F5B82E; }
+.over p.coins a, .wallet a { color: inherit; text-underline-offset: 3px; }
+.wallet { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--edge); font-size: 14px; }
+.wallet b { color: var(--gold-ink); }
+@media (prefers-color-scheme: dark) { .wallet b { color: var(--gold); } }

@@ -224,7 +224,7 @@
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.snake.best', LVKEY = 'snowrealm.snake.level';
   var g = null, state = 'intro', acc = 0, last = 0, cell = 20, dpr = 1, fx = [], shake = 0, ac = null, wait = 0, flash = 0;
-  var level = 'normal', bests = {};
+  var level = 'normal', bests = {}, startAt = 0;
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY + 's') || '{}') || {}; var old = +window.localStorage.getItem(KEY) || 0; if (old && !bests.normal) bests.normal = old; } catch (e) { /* no storage */ }
   if (!Snake.LEVELS[level]) level = 'normal';
   function bestOf(lv) { return +bests[lv] || 0; }
@@ -363,7 +363,7 @@
     hud();
   }
   function start() {
-    g = new Snake(null, level); state = 'play'; acc = 0; fx = []; heartsShown = -1;
+    g = new Snake(null, level); startAt = Date.now(); state = 'play'; acc = 0; fx = []; heartsShown = -1;
     show('intro', false); show('end', false); show('paused', false); show('ouch', false);
     $('pause').disabled = false;
     hud();
@@ -378,6 +378,7 @@
     $('endScore').textContent = g.score;
     $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・吃了 ' + g.eaten + ' 塊・消掉 ' + g.cleared + ' 塊' + (g.chainBest > 1 ? '・最多 ' + g.chainBest + ' 連消' : '');
     show('end', true);
+    if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'snake', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
     hud();
     tone(330, 0.3, 'triangle', 0.09, 160); shake = 10;

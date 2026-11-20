@@ -117,6 +117,12 @@ function applyOps(state, srv, ops, now) {
       if (srv.bud < LIMIT.MATCH_MIN) r = { ok: false, why: 'fast' };
       else { r = Meta.run(op.k, op.a); if (r && r.ok) { srv.bud -= LIMIT.MATCH_MIN; mark('wxr', Meta.data.lv.wxr); } }
     }
+    else if (op.k === 'mini') {
+      // a brick game: it cannot have taken less time than it says, and the time comes out of the allowance
+      const ms = Math.max(0, Math.floor(+(op.a && op.a[4])) || 0), cost = Math.max(3000, ms);
+      if (srv.bud < cost) r = { ok: false, why: 'fast' };
+      else { r = Meta.run(op.k, op.a); if (r && r.ok) srv.bud -= cost; }
+    }
     else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
@@ -230,6 +236,9 @@ function importState(raw, now) {
   d.daily.ads = sd.day === today ? int(sd.ads, 0, Meta.ADS.perDay) : 0;
   d.daily.wheel = sd.day === today ? int(sd.wheel, 0, Meta.WHEEL_FREE.sub) : 0;
   d.daily.slot = sd.day === today ? int(sd.slot, 0, Meta.SLOT.perDay) : 0;
+  d.daily.mini = sd.day === today ? int(sd.mini, 0, 300) : 0;
+  // brick-game progress comes along: stars and bests only open things up; their coins were paid on the device
+  if (src.mini && typeof src.mini === 'object') d.mini = src.mini;
   const t = obj(src.tot);
   d.tot.games = int(t.games, 0, 1e6); d.tot.wins = int(t.wins, 0, d.tot.games);
   d.tot.best = int(t.best, 0, 600000);
@@ -251,7 +260,7 @@ function cleanOps(v) {
   if (!Array.isArray(v) || v.length > LIMIT.OPS_PER_CALL) return null;
   const out = [];
   for (const o of v) {
-    if (!o || typeof o !== 'object' || typeof o.i !== 'string' || !OP_ID.test(o.i) || typeof o.k !== 'string' || Meta.OPS.indexOf(o.k) < 0 || !Array.isArray(o.a) || o.a.length > 4) return null;
+    if (!o || typeof o !== 'object' || typeof o.i !== 'string' || !OP_ID.test(o.i) || typeof o.k !== 'string' || Meta.OPS.indexOf(o.k) < 0 || !Array.isArray(o.a) || o.a.length > 5) return null;
     out.push({ i: o.i, k: o.k, a: o.a });
   }
   return out;

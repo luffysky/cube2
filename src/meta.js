@@ -5,6 +5,7 @@
 (function (root) {
   'use strict';
   var ZZ = root.ZZ || require('./engine.js');
+  var MINI = root.SnowRealmMini || require('../games/rewards.js');      // what the brick games pay (games/rewards.js)
   var KEY = 'zhuanzhuan.meta.v1', DAY = 86400000;
   var TZ = 480;   // the game's day and season turn over at midnight UTC+8 for every player, on every device and on the server
   function int(v, lo, hi) { v = Math.round(+v || 0); return v < lo ? lo : v > hi ? hi : v; }
@@ -293,6 +294,7 @@
     { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
     { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } },
     { id: 'wx', need: 2, coin: 50, ev: 'wx', on: function () { return 0; } },
+    { id: 'mini', need: 3, coin: 40, ev: 'mini', on: function () { return 0; } },
     // level jobs
     { id: 'lv3', cat: 'lvl', need: 3, coin: 60, ev: 'lvl', on: function () { return 0; } },
     { id: 'lvNew', cat: 'lvl', need: 1, coin: 50, ev: 'lvlNew', on: function () { return 0; } },
@@ -352,7 +354,9 @@
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
-      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
+      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
+      // the brick games: best score or time per difficulty, stars per level
+      mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
       box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0, wxr: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
@@ -424,7 +428,7 @@
     var d = Meta.data.daily, day = Meta.dayNo();
     if (d.day === day && d.jobs.length) return;
     // the first wave of the day, picked by the date so everyone gets the same set
-    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0;
+    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0;
   };
   Meta.loginDue = function () { return Meta.data.daily.login !== Meta.dayNo(); };
   Meta.claimLogin = function () {
@@ -542,6 +546,24 @@
     Meta.save();
     emit('wxb', [result, net ? 1 : 0]);
     return { ok: true, before: before, after: d.lv.wxr, delta: d.lv.wxr - before };
+  };
+  // A brick game finished (games/rewards.js says what it pays). r: { game, lv, value, stars, ms }
+  Meta.MINI_GAMES = Object.keys(MINI.GAMES);
+  Meta.miniDone = function (r) {
+    r = r && typeof r === 'object' ? r : {};
+    if (!MINI.GAMES.hasOwnProperty(r.game)) return { ok: false, why: 'game' };
+    var d = Meta.data, g = MINI.GAMES[r.game];
+    r = { game: r.game, lv: int(r.lv, 0, 2), value: g.kind === 'levels' ? int(r.value, 0, g.count - 1) : int(r.value, 0, 1e9), stars: int(r.stars, 0, 3), ms: int(r.ms, 0, 3600000) };
+    if (g.kind === 'levels' && r.stars < 1) return { ok: false, why: 'stars' };
+    if (g.kind === 'time' && r.value < 1000) return { ok: false, why: 'fast' };
+    var prev = d.mini[r.game], c = Math.max(0, Math.min(MINI.coins(r, prev), MINI.DAY_CAP - d.daily.mini));
+    var best = g.kind === 'levels' ? r.stars > (+String(prev).charAt(r.value) || 0) : g.kind === 'score' ? r.value > prev[r.lv] : !prev[r.lv] || r.value < prev[r.lv];
+    d.mini[r.game] = MINI.record(r, prev);
+    if (c) { d.daily.mini += c; Meta.earn(c); }
+    jobEvent('mini', 1);
+    Meta.save();
+    emit('mini', [r.game, r.lv, r.value, r.stars, r.ms]);
+    return { ok: true, coins: c, best: best };
   };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
@@ -689,6 +711,11 @@
     d.lv.wx = Math.max(0, Math.floor(+d.lv.wx) || 0);
     d.lv.wxs = Math.max(0, Math.min(3600, Math.floor(+d.lv.wxs) || 0));
     d.lv.wxr = Math.max(0, Math.min(99999, Math.floor(+d.lv.wxr) || 0));
+    Object.keys(MINI.GAMES).forEach(function (k) {
+      var g = MINI.GAMES[k], v = d.mini[k];
+      if (g.kind === 'levels') d.mini[k] = String(v || '').replace(/[^0-3]/g, '').slice(0, g.count);
+      else d.mini[k] = [0, 1, 2].map(function (i) { return Array.isArray(v) ? Math.max(0, Math.min(1e9, Math.floor(+v[i]) || 0)) : 0; });
+    });
   };
 
   // ---------- items carried into a match ----------
@@ -1016,6 +1043,7 @@
     custom: function () { return Meta.customPlayed(); },
     wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
     wxb: function (a) { return Meta.wxBattle(a[0], a[1] === 1); },
+    mini: function (a) { return Meta.miniDone({ game: a[0], lv: a[1], value: a[2], stars: a[3], ms: a[4] }); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },

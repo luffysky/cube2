@@ -200,7 +200,7 @@
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.breakout.bests', LVKEY = 'snowrealm.breakout.level';
   var g = null, state = 'intro', last = 0, scale = 1, dpr = 1, fx = [], shake = 0, ac = null, wait = 0, keys = { l: false, r: false };
-  var level = 'normal', bests = {};
+  var level = 'normal', bests = {}, startAt = 0;
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
   var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' }, POWER = { wide: '加寬', multi: '多球', slow: '變慢', heart: '+1 命' };
@@ -301,7 +301,7 @@
     hud();
   }
   function start() {
-    g = new Breakout(null, level); state = 'play'; fx = []; heartsShown = -1;
+    g = new Breakout(null, level); startAt = Date.now(); state = 'play'; fx = []; heartsShown = -1;
     show('intro', false); show('end', false); show('paused', false); show('ouch', false);
     $('pause').disabled = false;
     hud();
@@ -315,6 +315,7 @@
     $('endScore').textContent = g.score;
     $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・打到第 ' + g.n + ' 關・打破 ' + g.broken + ' 塊磚';
     show('end', true);
+    if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'breakout', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
     hud();
     tone(330, 0.3, 'triangle', 0.09, 160); shake = 8;

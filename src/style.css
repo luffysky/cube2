@@ -835,3 +835,6 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .wxres b { font-size: 22px; }
 .wxres em { font-style: normal; color: var(--accent); font-weight: 700; }
 @media (max-width: 420px) { .wxpick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* links styled as menu links or buttons */
+a.link { color: inherit; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }

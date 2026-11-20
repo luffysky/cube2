@@ -717,6 +717,19 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     r = await sync(X, many);
     ok(r.json.res.some(x => x.why === 'fast') && r.json.st.lv.wxr < 25 * 41, 'storm points cannot be reported faster than battles are played', r.json.st.lv.wxr);
   }
+  // ---------- the brick games pay through the server, no faster than they can be played ----------
+  {
+    const Y = await newPlayer(null, '203.0.113.95');
+    const c0 = (await sync(Y)).json.st.coins;
+    r = await sync(Y, [op('mini', ['snake', 1, 400, 0, 120000])]);
+    ok(r.json.res[0].ok && r.json.st.coins === c0 + 10 && r.json.st.mini.snake[1] === 400, 'a brick game result pays on the server and the best is kept', [r.json.res, r.json.st.coins - c0, r.json.st.mini]);
+    r = await sync(Y, [op('mini', ['push', 0, 0, 3, 30000])]);
+    ok(r.json.res[0].ok && r.json.st.mini.push === '3', 'a level cleared: its stars are kept', r.json.st.mini);
+    r = await sync(Y, [op('mini', ['breakout', 2, 1e7, 0, 3600000])]);
+    ok(r.json.res[0].ok === false && r.json.res[0].why === 'fast', 'an hour-long game cannot be reported straight after', r.json.res);
+    const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'mini'", [Y.id]);
+    ok(lg[0].n === 2, 'brick game coins are in the coin ledger', lg);
+  }
   // ---------- random matching keeps weather battles apart from ordinary ones ----------
   {
     let ipn = 70;
