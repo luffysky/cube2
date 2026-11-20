@@ -19,7 +19,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
     ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 5 && (await page.$$('.card.soon')).length === 5, 'five playable, five coming');
+    ok((await page.$$('a.card')).length === 6 && (await page.$$('.card.soon')).length === 4, 'six playable, four coming');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');
@@ -198,6 +198,37 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await pp.evaluate(() => window.__push().g.moves + window.__push().g.hist.length >= 0), 'the pad works');
     await pp.screenshot({ path: path.join(OUT, 'push-phone.png') });
     await ctx4.close();
+    // 磚塊合成
+    const mg = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    mg.on('pageerror', e => problems.push('merge: ' + e.message));
+    await mg.goto(BASE + 'games/merge/'); await sleep(400);
+    ok(await mg.evaluate(() => !document.getElementById('intro').hidden && document.querySelectorAll('[data-lv]').length === 3), '磚塊合成 opens on its start card');
+    await mg.click('[data-lv="easy"]'); await mg.click('#go'); await sleep(200);
+    ok(await mg.evaluate(() => window.__merge().state === 'play' && window.__merge().g.C === 5 && window.__merge().g.R === 8), 'easy: five columns, eight rows');
+    await mg.evaluate(() => { const { g } = window.__merge(); g.queue = [2, 2, 2]; });
+    await mg.keyboard.press('1'); await sleep(100); await mg.keyboard.press('2'); await sleep(400);
+    ok(await mg.evaluate(() => { const { g } = window.__merge(); return g.grid[1][0] && g.grid[1][0].v === 4 && g.score === 4 && document.getElementById('top').textContent === '4'; }), 'number keys drop bricks; two 2s make a 4');
+    const cbox = await mg.$eval('#cv', c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await mg.mouse.click(cbox.x + cbox.w * 0.9, cbox.y + cbox.h * 0.5); await sleep(300);
+    ok(await mg.evaluate(() => !!window.__merge().g.grid[4][0]), 'a click drops into that column');
+    for (let i = 0; i < 12; i++) { await mg.evaluate(() => { const { g } = window.__merge(); g.queue[0] = [2, 4, 8, 16][Math.floor(Math.random() * 4)]; }); await mg.mouse.click(cbox.x + cbox.w * (0.1 + 0.2 * (i % 5)), cbox.y + cbox.h * 0.5); await sleep(120); }
+    await sleep(400);
+    await mg.screenshot({ path: path.join(OUT, 'merge-play.png') });
+    await mg.evaluate(() => { const { g } = window.__merge(); g.lives = 1; for (let r = 0; r < g.R; r++) g.grid[2][r] = g.mk(r % 2 ? 1024 : 2048); });
+    await mg.keyboard.press('3'); await sleep(300);
+    ok(await mg.evaluate(() => window.__merge().state === 'over' && JSON.parse(localStorage.getItem('snowrealm.merge.bests')).easy === window.__merge().g.score), 'a full column on the last heart ends it; the best is kept');
+    await mg.screenshot({ path: path.join(OUT, 'merge-over.png') });
+    const ctx5 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const mp = await ctx5.newPage();
+    mp.on('pageerror', e => problems.push('merge phone: ' + e.message));
+    await mp.goto(BASE + 'games/merge/'); await sleep(400);
+    await mp.tap('#go'); await sleep(200);
+    const mfit = await mp.evaluate(() => { const r = document.getElementById('cv').getBoundingClientRect(); return { b: r.bottom, w: r.width, vh: innerHeight }; });
+    ok(mfit.b <= mfit.vh && mfit.w >= 250, 'on a phone the field fits', mfit);
+    await mp.tap('#cv', { position: { x: 20, y: 200 } }); await sleep(300);
+    ok(await mp.evaluate(() => !!window.__merge().g.grid[0][0]), 'a tap drops into the column tapped');
+    await mp.screenshot({ path: path.join(OUT, 'merge-phone.png') });
+    await ctx5.close();
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();
