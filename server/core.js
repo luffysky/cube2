@@ -379,4 +379,56 @@ async function roomClose(db, body) {
   return good({});
 }
 
-module.exports = { adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+// ---------- SnowRealm Identity: link this save to a platform player, and get it back on another device ----------
+// claims: a token server/identity.js has already checked. Nothing here runs unless linking is switched on.
+async function useJti(db, claims) {
+  const r = await db.query('INSERT INTO zz.idjti (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING RETURNING jti', [claims.jti, claims.exp * 1000]);
+  return !!r[0];
+}
+async function idStatus(db, cred, on) {
+  const p = await findPlayer(db, cred);
+  if (!p) return fail(401, 'auth');
+  if (!on) return good({ enabled: false, linked: false });
+  const r = await db.query('SELECT linked_at FROM zz.identity WHERE pid = $1', [p.id]);
+  return good({ enabled: true, linked: !!r[0], linkedAt: r[0] ? r[0].linked_at : 0 });
+}
+async function idLink(db, cred, claims, now) {
+  const p = await findPlayer(db, cred);
+  if (!p) return fail(401, 'auth');
+  if (!(await useJti(db, claims))) return fail(409, 'replay');
+  const mine = await db.query('SELECT platform_id FROM zz.identity WHERE pid = $1', [p.id]);
+  const theirs = await db.query('SELECT i.pid, p.pub, p.state FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
+  if (mine[0] && mine[0].platform_id === claims.sub) return good({ linked: true, same: true });
+  // never merged or overwritten: the player chooses, and both saves stay as they are
+  if (mine[0]) return fail(409, 'linked');
+  if (theirs[0]) { const d = rules.current(theirs[0].state, now); return fail(409, 'taken', { other: { pub: theirs[0].pub, name: d.name, coins: d.coins, games: d.tot.games } }); }
+  const secret = newSecret();
+  try {
+    await db.batch([
+      ['INSERT INTO zz.identity (platform_id, pid, linked_at, provider_hint) VALUES ($1, $2, $3, $4)', [claims.sub, p.id, now, 'snowrealm']],
+      // this device gets a fresh key; its old key and any open transfer codes stop working
+      ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), p.id, now]],
+      ['DELETE FROM zz.keys WHERE hash = $1 AND pid = $2', [cred.hash, p.id]],
+      ['DELETE FROM zz.codes WHERE pid = $1', [p.id]]
+    ]);
+  } catch (e) {
+    if (e && e.code === '23505') return fail(409, 'race');      // linked a moment ago from somewhere else
+    throw e;
+  }
+  return good({ linked: true, id: p.id, key: secret, now });
+}
+// another device: the platform player's 轉磚 save, with a key of its own for this device
+async function idRecover(db, claims, now) {
+  if (!(await useJti(db, claims))) return fail(409, 'replay');
+  const r = await db.query('SELECT p.id, p.pub, p.state, p.ver, p.ban FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [claims.sub]);
+  if (!r[0]) return fail(404, 'none');
+  if (r[0].ban) return fail(403, 'ban');
+  const secret = newSecret(), pid = r[0].id;
+  await db.batch([
+    ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), pid, now]],
+    ['DELETE FROM zz.keys WHERE pid = $1 AND hash NOT IN (SELECT hash FROM zz.keys WHERE pid = $1 ORDER BY made DESC, hash LIMIT ' + LIMIT.DEVICES + ')', [pid]]
+  ]);
+  return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
+}
+
+module.exports = { idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

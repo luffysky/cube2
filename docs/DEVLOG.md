@@ -128,3 +128,45 @@
 1. 關卡模式：1000 關加無限隨機，以及可以分享給朋友的自訂關卡
 2. 「挑戰大自然」：風、雨、雪、雷雨、霧會影響方塊落下的新模式，可以連線、也有排位
 3. 遊戲目錄頁和第二款遊戲「磚蛇」
+
+---
+
+# 結構化變更紀錄
+
+從 2026-11-20 起，依 cube1〈SNOWREALM_GAMES_DEVELOPMENT_GOVERNANCE_AND_CHANGELOG_zh-TW.md〉的固定格式記錄。Owner 指令另列在 [OWNER_DECISIONS.md](./OWNER_DECISIONS.md)。
+
+## 2026-11-20 08:52–17:05（Asia/Taipei）｜補記：治理制度建立前、今天已上線的變更
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-007～C-014
+- 原因與目標：治理文件要求每次變更留紀錄；以下是文件交付前今天已經上線的內容，補在這裡。
+- 實際變更與 commit（全部在 `main`，Vercel 自動部署到 https://cube2-xi.vercel.app ）：
+  - `2feddd4` 關卡模式：1000 關、無限挑戰、自訂關卡
+  - `1e58798` 挑戰大自然（單人）；`f80f5ed` 天氣對戰、天氣排位、手機暫存鍵、年齡頁「不再顯示」；`e46b153` 拉霸機圖案
+  - `af4a917` /games 目錄＋磚蛇；`23ea18d` 磚蛇難度／5 命／陷阱；`9ea6f78` 打磚塊；`2cea131` 疊磚塔；`f0ef3f0` 推磚倉庫；`65f84f1` 磚塊合成；`05f0277` 分磚；`b51297c` 磚畫謎；`c428fd0` 磚道；`2a46118` 掃磚
+  - `d1af8b4` 小遊戲接轉磚金幣與存檔；登入／註冊引導到 SnowRealm Games
+- 資料庫：非破壞性新增 — `zz.queue` 加欄位 `pool`（`ALTER TABLE … ADD COLUMN IF NOT EXISTS`，預設 `''`）；玩家存檔 JSON 新增 `lv.wx`／`lv.wxs`／`lv.wxr`、`mini`、`daily.mini` 欄位（舊存檔自動補預設值，不覆蓋既有資料）。
+- 刪除操作：無新增的刪除。
+- 測試：`node test/run.js` 全過；`test/api.test.js` 300、`test/weather.test.js`、`test/minis.test.js` 等單元測試；瀏覽器測試 `stages` 12、`skies` 23、`wxnet` 17、`bricks` 73、`minipay` 10、`flow` 60、`rwd` 232、`consent` 31、`cloudui` 39、`pwa` 47。手機實機未驗。
+- 部署：正式（Vercel production），每個 commit 都確認 READY；`/api/health` 200、`/api/board?b=wxr` 200，近 1 小時無 runtime error（17:07 查）。
+- 未完成：小遊戲排行榜；春節活動未開。
+
+## 2026-11-20 18:20（Asia/Taipei）｜SnowRealm Identity 綁定與找回（伺服器端，開關關閉）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-001、C-014、C-015；cube1 D-005、D-007、D-008
+- 原因與目標：依 Owner 核准書階段 A／B，先把驗證器、綁定、找回與資料表做好並測試，Identity 正式服務上線前一律關閉。
+- 實際變更：
+  - 新增 `server/identity.js`：SnowRealm Identity JWT 驗證（只收 EdDSA／Ed25519、kid、iss、aud、sub=UUID、jti、iat 誤差 60 秒、壽命 ≤ 600 秒、nbf、scope `brickduel:account:link`；JWKS 快取 10 分鐘、取不到就拒絕）。
+  - `server/core.js` 新增 `idStatus`、`idLink`（一對一、不合併、409 衝突、同 token 不能重用、成功後換掉這台裝置的憑證並作廢引繼碼）、`idRecover`（另一台用平台身分取回同一份存檔）。
+  - `server/app.js`：`/api/rpc` 新增動作 `idStatus`、`idLink`、`idRecover`；未啟用回 503 `off`。
+  - 文件：`docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md` 第二版（**更正 `pid` 型別為 uuid**）、新增 `docs/BRICKDUEL_IDENTITY_MIGRATION.md`、`docs/OWNER_DECISIONS.md`。
+- 檔案／API／資料表：上列檔案；`/api/rpc` 三個動作；新表 `zz.identity`、`zz.idjti`。
+- 資料庫：`CREATE TABLE IF NOT EXISTS`（非破壞性，D-007 範圍內），正式資料庫在部署後第一次建表檢查時建立；開關關閉時不寫入。備份：只新增空表。驗證：PGlite 測試資料庫建表成功（13 → 15 張）。
+- 刪除操作：無新增刪除動作。綁定成功時刪除「這台裝置的舊憑證」與「這份存檔的引繼碼」、找回時只保留最近 5 台裝置的憑證——屬於核准書第 4 節要求的憑證輪替，且只在開關打開後才會發生。
+- Git commit：見本條提交（SHA 記在下一條）。
+- 測試：`node test/identity.test.js` 49 通過；`node test/api.test.js` 300 通過；`node test/run.js` 全過。
+- 部署：程式會隨 commit 部署到正式環境，但 `IDENTITY_*` 環境變數未設定 → 功能關閉。沒有真實 Identity 服務，**沒有做跨站端到端驗收，不可宣稱已能綁定**。
+- 風險、回滾：關閉 `IDENTITY_LINK_ENABLED` 即全部停用；移除資料表屬刪除，需 Owner 核准。
+- 未完成／阻塞：BFF（授權碼 + PKCE、callback、HttpOnly 工作階段）等 GPT 提供授權端點與 client 註冊；登入後的「綁定／找回」畫面；排位與開房的登入閘門。
+- 交接對方的事項（GPT）：Identity 正式 issuer／JWKS／audience、授權與 token 端點、允許的 callback（預定 `https://cube2-xi.vercel.app/api/auth/callback`，TBD）、停權查詢方式；平台首頁若能提供直達註冊的網址，轉磚會改連過去。

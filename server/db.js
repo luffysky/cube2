@@ -112,6 +112,18 @@ const SCHEMA = [
      seen double precision NOT NULL
    )`,
   'CREATE INDEX IF NOT EXISTS queue_made ON zz.queue (made)',
+  // SnowRealm Identity: one platform player to one 轉磚 save (used only when IDENTITY_LINK_ENABLED is on; see server/identity.js)
+  `CREATE TABLE IF NOT EXISTS zz.identity (
+     platform_id uuid PRIMARY KEY,
+     pid uuid NOT NULL UNIQUE REFERENCES zz.players(id) ON DELETE CASCADE,
+     linked_at double precision NOT NULL,
+     provider_hint text NOT NULL DEFAULT ''
+   )`,
+  // platform tokens already used for linking or recovery (each jti once)
+  `CREATE TABLE IF NOT EXISTS zz.idjti (
+     jti text PRIMARY KEY,
+     exp double precision NOT NULL
+   )`,
   // which matchmaking pool a waiting room is in ('' ordinary battles, 'wx' weather battles)
   "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS pool text NOT NULL DEFAULT ''",
   // every treasure box opened, kept so the published odds can be checked against what was really drawn

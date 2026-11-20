@@ -3,7 +3,7 @@
    runs as Vercel Functions, behind the local dev server and inside the tests.
 
      GET  /api/health                     is the API here, and is a database linked
-     POST /api/rpc    { a: action, … }    hello · sync · code · redeem · delete
+     POST /api/rpc    { a: action, … }    hello · sync · code · redeem · delete · idStatus · idLink · idRecover
      GET  /api/board?b=rp|score|sprint    a leaderboard (&s=all for all-time, &me=<tag> for one player's place)
      POST /api/room   { a: action, … }    open · join · x (exchange messages) · close: rooms for online matches
 
@@ -15,6 +15,7 @@ const db = require('./db.js');
 const core = require('./core.js');
 const ads = require('./ads.js');
 const rules = require('./rules.js');
+const identity = require('./identity.js');
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
@@ -140,6 +141,19 @@ const routes = {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.wipe(d, cred));
         break;
+      // SnowRealm Identity (off until IDENTITY_LINK_ENABLED is set and the service is live; see server/identity.js)
+      case 'idStatus':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.idStatus(d, cred, identity.enabled()));
+        break;
+      case 'idLink': case 'idRecover': {
+        if (!identity.enabled()) return send(res, 503, { ok: false, why: 'off' });
+        if (body.a === 'idLink' && !cred) return send(res, 401, { ok: false, why: 'auth' });
+        const v = await identity.verify(body.idt, { now, need: identity.LINK_SCOPE });
+        if (!v.ok) return send(res, v.why === 'jwks' ? 503 : 401, { ok: false, why: 'identity', detail: v.why });
+        out = await db.run(d => body.a === 'idLink' ? core.idLink(d, cred, v, now) : core.idRecover(d, v, now));
+        break;
+      }
       default:
         return send(res, 400, { ok: false, why: 'action' });
     }
