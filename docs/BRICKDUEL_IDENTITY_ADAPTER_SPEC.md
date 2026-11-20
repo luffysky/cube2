@@ -89,4 +89,4 @@
 
 **測試**：`test/bff.test.js`（66 項，用測試自己產生的金鑰模擬 Identity）：正常綁定、錯 state、錯 nonce（token 端拒絕、token 內 nonce 不同）、同一 callback 重放、已換過的 code、過期、沒有 cookie／別人的 cookie（換機）、409（兩份存檔都不變、金幣不變）、已綁的存檔不能再綁別的帳號、撤銷（active:false、403、503、逾時、`active` 不是 true）、token 端 503／逾時、JWKS 失聯、拒絕的情況都沒有發出裝置金鑰、另一台裝置找回、等待刪除後恢復、限流；`test/authui.js`（瀏覽器 9 項）。
 
-**還沒做到（不能假裝通過）**：cube1 的 `/oauth/authorize`、`/oauth/token` 目前回 503，`identity.snowrealm.pet` 尚無正式部署，所以**沒有任何正式 E2E**。開 `IDENTITY_LINK_ENABLED` 要等兩邊用兩個測試帳號驗收。開之前還要：同意畫面「不用 cookie」的文字改寫（隱私權政策已先寫明這個例外）、Owner 決定過期 session 怎麼清。
+**還沒做到（不能假裝通過）**：cube1 的 `/oauth/authorize`、`/oauth/token` 目前回 503，`identity.snowrealm.pet` 尚無正式部署，所以**沒有任何正式 E2E**。開 `IDENTITY_LINK_ENABLED` 要等兩邊用兩個測試帳號驗收。開之前還要 Owner 決定過期 session 怎麼清。同意畫面與隱私權政策已改成「會用一個必要 cookie」並寫明名稱、用途、內容、期限（2026-11-21）。

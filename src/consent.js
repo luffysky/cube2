@@ -3,7 +3,7 @@
 
    What is kept and why:
    - Game progress and settings in the browser's storage are needed for the game to work at all, so they are not
-     asked about (they are explained). There are no cookies, no ads and no trackers.
+     asked about (they are explained). There are no ads and no trackers; the one cookie (__Host-zzauth) is set only while linking a SnowRealm Games account (server/bff.js).
    - Fonts come from Google Fonts, which means the browser contacts Google. That is optional: until the player
      allows it, the page uses the fonts already on the device.
    - Language first, then where the player lives and an age band, in the same order and with the same choices as
@@ -85,7 +85,7 @@
 
   L.add({
     'cs.title': ['開始之前', 'Before you start', 'はじめる前に', '시작하기 전에'],
-    'cs.p1': ['轉磚不用註冊。遊戲進度存在你的裝置上；第一次打完一場之後，也會存一份匿名的雲端存檔，換裝置不會不見。不用 cookie、沒有廣告、沒有追蹤程式。', 'No sign-up. Your progress is kept on your device and, after your first match, in an anonymous cloud save so it survives a new device. No cookies, no ads, no trackers.', '登録は不要です。進行状況は端末に保存され、最初の対戦のあとは匿名のクラウドセーブにも保存されます。Cookie、広告、トラッカーは使いません。', '가입이 필요 없습니다. 진행 상황은 기기에 저장되고, 첫 대전 후에는 익명 클라우드 저장에도 보관됩니다. 쿠키, 광고, 추적기는 쓰지 않습니다.'],
+    'cs.p1': ['轉磚不用註冊。遊戲進度存在你的裝置上；第一次打完一場之後，也會存一份匿名的雲端存檔，換裝置不會不見。沒有廣告、沒有追蹤程式。會用到一個必要的 cookie：只在你把存檔連結到 SnowRealm Games 帳號（或用帳號找回存檔）時設定，用來確認登入後回來的是同一個瀏覽器，最長 10 分鐘，用完就失效，不做追蹤。', 'No sign-up. Your progress is kept on your device and, after your first match, in an anonymous cloud save so it survives a new device. No ads, no trackers. One necessary cookie is used: it is set only when you link your save to a SnowRealm Games account (or get it back with one), to check that the same browser comes back after signing in. It lasts at most 10 minutes, ends once used and is never used for tracking.', '登録は不要です。進行状況は端末に保存され、最初の対戦のあとは匿名のクラウドセーブにも保存されます。広告やトラッカーは使いません。必要な Cookie を一つだけ使います：セーブを SnowRealm Games アカウントに連携する（またはアカウントで取り戻す）ときだけ設定し、ログイン後に同じブラウザが戻ってきたかの確認に使います。最長10分で、使用後は無効になり、追跡には使いません。', '가입이 필요 없습니다. 진행 상황은 기기에 저장되고, 첫 대전 후에는 익명 클라우드 저장에도 보관됩니다. 광고와 추적기는 쓰지 않습니다. 꼭 필요한 쿠키 하나를 사용합니다: 저장 데이터를 SnowRealm Games 계정에 연결하거나 계정으로 되찾을 때만 설정되며, 로그인 후 같은 브라우저로 돌아왔는지 확인하는 데 씁니다. 최대 10분이며 사용하면 무효가 되고 추적에는 쓰지 않습니다.'],
     'cs.lang': ['語言', 'Language', '言語', '언어'],
     'cs.region': ['你住在哪裡？', 'Where do you live?', 'お住まいの地域', '거주 지역'],
     'rg.tw': ['臺灣', 'Taiwan', '台湾', '대만'],
