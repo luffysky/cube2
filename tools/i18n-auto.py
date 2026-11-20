@@ -113,7 +113,18 @@ def safe(run, text, a, b):
     return ''.join(p if KEEP.fullmatch(p) or not p.strip() else run(p, a, b).strip() for p in parts).strip()
 
 
+def check():
+    """--check: one made-up phrase through Gemini, to see that the key works. Changes nothing."""
+    batch, version = gemini()
+    got = batch([{'k': 'check.hello', 'zh': '歡迎來玩轉磚！'}]).get('check.hello') or {}
+    ok = all(isinstance(got.get(l), str) and got[l].strip() for l in ('en', 'ja', 'ko'))
+    print('check', version, 'ok' if ok else 'FAILED', json.dumps(got, ensure_ascii=False))
+    sys.exit(0 if ok else 1)
+
+
 def main():
+    if '--check' in sys.argv:
+        return check()
     engine = 'gemini'
     if '--engine' in sys.argv:
         engine = sys.argv[sys.argv.index('--engine') + 1]

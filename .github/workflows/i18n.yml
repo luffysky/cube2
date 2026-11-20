@@ -11,6 +11,11 @@ on:
     branches: [main]
     paths: ['src/**', 'tools/dict.js', 'tools/i18n-*', 'i18n/**']
   workflow_dispatch:
+    inputs:
+      check:
+        description: 'only check that the Gemini key works (translates one test phrase, commits nothing)'
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -28,6 +33,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: check the Gemini key
+        if: inputs.check == true
+        run: python3 tools/i18n-auto.py --check
       - name: anything to translate?
         id: scan
         run: |
