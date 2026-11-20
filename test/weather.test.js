@@ -76,6 +76,29 @@ ok(new W({ seed: 5, only: 'fog' }).kind === 'fog', 'practice starts on its weath
 // runs get faster
 ok(W.gravAt(300000) > W.gravAt(0), 'the run speeds up');
 
+// weather thrown by a rival: that kind at full strength for a while, then back to the sky's own schedule
+{
+  const g = new ZZ.Game({ seed: 21, garbage: false }), w = new W({ seed: 21 });
+  g.start();
+  ok(!w.hit('hail') && w.kindNow() === 'clear', 'an unknown kind is not thrown');
+  ok(w.hit('rain', 3000) && w.kindNow() === 'rain' && w.lvlNow() === 3 && w.info().hit, 'a hit brings its weather at level 3');
+  let back = false;
+  for (let t = 0; t < 3500; t += 16) w.step(g, 16).forEach(e => { if (e.type === 'change' && e.back) back = true; });
+  ok(back && w.kindNow() === w.kind && !w.info().hit, 'and the sky goes back afterwards');
+  const opp = new W({ seed: 21, boardOnly: true }), og = new ZZ.Game({ seed: 21, manual: true });
+  opp.hit('rain', 5000); const g0 = og.gravity; opp.step(og, 16);
+  ok(og.gravity === g0, "a computer's wall only gets what lands on it");
+}
+// storm points
+{
+  const mem2 = {}; M.store = { getItem: k => mem2[k] || null, setItem: (k, v) => { mem2[k] = v; } }; M.load();
+  let r = M.wxBattle(1, false); ok(r.after === 15 && r.delta === 15, 'a win against the computer: +15');
+  r = M.wxBattle(1, true); ok(r.after === 40, 'against a person: +25');
+  r = M.wxBattle(-1, true); ok(r.after === 30 && r.delta === -10, 'a loss: -10');
+  M.data.lv.wxr = 4; r = M.wxBattle(-1, false); ok(r.after === 0 && r.delta === -4, 'never below zero');
+  ok(M.OPS.indexOf('wxb') >= 0, 'wxb is an op');
+}
+
 // rewards
 const mem = {}; M.store = { getItem: k => mem[k] || null, setItem: (k, v) => { mem[k] = v; } };
 M.now = () => new Date(2026, 10, 20, 12).getTime();

@@ -943,6 +943,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       <div id="oppWide" hidden><span class="who" id="oppNameW"></span><div class="frame" id="oppFrame"></div></div>
       <div id="colL" class="col">
         <button id="holdBox" class="slot" type="button" data-ta="hold"><span class="slot-label" data-t="hold">暫存</span><canvas id="holdCv"></canvas></button>
+        <div id="wxInfo" class="wxinfo" aria-live="off" hidden></div>
         <button id="itemBox" class="slot" type="button" data-ta="a.ITEM" hidden><span class="slot-label" data-t="item">道具</span><canvas id="itemCv"></canvas></button>
         <div id="oppMini" class="slot" hidden><span class="slot-label" id="oppName"></span><canvas id="oppCv"></canvas></div>
         <div id="chips" class="chips" aria-live="off"></div>
@@ -2919,6 +2920,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     this.dir = 1; this.wind = 0; this.rain = 0; this.snow = 0; this.fog = 0;
     this.pushAcc = 0; this.driftAcc = 0; this.boltAt = 0; this.gustT = 0;
     this.baseGrav = 1 / 900; this.baseLock = 500;
+    this.boardOnly = !!o.boardOnly;     // a computer's board: no pushing or speed changes, only what lands on the wall
+    this.hitKind = ''; this.hitLeft = 0; this.hitLvl = 3;
     if (this.only) this.next();
   }
 
@@ -2939,9 +2942,20 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     return k;
   };
 
+  // Weather thrown by the rival (a 4-line clear in a weather battle): this kind at full strength for ms, then the sky
+  // goes back to its own schedule.
+  Weather.prototype.hit = function (kind, ms) {
+    if (KINDS.indexOf(kind) < 0) return false;
+    this.hitKind = kind; this.hitLeft = Math.max(1000, Math.min(15000, ms || 9000));
+    this.boltAt = Math.min(this.boltAt, 1500); this.driftAcc = 0; this.pushAcc = 0;
+    return true;
+  };
+  Weather.prototype.kindNow = function () { return this.hitLeft > 0 ? this.hitKind : this.kind; };
+  Weather.prototype.lvlNow = function () { return this.hitLeft > 0 ? this.hitLvl : this.lvl; };
+
   // How hard the wind blows right now, in metres a second (shown to the player); gusts come and go.
   Weather.prototype.windNow = function () {
-    var k = this.kind, base = k === 'wind' ? 4 + this.lvl * 4 : k === 'storm' ? 6 + this.lvl * 4 : k === 'rain' ? 1 + this.lvl : 0;
+    var k = this.kindNow(), L = this.lvlNow(), base = k === 'wind' ? 4 + L * 4 : k === 'storm' ? 6 + L * 4 : k === 'rain' ? 1 + L : 0;
     if (!base) return 0;
     var gust = Math.sin(this.t / 1700) * 0.25 + Math.sin(this.t / 610 + this.n) * 0.15;
     return Math.max(0, Math.round(base * (1 + gust)));
@@ -2953,14 +2967,16 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var out = [];
     this.t += dt;
     this.left -= dt;
-    if (this.left <= 0) { this.next(); out.push({ type: 'change', kind: this.kind, lvl: this.lvl }); }
-    var k = this.kind, L = this.lvl, wet = k === 'rain' || k === 'storm';
+    if (this.left <= 0) { this.next(); if (!(this.hitLeft > 0)) out.push({ type: 'change', kind: this.kind, lvl: this.lvl }); }
+    if (this.hitLeft > 0) { this.hitLeft -= dt; if (this.hitLeft <= 0) out.push({ type: 'change', kind: this.kind, lvl: this.lvl, back: true }); }
+    var k = this.kindNow(), L = this.lvlNow(), wet = k === 'rain' || k === 'storm';
     this.wind = this.windNow();
     this.rain = wet ? Math.round((k === 'storm' ? 20 : 8) * L + Math.sin(this.t / 2300) * 3 + 3) : 0;
     this.snow = k === 'snow' ? L : 0;
     this.fog = k === 'fog' ? 2 + L * 2 : 0;
 
     // fall speed and how long a landed piece waits
+    if (this.boardOnly) return this.land(g, dt, k, L, out);
     var fall = wet ? 1 + 0.22 * L : k === 'snow' ? 0.6 : 1;
     g.gravity = this.baseGrav * fall;
     g.lockDelay = wet ? Math.max(260, Math.round(this.baseLock * (1 - 0.13 * L))) : this.baseLock;
@@ -2982,7 +2998,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         }
       }
     } else this.pushAcc = 0;
-
+    return this.land(g, dt, k, L, out);
+  };
+  // what the weather does to the wall itself: snow settling and lightning
+  Weather.prototype.land = function (g, dt, k, L, out) {
     // snow settles: one cell at a time on top of a column, never filling a row by itself
     if (k === 'snow') {
       this.driftAcc += dt;
@@ -3042,7 +3061,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 
   // what the screen shows beside the next pieces
   Weather.prototype.info = function () {
-    return { kind: this.kind, lvl: this.lvl, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.left) };
+    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left) };
   };
 
   // How the run is scored: the game's own score plus 5 for every second survived.
@@ -3414,7 +3433,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
-      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0 },
+      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0, wxr: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -3594,6 +3613,16 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     emit('wx', [sec, lines, score, practice ? 1 : 0]);
     return out;
   };
+  // a weather battle ended (result 1 won, 0 drawn, -1 lost; net: against a real player): the storm points go up or down
+  Meta.wxBattle = function (result, net) {
+    result = result > 0 ? 1 : result < 0 ? -1 : 0;
+    var d = Meta.data, before = d.lv.wxr, delta = result > 0 ? (net ? 25 : 15) : result === 0 ? 5 : -10;
+    d.lv.wxr = Math.max(0, Math.min(99999, before + delta));
+    jobEvent('wx', 1);
+    Meta.save();
+    emit('wxb', [result, net ? 1 : 0]);
+    return { ok: true, before: before, after: d.lv.wxr, delta: d.lv.wxr - before };
+  };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
@@ -3739,6 +3768,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
     d.lv.wx = Math.max(0, Math.floor(+d.lv.wx) || 0);
     d.lv.wxs = Math.max(0, Math.min(3600, Math.floor(+d.lv.wxs) || 0));
+    d.lv.wxr = Math.max(0, Math.min(99999, Math.floor(+d.lv.wxr) || 0));
   };
 
   // ---------- items carried into a match ----------
@@ -4065,6 +4095,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     endless: function (a) { return Meta.endlessDone(a[0]); },
     custom: function () { return Meta.customPlayed(); },
     wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
+    wxb: function (a) { return Meta.wxBattle(a[0], a[1] === 1); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },
@@ -5919,7 +5950,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   // acts[name](button) handles data-do, clicks/inputs are tried for anything else, go[name]() handles menu buttons,
   // kinds[name] adds a play mode, taps see every event of the player's own game.
   var App = ZZ.App = {
-    sheets: {}, opened: {}, closed: {}, acts: {}, clicks: [], inputs: [], go: {}, kinds: {}, taps: [], again: {}, tools: {},
+    sheets: {}, opened: {}, closed: {}, acts: {}, clicks: [], inputs: [], go: {}, kinds: {}, taps: [], again: {}, tools: {}, hooks: [],
     dismiss: { battle: 1, dojo: 1, settings: 1, help: 1, keys: 1 }, capture: null
   };
 
@@ -6190,6 +6221,12 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
       S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
       S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
+      // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
+      if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
+        S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
+        S.sky.me.baseLock = set.lock;
+        S.wx = S.sky.me; S.rec = null; S.tape = null;
+      }
     } else if (kind === 'sprint') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.goal = 40;
@@ -6581,6 +6618,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   }
   function handle(g, v, mine, e, now) {
     var K = kindOf(), i;
+    for (i = 0; i < App.hooks.length; i++) App.hooks[i](g, e, mine);
     if (mine) {
       if (S.rec) S.rec.on(g, e);
       if (S.tape && g === S.me) S.tape.on(g, e);
@@ -6761,6 +6799,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -7090,6 +7129,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (App.again[S.mode]) return App.again[S.mode](o);
     o.bring = Meta.takeBring();
     o.seed = null;
+    if (o.wx) o.wx = (Math.random() * 4294967296) >>> 0 || 1;
     begin('battle', o);
   }
   function sheetDo(a, target) {
@@ -7457,6 +7497,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         }
         if (fz[k] > 0) fz[k] = Math.max(0, fz[k] - dt);
         if (S.blind[k] > 0) S.blind[k] = Math.max(0, S.blind[k] - dt);
+      }
+      if (S.sky && App.wxStep) {
+        if (S.sky.opp && fz.opp <= 0 && !S.opp.over) App.wxStep(S.sky.opp, S.opp, dt, false);
+        if (fz.me <= 0 && !S.me.over) App.wxStep(S.sky.me, S.me, dt, true);
       }
       if (S.remote) ZZ.Net.tick(dt);
       else if (fz.opp <= 0) {
@@ -7915,7 +7959,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     Net.me = String(name || '').slice(0, 12); Net.host = host; Net.foe = ''; Net.err = ''; Net.code = ''; Net.seated = false;
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; relayed = false;
     Net.matched = false; clearInterval(quickT); quickT = 0;
-    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false;
+    Net.seat = host ? 0 : 1; Net.peers = {}; Net.cfg.team = false; Net.cfg.wx = false; Net.pool = '';
     epoch++;
   }
 
@@ -8004,11 +8048,13 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   // Ask the server for anyone. Someone already waiting: sit down in their room. Nobody: wait in a room of our own,
   // telling the server every few seconds that we are still here. After QUICK_WAIT without a real player, give up and
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
-  Net.quick = function (name, again) {
+  // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
+  Net.quick = function (name, again, pool) {
+    pool = pool === 'wx' ? 'wx' : '';
     reset(name, false);
     if (!again) quickTries = 0;
-    Net.matched = true; Net.quickSince = Date.now();
-    Net.cfg = { minutes: 2, items: false };
+    Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
+    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx' };
     setState('matching');
     var run = epoch;
     transport(function (kind) {
@@ -8016,7 +8062,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       if (kind !== 'relay') return fail('noquick');      // a plain static host has no server to match through
       var key = seatKey();
       relayed = true;
-      rpc({ a: 'quick', key: key }).then(function (r) {
+      rpc({ a: 'quick', key: key, pool: pool }).then(function (r) {
         if (run !== epoch || Net.state !== 'matching') return;
         var b = r.body;
         if (r.status !== 200 || !b || !b.ok || !b.code) return fail(r.status === 429 ? 'slow' : 'server');
@@ -8047,18 +8093,19 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   };
   Net.setCfg = function (c) {
     if (!Net.host) return;
-    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team };
-    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team });
+    Net.cfg = { minutes: int(c.minutes, 1, 3), items: !!c.items, team: !!c.team, wx: !!c.wx };
+    send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx });
     changed();
   };
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi) {
+  function startMatch(seed, minutes, items, multi, wx) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
     var o = { mode: 'net', seed: seed >>> 0, minutes: int(minutes, 1, 3), items: !!items, oppName: Net.foe || ZZ.L.t('foe') };
+    if (wx && !multi) o.wx = wx >>> 0;
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -8074,8 +8121,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       if (Net.cfg.team && Net.teamOk(roster.length)) { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
       multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
     }
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi);
+    var wx = Net.cfg.wx && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -8090,6 +8138,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     send({ t: 'a', n: n });
   };
   Net.item = function (id) { send({ t: 'i', id: id }); };
+  // weather thrown at the other player (a weather battle)
+  Net.weather = function (kind) { send({ t: 'w', k: kind }); };
 
   function pack(g) {
     var first = ROWS, r, x, s = '', items = [], c = g.cur, st = g.stats;
@@ -8185,7 +8235,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     switch (m.t) {
       case 'hello':
         // answer once, in case our own greeting went out before the other side was listening
-        if (!m.ack) { send(hello(1)); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team }); }
+        if (!m.ack) { send(hello(1)); if (Net.host) send({ t: 'cfg', minutes: Net.cfg.minutes, items: Net.cfg.items, team: !!Net.cfg.team, wx: !!Net.cfg.wx }); }
         var nm = String(m.name || '').replace(/[<>&"]/g, '').slice(0, 12);
         if (!Net.peers[from]) Net.peers[from] = { name: nm, heard: Date.now() };
         Net.peers[from].name = nm; Net.peers[from].gone = false;
@@ -8197,12 +8247,13 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         if (Net.matched && Net.host && Net.state === 'ready') { clearInterval(quickT); quickT = 0; setTimeout(function () { if (Net.matched && Net.state === 'ready' && link) Net.start(); }, 1800); }
         break;
       case 'full': fail('full'); break;
-      case 'cfg': if (!Net.host && from === 0) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items, team: !!m.team }; changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi)); break;
+      case 'cfg': if (!Net.host && from === 0) { Net.cfg = { minutes: int(m.minutes, 1, 3), items: !!m.items, team: !!m.team, wx: !!m.wx }; changed(); } break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
       case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
+      case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.indexOf(m.k) >= 0) App.wxHit(m.k); break;
       case 'end':
         var tally = { downs: int(m.downs, 0, 99), sent: int(m.sent, 0, 99999), score: int(m.score, 0, 99999999) };
         // the rest of the result card (older pages do not send these)
@@ -8270,7 +8321,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   };
   function dropped() {
     if (!link && !peer) return;
-    if (Net.state === 'matching' && Net.matched && quickTries < 2 && Date.now() - Net.quickSince < Net.QUICK_WAIT) { quickTries++; shut(); return Net.quick(Net.me, true); }
+    if (Net.state === 'matching' && Net.matched && quickTries < 2 && Date.now() - Net.quickSince < Net.QUICK_WAIT) { quickTries++; shut(); return Net.quick(Net.me, true, Net.pool); }
     var S = App.S(), mid = !!S && S.remote && (S.state === 'play' || S.state === 'count');
     shut();
     if (mid) { Net.state = 'idle'; App.endBattle('left'); return; }
@@ -8637,7 +8688,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
-  function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')); }
+  function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')) + (Net.cfg.wx && Net.count() === 2 ? '　' + t('wx.netOn') : ''); }
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
@@ -8665,7 +8716,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
         h += '</div>';
-        if (n === 2) h += App.toggle('nItems', t('itemsMode'));
+        if (n === 2) h += App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle'));
         else h += '<p class="note">' + t('mp.noItems') + '</p>';
         if (Net.teamOk(n)) h += App.toggle('nTeam', t('mp.teamMode', n / 2));
         h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
@@ -8679,7 +8730,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
-        h += '</div>' + App.toggle('nItems', t('itemsMode')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
+        h += '</div>' + App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
       } else {
         h += '<p>' + esc(rulesText()) + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
@@ -8696,15 +8747,15 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     }
     return h;
   };
-  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
+  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; c = $('nWx'); if (c) c.checked = !!Net.cfg.wx; };
   App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
-  App.acts.netQuickAgain = function () { App.toMenu(); App.openSheet('online'); Net.quick(myName()); };
+  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o && S.o.wx ? 'wx' : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   // nobody real in time: a computer at about the player's own level, named as a computer
   Net.onNoOne = function () {
     var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
     App.closeSheet(true);
     App.toast(t('net.noOne'), 4200);
-    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true });
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0 });
   };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };
@@ -8721,8 +8772,9 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     try { navigator.share({ title: t('title'), text: t('net.shareText', Net.code), url: inviteUrl() }).catch(function () { /* closed without sharing */ }); } catch (e) { /* not available */ }
   };
   App.inputs.push(function (el) {
-    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team }); return true; }
-    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked }); return true; }
+    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
+    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked, wx: Net.cfg.wx }); return true; }
+    if (el.id === 'nWx') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: el.checked }); return true; }
     if (el.id === 'nCode') { joinCode = el.value.toUpperCase(); return true; }
     return false;
   });
@@ -8752,7 +8804,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
     if (d.nsize != null && [4, 6, 8].indexOf(+d.nsize) >= 0) { Net.size = +d.nsize; App.openSheet('online'); return true; }
-    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team }); return true; }
+    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
     return false;
   });
 
@@ -9919,6 +9971,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'lb.score': ['單場最高分', 'Best score', '最高スコア', '최고 점수'],
     'lb.sprint': ['40 行競速', '40-line sprint', '40ライン', '40줄 스프린트'],
     'lb.wx': ['挑戰大自然', 'Weather', '大自然チャレンジ', '대자연 도전'],
+    'lb.wxr': ['天氣排位', 'Storm rank', '天気ランク', '날씨 랭크'],
     'lb.season': ['本季', 'This season', '今シーズン', '이번 시즌'],
     'lb.all': ['歷來', 'All time', '歴代', '역대'],
     'lb.loading': ['讀取中…', 'Loading…', '読み込み中…', '불러오는 중…'],
@@ -10079,7 +10132,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'score', 'sprint', 'wx'];
+  var BOARDS = ['rp', 'score', 'sprint', 'wx', 'wxr'];
   function valueOf(b, v) {
     if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);
@@ -10201,31 +10254,33 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   // the same lists as SPINREALM (cube1 dist/region-policies.mjs), plus Hong Kong and Macau (asked for 2026-11-20)
   var REGIONS = ['tw', 'hk', 'mo', 'cn', 'jp', 'kr', 'my', 'sg', 'au', 'us', 'uk', 'other'];
   var AGES = ['u13', 'a13', 'a14', 'a16', 'adult'];
-  var C = { v: 0, at: 0, fonts: false, age: '', region: '' };
+  var C = { v: 0, at: 0, fonts: false, age: '', region: '', ask: false }, noAsk = true;
 
   function load() {
     try {
       var d = JSON.parse(window.localStorage.getItem(KEY) || 'null');
       if (d && typeof d === 'object') {
-        C.v = +d.v || 0; C.at = +d.at || 0; C.fonts = !!d.fonts;
+        C.v = +d.v || 0; C.at = +d.at || 0; C.fonts = !!d.fonts; C.ask = d.ask === true;
         C.region = REGIONS.indexOf(d.region) >= 0 ? d.region : '';
         // the first version had three bands: 18+ and under 13 carry over; 13 to 17 is asked again
         C.age = AGES.indexOf(d.age) >= 0 ? d.age : d.age === 'child' ? 'u13' : '';
       }
     } catch (e) { /* asked again */ }
   }
-  function keep() { try { window.localStorage.setItem(KEY, JSON.stringify({ v: VERSION, at: Date.now(), fonts: C.fonts, age: C.age, region: C.region })); } catch (e) { /* asked again next time */ } }
+  function keep() { try { window.localStorage.setItem(KEY, JSON.stringify({ v: VERSION, at: Date.now(), fonts: C.fonts, age: C.age, region: C.region, ask: C.ask })); } catch (e) { /* asked again next time */ } }
   var Consent = {
     done: function () { return C.v >= VERSION && !!C.age && !!C.region; },
     fonts: function () { return C.fonts; },
     age: function () { return C.age; },
     region: function () { return C.region; },
     child: function () { return C.age === 'u13'; },
+    asks: function () { return C.ask; },
     minor: function () { return !!C.age && C.age !== 'adult'; },
     set: function (o) {
       if (o.fonts != null) C.fonts = !!o.fonts;
       if (o.age) C.age = o.age;
       if (o.region) C.region = o.region;
+      if (o.ask != null) C.ask = !!o.ask;
       C.v = VERSION;
       keep();
       apply();
@@ -10297,6 +10352,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'cs.startMin': ['開始玩（不用）', 'Start, without', 'はじめる（使わない）', '시작(사용 안 함)'],
     'cs.settingsH': ['隱私與資料', 'Privacy and data', 'プライバシーとデータ', '개인정보와 데이터'],
     'cs.ageNow': ['地區：{0}　年齡：{1}', 'Where you live: {0} · Age: {1}', '地域：{0}　年齢：{1}', '지역: {0} · 나이: {1}'],
+    'cs.noAsk': ['下次不再顯示（之後可以到設定改）', 'Don\'t show this again (change it later in Settings)', '次回から表示しない（設定で変更できます）', '다음부터 표시 안 함 (설정에서 변경 가능)'],
+    'cs.askEach': ['每次開始時顯示地區和年齡確認', 'Ask for region and age each time the game starts', '起動のたびに地域と年齢を確認', '시작할 때마다 지역과 나이 확인'],
     'cs.changeAge': ['改地區或年齡', 'Change region or age', '地域・年齢を変更', '지역·나이 변경'],
     'cs.export': ['下載我的資料', 'Download my data', '自分のデータをダウンロード', '내 데이터 다운로드'],
     'cs.links': ['<a href="privacy.html" target="_blank" rel="noopener">隱私政策</a>　<a href="terms.html" target="_blank" rel="noopener">服務條款</a>', '<a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>　<a href="terms.html" target="_blank" rel="noopener">Terms of service</a>', '<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>　<a href="terms.html" target="_blank" rel="noopener">利用規約</a>', '<a href="privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a>　<a href="terms.html" target="_blank" rel="noopener">이용약관</a>'],
@@ -10320,7 +10377,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     h += chips('age', 'cs.age', AGES, a, function (k) { return t('cs.' + k); });
     if (a === 'u13') h += '<p class="note">' + t('cs.childNote') + '</p>';
     else if (a && a !== 'adult') h += '<p class="note">' + t('cs.teenNote') + '</p>';
-    h += '<p class="note">' + t('cs.selfNote') + '</p>';
+    h += '<p class="note">' + t('cs.selfNote') + '</p>' + App.toggle('csNoAsk', t('cs.noAsk'));
     if (warn && (!a || !r)) h += '<p class="warn" role="status">' + t('cs.pick') + '</p>';
     h += '<h3>' + t('cs.fontsH') + '</h3><p class="note">' + t('cs.fontsP') + '</p>';
     if (L.lang === 'zh-Hans') h += '<p class="note"><b>适龄提示：' + AGE_MARK + '</b></p>';
@@ -10330,13 +10387,15 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   function go(fonts) {
     var a = pick || C.age, r = pickR || C.region;
     if (!a || !r) { warn = true; return App.openSheet('consent'); }
-    Consent.set({ age: a, region: r, fonts: fonts });
+    Consent.set({ age: a, region: r, fonts: fonts, ask: !noAsk });
     App.closeSheet();
   }
   App.acts.consentAll = function () { go(true); };
   App.acts.consentMin = function () { go(false); };
   App.inputs.push(function (el) {
     if (el.id === 'sFonts') { Consent.set({ fonts: el.checked }); return true; }
+    if (el.id === 'csNoAsk') { noAsk = el.checked; return true; }
+    if (el.id === 'sAskAge') { Consent.set({ ask: el.checked }); return true; }
     return false;
   });
   App.clicks.push(function (d) {
@@ -10359,10 +10418,11 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   };
   // in Settings
   App.settingsExtra = function () {
-    return '<h3>' + t('cs.settingsH') + '</h3>' + App.toggle('sFonts', t('cs.fontsOn')) + '<p class="note">' + esc(t('cs.ageNow', C.region ? t('rg.' + C.region) : '—', C.age ? t('cs.' + C.age) : '—')) + '</p>' +
+    return '<h3>' + t('cs.settingsH') + '</h3>' + App.toggle('sFonts', t('cs.fontsOn')) + App.toggle('sAskAge', t('cs.askEach')) + '<p class="note">' + esc(t('cs.ageNow', C.region ? t('rg.' + C.region) : '—', C.age ? t('cs.' + C.age) : '—')) + '</p>' +
       '<div class="row">' + btn('changeAge', 'cs.changeAge') + btn('exportData', 'cs.export') + '</div><p class="note">' + t('cs.links') + '</p>';
   };
-  App.settingsOpened = function () { var c = document.getElementById('sFonts'); if (c) c.checked = C.fonts; };
+  App.settingsOpened = function () { var c = document.getElementById('sFonts'); if (c) c.checked = C.fonts; c = document.getElementById('sAskAge'); if (c) c.checked = C.ask; };
+  App.opened.consent = function () { var c = document.getElementById('csNoAsk'); if (c) c.checked = noAsk; };
 
   // under 13: the places where strangers meet stay closed
   var goOnline = App.go.online, goQuick = App.go.quick;
@@ -10382,7 +10442,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var room = /[?&]room=/.test(window.location.search);
     // automated browser tests skip the first-visit screen (all but the one that tests it, which sets this flag)
     var robot = navigator.webdriver === true && !window.__zzAskConsent;
-    if (!Consent.done() && !robot) { pick = C.age; pickR = C.region; setTimeout(function () { if (!App.sheet() || room) App.openSheet('consent'); }, room ? 400 : 80); }
+    noAsk = !C.ask;
+    if ((!Consent.done() || C.ask) && !robot) { pick = C.age; pickR = C.region; setTimeout(function () { if (!App.sheet() || room) App.openSheet('consent'); }, room ? 400 : 80); }
   });
   App.langChanged = App.langChanged || [];
   App.langChanged.push(notice);
@@ -10873,6 +10934,17 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'wx.newBest': ['新紀錄！', 'New best!', '自己ベスト！', '신기록!'],
     'wx.practice': ['練習場，不算獎勵', 'Practice: no rewards', '練習：報酬なし', '연습: 보상 없음'],
     'wx.again': ['再挑戰', 'Go again', 'もう一度', '다시 도전'],
+    'wx.vs': ['天氣對戰', 'Weather battles', '天気バトル', '날씨 대전'],
+    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣丟到對手那邊 9 秒。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw a burst of strong weather at your rival for 9 seconds. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気を相手に9秒投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨를 상대에게 9초간 던져요. 이기면 날씨 랭크가 올라요.'],
+    'wx.rank': ['天氣排位：{0} 分', 'Storm rank: {0}', '天気ランク：{0}', '날씨 랭크: {0}'],
+    'wx.vsAi': ['對電腦', 'Against the computer', 'コンピューターと', '컴퓨터와'],
+    'wx.vsQuick': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
+    'wx.vsRoom': ['跟朋友玩：開房間時打開「天氣對戰」。', 'With a friend: turn on "Weather battle" when you open a room.', '友だちと：ルームを開いて「天気バトル」をオン。', '친구와: 방을 열고 "날씨 대전"을 켜세요.'],
+    'wx.netToggle': ['天氣對戰', 'Weather battle', '天気バトル', '날씨 대전'],
+    'wx.netOn': ['天氣對戰', 'weather battle', '天気バトル', '날씨 대전'],
+    'wx.threw': ['把 {0} 丟給對手！', 'Sent {0} to your rival!', '{0}を相手に！', '{0}을(를) 상대에게!'],
+    'wx.gotHit': ['對手丟來 {0}！', 'Your rival sent {0}!', '相手から{0}！', '상대가 {0}을(를) 보냈어요!'],
+    'wx.rankLine': ['天氣排位 {0}（{1}）', 'Storm rank {0} ({1})', '天気ランク {0}（{1}）', '날씨 랭크 {0} ({1})'],
     'wx.short': ['撐 20 秒以上才有金幣。', 'Last 20 seconds or more for coins.', '20秒以上でコイン獲得。', '20초 이상 버텨야 코인을 받아요.']
   });
 
@@ -10892,8 +10964,17 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     W.KINDS.forEach(function (k) {
       h += '<button type="button" role="radio" class="wxp" aria-checked="' + (pick.only === k) + '" data-wxonly="' + k + '"><i aria-hidden="true">' + KIND_ICON[k] + '</i><b>' + esc(kindName(k)) + '</b></button>';
     });
-    return h + '</div><div class="row">' + btn('wxGo', 'wx.go', true) + btn('close', 'close') + '</div>';
+    h += '</div><div class="row">' + btn('wxGo', 'wx.go', true) + '</div>';
+    h += '<h3>' + t('wx.vs') + '</h3><p class="note">' + t('wx.vsP') + '</p><p><b>' + esc(t('wx.rank', L.num(d.wxr || 0))) + '</b></p><div class="row">' + btn('wxAi', 'wx.vsAi') +
+      (ZZ.Cloud && ZZ.Cloud.hosted() ? btn('wxQuick', 'wx.vsQuick') : '') + '</div><p class="note">' + t('wx.vsRoom') + '</p>';
+    return h + '<div class="row">' + btn('close', 'close') + '</div>';
   };
+  function newSky() { return (Math.random() * 4294967296) >>> 0 || 1; }
+  App.acts.wxAi = function () {
+    var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, wx: newSky() });
+  };
+  App.acts.wxQuick = function () { App.openSheet('online'); ZZ.Net.quick(Meta.data.name || t('player'), false, 'wx'); };
   App.clicks.push(function (d) {
     if (d.wxonly != null) { pick.only = W.KINDS.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
     return false;
@@ -10915,36 +10996,45 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       el.hudC.innerHTML = '<div class="hud-title" id="wxNow"></div>';
       el.hudR.innerHTML = '<div class="stat"><b id="wxTime">0:00</b><span>' + t('wx.time') + '</span></div>';
     },
-    tools: function () { return '<div class="wxinfo" id="wxInfo" aria-live="off"></div>' + App.tool('restart', 'restart'); },
+    tools: function () { return App.tool('restart', 'restart'); },
     tick: function (dt) {
-      var S = App.S(), wx = S.wx;
-      wx.baseGrav = W.gravAt(S.time);
-      var ev = wx.step(S.me, dt);
-      for (var i = 0; i < ev.length; i++) {
-        var e = ev[i];
-        if (e.type === 'change') { App.banner(KIND_ICON[e.kind] + ' ' + kindName(e.kind), '', 1100); sky.change(); }
-        else if (e.type === 'gust') { if (S.time - sky.gustAt > 900) { sky.gustAt = S.time; App.sfx.play('gust'); } }
-        else if (e.type === 'drift') App.sfx.play('drift');
-        else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
-      }
+      var S = App.S();
+      S.wx.baseGrav = W.gravAt(S.time);
+      App.wxStep(S.wx, S.me, dt, true);
     },
-    update: function () {
-      var S = App.S(), wx = S.wx, n = wx.info();
-      App.txt('wxTime', clock(S.time));
-      var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
-      if (key === S.infoKey) return;
-      S.infoKey = key;
-      var now = document.getElementById('wxNow');
-      if (now) now.textContent = KIND_ICON[n.kind] + ' ' + kindName(n.kind) + (n.lvl && n.kind !== 'clear' ? ' · ' + t('wx.lvl', n.lvl) : '');
-      var box = document.getElementById('wxInfo');
-      if (!box) return;
-      var h = '<div><span>' + t('wx.wind') + '</span><b>' + (n.wind ? (n.dir < 0 ? '← ' : '→ ') + n.wind + ' m/s' : '0') + '</b></div>' +
-        '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
-      if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
-      if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
-      if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
-      box.innerHTML = h;
-    },
+    update: function () { App.txt('wxTime', clock(App.S().time)); }
+  };
+  // The weather box goes beside the next pieces with a keyboard; on a touch screen that column holds the hold and
+  // pause keys, so it sits under the hold slot instead.
+  function placeInfo() {
+    var box = document.getElementById('wxInfo'), el = App.el;
+    if (!box) return;
+    var phone = App.env.touch;
+    if (phone && box.parentNode !== el.holdBox.parentNode) el.holdBox.parentNode.insertBefore(box, el.holdBox.nextSibling);
+    else if (!phone && box.parentNode !== el.nextBox.parentNode) el.nextBox.parentNode.insertBefore(box, el.nextBox.nextSibling);
+    box.hidden = false; box.innerHTML = '';
+    var S = App.S(); if (S) S.infoKey = '';
+  }
+  // the weather beside the next pieces (the weather mode and weather battles alike)
+  function showInfo(S) {
+    var wx = S.wx, n = wx.info();
+    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
+    if (key === S.infoKey) return;
+    S.infoKey = key;
+    var now = document.getElementById('wxNow');
+    if (now) now.textContent = KIND_ICON[n.kind] + ' ' + kindName(n.kind) + (n.lvl && n.kind !== 'clear' ? ' · ' + t('wx.lvl', n.lvl) : '');
+    var box = document.getElementById('wxInfo');
+    if (!box) return;
+    var h = '<div><span>' + t('wx.wind') + '</span><b>' + (n.wind ? (n.dir < 0 ? '← ' : '→ ') + n.wind + ' m/s' : '0') + '</b></div>' +
+      '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
+    if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
+    if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
+    if (n.hit) h += '<p>' + esc(t('wx.gotHit', kindName(n.kind))) + '</p>';
+    else if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
+    box.innerHTML = h;
+  }
+  K = App.kinds.weather;
+  Object.assign(K, {
     topout: function () { K.end(); },
     empty: function () { /* the queue never runs out */ },
     restart: function () { var S = App.S(); App.begin('weather', { only: S.o.only, seed: (Math.random() * 4294967296) >>> 0 }); },
@@ -10958,7 +11048,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       S.res.sec = sec; S.res.lines = st.lines; S.res.score = score;
       S.after = function () { App.openSheet('wxOver'); };
     }
-  };
+  });
 
   App.sheets.wxOver = function () {
     var S = App.S(), r = S.res || {}, h = '<h2 class="verdict lose">' + t('wx.over') + '</h2>';
@@ -10970,12 +11060,61 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   };
   App.acts.wxSetupBack = function () { App.toMenu(); App.openSheet('wxSetup'); };
 
+  // One step of weather over one wall, with the sound and the picture for the player's own.
+  App.wxStep = function (wx, g, dt, mine) {
+    var S = App.S(), ev = wx.step(g, dt);
+    if (!mine) return;
+    if (!sky.on) sky.reset();
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i];
+      if (e.type === 'change') { if (!e.back || S.kind === 'weather') App.banner(KIND_ICON[e.kind] + ' ' + kindName(e.kind), '', 1100); sky.change(); }
+      else if (e.type === 'gust') { if (wx.t - sky.gustAt > 900) { sky.gustAt = wx.t; App.sfx.play('gust'); } }
+      else if (e.type === 'drift') App.sfx.play('drift');
+      else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
+    }
+  };
+  // ---------- weather battles ----------
+  // A four-line clear or a T-spin double or better throws strong weather at the rival for nine seconds.
+  var HIT_MS = 9000;
+  function throws(e) { return e.lines >= 4 || (e.tspin === 'full' && e.lines >= 2); }
+  function anyKind() { return W.KINDS[Math.floor(Math.random() * W.KINDS.length)]; }
+  App.hooks.push(function (g, e, mine) {
+    var S = App.S();
+    if (!S || !S.sky || S.state !== 'play' || e.type !== 'lock' || !throws(e)) return;
+    var k = anyKind();
+    if (mine && g === S.me) {
+      if (S.remote) { if (ZZ.Net) ZZ.Net.weather(k); }
+      else if (S.sky.opp) S.sky.opp.hit(k, HIT_MS);
+      App.popRaw(t('wx.threw', KIND_ICON[k] + kindName(k)), [], 0, false);
+    } else if (!mine && g === S.opp && !S.remote) App.wxHit(k);      // the computer throws too
+  });
+  App.wxHit = function (k) {
+    var S = App.S();
+    if (!S || !S.sky || !S.sky.me.hit(k, HIT_MS)) return;
+    App.banner(KIND_ICON[k] + ' ' + kindName(k), '', 1100);
+    App.popRaw(t('wx.gotHit', kindName(k)), [], 0, false);
+    App.sfx.play(k === 'storm' ? 'thunder' : 'gust');
+    sky.change();
+  };
+  // the storm points for a weather battle (one shorter than 20 seconds counts for nothing)
+  App.wxBattleEnd = function (r, played) {
+    var S = App.S();
+    if (played < 20000 || S.why === 'quit') return null;
+    return Meta.wxBattle(r, S.mode === 'net');
+  };
+  var extra = App.endExtra;
+  App.endExtra = function () {
+    var S = App.S(), h = '', r = S && S.wxRes;
+    if (r) h = '<p class="note"><b>' + esc(t('wx.rankLine', L.num(r.after), (r.delta >= 0 ? '+' : '') + r.delta)) + '</b></p>';
+    return h + (extra ? extra() : '');
+  };
+
   // ---------- the sky over the board ----------
   // A canvas laid over the board: rain, snow, wind streaks, lightning and fog. Purely for looks; the weather's effect on
   // the game is all in weather.js.
   var sky = {
     cv: null, x: null, w: 0, h: 0, parts: [], flash: 0, bolts: [], fade: 1, gustAt: -1e9, last: 0, on: false,
-    reset: function () { this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); },
+    reset: function () { this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); placeInfo(); },
     change: function () { this.fade = 0; },
     bolt: function (e) {
       var v = App.V.me, cell = v.cell, x0 = v.mw + (e.x + 0.5) * cell, y1 = e.y >= 0 ? v.cellXY(e.x, e.y)[1] + cell * 0.5 : this.h * 0.6, pts = [[x0 + (Math.random() - 0.5) * cell * 3, 0]];
@@ -10994,16 +11133,17 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       this.cv.hidden = false;
       if (!this.on) { this.on = true; this.last = 0; window.requestAnimationFrame(this.frame); }
     },
-    stop: function () { this.on = false; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
+    stop: function () { this.on = false; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
     frame: function (now) {
       var s = sky, S = App.S();
-      if (!S || S.kind !== 'weather' || App.screen() !== 'play') { s.stop(); return; }
+      if (!S || !S.wx || App.screen() !== 'play') { s.stop(); return; }
       window.requestAnimationFrame(s.frame);
       var dt = s.last ? Math.min(50, now - s.last) : 16;
       s.last = now;
       if (S.state === 'pause') dt = 0;
       s.size();
       s.draw(S.wx, dt);
+      showInfo(S);
     },
     size: function () {
       var wc = App.el.wellCv, w = wc.offsetWidth, h = wc.offsetHeight;

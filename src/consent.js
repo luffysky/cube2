@@ -21,31 +21,33 @@
   // the same lists as SPINREALM (cube1 dist/region-policies.mjs), plus Hong Kong and Macau (asked for 2026-11-20)
   var REGIONS = ['tw', 'hk', 'mo', 'cn', 'jp', 'kr', 'my', 'sg', 'au', 'us', 'uk', 'other'];
   var AGES = ['u13', 'a13', 'a14', 'a16', 'adult'];
-  var C = { v: 0, at: 0, fonts: false, age: '', region: '' };
+  var C = { v: 0, at: 0, fonts: false, age: '', region: '', ask: false }, noAsk = true;
 
   function load() {
     try {
       var d = JSON.parse(window.localStorage.getItem(KEY) || 'null');
       if (d && typeof d === 'object') {
-        C.v = +d.v || 0; C.at = +d.at || 0; C.fonts = !!d.fonts;
+        C.v = +d.v || 0; C.at = +d.at || 0; C.fonts = !!d.fonts; C.ask = d.ask === true;
         C.region = REGIONS.indexOf(d.region) >= 0 ? d.region : '';
         // the first version had three bands: 18+ and under 13 carry over; 13 to 17 is asked again
         C.age = AGES.indexOf(d.age) >= 0 ? d.age : d.age === 'child' ? 'u13' : '';
       }
     } catch (e) { /* asked again */ }
   }
-  function keep() { try { window.localStorage.setItem(KEY, JSON.stringify({ v: VERSION, at: Date.now(), fonts: C.fonts, age: C.age, region: C.region })); } catch (e) { /* asked again next time */ } }
+  function keep() { try { window.localStorage.setItem(KEY, JSON.stringify({ v: VERSION, at: Date.now(), fonts: C.fonts, age: C.age, region: C.region, ask: C.ask })); } catch (e) { /* asked again next time */ } }
   var Consent = {
     done: function () { return C.v >= VERSION && !!C.age && !!C.region; },
     fonts: function () { return C.fonts; },
     age: function () { return C.age; },
     region: function () { return C.region; },
     child: function () { return C.age === 'u13'; },
+    asks: function () { return C.ask; },
     minor: function () { return !!C.age && C.age !== 'adult'; },
     set: function (o) {
       if (o.fonts != null) C.fonts = !!o.fonts;
       if (o.age) C.age = o.age;
       if (o.region) C.region = o.region;
+      if (o.ask != null) C.ask = !!o.ask;
       C.v = VERSION;
       keep();
       apply();
@@ -117,6 +119,8 @@
     'cs.startMin': ['開始玩（不用）', 'Start, without', 'はじめる（使わない）', '시작(사용 안 함)'],
     'cs.settingsH': ['隱私與資料', 'Privacy and data', 'プライバシーとデータ', '개인정보와 데이터'],
     'cs.ageNow': ['地區：{0}　年齡：{1}', 'Where you live: {0} · Age: {1}', '地域：{0}　年齢：{1}', '지역: {0} · 나이: {1}'],
+    'cs.noAsk': ['下次不再顯示（之後可以到設定改）', 'Don\'t show this again (change it later in Settings)', '次回から表示しない（設定で変更できます）', '다음부터 표시 안 함 (설정에서 변경 가능)'],
+    'cs.askEach': ['每次開始時顯示地區和年齡確認', 'Ask for region and age each time the game starts', '起動のたびに地域と年齢を確認', '시작할 때마다 지역과 나이 확인'],
     'cs.changeAge': ['改地區或年齡', 'Change region or age', '地域・年齢を変更', '지역·나이 변경'],
     'cs.export': ['下載我的資料', 'Download my data', '自分のデータをダウンロード', '내 데이터 다운로드'],
     'cs.links': ['<a href="privacy.html" target="_blank" rel="noopener">隱私政策</a>　<a href="terms.html" target="_blank" rel="noopener">服務條款</a>', '<a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>　<a href="terms.html" target="_blank" rel="noopener">Terms of service</a>', '<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>　<a href="terms.html" target="_blank" rel="noopener">利用規約</a>', '<a href="privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a>　<a href="terms.html" target="_blank" rel="noopener">이용약관</a>'],
@@ -140,7 +144,7 @@
     h += chips('age', 'cs.age', AGES, a, function (k) { return t('cs.' + k); });
     if (a === 'u13') h += '<p class="note">' + t('cs.childNote') + '</p>';
     else if (a && a !== 'adult') h += '<p class="note">' + t('cs.teenNote') + '</p>';
-    h += '<p class="note">' + t('cs.selfNote') + '</p>';
+    h += '<p class="note">' + t('cs.selfNote') + '</p>' + App.toggle('csNoAsk', t('cs.noAsk'));
     if (warn && (!a || !r)) h += '<p class="warn" role="status">' + t('cs.pick') + '</p>';
     h += '<h3>' + t('cs.fontsH') + '</h3><p class="note">' + t('cs.fontsP') + '</p>';
     if (L.lang === 'zh-Hans') h += '<p class="note"><b>适龄提示：' + AGE_MARK + '</b></p>';
@@ -150,13 +154,15 @@
   function go(fonts) {
     var a = pick || C.age, r = pickR || C.region;
     if (!a || !r) { warn = true; return App.openSheet('consent'); }
-    Consent.set({ age: a, region: r, fonts: fonts });
+    Consent.set({ age: a, region: r, fonts: fonts, ask: !noAsk });
     App.closeSheet();
   }
   App.acts.consentAll = function () { go(true); };
   App.acts.consentMin = function () { go(false); };
   App.inputs.push(function (el) {
     if (el.id === 'sFonts') { Consent.set({ fonts: el.checked }); return true; }
+    if (el.id === 'csNoAsk') { noAsk = el.checked; return true; }
+    if (el.id === 'sAskAge') { Consent.set({ ask: el.checked }); return true; }
     return false;
   });
   App.clicks.push(function (d) {
@@ -179,10 +185,11 @@
   };
   // in Settings
   App.settingsExtra = function () {
-    return '<h3>' + t('cs.settingsH') + '</h3>' + App.toggle('sFonts', t('cs.fontsOn')) + '<p class="note">' + esc(t('cs.ageNow', C.region ? t('rg.' + C.region) : '—', C.age ? t('cs.' + C.age) : '—')) + '</p>' +
+    return '<h3>' + t('cs.settingsH') + '</h3>' + App.toggle('sFonts', t('cs.fontsOn')) + App.toggle('sAskAge', t('cs.askEach')) + '<p class="note">' + esc(t('cs.ageNow', C.region ? t('rg.' + C.region) : '—', C.age ? t('cs.' + C.age) : '—')) + '</p>' +
       '<div class="row">' + btn('changeAge', 'cs.changeAge') + btn('exportData', 'cs.export') + '</div><p class="note">' + t('cs.links') + '</p>';
   };
-  App.settingsOpened = function () { var c = document.getElementById('sFonts'); if (c) c.checked = C.fonts; };
+  App.settingsOpened = function () { var c = document.getElementById('sFonts'); if (c) c.checked = C.fonts; c = document.getElementById('sAskAge'); if (c) c.checked = C.ask; };
+  App.opened.consent = function () { var c = document.getElementById('csNoAsk'); if (c) c.checked = noAsk; };
 
   // under 13: the places where strangers meet stay closed
   var goOnline = App.go.online, goQuick = App.go.quick;
@@ -202,7 +209,8 @@
     var room = /[?&]room=/.test(window.location.search);
     // automated browser tests skip the first-visit screen (all but the one that tests it, which sets this flag)
     var robot = navigator.webdriver === true && !window.__zzAskConsent;
-    if (!Consent.done() && !robot) { pick = C.age; pickR = C.region; setTimeout(function () { if (!App.sheet() || room) App.openSheet('consent'); }, room ? 400 : 80); }
+    noAsk = !C.ask;
+    if ((!Consent.done() || C.ask) && !robot) { pick = C.age; pickR = C.region; setTimeout(function () { if (!App.sheet() || room) App.openSheet('consent'); }, room ? 400 : 80); }
   });
   App.langChanged = App.langChanged || [];
   App.langChanged.push(notice);

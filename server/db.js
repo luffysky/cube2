@@ -112,6 +112,8 @@ const SCHEMA = [
      seen double precision NOT NULL
    )`,
   'CREATE INDEX IF NOT EXISTS queue_made ON zz.queue (made)',
+  // which matchmaking pool a waiting room is in ('' ordinary battles, 'wx' weather battles)
+  "ALTER TABLE zz.queue ADD COLUMN IF NOT EXISTS pool text NOT NULL DEFAULT ''",
   // every treasure box opened, kept so the published odds can be checked against what was really drawn
   `CREATE TABLE IF NOT EXISTS zz.draws (
      id bigserial PRIMARY KEY,

@@ -112,6 +112,11 @@ function applyOps(state, srv, ops, now) {
       if (srv.bud < cost) r = { ok: false, why: 'fast' };
       else { r = Meta.run(op.k, op.a); if (r && r.ok) { srv.bud -= cost; const sc = Math.min(Math.max(0, Math.floor(+op.a[2]) || 0), sec * 3000 + 5000); if (op.a[3] !== 1 && sc > 0) mark('wx', sc); } }
     }
+    else if (op.k === 'wxb') {
+      // a weather battle lasts minutes: storm points cannot be reported faster than battles can be played
+      if (srv.bud < LIMIT.MATCH_MIN) r = { ok: false, why: 'fast' };
+      else { r = Meta.run(op.k, op.a); if (r && r.ok) { srv.bud -= LIMIT.MATCH_MIN; mark('wxr', Meta.data.lv.wxr); } }
+    }
     else if (op.srv) r = Meta.runServer(op.k, op.a);    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
@@ -184,7 +189,7 @@ function importState(raw, now) {
   d.streak = int(src.streak, 0, 50);
   d.xp = int(src.xp, 0, LIMIT.IMPORT_XP);
   // level progress comes along (it only opens levels; the coins for them were paid on the device)
-  d.lv = { stars: String(obj(src.lv).stars || '').replace(/[^0-3]/g, '').slice(0, 1000), endless: int(obj(src.lv).endless, 0, 999), wx: 0, wxs: 0 };      // titles are not brought in: they are earned where the server can see it
+  d.lv = { stars: String(obj(src.lv).stars || '').replace(/[^0-3]/g, '').slice(0, 1000), endless: int(obj(src.lv).endless, 0, 999), wx: 0, wxs: 0, wxr: 0 };      // titles are not brought in: they are earned where the server can see it
   d.titles = []; d.title = '';
   Meta.KINDS.forEach(kind => {
     const got = [];

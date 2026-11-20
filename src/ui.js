@@ -67,7 +67,7 @@
   // acts[name](button) handles data-do, clicks/inputs are tried for anything else, go[name]() handles menu buttons,
   // kinds[name] adds a play mode, taps see every event of the player's own game.
   var App = ZZ.App = {
-    sheets: {}, opened: {}, closed: {}, acts: {}, clicks: [], inputs: [], go: {}, kinds: {}, taps: [], again: {}, tools: {},
+    sheets: {}, opened: {}, closed: {}, acts: {}, clicks: [], inputs: [], go: {}, kinds: {}, taps: [], again: {}, tools: {}, hooks: [],
     dismiss: { battle: 1, dojo: 1, settings: 1, help: 1, keys: 1 }, capture: null
   };
 
@@ -338,6 +338,12 @@
       S.level = mode === 'rank' ? o.cfg.level : mode === 'ai' ? o.level : 2;
       S.rec = ZZ.Replay ? new ZZ.Replay.Recorder({ seed: seed, minutes: o.minutes, items: !!o.items, mode: mode, foe: S.oppName }) : null;
       S.tape = ZZ.Replay ? new ZZ.Replay.Tape(seed, !!o.items || (o.bring && o.bring.length)) : null;
+      // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
+      if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
+        S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
+        S.sky.me.baseLock = set.lock;
+        S.wx = S.sky.me; S.rec = null; S.tape = null;
+      }
     } else if (kind === 'sprint') {
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, garbage: false });
       S.goal = 40;
@@ -729,6 +735,7 @@
   }
   function handle(g, v, mine, e, now) {
     var K = kindOf(), i;
+    for (i = 0; i < App.hooks.length; i++) App.hooks[i](g, e, mine);
     if (mine) {
       if (S.rec) S.rec.on(g, e);
       if (S.tape && g === S.me) S.tape.on(g, e);
@@ -909,6 +916,7 @@
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
       S.result = r; S.why = why || '';
       S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
         S.saved = ZZ.Replay.save(S.rec.done({
@@ -1238,6 +1246,7 @@
     if (App.again[S.mode]) return App.again[S.mode](o);
     o.bring = Meta.takeBring();
     o.seed = null;
+    if (o.wx) o.wx = (Math.random() * 4294967296) >>> 0 || 1;
     begin('battle', o);
   }
   function sheetDo(a, target) {
@@ -1605,6 +1614,10 @@
         }
         if (fz[k] > 0) fz[k] = Math.max(0, fz[k] - dt);
         if (S.blind[k] > 0) S.blind[k] = Math.max(0, S.blind[k] - dt);
+      }
+      if (S.sky && App.wxStep) {
+        if (S.sky.opp && fz.opp <= 0 && !S.opp.over) App.wxStep(S.sky.opp, S.opp, dt, false);
+        if (fz.me <= 0 && !S.me.over) App.wxStep(S.sky.me, S.me, dt, true);
       }
       if (S.remote) ZZ.Net.tick(dt);
       else if (fz.opp <= 0) {

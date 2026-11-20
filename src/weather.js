@@ -30,6 +30,8 @@
     this.dir = 1; this.wind = 0; this.rain = 0; this.snow = 0; this.fog = 0;
     this.pushAcc = 0; this.driftAcc = 0; this.boltAt = 0; this.gustT = 0;
     this.baseGrav = 1 / 900; this.baseLock = 500;
+    this.boardOnly = !!o.boardOnly;     // a computer's board: no pushing or speed changes, only what lands on the wall
+    this.hitKind = ''; this.hitLeft = 0; this.hitLvl = 3;
     if (this.only) this.next();
   }
 
@@ -50,9 +52,20 @@
     return k;
   };
 
+  // Weather thrown by the rival (a 4-line clear in a weather battle): this kind at full strength for ms, then the sky
+  // goes back to its own schedule.
+  Weather.prototype.hit = function (kind, ms) {
+    if (KINDS.indexOf(kind) < 0) return false;
+    this.hitKind = kind; this.hitLeft = Math.max(1000, Math.min(15000, ms || 9000));
+    this.boltAt = Math.min(this.boltAt, 1500); this.driftAcc = 0; this.pushAcc = 0;
+    return true;
+  };
+  Weather.prototype.kindNow = function () { return this.hitLeft > 0 ? this.hitKind : this.kind; };
+  Weather.prototype.lvlNow = function () { return this.hitLeft > 0 ? this.hitLvl : this.lvl; };
+
   // How hard the wind blows right now, in metres a second (shown to the player); gusts come and go.
   Weather.prototype.windNow = function () {
-    var k = this.kind, base = k === 'wind' ? 4 + this.lvl * 4 : k === 'storm' ? 6 + this.lvl * 4 : k === 'rain' ? 1 + this.lvl : 0;
+    var k = this.kindNow(), L = this.lvlNow(), base = k === 'wind' ? 4 + L * 4 : k === 'storm' ? 6 + L * 4 : k === 'rain' ? 1 + L : 0;
     if (!base) return 0;
     var gust = Math.sin(this.t / 1700) * 0.25 + Math.sin(this.t / 610 + this.n) * 0.15;
     return Math.max(0, Math.round(base * (1 + gust)));
@@ -64,14 +77,16 @@
     var out = [];
     this.t += dt;
     this.left -= dt;
-    if (this.left <= 0) { this.next(); out.push({ type: 'change', kind: this.kind, lvl: this.lvl }); }
-    var k = this.kind, L = this.lvl, wet = k === 'rain' || k === 'storm';
+    if (this.left <= 0) { this.next(); if (!(this.hitLeft > 0)) out.push({ type: 'change', kind: this.kind, lvl: this.lvl }); }
+    if (this.hitLeft > 0) { this.hitLeft -= dt; if (this.hitLeft <= 0) out.push({ type: 'change', kind: this.kind, lvl: this.lvl, back: true }); }
+    var k = this.kindNow(), L = this.lvlNow(), wet = k === 'rain' || k === 'storm';
     this.wind = this.windNow();
     this.rain = wet ? Math.round((k === 'storm' ? 20 : 8) * L + Math.sin(this.t / 2300) * 3 + 3) : 0;
     this.snow = k === 'snow' ? L : 0;
     this.fog = k === 'fog' ? 2 + L * 2 : 0;
 
     // fall speed and how long a landed piece waits
+    if (this.boardOnly) return this.land(g, dt, k, L, out);
     var fall = wet ? 1 + 0.22 * L : k === 'snow' ? 0.6 : 1;
     g.gravity = this.baseGrav * fall;
     g.lockDelay = wet ? Math.max(260, Math.round(this.baseLock * (1 - 0.13 * L))) : this.baseLock;
@@ -93,7 +108,10 @@
         }
       }
     } else this.pushAcc = 0;
-
+    return this.land(g, dt, k, L, out);
+  };
+  // what the weather does to the wall itself: snow settling and lightning
+  Weather.prototype.land = function (g, dt, k, L, out) {
     // snow settles: one cell at a time on top of a column, never filling a row by itself
     if (k === 'snow') {
       this.driftAcc += dt;
@@ -153,7 +171,7 @@
 
   // what the screen shows beside the next pieces
   Weather.prototype.info = function () {
-    return { kind: this.kind, lvl: this.lvl, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.left) };
+    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left) };
   };
 
   // How the run is scored: the game's own score plus 5 for every second survived.

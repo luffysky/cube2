@@ -709,6 +709,24 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     r = await sync(X, [op('wx', [10, 2, 1e9, 1])]);
     const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'wx'", [X.id]);
     ok(lg[0].n === 1, 'only the paid run is in the coin ledger', lg);
+    r = await sync(X, [op('wxb', [1, 1])]);
+    ok(r.json.res[0].ok && r.json.st.lv.wxr === 25, 'a weather battle won against a person: storm points', r.json.st.lv);
+    r = await call('board', { url: '/api/board?b=wxr&s=all' });
+    ok(r.status === 200 && r.json.top.some(x => x.v === 25), 'and they are on the storm-rank board', r.json);
+    const many = []; for (let i = 0; i < 40; i++) many.push(op('wxb', [1, 1]));
+    r = await sync(X, many);
+    ok(r.json.res.some(x => x.why === 'fast') && r.json.st.lv.wxr < 25 * 41, 'storm points cannot be reported faster than battles are played', r.json.st.lv.wxr);
+  }
+  // ---------- random matching keeps weather battles apart from ordinary ones ----------
+  {
+    let ipn = 70;
+    const q = (key, pool) => room(Object.assign({ a: 'quick', key }, pool ? { pool } : {}), { ip: '203.0.113.' + (ipn++) });
+    const k = n => ('poolkey' + n).padEnd(28, 'x');
+    const plain = await q(k(1)), w1 = await q(k(2), 'wx');
+    ok(plain.json.seat === 0 && w1.json.seat === 0 && plain.json.code !== w1.json.code, 'a weather asker does not take an ordinary waiting room', [plain.json, w1.json]);
+    const w2 = await q(k(3), 'wx'), p2 = await q(k(4));
+    ok(w2.json.seat === 1 && w2.json.code === w1.json.code, 'a second weather asker sits with the first', w2.json);
+    ok(p2.json.seat === 1 && p2.json.code === plain.json.code, 'and an ordinary one with the ordinary room', p2.json);
   }
 
   // ---------- when the database is in trouble ----------

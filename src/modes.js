@@ -304,7 +304,7 @@
   App.go.quick = function () { App.openSheet('online'); if (Net.state === 'idle' || Net.state === 'error') Net.quick(myName()); };
   function myName() { return Meta.data.name || t('player'); }
   function inviteUrl() { return window.location.href.split('#')[0].split('?')[0] + '?room=' + Net.code; }
-  function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')); }
+  function rulesText() { return t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items ? 'net.itemsOn' : 'net.itemsOff')) + (Net.cfg.wx && Net.count() === 2 ? '　' + t('wx.netOn') : ''); }
   App.sheets.online = function () {
     var st = Net.state, h = '<h2>' + t('m.online') + '</h2>', i;
     if (st === 'opening') h += '<p>' + t('net.opening') + '</p><div class="row">' + btn('netQuit', 'cancel') + '</div>';
@@ -332,7 +332,7 @@
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
         h += '</div>';
-        if (n === 2) h += App.toggle('nItems', t('itemsMode'));
+        if (n === 2) h += App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle'));
         else h += '<p class="note">' + t('mp.noItems') + '</p>';
         if (Net.teamOk(n)) h += App.toggle('nTeam', t('mp.teamMode', n / 2));
         h += '<p class="note">' + t(n === 2 ? 'mp.more' : team ? 'mp.ruleTeam' : 'mp.rule') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
@@ -346,7 +346,7 @@
       if (Net.host) {
         h += '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
         for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (Net.cfg.minutes === i) + '" data-nmin="' + i + '">' + t('minutes', i) + '</button>';
-        h += '</div>' + App.toggle('nItems', t('itemsMode')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
+        h += '</div>' + App.toggle('nItems', t('itemsMode')) + App.toggle('nWx', t('wx.netToggle')) + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + btn('netStart', 'net.start', true) + '</div>';
       } else {
         h += '<p>' + esc(rulesText()) + '</p><p class="note">' + t('net.waitHost') + '</p><div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
       }
@@ -363,15 +363,15 @@
     }
     return h;
   };
-  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
+  App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; c = $('nWx'); if (c) c.checked = !!Net.cfg.wx; };
   App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
-  App.acts.netQuickAgain = function () { App.toMenu(); App.openSheet('online'); Net.quick(myName()); };
+  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o && S.o.wx ? 'wx' : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   // nobody real in time: a computer at about the player's own level, named as a computer
   Net.onNoOne = function () {
     var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
     App.closeSheet(true);
     App.toast(t('net.noOne'), 4200);
-    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true });
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0 });
   };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };
@@ -388,8 +388,9 @@
     try { navigator.share({ title: t('title'), text: t('net.shareText', Net.code), url: inviteUrl() }).catch(function () { /* closed without sharing */ }); } catch (e) { /* not available */ }
   };
   App.inputs.push(function (el) {
-    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team }); return true; }
-    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked }); return true; }
+    if (el.id === 'nItems') { Net.setCfg({ minutes: Net.cfg.minutes, items: el.checked, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
+    if (el.id === 'nTeam') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: el.checked, wx: Net.cfg.wx }); return true; }
+    if (el.id === 'nWx') { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, wx: el.checked }); return true; }
     if (el.id === 'nCode') { joinCode = el.value.toUpperCase(); return true; }
     return false;
   });
@@ -419,7 +420,7 @@
     if (d.ghostdel != null) { Replay.remove(+d.ghostdel); App.openSheet('ghost'); return true; }
     if (d.lesson != null) { App.begin('lesson', { lesson: +d.lesson }); return true; }
     if (d.nsize != null && [4, 6, 8].indexOf(+d.nsize) >= 0) { Net.size = +d.nsize; App.openSheet('online'); return true; }
-    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team }); return true; }
+    if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, wx: Net.cfg.wx }); return true; }
     return false;
   });
 

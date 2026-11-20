@@ -412,6 +412,7 @@
     'lb.score': ['單場最高分', 'Best score', '最高スコア', '최고 점수'],
     'lb.sprint': ['40 行競速', '40-line sprint', '40ライン', '40줄 스프린트'],
     'lb.wx': ['挑戰大自然', 'Weather', '大自然チャレンジ', '대자연 도전'],
+    'lb.wxr': ['天氣排位', 'Storm rank', '天気ランク', '날씨 랭크'],
     'lb.season': ['本季', 'This season', '今シーズン', '이번 시즌'],
     'lb.all': ['歷來', 'All time', '歴代', '역대'],
     'lb.loading': ['讀取中…', 'Loading…', '読み込み中…', '불러오는 중…'],
@@ -572,7 +573,7 @@
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'score', 'sprint', 'wx'];
+  var BOARDS = ['rp', 'score', 'sprint', 'wx', 'wxr'];
   function valueOf(b, v) {
     if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);

@@ -353,7 +353,7 @@
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
-      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0 },
+      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0, wxr: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -533,6 +533,16 @@
     emit('wx', [sec, lines, score, practice ? 1 : 0]);
     return out;
   };
+  // a weather battle ended (result 1 won, 0 drawn, -1 lost; net: against a real player): the storm points go up or down
+  Meta.wxBattle = function (result, net) {
+    result = result > 0 ? 1 : result < 0 ? -1 : 0;
+    var d = Meta.data, before = d.lv.wxr, delta = result > 0 ? (net ? 25 : 15) : result === 0 ? 5 : -10;
+    d.lv.wxr = Math.max(0, Math.min(99999, before + delta));
+    jobEvent('wx', 1);
+    Meta.save();
+    emit('wxb', [result, net ? 1 : 0]);
+    return { ok: true, before: before, after: d.lv.wxr, delta: d.lv.wxr - before };
+  };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
@@ -678,6 +688,7 @@
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
     d.lv.wx = Math.max(0, Math.floor(+d.lv.wx) || 0);
     d.lv.wxs = Math.max(0, Math.min(3600, Math.floor(+d.lv.wxs) || 0));
+    d.lv.wxr = Math.max(0, Math.min(99999, Math.floor(+d.lv.wxr) || 0));
   };
 
   // ---------- items carried into a match ----------
@@ -1004,6 +1015,7 @@
     endless: function (a) { return Meta.endlessDone(a[0]); },
     custom: function () { return Meta.customPlayed(); },
     wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
+    wxb: function (a) { return Meta.wxBattle(a[0], a[1] === 1); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },

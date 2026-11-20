@@ -36,6 +36,17 @@
     'wx.newBest': ['新紀錄！', 'New best!', '自己ベスト！', '신기록!'],
     'wx.practice': ['練習場，不算獎勵', 'Practice: no rewards', '練習：報酬なし', '연습: 보상 없음'],
     'wx.again': ['再挑戰', 'Go again', 'もう一度', '다시 도전'],
+    'wx.vs': ['天氣對戰', 'Weather battles', '天気バトル', '날씨 대전'],
+    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣丟到對手那邊 9 秒。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw a burst of strong weather at your rival for 9 seconds. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気を相手に9秒投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨를 상대에게 9초간 던져요. 이기면 날씨 랭크가 올라요.'],
+    'wx.rank': ['天氣排位：{0} 分', 'Storm rank: {0}', '天気ランク：{0}', '날씨 랭크: {0}'],
+    'wx.vsAi': ['對電腦', 'Against the computer', 'コンピューターと', '컴퓨터와'],
+    'wx.vsQuick': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
+    'wx.vsRoom': ['跟朋友玩：開房間時打開「天氣對戰」。', 'With a friend: turn on "Weather battle" when you open a room.', '友だちと：ルームを開いて「天気バトル」をオン。', '친구와: 방을 열고 "날씨 대전"을 켜세요.'],
+    'wx.netToggle': ['天氣對戰', 'Weather battle', '天気バトル', '날씨 대전'],
+    'wx.netOn': ['天氣對戰', 'weather battle', '天気バトル', '날씨 대전'],
+    'wx.threw': ['把 {0} 丟給對手！', 'Sent {0} to your rival!', '{0}を相手に！', '{0}을(를) 상대에게!'],
+    'wx.gotHit': ['對手丟來 {0}！', 'Your rival sent {0}!', '相手から{0}！', '상대가 {0}을(를) 보냈어요!'],
+    'wx.rankLine': ['天氣排位 {0}（{1}）', 'Storm rank {0} ({1})', '天気ランク {0}（{1}）', '날씨 랭크 {0} ({1})'],
     'wx.short': ['撐 20 秒以上才有金幣。', 'Last 20 seconds or more for coins.', '20秒以上でコイン獲得。', '20초 이상 버텨야 코인을 받아요.']
   });
 
@@ -55,8 +66,17 @@
     W.KINDS.forEach(function (k) {
       h += '<button type="button" role="radio" class="wxp" aria-checked="' + (pick.only === k) + '" data-wxonly="' + k + '"><i aria-hidden="true">' + KIND_ICON[k] + '</i><b>' + esc(kindName(k)) + '</b></button>';
     });
-    return h + '</div><div class="row">' + btn('wxGo', 'wx.go', true) + btn('close', 'close') + '</div>';
+    h += '</div><div class="row">' + btn('wxGo', 'wx.go', true) + '</div>';
+    h += '<h3>' + t('wx.vs') + '</h3><p class="note">' + t('wx.vsP') + '</p><p><b>' + esc(t('wx.rank', L.num(d.wxr || 0))) + '</b></p><div class="row">' + btn('wxAi', 'wx.vsAi') +
+      (ZZ.Cloud && ZZ.Cloud.hosted() ? btn('wxQuick', 'wx.vsQuick') : '') + '</div><p class="note">' + t('wx.vsRoom') + '</p>';
+    return h + '<div class="row">' + btn('close', 'close') + '</div>';
   };
+  function newSky() { return (Math.random() * 4294967296) >>> 0 || 1; }
+  App.acts.wxAi = function () {
+    var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, wx: newSky() });
+  };
+  App.acts.wxQuick = function () { App.openSheet('online'); ZZ.Net.quick(Meta.data.name || t('player'), false, 'wx'); };
   App.clicks.push(function (d) {
     if (d.wxonly != null) { pick.only = W.KINDS.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
     return false;
@@ -78,36 +98,45 @@
       el.hudC.innerHTML = '<div class="hud-title" id="wxNow"></div>';
       el.hudR.innerHTML = '<div class="stat"><b id="wxTime">0:00</b><span>' + t('wx.time') + '</span></div>';
     },
-    tools: function () { return '<div class="wxinfo" id="wxInfo" aria-live="off"></div>' + App.tool('restart', 'restart'); },
+    tools: function () { return App.tool('restart', 'restart'); },
     tick: function (dt) {
-      var S = App.S(), wx = S.wx;
-      wx.baseGrav = W.gravAt(S.time);
-      var ev = wx.step(S.me, dt);
-      for (var i = 0; i < ev.length; i++) {
-        var e = ev[i];
-        if (e.type === 'change') { App.banner(KIND_ICON[e.kind] + ' ' + kindName(e.kind), '', 1100); sky.change(); }
-        else if (e.type === 'gust') { if (S.time - sky.gustAt > 900) { sky.gustAt = S.time; App.sfx.play('gust'); } }
-        else if (e.type === 'drift') App.sfx.play('drift');
-        else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
-      }
+      var S = App.S();
+      S.wx.baseGrav = W.gravAt(S.time);
+      App.wxStep(S.wx, S.me, dt, true);
     },
-    update: function () {
-      var S = App.S(), wx = S.wx, n = wx.info();
-      App.txt('wxTime', clock(S.time));
-      var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
-      if (key === S.infoKey) return;
-      S.infoKey = key;
-      var now = document.getElementById('wxNow');
-      if (now) now.textContent = KIND_ICON[n.kind] + ' ' + kindName(n.kind) + (n.lvl && n.kind !== 'clear' ? ' · ' + t('wx.lvl', n.lvl) : '');
-      var box = document.getElementById('wxInfo');
-      if (!box) return;
-      var h = '<div><span>' + t('wx.wind') + '</span><b>' + (n.wind ? (n.dir < 0 ? '← ' : '→ ') + n.wind + ' m/s' : '0') + '</b></div>' +
-        '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
-      if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
-      if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
-      if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
-      box.innerHTML = h;
-    },
+    update: function () { App.txt('wxTime', clock(App.S().time)); }
+  };
+  // The weather box goes beside the next pieces with a keyboard; on a touch screen that column holds the hold and
+  // pause keys, so it sits under the hold slot instead.
+  function placeInfo() {
+    var box = document.getElementById('wxInfo'), el = App.el;
+    if (!box) return;
+    var phone = App.env.touch;
+    if (phone && box.parentNode !== el.holdBox.parentNode) el.holdBox.parentNode.insertBefore(box, el.holdBox.nextSibling);
+    else if (!phone && box.parentNode !== el.nextBox.parentNode) el.nextBox.parentNode.insertBefore(box, el.nextBox.nextSibling);
+    box.hidden = false; box.innerHTML = '';
+    var S = App.S(); if (S) S.infoKey = '';
+  }
+  // the weather beside the next pieces (the weather mode and weather battles alike)
+  function showInfo(S) {
+    var wx = S.wx, n = wx.info();
+    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
+    if (key === S.infoKey) return;
+    S.infoKey = key;
+    var now = document.getElementById('wxNow');
+    if (now) now.textContent = KIND_ICON[n.kind] + ' ' + kindName(n.kind) + (n.lvl && n.kind !== 'clear' ? ' · ' + t('wx.lvl', n.lvl) : '');
+    var box = document.getElementById('wxInfo');
+    if (!box) return;
+    var h = '<div><span>' + t('wx.wind') + '</span><b>' + (n.wind ? (n.dir < 0 ? '← ' : '→ ') + n.wind + ' m/s' : '0') + '</b></div>' +
+      '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
+    if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
+    if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
+    if (n.hit) h += '<p>' + esc(t('wx.gotHit', kindName(n.kind))) + '</p>';
+    else if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
+    box.innerHTML = h;
+  }
+  K = App.kinds.weather;
+  Object.assign(K, {
     topout: function () { K.end(); },
     empty: function () { /* the queue never runs out */ },
     restart: function () { var S = App.S(); App.begin('weather', { only: S.o.only, seed: (Math.random() * 4294967296) >>> 0 }); },
@@ -121,7 +150,7 @@
       S.res.sec = sec; S.res.lines = st.lines; S.res.score = score;
       S.after = function () { App.openSheet('wxOver'); };
     }
-  };
+  });
 
   App.sheets.wxOver = function () {
     var S = App.S(), r = S.res || {}, h = '<h2 class="verdict lose">' + t('wx.over') + '</h2>';
@@ -133,12 +162,61 @@
   };
   App.acts.wxSetupBack = function () { App.toMenu(); App.openSheet('wxSetup'); };
 
+  // One step of weather over one wall, with the sound and the picture for the player's own.
+  App.wxStep = function (wx, g, dt, mine) {
+    var S = App.S(), ev = wx.step(g, dt);
+    if (!mine) return;
+    if (!sky.on) sky.reset();
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i];
+      if (e.type === 'change') { if (!e.back || S.kind === 'weather') App.banner(KIND_ICON[e.kind] + ' ' + kindName(e.kind), '', 1100); sky.change(); }
+      else if (e.type === 'gust') { if (wx.t - sky.gustAt > 900) { sky.gustAt = wx.t; App.sfx.play('gust'); } }
+      else if (e.type === 'drift') App.sfx.play('drift');
+      else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
+    }
+  };
+  // ---------- weather battles ----------
+  // A four-line clear or a T-spin double or better throws strong weather at the rival for nine seconds.
+  var HIT_MS = 9000;
+  function throws(e) { return e.lines >= 4 || (e.tspin === 'full' && e.lines >= 2); }
+  function anyKind() { return W.KINDS[Math.floor(Math.random() * W.KINDS.length)]; }
+  App.hooks.push(function (g, e, mine) {
+    var S = App.S();
+    if (!S || !S.sky || S.state !== 'play' || e.type !== 'lock' || !throws(e)) return;
+    var k = anyKind();
+    if (mine && g === S.me) {
+      if (S.remote) { if (ZZ.Net) ZZ.Net.weather(k); }
+      else if (S.sky.opp) S.sky.opp.hit(k, HIT_MS);
+      App.popRaw(t('wx.threw', KIND_ICON[k] + kindName(k)), [], 0, false);
+    } else if (!mine && g === S.opp && !S.remote) App.wxHit(k);      // the computer throws too
+  });
+  App.wxHit = function (k) {
+    var S = App.S();
+    if (!S || !S.sky || !S.sky.me.hit(k, HIT_MS)) return;
+    App.banner(KIND_ICON[k] + ' ' + kindName(k), '', 1100);
+    App.popRaw(t('wx.gotHit', kindName(k)), [], 0, false);
+    App.sfx.play(k === 'storm' ? 'thunder' : 'gust');
+    sky.change();
+  };
+  // the storm points for a weather battle (one shorter than 20 seconds counts for nothing)
+  App.wxBattleEnd = function (r, played) {
+    var S = App.S();
+    if (played < 20000 || S.why === 'quit') return null;
+    return Meta.wxBattle(r, S.mode === 'net');
+  };
+  var extra = App.endExtra;
+  App.endExtra = function () {
+    var S = App.S(), h = '', r = S && S.wxRes;
+    if (r) h = '<p class="note"><b>' + esc(t('wx.rankLine', L.num(r.after), (r.delta >= 0 ? '+' : '') + r.delta)) + '</b></p>';
+    return h + (extra ? extra() : '');
+  };
+
   // ---------- the sky over the board ----------
   // A canvas laid over the board: rain, snow, wind streaks, lightning and fog. Purely for looks; the weather's effect on
   // the game is all in weather.js.
   var sky = {
     cv: null, x: null, w: 0, h: 0, parts: [], flash: 0, bolts: [], fade: 1, gustAt: -1e9, last: 0, on: false,
-    reset: function () { this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); },
+    reset: function () { this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); placeInfo(); },
     change: function () { this.fade = 0; },
     bolt: function (e) {
       var v = App.V.me, cell = v.cell, x0 = v.mw + (e.x + 0.5) * cell, y1 = e.y >= 0 ? v.cellXY(e.x, e.y)[1] + cell * 0.5 : this.h * 0.6, pts = [[x0 + (Math.random() - 0.5) * cell * 3, 0]];
@@ -157,16 +235,17 @@
       this.cv.hidden = false;
       if (!this.on) { this.on = true; this.last = 0; window.requestAnimationFrame(this.frame); }
     },
-    stop: function () { this.on = false; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
+    stop: function () { this.on = false; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
     frame: function (now) {
       var s = sky, S = App.S();
-      if (!S || S.kind !== 'weather' || App.screen() !== 'play') { s.stop(); return; }
+      if (!S || !S.wx || App.screen() !== 'play') { s.stop(); return; }
       window.requestAnimationFrame(s.frame);
       var dt = s.last ? Math.min(50, now - s.last) : 16;
       s.last = now;
       if (S.state === 'pause') dt = 0;
       s.size();
       s.draw(S.wx, dt);
+      showInfo(S);
     },
     size: function () {
       var wc = App.el.wellCv, w = wc.offsetWidth, h = wc.offsetHeight;

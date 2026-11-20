@@ -18,7 +18,7 @@ const LIMIT = {
   BOARD_ROWS: 50,
   SAVE_TRIES: 4
 };
-const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1 };
+const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1, wxr: 1 };
 const TITLE_ID = /^[a-z0-9]{1,12}$/;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: nothing to misread
 const PUB_ABC = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -271,15 +271,15 @@ const QUICK = { STALE: 25000, TRIES: 30, WINDOW: 10 * 60000 };
 const CLAIM = `
   DELETE FROM zz.queue WHERE code = (
     SELECT q.code FROM zz.queue q JOIN zz.rooms r ON r.code = q.code
-    WHERE q.seen > $1 AND r.exp > $2 AND cardinality(r.ks) = 1 AND r.cap = 2 AND NOT ($3 = ANY(r.ks))
+    WHERE q.seen > $1 AND r.exp > $2 AND cardinality(r.ks) = 1 AND r.cap = 2 AND NOT ($3 = ANY(r.ks)) AND q.pool = $4
     ORDER BY q.made LIMIT 1 FOR UPDATE OF q SKIP LOCKED
   ) RETURNING code`;
 async function roomQuick(db, body, ip, now) {
   if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
   if (await bump(db, 'quick', ip, QUICK.WINDOW, now) > QUICK.TRIES) return fail(429, 'slow');
-  const hash = sha(body.key);
+  const hash = sha(body.key), pool = body.pool === 'wx' ? 'wx' : '';      // weather battles are matched only with each other
   for (let tries = 0; tries < 3; tries++) {
-    const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash]);
+    const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash, pool]);
     if (!got[0]) break;
     const sat = await db.query('UPDATE zz.rooms SET ks = ks || $2::text WHERE code = $1 AND exp > $3 AND cardinality(ks) < cap RETURNING cap', [got[0].code, hash, now]);
     if (sat[0]) return good({ code: got[0].code, seat: 1, cap: 2, quick: true, now });
@@ -290,7 +290,7 @@ async function roomQuick(db, body, ip, now) {
       await db.batch([
         ['DELETE FROM zz.rooms WHERE exp < $1', [now]],
         ['INSERT INTO zz.rooms (code, hk, exp, ks, cap) VALUES ($1, $2, $3, ARRAY[$2], 2)', [code, hash, now + ROOM.TTL]],
-        ['INSERT INTO zz.queue (code, made, seen) VALUES ($1, $2, $2)', [code, now]]
+        ['INSERT INTO zz.queue (code, made, seen, pool) VALUES ($1, $2, $2, $3)', [code, now, pool]]
       ]);
       return good({ code, seat: 0, cap: 2, quick: true, now });
     } catch (e) {

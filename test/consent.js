@@ -21,7 +21,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(fonts.length === 0, 'nothing is fetched from Google before the player says so', fonts);
     ok(await page.evaluate(() => [...document.querySelectorAll('#sheetCard a')].map(a => a.getAttribute('href')).join() === 'terms.html,privacy.html'), 'it links the terms and the privacy policy');
     await page.screenshot({ path: path.join(OUT, 'consent.png') });
-    ok(await page.evaluate(() => !document.querySelector('#sheetCard input[type=checkbox]') && !!document.querySelector('[data-do="consentAll"]') && !!document.querySelector('[data-do="consentMin"]')), 'nothing is ticked in advance: two equal buttons');
+    ok(await page.evaluate(() => [...document.querySelectorAll('#sheetCard input[type=checkbox]')].every(c => c.id === 'csNoAsk') && !!document.querySelector('[data-do="consentAll"]') && !!document.querySelector('[data-do="consentMin"]')), 'nothing is ticked in advance: two equal buttons');
     await page.click('[data-do="consentMin"]'); await sleep(200);
     ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && /先選地區和年齡/.test(document.getElementById('sheetCard').textContent)), 'it asks for region and age before going on');
     ok(await page.evaluate(() => document.querySelectorAll('[data-region]').length === 12 && document.querySelectorAll('[data-age]').length === 5 && document.querySelectorAll('[data-cslang]').length === 5), 'twelve regions, five age bands, five languages, as in SPINREALM');
@@ -46,6 +46,16 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     // a reload does not ask again
     await page.reload(); await sleep(800);
     ok(await page.evaluate(() => ZZ.peek().sheet !== 'consent'), 'asked once');
+    // asking every time instead: switched on in settings, the next start asks again; switched off on that screen, it stops
+    await page.evaluate(() => ZZ.App.openSheet('settings')); await sleep(300);
+    await page.click('label[for="sAskAge"]'); await sleep(150);
+    ok(await page.evaluate(() => ZZ.Consent.asks()), 'settings can turn the question back on');
+    await page.reload(); await sleep(800);
+    ok(await page.evaluate(() => ZZ.peek().sheet === 'consent' && document.getElementById('csNoAsk').checked === false), 'then it is asked at the next start, with "do not show again" unticked');
+    await page.click('label[for="csNoAsk"]'); await sleep(100);
+    await page.click('[data-do="consentMin"]'); await sleep(300);
+    await page.reload(); await sleep(800);
+    ok(await page.evaluate(() => ZZ.peek().sheet !== 'consent' && !ZZ.Consent.asks()), 'ticking "do not show again" stops it');
     // settings: change age, allow fonts, download data
     await page.evaluate(() => ZZ.App.openSheet('settings')); await sleep(300);
     ok(await page.evaluate(() => !!document.getElementById('sFonts') && /未滿 13 歲/.test(document.getElementById('sheetCard').textContent)), 'settings show the choices');
