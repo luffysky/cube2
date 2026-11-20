@@ -188,6 +188,13 @@
     return '<h3>' + t('cs.settingsH') + '</h3>' + App.toggle('sFonts', t('cs.fontsOn')) + App.toggle('sAskAge', t('cs.askEach')) + '<p class="note">' + esc(t('cs.ageNow', C.region ? t('rg.' + C.region) : '—', C.age ? t('cs.' + C.age) : '—')) + '</p>' +
       '<div class="row">' + btn('changeAge', 'cs.changeAge') + btn('exportData', 'cs.export') + '</div><p class="note">' + t('cs.links') + '</p>';
   };
+  // The privacy policy and terms are written per region (legal/<region>/, drafts for now): links to them go to the
+  // version for the region the player chose. Taiwan, and no choice yet, keep the main pages.
+  Consent.legal = function (doc) { return C.region && C.region !== 'tw' ? 'legal/' + C.region + '/' + doc + '.html' : doc + '.html'; };
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null, m = a && /^(privacy|terms)\.html$/.exec(a.getAttribute('href'));
+    if (m) a.setAttribute('href', Consent.legal(m[1]));
+  }, true);
   App.settingsOpened = function () { var c = document.getElementById('sFonts'); if (c) c.checked = C.fonts; c = document.getElementById('sAskAge'); if (c) c.checked = C.ask; };
   App.opened.consent = function () { var c = document.getElementById('csNoAsk'); if (c) c.checked = noAsk; };
 

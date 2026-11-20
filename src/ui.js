@@ -1161,7 +1161,12 @@
   // ?lang=en in the address shows that language for this visit (search engines and shared links use it);
   // choosing a language in the settings takes over again.
   var urlLang = (function () {
-    try { var v = new URLSearchParams(window.location.search).get('lang') || ''; return L.LANGS.some(function (x) { return x[0] === v; }) ? v : ''; } catch (e) { return ''; }
+    // each language has its own address (/en, /ja, /ko, /zh-Hans; / is 繁體中文); ?lang= still works for old links
+    try {
+      var v = new URLSearchParams(window.location.search).get('lang') || '', m = /\/(zh-Hans|en|ja|ko)\/?$/.exec(window.location.pathname);
+      if (!v && m) v = m[1];
+      return L.LANGS.some(function (x) { return x[0] === v; }) ? v : '';
+    } catch (e) { return ''; }
   })();
   function applyLang() {
     L.set(urlLang || set.lang || '');
@@ -1171,7 +1176,7 @@
     var md = document.querySelector('meta[name="description"]'), can = document.querySelector('link[rel="canonical"]');
     if (md) md.setAttribute('content', t('seo.desc'));
     // each language's own address is the one to index for that language
-    if (can) can.setAttribute('href', can.getAttribute('href').split('?')[0] + (urlLang && urlLang !== 'zh-Hant' ? '?lang=' + urlLang : ''));
+    if (can) { var base = can.getAttribute('href').replace(/\/(zh-Hans|en|ja|ko)$/, '/').split('?')[0].replace(/\/?$/, '/'); can.setAttribute('href', urlLang && urlLang !== 'zh-Hant' ? base + urlLang : base); }
     var f = FONT[L.lang];
     // fonts come from Google only once the player has allowed it (see consent.js); until then the device's own are used
     if (f && !fontDone[L.lang] && ZZ.Consent && ZZ.Consent.fonts()) {

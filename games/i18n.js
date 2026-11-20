@@ -52,6 +52,8 @@
         h.setAttribute('lang', HTML_LANG[W.lang]);
         if (tk) document.title = W.t(tk) + ' · ' + (tk === 'dir.title' ? 'SnowRealm' : W.t('g.site'));
         if (dk) { var m = document.querySelector('meta[name="description"]'); if (m) m.setAttribute('content', W.t(dk)); }
+        var can = document.querySelector('link[rel="canonical"]');
+        if (can) can.setAttribute('href', can.getAttribute('href').split('?')[0] + (W.lang !== 'zh-Hant' ? '?lang=' + W.lang : ''));
       }
     }
   };

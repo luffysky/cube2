@@ -13,6 +13,10 @@
   var ic = function (n, cls) { return '<i class="ic' + (cls ? ' ' + cls : '') + '">' + (I ? I.svg(n) : '') + '</i>'; };
   var row = function (href, icon, label, more) { more = more || {}; return '<a href="' + href + '"' + (more.cur ? ' aria-current="page"' : '') + (more.ext ? ' target="_blank" rel="noopener"' : '') + '>' + ic(icon) + '<span>' + label + '</span>' + (more.badge ? '<b class="badge">' + more.badge + '</b>' : '') + ic(more.ext ? 'out' : 'chev', 'go') + '</a>'; };
   var grp = function (tone, title, rows) { return '<section class="dr-grp" data-tone="' + tone + '"><h3>' + title + '</h3><div class="dr-list">' + rows.join('') + '</div></section>'; };
+  // the privacy policy and terms for the region chosen in 轉磚 (legal/<region>/)
+  var region = '';
+  try { region = (JSON.parse(localStorage.getItem('zhuanzhuan.consent.v1') || 'null') || {}).region || ''; } catch (e) { /* none */ }
+  var legal = function (doc) { return /^[a-z]{2,5}$/.test(region) && region !== 'tw' ? up + 'legal/' + region + '/' + doc + '.html' : up + doc + '.html'; };
   var cur = (here.match(/\/games\/([a-z]+)/) || [])[1] || '';
   var h = '<div class="dr-head"><button class="dr-close" type="button" aria-label="' + T('nav.close') + '">✕</button>' +
     '<a class="dr-me" href="' + up + '?go=profile"><i class="dr-av">' + esc(Array.from(name)[0] || '磚') + '</i><span><b>' + esc(name) + '</b><small>' + T('nav.profileIn') + '</small></span></a>' +
@@ -24,7 +28,7 @@
   var games = [row(up, 'brick', T('nav.zz')), row(g, 'grid', T('nav.all'), { cur: !inGame })];
   GAMES.forEach(function (x) { games.push(row(g + x[0] + '/', x[1], T('n.' + x[0]), { cur: x[0] === cur })); });
   h += grp('games', T('nav.games'), games);
-  h += grp('more', T('nav.more'), [row(up + 'privacy.html', 'shield', T('nav.privacy')), row(up + 'terms.html', 'doc', T('nav.terms'))]) + '</nav>';
+  h += grp('more', T('nav.more'), [row(legal('privacy'), 'shield', T('nav.privacy')), row(legal('terms'), 'doc', T('nav.terms'))]) + '</nav>';
   var dr = document.createElement('aside'), sc = document.createElement('div'), btn = document.createElement('button');
   dr.className = 'drawer'; dr.id = 'drawer'; dr.setAttribute('aria-hidden', 'true'); dr.setAttribute('aria-label', T('nav.menu')); dr.innerHTML = h;
   sc.className = 'scrim'; sc.hidden = true;

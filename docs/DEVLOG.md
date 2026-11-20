@@ -351,3 +351,18 @@
 - 測試：`node test/run.js` 全過；瀏覽器 `gameslang` 113（十頁 × 英日韓簡，每個 key 都存在、英韓頁面沒有殘留中文、簡體已轉換、側邊選單英文、沿用轉磚的語言設定）、`bricks` 73、`minipay` 10、`drawer` 28。（瀏覽器測試改用 zh-TW 語系開啟，原本的中文斷言不變。）
 - Gemini 尚未實測：要等 Owner 在 GitHub 加 `GEMINI_API_KEY` secret 後，下一次有待翻文字時才會跑。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`3b129e6`](https://github.com/luffysky/cube2/commit/3b129e6)。
+
+## 2026-11-20 22:35（Asia/Taipei）｜地區法律文件草稿、每種語言一個網址（SEO meta 翻譯）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-025（法律文件依地區各寫一版初稿先推上，之後請律師審）、C-027（SEO meta 也翻）、C-026（音樂，僅記錄）
+- 實際變更：
+  - 法律：新增 `legal/src/`（日文、韓文隱私政策與條款依 APPI／電氣通信事業法外部送信、PIPA 處理方針作成指針撰寫；12 個地區的補充：香港 PDPO、澳門第 8/2005 號法律、中國大陸 PIPL、美國 COPPA／州法、英國 UK GDPR、澳洲 Privacy Act、新加坡 PDPA、馬來西亞 PDPA 2024 修正＋馬來文通知、歐盟 GDPR）；`tools/legal.js` 產生 24 頁，全部標示草稿與【待確認】項目、`noindex`；根目錄 `privacy.html`、`terms.html` 由同一份文字重建，更新 30 天刪除與「一個帳號一份存檔、不合併不覆蓋」的說明，並列出其他地區。
+  - 遊戲內的法律連結依玩家選的地區導向對應版本（`src/consent.js`、`games/nav.js`）。
+  - SEO：主頁五語各自一個網址與檔案（`/`、`/zh-Hans`、`/en`、`/ja`、`/ko`，`vercel.json` rewrites），翻好 title、description、OG、Twitter、og:locale、canonical、JSON-LD；新增字典 `seo.og`、`seo.ogDesc`、`seo.ogAlt`；sitemap 改成路徑網址；小遊戲頁加 canonical 與五語 hreflang。
+- 檔案：`legal/`（新）、`tools/legal.js`（新）、`privacy.html`、`terms.html`、`src/index.template.html`、`src/i18n.js`、`src/ui.js`、`src/consent.js`、`games/nav.js`、`games/i18n.js`、`games/*/index.html`、`build.js`、`index*.html`、`vercel.json`、`sitemap.xml`、`.vercelignore`、`test/legal.js`（新）、`test/pwa.js`、`docs/ARCHITECTURE.md`、`docs/OWNER_DECISIONS.md`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `legal` 439（24 頁語言、草稿標示、noindex、地區清單、所有站內連結可開、簡體版、選日本的玩家連到日文版）、`pwa` 52（五語頁面各自的 meta、canonical、結構化資料、rewrites）、`gameslang` 113、`rwd` 232、`flow` 60、`cloudui` 41、`consent` 31、`drawer` 28、`sites` 25、`bricks` 73、`minipay` 10。
+- 待律師：所有【待確認】項目（各地代表人、跨境傳輸條件、韓國遊戲分級、中國大陸是否關閉服務、準據法等）。法律文件內容是草稿，不是法律意見。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

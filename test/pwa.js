@@ -35,7 +35,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(meta('twitter:card') === 'summary_large_image' && meta('twitter:image') === site + 'icons/og.png', 'a large preview card');
   ok((head.match(/rel="alternate" hreflang="/g) || []).length === 6 && head.indexOf('hreflang="x-default"') > 0, 'the five languages and a default are announced');
   let ld = null; try { ld = JSON.parse((/<script type="application\/ld\+json">([^<]+)<\/script>/.exec(head) || [])[1]); } catch (e) { /* stays null */ }
-  ok(ld && ld['@type'].indexOf('VideoGame') >= 0 && ld.url === site && ld.offers.price === '0' && ld.inLanguage.length === 5, 'structured data says: a free game, in five languages', ld && ld['@type']);
+  ok(ld && ld['@type'].indexOf('VideoGame') >= 0 && ld.url === site && ld.offers.price === '0' && ld.inLanguage === 'zh-Hant', 'structured data says: a free game, in this page\'s language', ld && ld['@type']);
   ok(!/Tetris|俄羅斯方塊|テトリス|테트리스/i.test(head + raw.slice(raw.indexOf('<body'), raw.indexOf('<script>'))), 'no borrowed brand name in the page text');
   const body = raw.slice(raw.indexOf('<body'), raw.indexOf('<script>', raw.indexOf('<body')));
   ok(/<b data-t="m\.rank">排位賽<\/b>/.test(body) && /class="about"[^>]*>轉磚對戰是免費的/.test(body) && /class="lede"[^>]*>[^<]{10,}/.test(body), 'the page carries its words before any script runs', body.slice(body.indexOf('class="about"'), body.indexOf('class="about"') + 80));
@@ -44,7 +44,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(icoSize > 1000 && /rel="icon" href="favicon\.ico"/.test(head) && /rel="icon" href="icons\/favicon\.svg"/.test(head) && /rel="apple-touch-icon" href="icons\/apple-touch-icon\.png"/.test(head), 'favicon, in three kinds');
   const robots = fs.readFileSync(path.join(ROOT, 'robots.txt'), 'utf8'), smap = fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8');
   ok(/Disallow: \/api\//.test(robots) && robots.indexOf('Sitemap: ' + site + 'sitemap.xml') > 0, 'robots.txt keeps crawlers out of the API and points at the sitemap');
-  ok((smap.match(/<loc>/g) || []).length === 15 && smap.indexOf(site + 'games/sweep/') > 0 && smap.indexOf('<loc>' + site + '</loc>') > 0 && smap.indexOf(site + '?lang=ja') > 0, 'the sitemap lists the page in each language, and the brick games');
+  ok((smap.match(/<loc>/g) || []).length === 15 && smap.indexOf(site + 'games/sweep/') > 0 && smap.indexOf('<loc>' + site + '</loc>') > 0 && smap.indexOf('<loc>' + site + 'ja</loc>') > 0, 'the sitemap lists the page in each language, and the brick games');
 
   // ---------- in a browser ----------
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'zh-TW' });
@@ -124,11 +124,19 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(await lp.evaluate(() => document.getElementById('mInstall').hidden), 'inside a chat app\'s browser nothing can be installed, so nothing is offered');
   await line.close();
 
+  // ---------- one page per language, for search engines that do not run scripts ----------
+  for (const [lang, file, title, ogloc] of [['en', 'index.en.html', /^Zhuan Zhuan Battle \| Free online/, 'en_US'], ['ja', 'index.ja.html', /無料のブラウザ対戦/, 'ja_JP'], ['ko', 'index.ko.html', /무료 온라인 블록 대전/, 'ko_KR'], ['zh-Hans', 'index.zh-Hans.html', /转砖对战/, 'zh_CN']]) {
+    const f = fs.readFileSync(path.join(ROOT, file), 'utf8'), fh = f.slice(0, f.indexOf('</head>'));
+    const fld = JSON.parse((/<script type="application\/ld\+json">([^<]+)<\/script>/.exec(fh) || [])[1]);
+    ok(new RegExp('<html lang="' + lang + '">').test(f) && title.test((/<title>([^<]*)/.exec(fh) || [])[1]) && fh.indexOf('<link rel="canonical" href="' + site + lang + '">') > 0 && fh.indexOf('og:locale" content="' + ogloc + '"') > 0 && fld.inLanguage === lang && fld.url === site + lang, lang + ': its own title, description, preview, canonical address and structured data');
+  }
+  const vj = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
+  ok(['zh-Hans', 'en', 'ja', 'ko'].every(l => vj.rewrites.some(r => r.source === '/' + l && r.destination === '/index.' + l + '.html')), 'each language address is served its page');
   // ---------- addresses ----------
   const desk = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'zh-TW' });
   const en = await open(desk, BASE + '?lang=en');
   ok(await en.evaluate(() => document.documentElement.lang === 'en' && /^Zhuan Zhuan Battle \| Free online/.test(document.title) && /free falling-block battle game/.test(document.querySelector('meta[name="description"]').content)), '?lang=en shows English, title and description included', await en.evaluate(() => document.title));
-  ok(await en.evaluate(() => /\?lang=en$/.test(document.querySelector('link[rel="canonical"]').href) && document.querySelector('[data-go="rank"] b').textContent === 'Ranked'), 'and is its own canonical address');
+  ok(await en.evaluate(() => /\/en$/.test(document.querySelector('link[rel="canonical"]').href) && document.querySelector('[data-go="rank"] b').textContent === 'Ranked'), 'and is its own canonical address');
   await en.evaluate(() => document.querySelector('[data-sheet="settings"]').click()); await sleep(200);
   await en.selectOption('#sLang', 'ja'); await sleep(300);
   ok(await en.evaluate(() => document.documentElement.lang === 'ja' && !/lang=/.test(document.querySelector('link[rel="canonical"]').href.split('/').pop().replace('?lang=ja', ''))), 'choosing a language in the settings takes over from the address');

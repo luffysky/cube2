@@ -62,49 +62,68 @@ L.set('zh-Hant');
 const t = k => L.t(k);
 const LANGS = L.LANGS.map(x => x[0]);
 
-// Search engines that do not run scripts, and the first moment before the page's own script has run, see the
-// Traditional Chinese text instead of an empty frame. The page fills in the reader's language right after.
-html = html.replace(/(<(\w+)\b[^>]*\bdata-t="([^"]+)"[^>]*>)(<\/\2>)/g, (all, open, tag, key, close) => (L.has(key) ? open + esc(t(key)) + close : all));
-
-const jsonld = {
-  '@context': 'https://schema.org',
-  '@type': ['VideoGame', 'WebApplication'],
-  name: t('title'), alternateName: ['轉磚', 'Zhuan Zhuan Battle'],
-  url: SITE + '/', image: SITE + '/icons/og.png', screenshot: SITE + '/icons/shot-wide.png',
-  description: t('seo.desc'),
-  applicationCategory: 'GameApplication', genre: ['Puzzle', 'Versus'],
-  gamePlatform: ['Web browser', 'Android', 'iOS', 'Windows', 'macOS'], operatingSystem: 'Any',
-  browserRequirements: 'A current browser with JavaScript',
-  playMode: ['SinglePlayer', 'MultiPlayer'],
-  numberOfPlayers: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2 },
-  inLanguage: LANGS, isAccessibleForFree: true,
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'TWD', availability: 'https://schema.org/InStock' }
-};
-const words = {
-  SITE, NAME: t('title'), SHORT: '轉磚', TITLE: t('seo.title'), DESC: t('seo.desc'),
-  OG_TITLE: '轉磚對戰｜兩分鐘一場的方塊對戰', OG_DESC: '把方塊轉進洞裡，送對手一面水泥牆。打電腦、爬排位、開房間和朋友連線，手機電腦打開就能玩。',
-  OG_ALT: '轉磚對戰的遊戲畫面：一面磁磚牆，金色的 T 正要轉進洞裡'
-};
-html = html.replace(/\{\{(\w+)\}\}/g, (all, k) => {
-  if (k === 'JSONLD') return JSON.stringify(jsonld).replace(/</g, '\\u003c');
-  if (!(k in words)) throw new Error('unknown word {{' + k + '}} in the template');
-  return esc(words[k]);
-});
+// ---------- one page per language ----------
+// Search engines and link previews read the page without running it, so each language gets its own address with its
+// own title, description, preview text and first-moment text: / (繁體中文), /zh-Hans, /en, /ja, /ko (vercel.json
+// rewrites them to index.<lang>.html). The scripts are the same in all of them.
+const PAGE_LANGS = ['zh-Hant', 'zh-Hans', 'en', 'ja', 'ko'];
+const OG_LOCALE = { 'zh-Hant': 'zh_TW', 'zh-Hans': 'zh_CN', en: 'en_US', ja: 'ja_JP', ko: 'ko_KR' };
+const pathOf = l => l === 'zh-Hant' ? '/' : '/' + l;
+const fileOf = l => l === 'zh-Hant' ? 'index.html' : 'index.' + l + '.html';
+const template = html;
+let pagesOut = {};
+for (const lang of PAGE_LANGS) {
+  L.set(lang);
+  let h = template;
+  // the reader's language right away, before the page's own script has run
+  h = h.replace(/(<(\w+)\b[^>]*\bdata-t="([^"]+)"[^>]*>)(<\/\2>)/g, (all, open, tag, key, close) => (L.has(key) ? open + esc(t(key)) + close : all));
+  const jsonld = {
+    '@context': 'https://schema.org',
+    '@type': ['VideoGame', 'WebApplication'],
+    name: t('title'), alternateName: ['轉磚', 'Zhuan Zhuan Battle'],
+    url: SITE + pathOf(lang), image: SITE + '/icons/og.png', screenshot: SITE + '/icons/shot-wide.png',
+    description: t('seo.desc'),
+    applicationCategory: 'GameApplication', genre: ['Puzzle', 'Versus'],
+    gamePlatform: ['Web browser', 'Android', 'iOS', 'Windows', 'macOS'], operatingSystem: 'Any',
+    browserRequirements: 'A current browser with JavaScript',
+    playMode: ['SinglePlayer', 'MultiPlayer'],
+    numberOfPlayers: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2 },
+    inLanguage: lang, isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'TWD', availability: 'https://schema.org/InStock' }
+  };
+  const words = {
+    SITE, LANG: lang, PATH: pathOf(lang), NAME: t('title'), SHORT: '轉磚', TITLE: t('seo.title'), DESC: t('seo.desc'),
+    OG_TITLE: t('seo.og'), OG_DESC: t('seo.ogDesc'), OG_ALT: t('seo.ogAlt')
+  };
+  h = h.replace(/\{\{(\w+)\}\}/g, (all, k) => {
+    if (k === 'JSONLD') return JSON.stringify(jsonld).replace(/</g, '\\u003c');
+    if (k === 'OG_LOCALES') return '<meta property="og:locale" content="' + OG_LOCALE[lang] + '">\n' + PAGE_LANGS.filter(x => x !== lang).map(x => '<meta property="og:locale:alternate" content="' + OG_LOCALE[x] + '">').join('\n');
+    if (!(k in words)) throw new Error('unknown word {{' + k + '}} in the template');
+    return esc(words[k]);
+  });
+  pagesOut[lang] = h;
+}
+L.set('zh-Hant');
 // ---------- the page: scripts and stylesheet go in last, so nothing above can touch their text ----------
 const parts = { MINIREWARDS: '../games/rewards.js', ICONS: '../games/drawer-icons.js', CSS: 'style.css', ENGINE: 'engine.js', HANS: 'hans-map.js', I18N: 'i18n.js', BOT: 'bot.js', DRILLS: 'drills.js', OPENERS: 'openers.js', LEVELS: 'levels.js', WEATHER: 'weather.js', META: 'meta.js',
   SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', PWA: 'pwa.js', SHOP: 'shop.js', CLOUD: 'cloud.js', CONSENT: 'consent.js', BONUS: 'bonus.js', LEVELMODE: 'levelmode.js', WXMODE: 'wxmode.js', MINIS: 'minis.js', DRAWER: 'drawer.js' };
 // the machine-filled words, and which of them a machine wrote (L.machine), go into the page after every dictionary
 const autoPart = 'ZZ.L.add(' + JSON.stringify(filled) + ');ZZ.L.machine=' + JSON.stringify(auto.machine) + ';';
 if (!html.includes('/*__AUTOI18N__*/')) throw new Error('missing marker /*__AUTOI18N__*/');
-html = html.split('/*__AUTOI18N__*/').join(autoPart.replace(/</g, '\\u003c'));
-for (const [k, f] of Object.entries(parts)) {
-  const body = src(f) + (k === 'CSS' ? '\n' + src('site-themes.css') + '\n' + src('drawer-items.css') : '');      // the site themes go in after the page's own colours
-  if (body.includes('</script')) throw new Error(f + ' contains a closing script tag');
-  const mark = '/*__' + k + '__*/';
-  if (!html.includes(mark)) throw new Error('missing marker ' + mark);
-  html = html.split(mark).join(body.trim());
+for (const lang of PAGE_LANGS) {
+  let h = pagesOut[lang].split('/*__AUTOI18N__*/').join(autoPart.replace(/</g, '\\u003c'));
+  for (const [k, f] of Object.entries(parts)) {
+    const body = src(f) + (k === 'CSS' ? '\n' + src('site-themes.css') + '\n' + src('drawer-items.css') : '');      // the site themes go in after the page's own colours
+    if (body.includes('</script')) throw new Error(f + ' contains a closing script tag');
+    const mark = '/*__' + k + '__*/';
+    if (!h.includes(mark)) throw new Error('missing marker ' + mark);
+    h = h.split(mark).join(body.trim());
+  }
+  fs.writeFileSync(path.join(root, fileOf(lang)), h);
+  if (lang === 'zh-Hant') html = h;
 }
-fs.writeFileSync(path.join(root, 'index.html'), html);
+// the regional privacy policies and terms (drafts for a lawyer): legal/<region>/
+require('./tools/legal.js').root(); require('./tools/legal.js').build();
 // the brick games' pages share the site themes
 fs.writeFileSync(path.join(root, 'games', 'site-themes.css'), src('site-themes.css'));
 fs.writeFileSync(path.join(root, 'games', 'drawer-items.css'), src('drawer-items.css'));
@@ -121,6 +140,11 @@ fs.writeFileSync(path.join(root, 'games', 'drawer-items.css'), src('drawer-items
       const v = crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex').slice(0, 10);
       h = h.replace(new RegExp('((?:href|src)="' + f.replace('.', '\\.') + ')(\\?v=[0-9a-f]+)?"', 'g'), '$1?v=' + v + '"');
     }
+    // each language's address, for search engines (the page fills in that language's title and description itself)
+    const rel = path.relative(root, path.dirname(pg)).split(path.sep).join('/') + '/';
+    const seo = '<link rel="canonical" href="' + SITE + '/' + rel + '">\n' + PAGE_LANGS.map(l => '<link rel="alternate" hreflang="' + l + '" href="' + SITE + '/' + rel + (l === 'zh-Hant' ? '' : '?lang=' + l) + '">').join('\n') + '\n<link rel="alternate" hreflang="x-default" href="' + SITE + '/' + rel + '">\n';
+    h = h.replace(/<link rel="canonical"[^>]*>\n(<link rel="alternate" hreflang[^>]*>\n)*/, '');
+    h = h.replace(/(<meta name="description"[^>]*>\n)/, '$1' + seo);
     if (h !== was) fs.writeFileSync(pg, h);
   }
 }
@@ -144,6 +168,7 @@ const CSP = [
 const vfile = path.join(root, 'vercel.json'), vj = JSON.parse(fs.readFileSync(vfile, 'utf8'));
 const all = vj.headers.find(h => h.source === '/(.*)');
 all.headers = all.headers.filter(h => h.key !== 'Content-Security-Policy').concat([{ key: 'Content-Security-Policy', value: CSP }]);
+vj.rewrites = (vj.rewrites || []).filter(r => !/^\/index\.[\w-]+\.html$/.test(r.destination)).concat(PAGE_LANGS.filter(l => l !== 'zh-Hant').map(l => ({ source: '/' + l, destination: '/' + fileOf(l) })));
 fs.writeFileSync(vfile, JSON.stringify(vj, null, 2) + '\n');
 const build = crypto.createHash('sha256').update(html).digest('hex').slice(0, 12);
 
@@ -178,13 +203,13 @@ fs.writeFileSync(path.join(root, 'robots.txt'), [
   'User-agent: *', 'Allow: /', 'Disallow: /api/', 'Disallow: /src/', 'Disallow: /server/', 'Disallow: /test/', 'Disallow: /tools/', 'Disallow: /docs/', 'Disallow: /vendor/',
   '', 'Sitemap: ' + SITE + '/sitemap.xml', ''
 ].join('\n'));
-const alt = l => '    <xhtml:link rel="alternate" hreflang="' + l + '" href="' + SITE + '/' + (l === 'zh-Hant' ? '' : '?lang=' + l) + '"/>';
+const alt = l => '    <xhtml:link rel="alternate" hreflang="' + l + '" href="' + SITE + pathOf(l) + '"/>';
 const now = new Date(), two = n => String(n).padStart(2, '0');
 const day = now.getFullYear() + '-' + two(now.getMonth() + 1) + '-' + two(now.getDate());   // (the day here, not the day in UTC)
 fs.writeFileSync(path.join(root, 'sitemap.xml'), [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-  ...LANGS.map(l => ['  <url>', '    <loc>' + SITE + '/' + (l === 'zh-Hant' ? '' : '?lang=' + l) + '</loc>', '    <lastmod>' + day + '</lastmod>',
+  ...LANGS.map(l => ['  <url>', '    <loc>' + SITE + pathOf(l) + '</loc>', '    <lastmod>' + day + '</lastmod>',
     ...LANGS.map(alt), '    <xhtml:link rel="alternate" hreflang="x-default" href="' + SITE + '/"/>', '  </url>'].join('\n')),
   ...['games/', 'games/snake/', 'games/breakout/', 'games/stack/', 'games/push/', 'games/merge/', 'games/sort/', 'games/picross/', 'games/pipes/', 'games/sweep/'].map(u => ['  <url>', '    <loc>' + SITE + '/' + u + '</loc>', '    <lastmod>' + day + '</lastmod>', '  </url>'].join('\n')),
   '</urlset>', ''

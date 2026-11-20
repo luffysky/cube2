@@ -28,8 +28,9 @@
 | C-022 | 11-20 | 玩家按刪除那刻保留 30 天，30 天後刪除；用 snowrealm 網址；所有網址都綁自己的網域 snowrealm.pet | 刪除雲端資料改為立即停用、保留 30 天後自動刪除（Owner 核准 30 天後的刪除）；正式網址與 Identity 回呼改為 `https://brickduel.snowrealm.pet`（已在 Vercel 綁定並驗證），舊網址保留 | 已上線 |
 | C-023 | 11-20 | cube1 `BRICKDUEL_ACCOUNT_LINK_AND_DELETION_POLICY_zh-TW.md`（30 天刪除狀態機、期內可恢復、綁定期內保留、到期刪除、回呼 brickduel.snowrealm.pet） | 照規格補齊：期內封鎖改動、裝置或 SnowRealm 登入可取消刪除、綁定期內保留、到期清理留不具名紀錄、五語介面 | 已上線（Identity 仍關閉） |
 | C-024 | 11-20 | 加自動翻譯模組：偵測整個專案沒翻的新文字就自動翻、寫回字典並存進資料庫；用免費開源工具；機翻直接上線並標記；法律文件應該依各國客製而不是翻譯 | 用 Argos Translate（開源、在 GitHub Actions 上跑、不送外部服務）；`i18n/auto.json`＋`zz.i18n`（後台改過的不覆蓋）；法律文件不機翻，另案依地區客製 | 已上線（等第一次自動翻譯跑完） |
-| C-025 | 11-20 | 翻譯改用 Gemini（金鑰只放 GitHub）；「現在先你親自翻，不要 Argos」；九款小遊戲接上字典；法律文件依地區各寫一版初稿先推上，之後請律師朋友審 | Claude 直接寫四語；workflow 只在有 `GEMINI_API_KEY` secret 時用 Gemini，不再用 Argos；小遊戲全部接字典（五語）；地區法律文件草稿見 `legal/` | 小遊戲已上線；法律草稿進行中 |
+| C-025 | 11-20 | 翻譯改用 Gemini（金鑰只放 GitHub）；「現在先你親自翻，不要 Argos」；九款小遊戲接上字典；法律文件依地區各寫一版初稿先推上，之後請律師朋友審 | Claude 直接寫四語；workflow 只在有 `GEMINI_API_KEY` secret 時用 Gemini，不再用 Argos；小遊戲全部接字典（五語）；地區法律文件草稿見 `legal/` | 小遊戲已上線；法律草稿已上線（待律師審） |
 | C-026 | 11-20 | 音樂音效由 GPT 用 Suno 重新製作，做成 SnowRealm Games 音樂庫；Claude 從中挑合適的給轉磚；部分音效維持現在的，背景音樂可以換 | 等音樂庫完成；屆時列出現有背景音樂與音效清單，挑選替換背景音樂，音效保留 | 等 GPT |
+| C-027 | 11-20 | SEO 需要的 meta 標籤也要翻 | 主頁每種語言一個網址（/、/zh-Hans、/en、/ja、/ko），各自有翻好的 title、description、Open Graph、Twitter、結構化資料、canonical；小遊戲頁加各語言 hreflang，標題與描述由頁面依語言填入 | 已上線 |
 | C-016 | 11-19 | 律師審閱、統一編號登記的提醒 | 記在待辦；正式商用前完成 | 待辦 |
 | C-017 | 11-19 | 中國大陸版號等事項之後交給暖寶處理 | 不在 cube2 範圍內處理 | 待辦 |
 

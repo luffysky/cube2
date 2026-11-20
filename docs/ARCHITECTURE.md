@@ -419,3 +419,14 @@ node test/levels.js          # 七個電腦等級、設定裡的「電腦難度�
 - `server/words.js`：每個伺服器執行個體處理第一個 `/api/rpc` 時，版本不同就把 `server/i18n-data.json` 寫進 `zz.i18n`（`zz.i18nmeta` 記版本）。`src = 'admin'` 的列（後台人工改的）不會被覆蓋。
 - 磚塊小遊戲：文字寫在 `src/games-dict.js`（同樣四欄），`build.js` 產生 `games/words.js`（五欄：繁、簡、英、日、韓）。`games/i18n.js` 依 `?lang=`、轉磚的語言設定、瀏覽器語言決定語言，填入 `data-t`（文字）、`data-ta`（aria-label）、`data-th`（含標記）、`data-tk`＋`data-tv`（含會變動的數字）；遊戲程式用 `SRW.t()`。
 - 不在自動翻譯範圍：隱私政策、使用條款（依地區另寫，見 `legal/`）。
+
+## 每種語言一個網址（C-027）
+
+- `build.js` 從同一個模板產生五個主頁：`index.html`（繁中，網址 `/`）、`index.zh-Hans.html`、`index.en.html`、`index.ja.html`、`index.ko.html`。各自的 `<html lang>`、title、description、Open Graph／Twitter 文字、`og:locale`、canonical、JSON-LD（`inLanguage`、`url`）與首屏文字都換成該語言；script 完全相同，所以 CSP 雜湊共用。
+- `vercel.json` 的 `rewrites` 把 `/zh-Hans`、`/en`、`/ja`、`/ko` 送到對應檔案（網址不變，相對路徑 `api/`、`games/` 照常）。`src/ui.js` 從網址路徑（或舊的 `?lang=`）決定語言，canonical 改成路徑形式。`sitemap.xml` 列出五個網址與互相的 hreflang。
+- 小遊戲頁：建置時加上 canonical 與五語 hreflang（`?lang=`），`games/i18n.js` 依語言填 title、description 並更新 canonical。
+
+## 地區法律文件（C-025，草稿）
+
+- `legal/src/`：各語言的共同文字（`privacy|terms.<zh-Hant|en|ja|ko>.html`；日文、韓文直接依當地法寫）與 `regions.js`（12 個地區各自的補充、適用法律）。`tools/legal.js`（由 `build.js` 執行）產生 `legal/<地區>/privacy.html`、`terms.html`，每頁都標示「草稿、待律師審閱」並 `noindex`；中國大陸版由繁中轉簡體。根目錄的 `privacy.html`、`terms.html`（臺灣版＋英文）也由同一份文字重建，並列出其他地區。
+- 遊戲裡的隱私政策、條款連結會依玩家在第一次進來時選的居住地區，改連到 `legal/<地區>/`（臺灣與尚未選擇者用根目錄版本）；小遊戲的側邊選單也一樣。
