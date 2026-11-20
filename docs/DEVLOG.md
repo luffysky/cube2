@@ -653,3 +653,11 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `rtc` 11（兩人直連、房間顯示、對戰經通道、伺服器請求每秒不到 2 次、通道斷掉後改走中繼不漏、`?rtc=off` 不直連）、`quick` 13（隨機配對不直連）、`wxnet` 24、`legal` 439。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`ea65651`](https://github.com/luffysky/cube2/commit/ea65651)。
+
+## 2026-11-21 07:00（Asia/Taipei）｜CI：flow 測試不再依賴別的測試留下的截圖
+
+- 專案：cube2｜執行者：Claude
+- GitHub 上 `flow` 失敗：它拿 `smoke` 測試留下的 `shots/s_menu.png` 當會員自選圖片，GitHub 上沒跑 smoke 就沒有這張圖。改成 flow 自己先截一張圖再用。其他 18 個在 GitHub 上都過了。
+- 檔案：`test/flow.js`。｜資料庫：未異動。｜刪除：無。
+- 測試：本機刪掉那張圖後 `flow` 60 全過。

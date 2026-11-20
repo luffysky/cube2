@@ -213,11 +213,13 @@ const ok = (c, n, extra) => { if (c) pass++; else { fail++; console.log('  FAIL:
     await page.click('[data-do="subStart"]'); await sleep(300);
     ok(await ev(page, 'return M.isSub() && M.canUse("bg", "tatami")'), 'trial membership unlocks every look');
     ok(await page.evaluate(() => !!document.querySelector('[data-pick="bg"]') && !!document.getElementById('picFile')), 'members can choose their own pictures');
-    // hand the page a picture as if it had been chosen
-    await page.setInputFiles('#picFile', path.join(OUT, 's_menu.png')).catch(() => {});
+    // hand the page a picture as if it had been chosen (a screenshot made here, so the test needs no file from elsewhere)
+    const PIC = path.join(OUT, 'flow-pic.png');
+    await page.screenshot({ path: PIC });
+    await page.setInputFiles('#picFile', PIC).catch(() => {});
     await page.evaluate(() => { var f = document.getElementById('picFile'); });
     await page.click('[data-pick="bg"]').catch(() => {});
-    await page.setInputFiles('#picFile', path.join(OUT, 's_menu.png')); await sleep(900);
+    await page.setInputFiles('#picFile', PIC); await sleep(900);
     ok(await ev(page, 'return M.data.custom.bg === true && M.data.equip.bg === "custom" && !!ZZ.View.LOOK.img.bg'), 'own picture becomes the wall', await ev(page, 'return [M.data.custom, M.data.equip.bg]'));
     await page.evaluate(() => ZZ.App.closeSheet(true));
     await page.click('[data-go="practice"]'); await sleep(700);
