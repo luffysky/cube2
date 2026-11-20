@@ -6876,10 +6876,20 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; justif
     // and a key stays down until the finger lifts even if it drifts off the edge.
     // The keys live in three places: the pad under the wall and the two side strips beside it (hold, item, half turn).
     var ptrs = {}, SLIDE = { L: 1, R: 1 };
+    // the key under the finger; a tap that lands in the gap between keys, or just off a key's edge, goes to the
+    // nearest key within reach (a quick thumb often lands there, and a tap that does nothing feels like a dead key)
+    var REACH = 22;
     function keyAt(root, x, y) {
       var e = document.elementFromPoint(x, y);
       e = e && e.closest ? e.closest('.key') : null;
-      return e && root.contains(e) ? e : null;
+      if (e && root.contains(e)) return e;
+      var best = null, bd = REACH, ks = root.querySelectorAll('.key');
+      for (var i = 0; i < ks.length; i++) {
+        if (ks[i].hidden || !ks[i].offsetParent) continue;
+        var b = ks[i].getBoundingClientRect(), dx = x < b.left ? b.left - x : x > b.right ? x - b.right : 0, dy = y < b.top ? b.top - y : y > b.bottom ? y - b.bottom : 0, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < bd) { bd = d; best = ks[i]; }
+      }
+      return best;
     }
     function press(k) { k.classList.add('on'); act(k.dataset.k, true); buzz(7); }
     function lift(k) { k.classList.remove('on'); act(k.dataset.k, false); }

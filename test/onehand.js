@@ -29,6 +29,13 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       if (hand === 'L') ok(r.keys.every(k => k.r < w * 0.85), name + ': the keys are on the left', r.keys);
       if (w > h) ok(r.over === 0, name + ': sideways, no key covers the wall');
       if (w > h && hand !== 'two') ok(r.keys.filter(k => ['L', 'R', 'D', 'HD', 'CW', 'CCW'].includes(k.k)).every(k => hand === 'R' ? k.l > r.mid : k.r < r.mid), name + ': all six on that side of the wall');
+      // a tap in the gap between the two turn keys still turns the piece (to the nearer key)
+      if (hand === 'two' || w < h) {
+        const gap = await p.evaluate(() => { const a = document.querySelector('#pad .key[data-k="CCW"]').getBoundingClientRect(), c = document.querySelector('#pad .key[data-k="CW"]').getBoundingClientRect(); const l = a.right < c.left ? a : c, r = a.right < c.left ? c : a; return { x: (l.right + r.left) / 2 + 1, y: (l.top + l.bottom) / 2, w: r.left - l.right }; });
+        const rot0 = await p.evaluate(() => ZZ.peek().S.me.cur.rot);
+        await p.touchscreen.tap(gap.x, gap.y); await p.waitForTimeout(80);
+        ok(gap.w > 0 && (await p.evaluate(() => ZZ.peek().S.me.cur.rot)) !== rot0, name + ': a tap in the gap between the turn keys still turns', gap);
+      }
       await ctx.close();
     }
   } catch (e) { fail++; console.log('CRASH', e.message); }
