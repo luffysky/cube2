@@ -42,7 +42,7 @@
 - [ ] 刪掉 GitHub 的 `cloud` 分支
 - [ ] 確認勝利歡呼音效的授權
 - [ ] 決定春節等節日造型何時開放（現在只開聖誕）
-- [ ] 開 Cloudflare R2（照 `docs/R2_SETUP.md` 四步）
+- [x] 開 Cloudflare R2（照 `docs/R2_SETUP.md` 四步）
 - [ ] 決定雲端檔案要不要真的刪（目前拿掉只隱藏，不刪）
 
 ## 等 GPT

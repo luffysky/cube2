@@ -709,3 +709,10 @@
 - 另外：翻譯指示原本要求保留「轉磚」不翻，但英日韓介面上遊戲名稱是「Zhuan Zhuan」，改成照介面的名稱翻。
 - 檔案：`tools/i18n-auto.py`、`.github/workflows/i18n.yml`。｜資料庫：未異動。｜刪除：無。
 - 測試：`test/autoi18n.test.js` 24 全過；GitHub Actions 手動檢查成功（run 44803575885）。
+
+## 2026-11-21 04:35（Asia/Taipei）｜R2 金鑰設好，重新部署打開雲端上傳
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「好了」（R2 bucket、金鑰、CORS、Vercel 環境變數）
+- 確認 Vercel Production 有 `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET` 四個變數（只看名稱，沒有解密值）；變數在上次部署之後才加，用這次 commit 觸發重新部署。
+- 檔案：`docs/DEVLOG.md`、`docs/TODO.md`。｜資料庫：未異動。｜刪除：無。
