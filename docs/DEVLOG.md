@@ -603,3 +603,13 @@
 - 資料庫：未改結構（`zz.scores` 多了新的榜名）。｜刪除：無。
 - 測試：`node test/run.js` 全過（api 335：磚蛇分數上榜、時間顯示成時間、星星總數、太誇張的分數不上榜、不存在的榜回 400）；瀏覽器 `cloudui` 41，並用本機伺服器實際玩一筆磚蛇分數、在「小遊戲」分頁看到自己第 1 名。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`d9ed94b`](https://github.com/luffysky/cube2/commit/d9ed94b)。
+
+## 2026-11-21 05:35（Asia/Taipei）｜GitHub 上的瀏覽器測試修正
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-030（待辦 18）
+- 第一次在 GitHub 上跑：18 個裡 16 個過。`flow` 因為 GitHub 的機器上沒有 `shots/` 資料夾（截圖用，不在 git 裡）存不了圖；`onehand` 的「點在縫上也會轉」偶爾遇到目前方塊是 O（O 不會轉）。
+- 實際變更：`test/browser-run.js` 先建 `shots/`；`test/onehand.js` 遇到 O 時換成 T 再測。
+- 檔案：`test/browser-run.js`、`test/onehand.js`。｜資料庫：未異動。｜刪除：無。
+- 測試：本機 `onehand` 18；`node test/run.js` 全過。

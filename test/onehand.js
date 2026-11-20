@@ -32,7 +32,8 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       // a tap in the gap between the two turn keys still turns the piece (to the nearer key)
       if (hand === 'two' || w < h) {
         const gap = await p.evaluate(() => { const a = document.querySelector('#pad .key[data-k="CCW"]').getBoundingClientRect(), c = document.querySelector('#pad .key[data-k="CW"]').getBoundingClientRect(); const l = a.right < c.left ? a : c, r = a.right < c.left ? c : a; return { x: (l.right + r.left) / 2 + 1, y: (l.top + l.bottom) / 2, w: r.left - l.right }; });
-        const rot0 = await p.evaluate(() => ZZ.peek().S.me.cur.rot);
+        // an O does not turn: give it a T to turn
+        const rot0 = await p.evaluate(() => { const g = ZZ.peek().S.me; if (g.cur.type === 'O') { g.cur = { type: 'T', x: 3, y: g.cur.y, rot: 0 }; } return g.cur.rot; });
         await p.touchscreen.tap(gap.x, gap.y); await p.waitForTimeout(80);
         ok(gap.w > 0 && (await p.evaluate(() => ZZ.peek().S.me.cur.rot)) !== rot0, name + ': a tap in the gap between the turn keys still turns', gap);
       }
