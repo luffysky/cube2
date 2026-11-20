@@ -304,7 +304,7 @@
     paper: { base: 'paper' },
     metal: { base: 'metal', tint: ['#9AA4AE', 0.45] },
     cookie: { base: 'cookie', tint: ['#C8925A', 0.5] },
-    galaxy: { base: 'galaxy', tint: ['#1B1340', 0.55] },
+    galaxy: { base: 'galaxy', tint: ['#1B1340', 0.25] },
     mono: { base: 'glaze', gray: true }
   };
   function grayOf(c) { var p = hex(c), v = Math.round(p[0] * 0.3 + p[1] * 0.59 + p[2] * 0.11), h = (v < 16 ? '0' : '') + v.toString(16); return '#' + h + h + h; }
@@ -462,26 +462,26 @@
 
   // ---------- more walls: a gradient and a repeated pattern ----------
   var WALL_MORE = {
-    sakurasky: { g: [[0, '#FFD9E3'], [1, '#F29CB4']], p: 'petals', c: 'rgba(255,255,255,0.75)' },
-    heartpink: { g: [[0, '#FFB3C8'], [1, '#E9799B']], p: 'hearts', c: 'rgba(255,255,255,0.35)' },
-    lace: { g: [[0, '#E9A3BB'], [1, '#C9718F']], p: 'lace', c: 'rgba(255,255,255,0.55)' },
+    sakurasky: { g: [[0, '#6E2A4A'], [1, '#3A1428']], p: 'petals', c: 'rgba(255,200,220,0.45)' },
+    heartpink: { g: [[0, '#7A2448'], [1, '#401028']], p: 'hearts', c: 'rgba(255,160,200,0.28)' },
+    lace: { g: [[0, '#5A2742'], [1, '#2E1222']], p: 'lace', c: 'rgba(255,205,225,0.3)' },
     peach: { g: [[0, '#FFD8B8'], [1, '#FF9E8C']], p: 'dots', c: 'rgba(255,255,255,0.3)' },
     ocean: { g: [[0, '#0E4B73'], [1, '#05152B']], p: 'bubbles', c: 'rgba(170,225,255,0.35)' },
-    forest: { g: [[0, '#2F5A36'], [1, '#132A18']], p: 'leaves', c: 'rgba(160,220,140,0.2)' },
+    forest: { g: [[0, '#1A3A25'], [1, '#0A1A10']], p: 'leaves', c: 'rgba(160,220,140,0.12)' },
     snow: { g: [[0, '#1B2A4A'], [1, '#3D5585']], p: 'snow', c: 'rgba(255,255,255,0.8)' },
     sunset: { g: [[0, '#2B1B4A'], [0.55, '#C2456B'], [1, '#FFB36B']], p: 'none' },
-    aurora: { g: [[0, '#06121F'], [1, '#0E2F3A']], p: 'aurora', c: 'rgba(90,255,190,0.18)' },
-    desert: { g: [[0, '#F2C98A'], [1, '#C98A4B']], p: 'waves', c: 'rgba(120,70,20,0.18)' },
+    aurora: { g: [[0, '#05121C'], [1, '#0A2630']], p: 'aurora', c: 'rgba(90,255,190,0.16)' },
+    desert: { g: [[0, '#3A2414'], [1, '#1C0F07']], p: 'waves', c: 'rgba(255,200,120,0.16)' },
     brickwall: { g: [[0, '#8E3B2C'], [1, '#6A2A1F']], p: 'bricks', c: 'rgba(240,220,200,0.35)' },
-    wood: { g: [[0, '#8A5A34'], [1, '#5E3B20']], p: 'planks', c: 'rgba(40,20,5,0.3)' },
+    wood: { g: [[0, '#4E301B'], [1, '#2A190D']], p: 'planks', c: 'rgba(0,0,0,0.35)' },
     checker: { g: [[0, '#2A2F38'], [1, '#2A2F38']], p: 'checker', c: 'rgba(255,255,255,0.06)' },
     stripes: { g: [[0, '#2E3A59'], [1, '#2E3A59']], p: 'stripes', c: 'rgba(255,255,255,0.06)' },
     circuit: { g: [[0, '#0B2A22'], [1, '#06150F']], p: 'circuit', c: 'rgba(80,255,170,0.25)' },
-    graph: { g: [[0, '#F7F9FC'], [1, '#E8EDF5']], p: 'grid', c: 'rgba(60,110,200,0.18)' },
+    graph: { g: [[0, '#24406A'], [1, '#16294A']], p: 'grid', c: 'rgba(170,205,255,0.2)' },
     galaxy: { g: [[0, '#120A2A'], [0.5, '#2B1150'], [1, '#0A0618']], p: 'stars', c: 'rgba(255,255,255,0.8)' },
     rain: { g: [[0, '#1C2733'], [1, '#2E3C4A']], p: 'rain', c: 'rgba(180,210,240,0.28)' },
-    lavender: { g: [[0, '#E3D5F5'], [1, '#B79BDB']], p: 'dots', c: 'rgba(255,255,255,0.35)' },
-    mint: { g: [[0, '#D3F5E8'], [1, '#8FDCC0']], p: 'stripes', c: 'rgba(255,255,255,0.25)' }
+    lavender: { g: [[0, '#4A3575'], [1, '#25183F']], p: 'dots', c: 'rgba(220,200,255,0.25)' },
+    mint: { g: [[0, '#145A50'], [1, '#0A302B']], p: 'stripes', c: 'rgba(160,255,225,0.1)' }
   };
   // the holiday walls: a gradient with the holiday's mark stamped across it
   ZZ.Meta.FESTIVE.forEach(function (f) { WALL_MORE[f.id] = { g: [[0, f.wall[0][0]], [1, f.wall[0][1]]], p: 'stamp', mark: f.wall[1], c: f.wall[2] }; });

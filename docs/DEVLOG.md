@@ -252,3 +252,19 @@
 - 檔案：`games/drawer-icons.js`（新）、`src/drawer-items.css`（新）、`games/drawer-items.css`（建置產生）、`src/index.template.html`、`src/drawer.js`、`src/style.css`、`games/nav.js`、`games/games.css`、`games/*/index.html`、`build.js`。｜資料庫：未異動。｜刪除操作：無（只移除被新樣式取代的舊 CSS 規則）。
 - 測試：`node test/run.js` 全過；瀏覽器 `drawer` 28、`sites` 25、`bricks` 73、`minipay` 10、`pwa` 47；手機深淺色截圖目視檢查。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`3d6fbcc`](https://github.com/luffysky/cube2/commit/3d6fbcc)，Vercel `dpl_GqbU4vgQgn6Z89VJKLfN4F4LM5Rm` READY。
+
+## 2026-11-20 19:45（Asia/Taipei）｜整套風格：方塊與牆面對比修正
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：整套主題有些背景跟方塊同色、材質跟背景太像，要注意對比
+- 檢查方法：在瀏覽器把 50 套（20 套一般＋30 套節慶）逐一套上，量七種方塊顏色與牆面平均色的色差（CIE ΔE）和亮度比。修正前 24 套有方塊幾乎融進牆面（最低 ΔE 3、亮度比 1.0）。
+- 實際變更：
+  - 牆面改深、保留原本色系與圖案：櫻花雨、粉紅愛心、蕾絲、薰衣草、薄荷、方格紙、沙丘、木地板、森林、極光；圖案透明度一併調低，避免跟方塊材質混在一起。
+  - 銀河方塊的深紫覆蓋從 0.55 降到 0.25，讓方塊本色透出來。
+  - 節慶套：情人節、白色情人節、復活節、賞櫻、女兒節、兒童節、母親節、感恩節、潑水節、聖派翠克節、雪祭、豐收祭、地球日、開學季、生日派對改深色牆面；春節、父親節、畢業季、端午、聖誕節、感恩節、聖派翠克節、豐收祭、地球日、母親節、情人節、潑水節、開學季把跟牆面撞色的方塊顏色換掉。
+  - 新增 `test/contrast.js`：每一套的七種方塊都要 ΔE ≥ 25、亮度比 ≥ 1.8，之後新增或調整主題會自動擋下低對比。修正後全部 50 套通過（最低：極光之夜 ΔE 27）。
+- 檔案：`src/view.js`、`src/meta.js`、`index.html`、`test/contrast.js`（新）。｜資料庫：未異動。｜刪除操作：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `contrast` 50、`sites` 25、`drawer` 28、`bricks` 73。
+- 影響：已購買的牆面／整套名稱與擁有狀態不變，只改顏色。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
