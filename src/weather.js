@@ -10,6 +10,9 @@
      snow   pieces fall slower, but snow settles on the stack a cell at a time
      storm  wind and rain together, and lightning now and then turns a block into cement
      fog    the lower rows are hidden behind fog
+     sand   a sandstorm: the wind pushes like a gale and the next pieces cannot be seen
+     aurora the good one: every point scored while it lasts counts twice
+     eclipse the sky goes dark; only the cells around the falling piece can be seen
 
    The weather changes every 20 to 30 seconds and gets stronger the longer the run goes.
 
@@ -21,14 +24,21 @@
               back on other columns
      quake    the wall shakes: every block with a gap under it falls (rows filled that way are cleared and scored), and
               columns standing well above both neighbours topple one block over
+     hail     hailstones land on top of a few columns as ice: a row of ice cleared once only cracks it (the cracked
+              block drops back on its column), cleared again it goes
+     volcano  a row of lava pushes up from the floor (one gap, like cement); the blocks sitting on it burn away one
+              cell each, more of them the stronger it is, and the lava cools into cement when it is over
+     zap      one great bolt splits a whole column: every block in it is gone (a well for you, or a gap in every row)
    They run on their own random stream, so the ordinary weather is the same with or without them. */
 (function (root) {
   'use strict';
   var ZZ = root.ZZ, COLS = ZZ.COLS, ROWS = ZZ.ROWS, TOP = ZZ.TOP, GARBAGE = ZZ.GARBAGE, RNG = ZZ.RNG, SHAPES = ZZ.SHAPES;
   var SNOW = 9;
-  var KINDS = ['wind', 'rain', 'snow', 'storm', 'fog'];
-  var DISASTERS = ['flood', 'tornado', 'quake'];
-  var DIS_WARN = 2000, DIS_LEN = { flood: 3200, tornado: 3800, quake: 2200 };
+  var KINDS = ['wind', 'rain', 'snow', 'storm', 'fog', 'sand', 'aurora', 'eclipse'];
+  var GOOD = ['aurora'];      // weather that helps: never thrown at a rival
+  var DISASTERS = ['flood', 'tornado', 'quake', 'hail', 'volcano', 'zap'];
+  var DIS_WARN = 2000, DIS_LEN = { flood: 3200, tornado: 3800, quake: 2200, hail: 2600, volcano: 3400, zap: 900 };
+  var ICE = ZZ.ICE || 10, LAVA = ZZ.LAVA || 12;
   var CALM = 6000;          // a short calm at the start
   var MINUTE = 60000;
 
@@ -43,7 +53,7 @@
     this.rng = new RNG(this.seed ^ 0x5bd1e995);
     this.t = 0;
     this.kind = 'clear'; this.lvl = 0; this.left = CALM; this.n = 0;
-    this.dir = 1; this.wind = 0; this.rain = 0; this.snow = 0; this.fog = 0;
+    this.dir = 1; this.wind = 0; this.rain = 0; this.snow = 0; this.fog = 0; this.sand = 0; this.dark = 0; this.aurora = 0; this.sc = 0;
     this.pushAcc = 0; this.driftAcc = 0; this.boltAt = 0; this.gustT = 0;
     this.baseGrav = 1 / 900; this.baseLock = 500;
     this.boardOnly = !!o.boardOnly;     // a computer's board: no pushing or speed changes, only what lands on the wall
@@ -73,7 +83,7 @@
   // goes back to its own schedule.
   Weather.prototype.hit = function (kind, ms) {
     if (DISASTERS.indexOf(kind) >= 0) { if (this.dis) return false; this.startDis(kind, 3, 1500); return true; }
-    if (KINDS.indexOf(kind) < 0) return false;
+    if (KINDS.indexOf(kind) < 0 || GOOD.indexOf(kind) >= 0) return false;
     this.hitKind = kind; this.hitLeft = Math.max(1000, Math.min(15000, ms || 9000));
     this.boltAt = Math.min(this.boltAt, 1500); this.driftAcc = 0; this.pushAcc = 0;
     return true;
@@ -83,7 +93,7 @@
 
   // How hard the wind blows right now, in metres a second (shown to the player); gusts come and go.
   Weather.prototype.windNow = function () {
-    var k = this.kindNow(), L = this.lvlNow(), base = k === 'wind' ? 4 + L * 4 : k === 'storm' ? 6 + L * 4 : k === 'rain' ? 1 + L : 0;
+    var k = this.kindNow(), L = this.lvlNow(), base = k === 'wind' ? 4 + L * 4 : k === 'storm' ? 6 + L * 4 : k === 'sand' ? 3 + L * 3 : k === 'rain' ? 1 + L : 0;
     if (!base) return 0;
     var gust = Math.sin(this.t / 1700) * 0.25 + Math.sin(this.t / 610 + this.n) * 0.15;
     return Math.max(0, Math.round(base * (1 + gust)));
@@ -102,6 +112,13 @@
     this.rain = wet ? Math.round((k === 'storm' ? 20 : 8) * L + Math.sin(this.t / 2300) * 3 + 3) : 0;
     this.snow = k === 'snow' ? L : 0;
     this.fog = k === 'fog' ? 2 + L * 2 : 0;
+    this.sand = k === 'sand' ? L : 0;
+    this.dark = k === 'eclipse' ? L : 0;
+    this.aurora = k === 'aurora' ? 1 : 0;
+    // under the aurora every point scored since the last step counts twice
+    var sc = g.stats.score || 0;
+    if (this.aurora && sc > this.sc) { g.stats.score = sc + (sc - this.sc); out.push({ type: 'bonus', n: sc - this.sc }); }
+    this.sc = g.stats.score || 0;
 
     // fall speed and how long a landed piece waits
     if (this.boardOnly) return this.land(g, dt, k, L, out);
@@ -209,6 +226,9 @@
       d.phase = 'hit'; d.t = 0;
       out.push({ type: 'disaster', kind: d.kind, phase: 'hit', dir: d.dir, lvl: d.lvl });
       if (d.kind === 'quake') out.push(this.quake(g, d));
+      else if (d.kind === 'volcano') out.push(this.erupt(g, d));
+      else if (d.kind === 'zap') out.push(this.zap(g, d));
+      d.left = d.kind === 'hail' ? 2 + d.lvl * 2 : d.kind === 'volcano' ? d.lvl + 1 : 0;
       return;
     }
     var p = Math.min(1, d.t / d.dur), col;
@@ -230,6 +250,14 @@
           if (Math.abs(c.x + 1.5 - d.col) < 2.5 && g.fits(c.type, c.rot, c.x + d.dir, c.y)) { c.x += d.dir; g.lastMove = 'wind'; g.emit('move', { dx: d.dir, x: c.x, y: c.y, rot: c.rot, wind: true }); }
         }
       }
+    } else if (d.kind === 'hail') {
+      // stones come down one after another through the spell
+      var due = Math.min(2 + d.lvl * 2, Math.floor(p * (2 + d.lvl * 2) + 1));
+      while (d.left > 0 && (2 + d.lvl * 2) - d.left < due) { d.left--; var hs = this.hail(g, d); if (hs) out.push(hs); }
+    } else if (d.kind === 'volcano') {
+      // the blocks resting on the lava catch fire one after another
+      var bd = Math.floor(p * (d.lvl + 1));
+      while (d.left > 0 && (d.lvl + 1) - d.left < bd) { d.left--; var bu = this.burn(g, d); if (bu) out.push(bu); }
     } else if (d.kind === 'tornado') {
       // the funnel's column: across the wall with a wobble
       var along = p * (COLS - 1), wob = Math.sin(d.wob + p * 9) * 1.2;
@@ -238,6 +266,7 @@
     }
     if (d.t >= d.dur) {
       if (d.kind === 'tornado') out.push(this.drop(g, d));
+      if (d.kind === 'volcano') out.push(this.cool(g));
       out.push({ type: 'disaster', kind: d.kind, phase: 'end', gone: d.gone });
       this.dis = null;
       this.disNext = this.onlyDis ? 12000 + this.drng.next() * 8000 : 60000 + this.drng.next() * 60000;
@@ -312,12 +341,73 @@
     g.emit('quake', { lines: lines, fell: fell });
     return { type: 'quake', lines: lines, fell: fell };
   };
+  // a hailstone lands on top of a column as ice (never filling a row, never under the falling piece); it knocks the
+  // falling piece down a row if there is room
+  Weather.prototype.hail = function (g, d) {
+    var r = this.drng, start = Math.floor(r.next() * COLS);
+    for (var i = 0; i < COLS; i++) {
+      var x = (start + i * 7) % COLS, y = top(g, x) - 1;
+      if (y < TOP + 2 || underPiece(g, x, y) || fullAfter(g, y, x)) continue;
+      g.grid[y][x] = ICE;
+      if (!this.boardOnly && g.cur && g.fits(g.cur.type, g.cur.rot, g.cur.x, g.cur.y + 1)) { g.cur.y++; g.emit('move', { dx: 0, x: g.cur.x, y: g.cur.y, rot: g.cur.rot, wind: true }); }
+      g.refit();
+      g.emit('hail', { x: x, y: y });
+      return { type: 'hail', x: x, y: y };
+    }
+    return null;
+  };
+  // a row of lava comes up from the floor, with one gap
+  Weather.prototype.erupt = function (g, d) {
+    var gap = Math.floor(this.drng.next() * COLS);
+    g.pushGarbage(1, gap, 0);
+    var row = g.grid[ROWS - 1];
+    for (var x = 0; x < COLS; x++) if (row[x]) row[x] = LAVA;
+    d.gap = gap;
+    g.refit();
+    g.emit('erupt', { gap: gap });
+    return { type: 'erupt', gap: gap };
+  };
+  // a block sitting on the lava burns away; the column above it settles down a cell
+  Weather.prototype.burn = function (g, d) {
+    var r = this.drng, start = Math.floor(r.next() * COLS), y0 = -1;
+    for (var y = ROWS - 1; y >= 0; y--) { var lv = false; for (var j = 0; j < COLS; j++) if ((g.grid[y][j] & 15) === LAVA) { lv = true; break; } if (lv) { y0 = y; break; } }
+    if (y0 < 1) return null;
+    for (var i = 0; i < COLS; i++) {
+      var x = (start + i * 3) % COLS;
+      if ((g.grid[y0][x] & 15) !== LAVA || !g.grid[y0 - 1][x]) continue;
+      for (var yy = y0 - 1; yy > 0; yy--) g.grid[yy][x] = g.grid[yy - 1][x];
+      g.grid[0][x] = 0;
+      d.gone++;
+      g.refit();
+      g.emit('burn', { x: x, y: y0 - 1 });
+      return { type: 'burn', x: x, y: y0 - 1 };
+    }
+    return null;
+  };
+  // …and when it is over, the lava cools into cement
+  Weather.prototype.cool = function (g) {
+    var n = 0;
+    for (var y = 0; y < ROWS; y++) for (var x = 0; x < COLS; x++) if ((g.grid[y][x] & 15) === LAVA) { g.grid[y][x] = GARBAGE; n++; }
+    g.emit('cool', { n: n });
+    return { type: 'cool', n: n };
+  };
+  // one bolt splits a whole column (the falling piece is left alone)
+  Weather.prototype.zap = function (g, d) {
+    var r = this.drng, x = Math.floor(r.next() * COLS), n = 0;
+    // a strong bolt finds the tallest column
+    if (d.lvl >= 3) { var best = -1; for (var i = 0; i < COLS; i++) { var h = ROWS - top(g, i); if (h > best) { best = h; x = i; } } }
+    for (var y = 0; y < ROWS; y++) if (g.grid[y][x]) { g.grid[y][x] = 0; n++; }
+    d.col = x; d.gone += 0;
+    g.refit();
+    g.emit('zap', { x: x, n: n });
+    return { type: 'zap', x: x, n: n };
+  };
   function fullAfter(g, y, x) { var row = g.grid[y], n = 0; for (var j = 0; j < COLS; j++) if (row[j] || j === x) n++; return n >= COLS; }
 
   // what the screen shows beside the next pieces
   Weather.prototype.info = function () {
     var d = this.dis;
-    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left),
+    return { kind: this.kindNow(), lvl: this.lvlNow(), hit: this.hitLeft > 0, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, sand: this.sand, dark: this.dark, aurora: this.aurora, left: Math.max(0, this.hitLeft > 0 ? this.hitLeft : this.left),
       dis: d ? { kind: d.kind, phase: d.phase, p: d.phase === 'hit' ? Math.min(1, d.t / d.dur) : d.t / d.warn, col: d.col, dir: d.dir, air: d.air.length, lvl: d.lvl } : null };
   };
 
@@ -330,6 +420,8 @@
   ZZ.Weather = Weather;
   Weather.KINDS = KINDS;
   Weather.DISASTERS = DISASTERS;
+  Weather.GOOD = GOOD;
+  Weather.THROWN = KINDS.filter(function (k) { return GOOD.indexOf(k) < 0; }).concat(DISASTERS);
   Weather.scoreOf = scoreOf;
   Weather.gravAt = gravAt;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;

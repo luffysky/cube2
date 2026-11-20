@@ -23,16 +23,17 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   try {
     await page.goto(URL); await sleep(600);
     await page.click('[data-go="weather"]'); await sleep(300);
-    ok(await page.evaluate(() => ZZ.peek().sheet === 'wxSetup' && document.querySelectorAll('.wxp').length === 9), 'the setup sheet lists changing weather, five kinds and three disasters');
+    ok(await page.evaluate(() => ZZ.peek().sheet === 'wxSetup' && document.querySelectorAll('.wxp').length === 15), 'the setup sheet lists changing weather, eight kinds and six disasters');
     await page.screenshot({ path: path.join(OUT, 'wx-setup.png') });
-    for (const k of ['rain', 'snow', 'wind', 'fog', 'storm']) {
+    for (const k of ['rain', 'snow', 'wind', 'fog', 'storm', 'sand', 'aurora', 'eclipse', 'hail', 'volcano', 'zap']) {
       await page.evaluate(() => { if (ZZ.peek().S) ZZ.App.toMenu(); });
       await sleep(100);
       if (!(await page.evaluate(() => ZZ.peek().sheet === 'wxSetup'))) { await page.click('[data-go="weather"]'); await sleep(250); }
       await page.click('[data-wxonly="' + k + '"]'); await sleep(120);
       await page.click('[data-do="wxGo"]'); await sleep(2600);
       const st = await page.evaluate(() => { const S = ZZ.peek().S; return { kind: S.kind, wx: S.wx.kind, state: S.state, info: (document.getElementById('wxInfo') || {}).textContent || '', now: (document.getElementById('wxNow') || {}).textContent || '' }; });
-      ok(st.kind === 'weather' && st.wx === k && st.state === 'play', k + ': the run starts', st);
+      const dis = ['hail', 'volcano', 'zap'].includes(k);
+      ok(st.kind === 'weather' && (dis ? st.wx === 'clear' : st.wx === k) && st.state === 'play', k + ': the run starts', st);
       ok(/風速/.test(st.info) && /雨量/.test(st.info), k + ': wind and rain shown by the next pieces', st.info);
       if (k === 'storm') {
         await page.evaluate(() => { const S = ZZ.peek().S; for (let x = 0; x < 10; x++) S.me.grid[ZZ.ROWS - 1][x] = x === 4 ? 0 : 3; S.wx.boltAt = 0; });
@@ -40,8 +41,20 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
         ok(await page.evaluate(() => ZZ.peek().S.me.grid.some(r => Array.from(r).some(c => c === ZZ.GARBAGE))), 'storm: lightning leaves cement');
       }
       if (k === 'snow') { await page.evaluate(() => { const S = ZZ.peek().S; S.wx.driftAcc = 1e9; }); await sleep(200); ok(await page.evaluate(() => ZZ.peek().S.me.grid.some(r => Array.from(r).some(c => c === ZZ.SNOW))), 'snow settles'); }
+      if (k === 'sand') ok(await page.evaluate(() => ZZ.App.el.nextBox.style.visibility === 'hidden'), 'sand: the next pieces are hidden');
+      if (k === 'aurora') { await page.evaluate(() => { ZZ.peek().S.me.stats.score += 100; }); await sleep(100); ok(await page.evaluate(() => ZZ.peek().S.me.stats.score >= 200 && /×2/.test(document.getElementById('wxInfo').textContent)), 'aurora: points count twice'); }
+      if (dis) {
+        // bring the disaster on now, with a little wall for it to work on
+        await page.evaluate(() => { const S = ZZ.peek().S; for (let y = 1; y <= 3; y++) for (let x = 0; x < 10; x++) S.me.grid[ZZ.ROWS - y][x] = x === y ? 0 : 5; S.wx.disNext = 0; });
+        await sleep(2300); await page.screenshot({ path: path.join(OUT, 'wx-' + k + '-hit.png') });
+        await sleep(k === 'zap' ? 300 : 2000);
+        const g = await page.evaluate(() => ZZ.peek().S.me.grid.map(r => Array.from(r))), Z = await page.evaluate(() => ({ ICE: ZZ.ICE, LAVA: ZZ.LAVA, GARBAGE: ZZ.GARBAGE }));
+        if (k === 'hail') ok(g.some(r => r.includes(Z.ICE)), 'hail: ice on the wall');
+        if (k === 'volcano') ok(g.some(r => r.includes(Z.LAVA) || r.filter(c => c === Z.GARBAGE).length === 9), 'volcano: a row of lava or cooled cement');
+        if (k === 'zap') ok(Array.from({ length: 10 }, (_, x) => g.every(r => !r[x])).some(Boolean), 'zap: a whole column split');
+      }
       await sleep(400);
-      ok((await inked()) > 30, k + ': the sky is drawn over the board', await inked());
+      ok(dis || (await inked()) > 30, k + ': the sky is drawn over the board', await inked());
       await page.screenshot({ path: path.join(OUT, 'wx-' + k + '.png') });
     }
     // a changing-weather run to the end

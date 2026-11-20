@@ -80,7 +80,7 @@ ok(W.gravAt(300000) > W.gravAt(0), 'the run speeds up');
 {
   const g = new ZZ.Game({ seed: 21, garbage: false }), w = new W({ seed: 21 });
   g.start();
-  ok(!w.hit('hail') && w.kindNow() === 'clear', 'an unknown kind is not thrown');
+  ok(!w.hit('sunshine') && !w.hit('aurora') && w.kindNow() === 'clear', 'an unknown kind, or the good aurora, is not thrown');
   ok(w.hit('rain', 3000) && w.kindNow() === 'rain' && w.lvlNow() === 3 && w.info().hit, 'a hit brings its weather at level 3');
   let back = false;
   for (let t = 0; t < 3500; t += 16) w.step(g, 16).forEach(e => { if (e.type === 'change' && e.back) back = true; });
@@ -94,7 +94,8 @@ ok(W.gravAt(300000) > W.gravAt(0), 'the run speeds up');
   const cnt = g => g.grid.reduce((a, row) => a + row.filter(v => v).length, 0);
   const wall = (g, rows) => { for (let y = 0; y < rows.length; y++) { const r = rows[rows.length - 1 - y]; for (let x = 0; x < ZZ.COLS; x++) g.grid[ZZ.ROWS - 1 - y][x] = r[x] === '#' ? 3 : 0; } };
   const stepFor = (w, g, ms) => { const ev = []; for (let t = 0; t < ms; t += 16) ev.push(...w.step(g, 16)); return ev; };
-  ok(W.DISASTERS.join() === 'flood,tornado,quake', 'three disasters');
+  ok(W.DISASTERS.join() === 'flood,tornado,quake,hail,volcano,zap', 'six disasters');
+  ok(W.THROWN.indexOf('aurora') < 0 && W.THROWN.indexOf('sand') >= 0 && W.THROWN.indexOf('zap') >= 0, 'everything but the aurora can be thrown');
   // the plain weather is the same with or without them
   const a = new W({ seed: 77 }), b = new W({ seed: 77, noDis: true }), g1 = new ZZ.Game({ seed: 1, garbage: false }), g2 = new ZZ.Game({ seed: 1, garbage: false });
   let ka = [], kb = [];
@@ -159,6 +160,50 @@ ok(W.gravAt(300000) > W.gravAt(0), 'the run speeds up');
     f.startDis('flood', 2, 10);
     for (let t = 0; t < 3000; t += 16) { f.step(fg, 16); ys.add(fg.cur.y); }
     ok(ys.size >= 2, 'the piece bobs up and down');
+  }
+  // hail: ice on top of columns; cleared once it cracks and comes back, cleared again it goes
+  {
+    const h = new W({ seed: 11, noDis: true }), hg = new ZZ.Game({ seed: 11, garbage: false, gravity: 0 });
+    h.startDis('hail', 2, 10);
+    const e = stepFor(h, hg, 3000);
+    const ice = hg.grid.reduce((a, r) => a + r.filter(v => v === ZZ.ICE).length, 0);
+    ok(e.filter(x => x.type === 'hail').length === 6 && ice === 6, 'six hailstones at level 2, all ice (' + ice + ')');
+    const ig = new ZZ.Game({ seed: 3, garbage: false, gravity: 0 });
+    // a row of ice and cement with one gap; an I piece standing upright fills it
+    for (let x = 0; x < ZZ.COLS; x++) ig.grid[ZZ.ROWS - 1][x] = x === 9 ? 0 : x === 4 ? ZZ.ICE : 8;
+    ig.start(); ig.cur = { type: 'I', rot: 1, x: 7, y: ZZ.ROWS - 4 };
+    while (!ig.fits('I', 1, ig.cur.x, ig.cur.y)) ig.cur.y--;
+    ig.lock();
+    ok(ig.stats.lines === 1 && ig.grid.some(r => r[4] === ZZ.CRACK), 'the first clear only cracks the ice');
+  }
+  // the volcano: a lava row with a gap, blocks on it burn, it cools into cement
+  {
+    const v = new W({ seed: 12, noDis: true }), vg = new ZZ.Game({ seed: 12, garbage: false, gravity: 0 });
+    wall(vg, ['#########.']);
+    const before = cnt(vg);
+    v.startDis('volcano', 2, 10);
+    const e = stepFor(v, vg, 3600), end = e.find(x => x.type === 'disaster' && x.phase === 'end');
+    ok(e.some(x => x.type === 'erupt') && e.filter(x => x.type === 'burn').length === 3, 'it erupts and three blocks burn at level 2');
+    ok(vg.grid[ZZ.ROWS - 1].filter(c => c === 8).length === 9 && !vg.grid.some(r => r.includes(ZZ.LAVA)), 'the lava cooled into cement with one gap');
+    ok(cnt(vg) === before + 9 - end.gone && end.gone === 3, 'nothing else changes');
+  }
+  // the bolt splits a whole column
+  {
+    const z = new W({ seed: 13, noDis: true }), zg = new ZZ.Game({ seed: 13, garbage: false });
+    wall(zg, ['....#.....', '###.######', '#########.']);
+    z.startDis('zap', 3, 10);
+    const e = stepFor(z, zg, 1200), hit = e.find(x => x.type === 'zap');
+    ok(hit && hit.x === 4 && hit.n === 3 && zg.grid.every(r => !r[4]), 'a strong bolt splits the tallest column');
+  }
+  // the aurora doubles the points; sand and the eclipse are on show
+  {
+    const a2 = new W({ seed: 14, only: 'aurora' }), ag = new ZZ.Game({ seed: 14, garbage: false });
+    a2.step(ag, 16); ag.stats.score = 100; a2.step(ag, 16);
+    ok(ag.stats.score === 200, 'the aurora counts every point twice');
+    const sw = new W({ seed: 14, only: 'sand' }), sg = new ZZ.Game({ seed: 14, garbage: false }); sg.start(); sw.step(sg, 16);
+    ok(sw.info().sand > 0 && sw.info().wind > 0, 'a sandstorm blows and hides the next pieces');
+    const ew = new W({ seed: 14, only: 'eclipse' }); ew.step(new ZZ.Game({ seed: 14, garbage: false }), 16);
+    ok(ew.info().dark > 0, 'an eclipse darkens the sky');
   }
   // thrown by the rival
   {

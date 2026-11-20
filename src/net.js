@@ -538,7 +538,7 @@
       var row = g.grid[r];
       for (x = 0; x < COLS; x++) {
         var v = r < first ? 0 : parseInt(s.charAt((r - first) * COLS + x), 16);
-        row[x] = v >= 0 && v <= 8 ? v : 0;
+        row[x] = v >= 0 && v <= 12 ? v : 0;   // 9 to 12: snow, ice and lava from the weather
       }
     }
     if (Array.isArray(m.it)) for (i = 0; i < m.it.length && i < 40; i++) {

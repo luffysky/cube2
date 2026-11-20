@@ -8,9 +8,9 @@
 
   L.add({
     'wx.menuT': ['挑戰大自然', 'Weather run', '大自然チャレンジ', '대자연 도전'],
-    'wx.menuS': ['風、雨、雪、雷、霧，撐越久越好', 'Wind, rain, snow, storms and fog. Last as long as you can', '風・雨・雪・雷・霧の中で生き残れ', '바람, 비, 눈, 번개, 안개 속에서 버티기'],
+    'wx.menuS': ['風、雨、雪、雷、霧、沙塵、日蝕，撐越久越好', 'Wind, rain, snow, storms, fog, sand and eclipses. Last as long as you can', '風・雨・雪・雷・霧・砂嵐・日食の中で生き残れ', '바람, 비, 눈, 번개, 안개, 모래폭풍, 일식 속에서 버티기'],
     'wx.title': ['挑戰大自然', 'Weather run', '大自然チャレンジ', '대자연 도전'],
-    'wx.p': ['天氣每 20–30 秒換一次，越後面越強。風會把方塊吹歪，下雨方塊掉得快、落地還會滑，下雪會在牆上積雪，雷雨會把方塊劈成水泥，起霧看不到下面幾排。', 'The weather changes every 20 to 30 seconds and gets stronger. Wind blows pieces sideways, rain makes them fall faster and slide, snow piles up on the stack, lightning turns blocks to cement, and fog hides the lower rows.', '天気は20〜30秒ごとに変わり、だんだん強くなります。風でブロックが流され、雨で速く落ちて滑り、雪が積もり、雷でブロックがセメントに、霧で下の段が見えなくなります。', '날씨는 20~30초마다 바뀌고 점점 강해져요. 바람은 블록을 밀고, 비는 빨리 떨어지고 미끄러지며, 눈은 쌓이고, 번개는 블록을 시멘트로, 안개는 아래 줄을 가려요.'],
+    'wx.p': ['天氣每 20–30 秒換一次，越後面越強。風會把方塊吹歪，下雨方塊掉得快、落地還會滑，下雪會在牆上積雪，雷雨會把方塊劈成水泥，起霧看不到下面幾排，沙塵暴又吹又看不到接下來的方塊，日蝕整片變暗、只看得到方塊旁邊；出現極光時得分加倍。', 'The weather changes every 20 to 30 seconds and gets stronger as you go. Wind blows pieces off course, rain makes them fall faster and slide, snow piles up on the wall, storms turn blocks into cement, fog hides the lower rows, a sandstorm blows and hides the next pieces, and an eclipse darkens everything but the cells around your piece. Under the aurora every point counts twice.', '天気は20〜30秒ごとに変わり、だんだん強くなります。風でブロックが流され、雨で速く落ちて滑り、雪は壁に積もり、雷雨はブロックをセメントに変え、霧は下の段を隠し、砂嵐は吹き荒れて次のブロックが見えなくなり、日食はブロックの周り以外を暗くします。オーロラの間は得点が2倍。', '날씨는 20~30초마다 바뀌고 갈수록 강해져요. 바람은 블록을 밀고, 비는 빨리 떨어지고 미끄러지게 하고, 눈은 벽에 쌓이고, 뇌우는 블록을 시멘트로 바꾸고, 안개는 아래 줄을 가리고, 모래폭풍은 바람과 함께 다음 블록을 가리고, 일식은 블록 주변만 빼고 어둡게 해요. 오로라가 뜨면 점수가 두 배.'],
     'wx.best': ['最佳：{0} 分，撐了 {1}', 'Best: {0} points, lasted {1}', 'ベスト：{0}点・{1}', '최고: {0}점, {1} 버팀'],
     'wx.mix': ['天氣輪替', 'Changing weather', '天気が変わる', '날씨 변화'],
     'wx.mixS': ['算金幣、上排行榜', 'Counts for coins and the leaderboard', 'コインとランキング対象', '코인과 랭킹에 반영'],
@@ -25,9 +25,20 @@
     'wx.k.flood': ['洪水', 'Flood', '洪水', '홍수'],
     'wx.k.tornado': ['龍捲風', 'Tornado', '竜巻', '토네이도'],
     'wx.k.quake': ['地震', 'Earthquake', '地震', '지진'],
+    'wx.k.sand': ['沙塵暴', 'Sandstorm', '砂嵐', '모래폭풍'],
+    'wx.k.aurora': ['極光', 'Aurora', 'オーロラ', '오로라'],
+    'wx.k.eclipse': ['日蝕', 'Eclipse', '日食', '일식'],
+    'wx.k.hail': ['冰雹', 'Hail', '雹', '우박'],
+    'wx.k.volcano': ['火山', 'Volcano', '火山', '화산'],
+    'wx.k.zap': ['雷擊', 'Lightning strike', '落雷', '낙뢰'],
+    'wx.burned': ['燒掉 {0} 塊', '{0} burned away', '{0} 個燃えた', '{0}개 불탐'],
+    'wx.zapped': ['劈開一整列！', 'A whole column split!', '1列まるごと裂けた！', '한 열이 통째로 갈라졌다!'],
+    'wx.x2': ['極光：得分 ×2', 'Aurora: points ×2', 'オーロラ：得点×2', '오로라: 점수 ×2'],
+    'wx.sandP': ['看不到接下來的方塊', 'Next pieces hidden', '次のブロックが見えない', '다음 블록이 안 보여요'],
+    'wx.darkP': ['只看得到方塊旁邊', 'Only the cells around your piece', 'ブロックの周りだけ見える', '블록 주변만 보여요'],
     'wx.warn': ['{0} 來了！', '{0} coming!', '{0}が来る！', '{0}이(가) 온다!'],
     'wx.dis': ['災害', 'Disasters', '災害', '재해'],
-    'wx.disP': ['偶爾還會有災害，出現前會先警告：洪水把疊好的磚往下游沖、落下的方塊也會跟著上下漂；龍捲風把經過的磚捲起來，丟到別的地方；地震讓懸空的磚垮下來（補滿的行照樣消掉、計分），太高的柱子會倒。', 'Now and then a disaster strikes, always after a warning: a flood washes blocks downstream and makes the falling piece bob; a tornado lifts the blocks it passes and drops them somewhere else; an earthquake brings down every block with a gap under it (rows filled that way clear and score) and topples tall columns.', 'ときどき災害も起こります（必ず予告あり）：洪水は積んだブロックを下流へ流し、落下中のブロックも上下に揺れます。竜巻は通ったブロックを巻き上げて別の場所に落とします。地震は浮いたブロックを崩し（埋まった段は消えて得点）、高すぎる柱は倒れます。', '가끔 재해도 와요(항상 미리 경고): 홍수는 쌓은 블록을 하류로 쓸어 가고 떨어지는 블록도 위아래로 흔들려요. 토네이도는 지나간 블록을 감아올려 다른 곳에 떨어뜨려요. 지진은 떠 있는 블록을 무너뜨리고(채워진 줄은 지워지고 점수) 너무 높은 기둥은 쓰러져요.'],
+    'wx.disP': ['偶爾還會有災害，出現前會先警告：洪水把疊好的磚往下游沖、落下的方塊也會跟著上下漂；龍捲風把經過的磚捲起來，丟到別的地方；地震讓懸空的磚垮下來（補滿的行照樣消掉、計分）；冰雹在牆上落下冰塊，冰要消兩次才會碎；火山從底下噴出一排岩漿，壓在上面的磚會被燒掉，岩漿最後冷卻成水泥；雷擊劈開一整列。', 'Now and then a disaster comes, always after a warning: a flood washes the top blocks downstream and the falling piece bobs along; a tornado lifts the blocks it passes and drops them elsewhere; an earthquake brings floating blocks down (rows it fills are cleared and scored); hail drops ice that takes two clears to break; a volcano pushes up a row of lava that burns the blocks on it and cools into cement; a great bolt splits a whole column.', 'ときどき災害も。必ず先に警告が出ます：洪水は上のブロックを下流へ流し、落下中のブロックも揺れながら流されます。竜巻は通り道のブロックを巻き上げて別の場所に落とします。地震は浮いたブロックを落とします（埋まった段は消えて得点に）。雹は氷を落とし、氷は2回消さないと割れません。火山は下から溶岩の段を噴き上げ、上のブロックを焼き、最後はセメントに固まります。落雷は1列をまるごと裂きます。', '가끔 재해도 와요. 항상 먼저 경고가 떠요: 홍수는 위쪽 블록을 하류로 쓸어 가고 떨어지는 블록도 출렁이며 떠밀려요. 토네이도는 지나가는 블록을 감아올려 다른 곳에 떨어뜨려요. 지진은 떠 있는 블록을 무너뜨려요(채워진 줄은 지워지고 점수도 받아요). 우박은 얼음을 떨어뜨리고, 얼음은 두 번 지워야 깨져요. 화산은 아래에서 용암 줄을 밀어 올려 위의 블록을 태우고, 마지막엔 시멘트로 굳어요. 낙뢰는 한 열을 통째로 갈라요.'],
     'wx.washed': ['被沖走 {0} 塊', '{0} washed away', '{0} 個流された', '{0}개 휩쓸림'],
     'wx.quakeLines': ['震垮消了 {0} 行！', 'The quake cleared {0}!', '地震で {0} ライン消えた！', '지진으로 {0}줄 지워짐!'],
     'wx.lvl': ['{0} 級', 'level {0}', 'レベル{0}', '{0}단계'],
@@ -45,7 +56,7 @@
     'wx.practice': ['練習場，不算獎勵', 'Practice: no rewards', '練習：報酬なし', '연습: 보상 없음'],
     'wx.again': ['再挑戰', 'Go again', 'もう一度', '다시 도전'],
     'wx.vs': ['天氣對戰', 'Weather battles', '天気バトル', '날씨 대전'],
-    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣（或一場洪水、龍捲風、地震）丟到對手那邊。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw strong weather (or a flood, tornado or earthquake) at your rival. Wins raise your storm rank.', '同じ空の下で対戦。4ライン消しかTスピンダブルで、強い天気（または洪水・竜巻・地震）を相手に投げつけます。勝つと天気ランクが上がります。', '같은 하늘 아래에서 대전해요. 4줄을 지우거나 T스핀 더블로 강한 날씨(또는 홍수, 토네이도, 지진)를 상대에게 던져요. 이기면 날씨 랭크가 올라요.'],
+    'wx.vsP': ['兩個人頭上是同一片天。消 4 行或做出 T 轉雙消，就把一陣強烈天氣或一場災害丟到對手那邊（極光是好天氣，不會丟過去）。贏了加天氣排位分。', 'Both of you play under the same sky. Clear four lines or make a T-spin double to throw strong weather or a disaster at your rival (never the aurora: that one is good). Wins raise your storm rank.', '二人とも同じ空の下。4ライン消しかTスピンダブルで、強い天気か災害を相手に投げつけます（オーロラは良い天気なので投げません）。勝つと天気ランクが上がります。', '두 사람 위에 같은 하늘. 4줄을 지우거나 T스핀 더블로 강한 날씨나 재해를 상대에게 던져요(오로라는 좋은 날씨라 던지지 않아요). 이기면 날씨 랭크가 올라요.'],
     'wx.rank': ['天氣排位：{0} 分', 'Storm rank: {0}', '天気ランク：{0}', '날씨 랭크: {0}'],
     'wx.vsAi': ['對電腦', 'Against the computer', 'コンピューターと', '컴퓨터와'],
     'wx.vsQuick': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
@@ -58,7 +69,7 @@
     'wx.short': ['撐 20 秒以上才有金幣。', 'Last 20 seconds or more for coins.', '20秒以上でコイン獲得。', '20초 이상 버텨야 코인을 받아요.']
   });
 
-  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️', flood: '🌊', tornado: '🌪️', quake: '🌍' };
+  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️', sand: '🏜️', aurora: '🌌', eclipse: '🌑', flood: '🌊', tornado: '🌪️', quake: '🌍', hail: '🧊', volcano: '🌋', zap: '⚡' };
   var ALL = W.KINDS.concat(W.DISASTERS);
   function kindName(k) { return t('wx.k.' + k); }
   function clock(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
@@ -129,7 +140,7 @@
   // the weather beside the next pieces (the weather mode and weather battles alike)
   function showInfo(S) {
     var wx = S.wx, n = wx.info();
-    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang + (n.dis ? n.dis.kind + n.dis.phase : '');
+    var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + n.sand + n.dark + n.aurora + '|' + Math.ceil(n.left / 1000) + L.lang + (n.dis ? n.dis.kind + n.dis.phase : '');
     if (key === S.infoKey) return;
     S.infoKey = key;
     var now = document.getElementById('wxNow');
@@ -140,6 +151,9 @@
       '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
     if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
     if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
+    if (n.aurora) h += '<p class="wxgood"><b>' + esc(t('wx.x2')) + '</b></p>';
+    if (n.sand) h += '<p>' + esc(t('wx.sandP')) + '</p>';
+    if (n.dark) h += '<p>' + esc(t('wx.darkP')) + '</p>';
     if (n.dis) h += '<p class="wxdis"><b>' + KIND_ICON[n.dis.kind] + ' ' + esc(n.dis.phase === 'warn' ? t('wx.warn', kindName(n.dis.kind)) : kindName(n.dis.kind)) + '</b></p>';
     if (n.hit) h += '<p>' + esc(t('wx.gotHit', kindName(n.kind))) + '</p>';
     else if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
@@ -185,9 +199,14 @@
       else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
       else if (e.type === 'disaster') {
         if (e.phase === 'warn') { App.banner('⚠️ ' + t('wx.warn', KIND_ICON[e.kind] + kindName(e.kind)), '', 1600); App.sfx.play('siren'); }
-        else if (e.phase === 'hit') { App.sfx.play(e.kind === 'flood' ? 'wave' : e.kind === 'tornado' ? 'twister' : 'quake'); App.buzz(e.kind === 'quake' ? [80, 40, 120, 40, 160] : [40, 30, 40]); }
-        else if (e.phase === 'end' && e.gone) App.popRaw(t('wx.washed', e.gone), [], 0, false);
+        else if (e.phase === 'hit') { App.sfx.play({ flood: 'wave', tornado: 'twister', quake: 'quake', volcano: 'lava', zap: 'thunder', hail: 'hail' }[e.kind] || 'quake'); App.buzz(e.kind === 'quake' || e.kind === 'volcano' ? [80, 40, 120, 40, 160] : [40, 30, 40]); }
+        else if (e.phase === 'end' && e.gone && e.kind !== 'zap') App.popRaw(t(e.kind === 'volcano' ? 'wx.burned' : 'wx.washed', e.gone), [], 0, false);
       }
+      else if (e.type === 'hail') { App.sfx.play('hail'); sky.stone(e); }
+      else if (e.type === 'burn') { App.sfx.play('sizzle'); sky.ember(e); }
+      else if (e.type === 'erupt') App.V.me.kick(0, 6);
+      else if (e.type === 'zap') { App.buzz([30, 40, 90]); sky.bolt({ x: e.x, y: ROWS - 1 }); App.V.me.kick(0, 6); if (e.n) App.popRaw(t('wx.zapped'), [], 0, false); }
+      else if (e.type === 'change' && e.kind === 'aurora') App.sfx.play('chime');
       else if (e.type === 'quake' && e.lines) App.popRaw(t('wx.quakeLines', e.lines), [], 0, false);
     }
   };
@@ -196,7 +215,7 @@
   var HIT_MS = 9000;
   function throws(e) { return e.lines >= 4 || (e.tspin === 'full' && e.lines >= 2); }
   // weather or, three times in eight, a disaster
-  function anyKind() { return ALL[Math.floor(Math.random() * ALL.length)]; }
+  function anyKind() { var T = W.THROWN || ALL; return T[Math.floor(Math.random() * T.length)]; }
   App.hooks.push(function (g, e, mine) {
     var S = App.S();
     if (!S || !S.sky || S.state !== 'play' || e.type !== 'lock' || !throws(e)) return;
@@ -234,8 +253,12 @@
   // the game is all in weather.js.
   var sky = {
     cv: null, x: null, w: 0, h: 0, parts: [], flash: 0, bolts: [], fade: 1, gustAt: -1e9, last: 0, on: false,
-    reset: function () { this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); placeInfo(); },
+    reset: function () { this.fx = []; this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); placeInfo(); },
     change: function () { this.fade = 0; },
+    fx: [],
+    // a hailstone coming down onto its cell, an ember rising off a burnt one
+    stone: function (e) { var v = App.V.me, p = v.cellXY(e.x, e.y); this.fx.push({ k: 'h', x: p[0] + v.cell * 0.5, y0: -v.cell, y1: p[1] + v.cell * 0.5, life: 260, max: 260 }); },
+    ember: function (e) { var v = App.V.me, p = v.cellXY(e.x, e.y); for (var i = 0; i < 6; i++) this.fx.push({ k: 'e', x: p[0] + v.cell * (0.2 + Math.random() * 0.6), y: p[1] + v.cell * 0.5, vx: (Math.random() - 0.5) * 40, vy: -60 - Math.random() * 80, life: 700, max: 700 }); },
     bolt: function (e) {
       var v = App.V.me, cell = v.cell, x0 = v.mw + (e.x + 0.5) * cell, y1 = e.y >= 0 ? v.cellXY(e.x, e.y)[1] + cell * 0.5 : this.h * 0.6, pts = [[x0 + (Math.random() - 0.5) * cell * 3, 0]];
       for (var y = cell * 1.2; y < y1; y += cell * (0.8 + Math.random() * 0.8)) pts.push([x0 + (Math.random() - 0.5) * cell * 1.6, y]);
@@ -253,7 +276,7 @@
       this.cv.hidden = false;
       if (!this.on) { this.on = true; this.last = 0; window.requestAnimationFrame(this.frame); }
     },
-    stop: function () { this.on = false; if (App.el.wellWrap) App.el.wellWrap.style.transform = ''; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
+    stop: function () { this.on = false; this.hideNext(false); if (App.el.wellWrap) App.el.wellWrap.style.transform = ''; var b = document.getElementById('wxInfo'); if (b) b.hidden = true; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
     frame: function (now) {
       var s = sky, S = App.S();
       if (!S || !S.wx || App.screen() !== 'play') { s.stop(); return; }
@@ -333,6 +356,59 @@
       }
       if (this.flash > 0) { x.fillStyle = 'rgba(255,255,255,' + this.flash.toFixed(3) + ')'; x.fillRect(0, 0, w, h); this.flash = Math.max(0, this.flash - dt / 260); }
       this.disaster(x, n.dis, v, cell, w, h, dt);
+      this.extra(x, n, v, cell, w, h, dt);
+    },
+    hidden: false,
+    hideNext: function (on) {
+      var b = App.el.nextBox;
+      if (!b || this.hidden === on) return;
+      this.hidden = on; b.style.visibility = on ? 'hidden' : '';
+      b.parentNode.classList.toggle('wxsand', on);
+    },
+    // the sandstorm, the aurora, the eclipse, and the hail and embers of the disasters
+    extra: function (x, n, v, cell, w, h, dt) {
+      var tt = this.disT / 1000, i, x0 = v.mw, bw = COLS * cell, reduce = App.env.reduce, a = this.fade;
+      this.hideNext(!!n.sand);
+      if (n.sand) {
+        // a yellow haze and blowing grit
+        x.fillStyle = 'rgba(205,160,90,' + ((0.18 + n.sand * 0.07) * a).toFixed(3) + ')'; x.fillRect(0, 0, w, h);
+        x.fillStyle = 'rgba(150,105,50,0.55)';
+        var cnt = reduce ? 30 : 60 + n.sand * 30;
+        for (i = 0; i < cnt; i++) { var gx = ((i * 97 + tt * (300 + (i % 5) * 80) * n.dir) % w + w) % w, gy = (i * 53 % 100) / 100 * h + Math.sin(tt * 3 + i) * cell * 0.3; x.fillRect(gx, gy, cell * 0.12, cell * 0.06); }
+      }
+      if (n.aurora) {
+        // ribbons of green and violet swaying across the top
+        for (var k = 0; k < 3; k++) {
+          var gr = x.createLinearGradient(0, 0, 0, h * 0.5);
+          gr.addColorStop(0, 'rgba(' + (k === 1 ? '170,110,255' : '90,255,170') + ',0)'); gr.addColorStop(0.5, 'rgba(' + (k === 1 ? '170,110,255' : '90,255,170') + ',' + (0.22 * a).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(90,255,170,0)');
+          x.fillStyle = gr; x.beginPath(); x.moveTo(0, h * 0.05);
+          for (i = 0; i <= 24; i++) x.lineTo(w * i / 24, h * (0.1 + k * 0.06) + Math.sin(tt * (0.8 + k * 0.3) + i * 0.5 + k) * cell * 1.2);
+          for (i = 24; i >= 0; i--) x.lineTo(w * i / 24, h * (0.3 + k * 0.06) + Math.sin(tt * (0.7 + k * 0.2) + i * 0.4 + k * 2) * cell * 1.5);
+          x.closePath(); x.fill();
+        }
+      }
+      if (n.dark) {
+        // darkness everywhere except a circle around the falling piece
+        var S = App.S(), c = S && S.me && S.me.cur, cx = x0 + bw / 2, cy = h / 2, rad = cell * (5.2 - n.dark * 0.9);
+        if (c) { cx = x0 + (c.x + 2) * cell; cy = v.cellXY(0, c.y + 1)[1] + cell * 0.5; }
+        var dg = x.createRadialGradient(cx, cy, rad * 0.55, cx, cy, rad);
+        dg.addColorStop(0, 'rgba(6,8,20,0)'); dg.addColorStop(1, 'rgba(6,8,20,' + (0.93 * a).toFixed(3) + ')');
+        x.fillStyle = dg; x.fillRect(0, 0, w, h);
+      }
+      // hailstones and embers
+      for (i = this.fx.length - 1; i >= 0; i--) {
+        var f = this.fx[i];
+        f.life -= dt;
+        if (f.life <= 0) { this.fx.splice(i, 1); continue; }
+        if (f.k === 'h') {
+          var q = 1 - f.life / f.max, yy = f.y0 + (f.y1 - f.y0) * q * q;
+          x.fillStyle = 'rgba(235,248,255,0.95)'; x.beginPath(); x.arc(f.x, yy, cell * 0.22, 0, 6.283); x.fill();
+        } else {
+          f.x += f.vx * dt / 1000; f.y += f.vy * dt / 1000;
+          x.fillStyle = 'rgba(255,' + Math.round(120 + 100 * f.life / f.max) + ',40,' + (f.life / f.max).toFixed(3) + ')';
+          x.fillRect(f.x, f.y, cell * 0.12, cell * 0.12);
+        }
+      }
     },
     // the disasters: water, a funnel, a shaking wall
     disT: 0,
@@ -372,6 +448,21 @@
         x.fillStyle = 'rgba(200,180,140,0.9)';
         for (i = 0; i < d.air; i++) { var an = tt * 6 + i * 2.1, rr = cell * (0.8 + (i % 3) * 0.5); x.fillRect(fx + Math.cos(an) * rr - cell * 0.3, h * (0.2 + (i % 4) * 0.12) + Math.sin(an) * rr * 0.3, cell * 0.6, cell * 0.6); }
         x.fillStyle = 'rgba(90,96,110,' + (0.12 * a).toFixed(3) + ')'; x.fillRect(0, 0, w, h);
+      } else if (d.kind === 'hail') {
+        // a grey cloud over the top, stones streaking down in the warning
+        x.fillStyle = 'rgba(110,120,135,' + (d.phase === 'warn' ? 0.15 + d.p * 0.2 : 0.35).toFixed(3) + ')'; x.fillRect(0, 0, w, cell * 2.5);
+        x.fillStyle = 'rgba(230,245,255,0.8)';
+        for (i = 0; i < 14; i++) { var sx2 = x0 + ((i * 41) % 100) / 100 * bw, sy2 = ((tt * 420 + i * 67) % h); x.beginPath(); x.arc(sx2, sy2, cell * 0.09, 0, 6.283); x.fill(); }
+      } else if (d.kind === 'volcano') {
+        // a red glow from the floor, then sparks while it burns
+        var gl = d.phase === 'warn' ? d.p : 1, vg = x.createLinearGradient(0, h - cell * 4, 0, h);
+        vg.addColorStop(0, 'rgba(255,90,20,0)'); vg.addColorStop(1, 'rgba(255,90,20,' + (0.45 * gl).toFixed(3) + ')');
+        x.fillStyle = vg; x.fillRect(x0, h - cell * 4, bw, cell * 4);
+        if (!reduce) wrap.style.transform = d.phase === 'warn' ? 'translateY(' + ((Math.random() - 0.5) * cell * 0.08 * d.p).toFixed(1) + 'px)' : '';
+        if (d.phase === 'hit') { x.fillStyle = 'rgba(255,200,60,0.85)'; for (i = 0; i < 16; i++) x.fillRect(x0 + ((i * 61 + tt * 50) % bw), h - ((tt * 260 + i * 43) % (cell * 6)), cell * 0.1, cell * 0.1); }
+      } else if (d.kind === 'zap') {
+        // the sky darkens and flickers before it strikes
+        if (d.phase === 'warn') { x.fillStyle = 'rgba(20,24,40,' + (0.3 * d.p).toFixed(3) + ')'; x.fillRect(0, 0, w, h); if (Math.random() < 0.05) this.flash = 0.25; }
       } else if (d.kind === 'quake') {
         var amp = d.phase === 'warn' ? cell * 0.06 * d.p : cell * 0.3 * (1 - d.p * 0.6);
         if (!reduce) wrap.style.transform = 'translate(' + ((Math.random() - 0.5) * amp * 2).toFixed(1) + 'px,' + ((Math.random() - 0.5) * amp).toFixed(1) + 'px)';

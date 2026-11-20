@@ -10,7 +10,7 @@
     dpr: Math.min(window.devicePixelRatio || 1, 3)
   };
   // Tile glazes by piece id: I ivory, O pink, T gold, S sky, Z jade, J coral, L lilac, 8 = cement.
-  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B', '#EEF5FB'];   // 9: snow (weather mode only)
+  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B', '#EEF5FB', '#BFE6F7', '#A5CFE3', '#FF6A2B'];   // 9 snow, 10 ice, 11 cracked ice, 12 lava (weather mode only)
   var theme = {};
 
   function hex(c) {
@@ -94,6 +94,30 @@
     x.fillStyle = gr; x.fill();
     x.fillStyle = 'rgba(255,255,255,0.9)';
     x.beginPath(); x.arc(px * 0.32, px * 0.3, px * 0.1, 0, 6.283); x.fill();
+  }
+  // hail ice: a pale glassy block with a shine; cracked ice has a crack across it; lava glows
+  function iceTile(x, px, cracked) {
+    var g = Math.max(0.5, px * 0.04), w = px - 2 * g;
+    rr(x, g, g, w, w, px * 0.16);
+    var gr = x.createLinearGradient(0, 0, px, px);
+    gr.addColorStop(0, cracked ? '#D6EEF8' : '#E8F8FF'); gr.addColorStop(1, cracked ? '#7FB4CF' : '#8FD0EE');
+    x.fillStyle = gr; x.fill();
+    x.strokeStyle = 'rgba(255,255,255,0.85)'; x.lineWidth = Math.max(1, px * 0.06);
+    x.beginPath(); x.moveTo(px * 0.22, px * 0.62); x.lineTo(px * 0.62, px * 0.22); x.stroke();
+    if (cracked) {
+      x.strokeStyle = 'rgba(30,70,100,0.75)'; x.lineWidth = Math.max(1, px * 0.07);
+      x.beginPath(); x.moveTo(px * 0.15, px * 0.3); x.lineTo(px * 0.45, px * 0.5); x.lineTo(px * 0.38, px * 0.72); x.lineTo(px * 0.85, px * 0.85);
+      x.moveTo(px * 0.45, px * 0.5); x.lineTo(px * 0.8, px * 0.35); x.stroke();
+    }
+  }
+  function lavaTile(x, px) {
+    var g = Math.max(0.5, px * 0.04), w = px - 2 * g;
+    rr(x, g, g, w, w, px * 0.12);
+    var gr = x.createRadialGradient(px * 0.5, px * 0.5, px * 0.05, px * 0.5, px * 0.5, px * 0.7);
+    gr.addColorStop(0, '#FFE070'); gr.addColorStop(0.5, '#FF7A22'); gr.addColorStop(1, '#B3220E');
+    x.fillStyle = gr; x.fill();
+    x.fillStyle = 'rgba(60,10,0,0.45)';
+    x.beginPath(); x.arc(px * 0.3, px * 0.68, px * 0.1, 0, 6.283); x.arc(px * 0.7, px * 0.3, px * 0.08, 0, 6.283); x.fill();
   }
   function cementTile(x, px, col) {
     var g = Math.max(0.5, px * 0.04), r = px * 0.18, w = px - 2 * g;
@@ -455,6 +479,8 @@
       return c;
     }
     if (id === 9) { snowTile(x, px); return c; }
+    if (id === 10 || id === 11) { iceTile(x, px, id === 11); return c; }
+    if (id === 12) { lavaTile(x, px); return c; }
     if (id === 8 && style !== 'neon' && style !== 'pixel') { cementTile(x, px, col); return c; }
     (TILE_DRAW[style] || TILE_DRAW.glaze)(x, px, col, id);
     return c;
@@ -825,7 +851,7 @@
     var key = style + '|' + px;
     if (!spriteCache[key]) {
       var t = [null];
-      for (var i = 1; i <= 9; i++) t.push(makeTile(px, i, style));
+      for (var i = 1; i <= 12; i++) t.push(makeTile(px, i, style));
       spriteCache[key] = t;
     }
     return spriteCache[key];
@@ -1479,6 +1505,10 @@
     wave: function (s) { s.noise(1.4, 0.16, 80, 900); s.noise(0.6, 0.06, 1500, 5000, 0.5); },
     twister: function (s) { s.noise(2.2, 0.12, 200, 1400); s.tone(110, 2, 'sawtooth', 0.025, 220); },
     quake: function (s) { s.noise(1.6, 0.26, 20, 220); s.tone(48, 1.4, 'sine', 0.2, 30); },
+    hail: function (s) { s.noise(0.05, 0.12, 2500, 9000); s.tone(1800, 0.06, 'square', 0.02, 1200); },
+    lava: function (s) { s.noise(1.8, 0.18, 30, 400); s.tone(60, 1.2, 'sawtooth', 0.05, 40); s.noise(0.3, 0.08, 1000, 3000, 0.4); },
+    sizzle: function (s) { s.noise(0.25, 0.07, 3000, 9000); },
+    chime: function (s) { s.tone(784, 0.5, 'sine', 0.05, 784); s.tone(1175, 0.6, 'sine', 0.04, 1175, 0.12); s.tone(1568, 0.7, 'sine', 0.03, 1568, 0.24); },
     siren: function (s) { s.tone(660, 0.35, 'triangle', 0.05, 880); s.tone(880, 0.35, 'triangle', 0.05, 660, 0.36); },
     thunder: function (s) { s.noise(0.08, 0.2, 800, 9000); s.noise(1.1, 0.24, 30, 420, 0.06); s.tone(70, 0.9, 'sawtooth', 0.07, 38, 0.05); },
     tock: function (s) { s.tone(1046, 0.07, 'sine', 0.11, 880); s.noise(0.02, 0.05, 1800, 5000); },

@@ -7,6 +7,9 @@
   var TYPES = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
   var TID = { I: 1, O: 2, T: 3, S: 4, Z: 5, J: 6, L: 7 };
   var GARBAGE = 8;   // a cell holds its glaze in the low four bits and, for an item tile, the item id above them
+  // cells the weather mode puts on the wall (9 is settled snow): hail ice that cracks the first time its row is cleared
+  // and goes the second time, and lava that cools into cement
+  var ICE = 10, CRACK = 11, LAVA = 12;
   // Items. Names and descriptions live in the language file (keys i1..i7); the tile shows a wordless mark.
   var ITEMS = [null,
     { id: 1, color: '#D9432F' },   // knock down: removes your bottom 3 rows
@@ -495,6 +498,18 @@
       this.grid.splice(rows[i], 1);
       this.grid.unshift(emptyRow());
     }
+    // hail ice only cracks: a cracked block drops back on top of its column (never filling a row by itself)
+    for (i = 0; i < lines; i++) for (x = 0; x < COLS; x++) {
+      if ((colors[i][x] & 15) !== ICE) continue;
+      var ty = 0;
+      while (ty < ROWS && this.grid[ty][x]) ty++;
+      while (ty < ROWS && !this.grid[ty][x]) ty++;
+      ty--;
+      if (ty < TOP + 2) continue;
+      var nn = 0;
+      for (var jx = 0; jx < COLS; jx++) if (this.grid[ty][jx] || jx === x) nn++;
+      if (nn < COLS) this.grid[ty][x] = CRACK;
+    }
 
     var atk = 0, b2b = false, perfect = false, pts = 0;
     if (lines) {
@@ -687,7 +702,7 @@
   };
 
   var ZZ = {
-    COLS: COLS, ROWS: ROWS, VIS: VIS, TOP: TOP, TYPES: TYPES, TID: TID, GARBAGE: GARBAGE, ITEMS: ITEMS, FX_KIND: FX_KIND, ITEM_POOL: ITEM_POOL,
+    COLS: COLS, ROWS: ROWS, VIS: VIS, TOP: TOP, TYPES: TYPES, TID: TID, GARBAGE: GARBAGE, ICE: ICE, CRACK: CRACK, LAVA: LAVA, ITEMS: ITEMS, FX_KIND: FX_KIND, ITEM_POOL: ITEM_POOL,
     BOX: BOX, SHAPES: SHAPES, kicksFor: kicksFor, tspinType: tspinType, calcAttack: calcAttack, calcScore: calcScore,
     RNG: RNG, Game: Game
   };

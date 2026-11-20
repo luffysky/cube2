@@ -381,3 +381,18 @@
 - 資料庫：未異動。｜刪除：無（玩家自己刪本機音樂檔是本機操作，不碰伺服器）。
 - 測試：`node test/run.js` 全過（weather 52）；瀏覽器 `wxnet` 19（三種房間模式、房客看到模式、同一片天、關卡地形兩邊同一關）、`music` 9（非會員沒有上傳、壞檔不收、只存 IndexedDB、沒有任何上傳請求、播放列表、重開還在）、`skies` 23、`rwd` 232、`flow` 60、`cloudui` 41、`gameslang` 113、`legal` 439、`pwa` 52、`drawer` 28。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`c8e5644`](https://github.com/luffysky/cube2/commit/c8e5644)，Vercel `dpl_BFq7gxUkJWgBCv7cpc4maZKTMgxX` READY。
+
+## 2026-11-20 23:50（Asia/Taipei）｜挑戰大自然再加三種天氣、三種災害
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-029
+- 實際變更：
+  - 天氣（`src/weather.js`）：沙塵暴（像強風一樣推方塊，下一個方塊被遮住）、極光（期間得分 ×2；`Weather.GOOD`，不會被丟給對手，`hit('aurora')` 拒收）、日蝕（只看得到落下方塊周圍）。
+  - 災害：冰雹（落在幾欄頂上的冰塊，第一次被消只會裂開、回到該欄頂上，第二次才消失；`src/engine.js` 新格子 ICE 10、CRACK 11）、火山（底下噴出一排有缺口的岩漿 LAVA 12，壓在上面的磚一格一格燒掉、上方往下補，結束時冷卻成水泥）、雷擊（劈掉一整列，3 級找最高的那列）。
+  - 畫面與聲音（`src/wxmode.js`、`src/view.js`）：沙塵黃霧與飛沙、極光彩帶、日蝕遮罩、冰雹落下、火山紅光與火星、雷擊閃電；冰、裂冰、岩漿的磚面；新音效 hail、lava、sizzle、chime。連線鏡像接受 9–12 號格子（之前雪在對手畫面上看不到，一起修好）。
+  - 說明文字四語更新；練習清單變成 8 種天氣、6 種災害。
+- 檔案：`src/engine.js`、`src/weather.js`、`src/wxmode.js`、`src/view.js`、`src/net.js`、`src/style.css`、`test/weather.test.js`、`test/skies.js`、`index*.html`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過（weather 62）；瀏覽器 `skies` 46（每種天氣與災害都實際跑一次、截圖）、`wxnet` 19、`rwd` 232、`flow` 60、`music` 9。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
