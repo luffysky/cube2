@@ -72,6 +72,22 @@ for (const [k, f] of Object.entries(parts)) {
 }
 fs.writeFileSync(path.join(root, 'index.html'), html);
 // the brick games' pages share the site themes
+// and every brick-game page asks for its shared files by this build, so a phone never keeps an old stylesheet
+{
+  const stampOf = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'games', f))).digest('hex').slice(0, 10);
+  const shared = fs.readdirSync(path.join(root, 'games')).filter(f => /\.(css|js)$/.test(f));
+  const pages = [path.join(root, 'games', 'index.html')].concat(fs.readdirSync(path.join(root, 'games'), { withFileTypes: true }).filter(d => d.isDirectory()).map(d => path.join(root, 'games', d.name, 'index.html')).filter(f => fs.existsSync(f)));
+  for (const pg of pages) {
+    let h = fs.readFileSync(pg, 'utf8'), was = h;
+    for (const f of shared) h = h.replace(new RegExp('((?:href|src)="(?:\\.\\./)?' + f.replace('.', '\\.') + ')(\\?v=[0-9a-f]+)?"', 'g'), '$1?v=' + stampOf(f) + '"');
+    const dir = path.dirname(pg);
+    if (dir !== path.join(root, 'games')) for (const f of fs.readdirSync(dir).filter(f => /\.(css|js)$/.test(f))) {
+      const v = crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex').slice(0, 10);
+      h = h.replace(new RegExp('((?:href|src)="' + f.replace('.', '\\.') + ')(\\?v=[0-9a-f]+)?"', 'g'), '$1?v=' + v + '"');
+    }
+    if (h !== was) fs.writeFileSync(pg, h);
+  }
+}
 fs.writeFileSync(path.join(root, 'games', 'site-themes.css'), src('site-themes.css'));
 
 // ---------- which scripts the page may run ----------

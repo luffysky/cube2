@@ -228,3 +228,14 @@
 - 檔案：`src/meta.js`、`src/site-themes.css`、`games/site-themes.css`（建置產生）、`index.html`、`test/meta.test.js`、`test/sites.js`、`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除操作：無。
 - 測試：`node test/run.js` 全過（meta 166）；瀏覽器 `sites` 25。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`856f5d2`](https://github.com/luffysky/cube2/commit/856f5d2)，Vercel `dpl_ENzMF3bGTt87ph3PJbzF1KCmg8kb` READY。
+
+## 2026-11-20 19:00（Asia/Taipei）｜修正：手機上小遊戲側邊選單沒有樣式
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：Owner 回報手機截圖（遊戲目錄頁底部出現一串沒有樣式的選單連結）
+- 原因：手機瀏覽器拿了舊版 `games.css`（沒有側邊選單樣式）配新版 `nav.js`，選單被當成一般文字排到頁尾。本機與測試用新檔都正常。
+- 實際變更：`build.js` 建置時幫所有磚塊遊戲頁引用的 CSS／JS 加上內容雜湊 `?v=`，檔案一改網址就變，手機不會再用舊檔；遊戲目錄頁尾改成「SnowRealm Games 註冊／登入」。
+- 檔案：`build.js`、`games/index.html`、`games/*/index.html`。｜資料庫：未異動。｜刪除操作：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `sites` 25、`drawer` 28、`bricks` 73、`minipay` 10、`pwa` 47。手機實機待 Owner 重新整理確認。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
