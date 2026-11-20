@@ -814,9 +814,10 @@
     var last = Meta.data.box.last;
     if (!box.wait || !last || last.n === box.before) return false;
     box.wait = 0;
-    var best = last.boxes.some(function (b) { return b.grade === 'gem' || b.grade === 'gold'; });
-    App.sfx.play(best ? 'cheer' : 'itemGet');
-    App.buzz(best ? [30, 40, 60] : 18);
+    var best = last.boxes.some(function (b) { return b.grade === 'gem' || b.grade === 'gold'; }), gem = last.boxes.some(function (b) { return b.grade === 'gem'; });
+    // a gold or gem box gets the full show; the rest is listed in the sheet as before
+    if (best && App.celebrate) App.celebrate([].concat.apply([], last.boxes.map(function (b) { return b.got; })), gem ? 3 : 2, t(gem ? 'bx.gem' : 'bx.gold'));
+    else { App.sfx.play('itemGet'); App.buzz(18); }
     return true;
   }
   App.clicks.push(function (d) {

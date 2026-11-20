@@ -16,6 +16,10 @@
     'bn.off': ['廣告還沒開通，開通後就能領。', 'Ads are not switched on yet.', '広告はまだ準備中です。', '광고는 아직 준비 중입니다.'],
     'bn.member': ['會員直接領 {0} 金幣', 'Member: take {0} coins', '会員はそのまま {0} コイン', '회원 바로 {0}코인'],
     'bn.memberP': ['會員不用看廣告，直接領，跟看廣告共用每天的次數。', 'Members take it without an ad, from the same daily count.', '会員は広告なしで受け取れます（1 日の回数は共通）。', '회원은 광고 없이 받을 수 있습니다(하루 횟수 공유).'],
+    'ce.got': ['拿到了！', 'You got it!', 'ゲット！', '획득!'],
+    'ce.big': ['大獎！', 'Big win!', '大当たり！', '대박!'],
+    'ce.jack': ['頭獎！！', 'JACKPOT!!', 'ジャックポット！！', '잭팟!!'],
+    'ce.tap': ['點一下繼續', 'Tap to continue', 'タップで続ける', '탭해서 계속'],
     'bn.got': ['拿到 {0} 金幣', 'Got {0} coins', '{0} コイン獲得', '{0}코인 획득'],
     'bn.wait': ['領取中…', 'Collecting…', '受け取り中…', '받는 중…'],
     'bn.none': ['今天的次數用完了，明天再來。', 'None left today. Come back tomorrow.', '今日の回数は終わりです。また明日。', '오늘 횟수를 다 썼어요. 내일 다시 오세요.'],
@@ -74,7 +78,7 @@
   App.acts.adFree = function () {
     var before = Meta.data.coins, r = Meta.adFree();
     if (!r.ok) { App.toast(t(r.why === 'none' ? 'bn.none' : 'sh.member')); return; }
-    if (!r.pending) { App.sfx.play('itemGet'); App.toast(t('bn.got', r.n)); App.updateMenu(); App.openSheet('bonus'); return; }
+    if (!r.pending) { App.updateMenu(); App.openSheet('bonus'); App.celebrate([{ kind: 'coins', n: r.n }], 1); return; }
     // with a cloud save the server pays; the coins arrive with the next sync
     waiting = Date.now();
     App.openSheet('bonus');
@@ -82,12 +86,81 @@
     var check = setInterval(function () {
       if (Meta.data.coins !== before || Date.now() - waiting > 8000) {
         clearInterval(check);
-        if (Meta.data.coins > before) { App.sfx.play('itemGet'); App.toast(t('bn.got', Meta.data.coins - before)); }
+        if (Meta.data.coins > before) App.celebrate([{ kind: 'coins', n: Meta.data.coins - before }], 1);
         waiting = 0;
         App.updateMenu();
         if (App.sheet() === 'bonus') App.openSheet('bonus');
       }
     }, 250);
+  };
+
+  // ---------- the prize show ----------
+  // A full-screen moment for what the wheel, the slot machine, an ad or a box just gave: rays, confetti, the prize
+  // big in the middle, coins counting up and flying to the purse. lvl 1 a small win, 2 a good one, 3 the jackpot.
+  // A tap (or a few seconds) closes it. With reduced motion: the card alone, no confetti or flying coins.
+  App.celebrate = function (got, lvl, title) {
+    got = (got || []).filter(Boolean);
+    if (!got.length) return;
+    lvl = lvl || 1;
+    var old = document.getElementById('cele'); if (old) old.remove();
+    var coins = got.reduce(function (a, g) { return a + (g.kind === 'coins' ? g.n : 0); }, 0), rest = got.filter(function (g) { return g.kind !== 'coins'; });
+    var el = document.createElement('div'), reduce = App.env && App.env.reduce;
+    el.id = 'cele'; el.className = 'cele l' + lvl + (reduce ? ' still' : ''); el.setAttribute('role', 'status');
+    el.innerHTML = '<canvas class="cele-cv" aria-hidden="true"></canvas><div class="cele-rays" aria-hidden="true"></div><div class="cele-card">' +
+      '<p class="cele-t">' + esc(title || t(lvl >= 3 ? 'ce.jack' : lvl === 2 ? 'ce.big' : 'ce.got')) + '</p>' +
+      (coins ? '<p class="cele-coins"><i class="coin"></i><b id="celeN">0</b></p>' : '') +
+      (rest.length ? '<p class="cele-rest">' + rest.map(App.prizeText).join('<br>') + '</p>' : '') +
+      '<p class="cele-tap">' + t('ce.tap') + '</p></div>';
+    document.body.appendChild(el);
+    var done = false, close = function () { if (done) return; done = true; el.classList.add('out'); setTimeout(function () { el.remove(); }, 260); };
+    el.addEventListener('click', close);
+    setTimeout(close, 2600 + lvl * 900);
+    App.buzz(lvl >= 3 ? [40, 60, 40, 60, 120] : lvl === 2 ? [30, 40, 60] : 20);
+    App.sfx.play(lvl >= 2 ? 'cheer' : 'itemGet');
+    // the number rolls up
+    var nEl = document.getElementById('celeN'), t0 = performance.now(), dur = reduce ? 1 : 700 + lvl * 300;
+    (function roll(now) {
+      if (!nEl) return;
+      var p = Math.min(1, (now - t0) / dur);
+      nEl.textContent = '+' + L.num(Math.round(coins * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(roll); else if (lvl >= 2) nEl.parentNode.classList.add('pop');
+    })(t0);
+    if (reduce) return;
+    // confetti, and coins that fly to the purse
+    var cv = el.querySelector('canvas'), W = innerWidth, H = innerHeight, x = ZZ.View.sizeCanvas(cv, W, H), parts = [], i;
+    var cols = lvl >= 3 ? ['#FFD54A', '#FFB300', '#FFF3B0', '#FF7043', '#FFFFFF'] : ['#F5B82E', '#5DB7F5', '#37C29A', '#FF9DB5', '#B49CFF', '#FFFFFF'];
+    var n = [0, 50, 110, 220][lvl];
+    for (i = 0; i < n; i++) parts.push({ k: 'c', x: W / 2, y: H * 0.42, vx: (Math.random() - 0.5) * 900, vy: -300 - Math.random() * 700, r: Math.random() * 6, vr: (Math.random() - 0.5) * 14, s: 5 + Math.random() * 6, c: cols[i % cols.length], life: 1800 + Math.random() * 1200 });
+    var purse = document.querySelector('.purse') || document.querySelector('.shop-top .coin'), pr = purse ? purse.getBoundingClientRect() : { left: W - 60, top: 20, width: 40, height: 30 };
+    var fly = coins ? Math.min(24, 6 + Math.round(Math.log(coins + 1) * 2) + lvl * 3) : 0;
+    for (i = 0; i < fly; i++) parts.push({ k: 'o', x0: W / 2 + (Math.random() - 0.5) * 80, y0: H * 0.45 + (Math.random() - 0.5) * 40, x1: pr.left + pr.width / 2, y1: pr.top + pr.height / 2, d: 500 + i * 55, t: 0, dur: 700 });
+    var last = performance.now();
+    (function frame(now) {
+      if (!el.isConnected) return;
+      var dt = Math.min(40, now - last); last = now;
+      x.clearRect(0, 0, W, H);
+      var alive = 0;
+      for (var j = 0; j < parts.length; j++) {
+        var p = parts[j];
+        if (p.k === 'c') {
+          if ((p.life -= dt) <= 0) continue;
+          alive++;
+          p.vy += 1400 * dt / 1000; p.vx *= 0.99; p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000; p.r += p.vr * dt / 1000;
+          x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.globalAlpha = Math.min(1, p.life / 400); x.fillStyle = p.c; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore();
+        } else {
+          p.t += dt;
+          var q = (p.t - p.d) / p.dur;
+          if (q < 0) { alive++; continue; }
+          if (q > 1) continue;
+          alive++;
+          var e = q * q * (3 - 2 * q), cx = p.x0 + (p.x1 - p.x0) * e, cy = p.y0 + (p.y1 - p.y0) * e - Math.sin(q * Math.PI) * 120;
+          x.fillStyle = '#F5B82E'; x.strokeStyle = '#B07A00'; x.lineWidth = 2;
+          x.beginPath(); x.ellipse(cx, cy, 9, 9 * Math.abs(Math.cos(p.t / 90)) + 2, 0, 0, 6.283); x.fill(); x.stroke();
+          if (q > 0.97 && purse && !p.hit) { p.hit = 1; purse.classList.remove('bump'); void purse.offsetWidth; purse.classList.add('bump'); App.sfx.play('tick'); }
+        }
+      }
+      if (alive) requestAnimationFrame(frame);
+    })(last);
   };
 
   // ---------- the wheel and the slot machine ----------
@@ -177,8 +250,8 @@
       if (g) { g.style.transition = 'transform 3.2s cubic-bezier(0.15, 0.85, 0.25, 1)'; g.style.transform = 'rotate(' + luck.angle + 'deg)'; }
       setTimeout(function () {
         luck.busy = ''; luck.wheelSeen = last.n;
-        App.sfx.play(last.seg === 'c1000' || last.seg === 'c300' ? 'cheer' : 'itemGet');
         App.updateMenu(); if (App.sheet() === 'bonus') App.openSheet('bonus');
+        App.celebrate(last.got, last.seg === 'c1000' ? 3 : last.seg === 'c300' ? 2 : 1);
       }, g ? 3300 : 0);
     });
   };
@@ -204,7 +277,8 @@
           App.sfx.play('lock');
           if (stopped === 3) {
             shown = fin; luck.busy = ''; luck.slotSeen = last.n;
-            App.sfx.play(last.out === 'gold3' || last.out === 'three' ? 'cheer' : last.got.length ? 'itemGet' : 'fail');
+            if (last.got.length) App.celebrate(last.got, last.out === 'gold3' ? 3 : last.out === 'three' || last.out === 'gold2' ? 2 : 1);
+            else App.sfx.play('fail');
             App.updateMenu();
             setTimeout(function () { if (App.sheet() === 'bonus') App.openSheet('bonus'); }, 300);
           }
