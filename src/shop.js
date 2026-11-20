@@ -28,6 +28,7 @@
     'e.no': ['這個不能用金幣買。', 'This cannot be bought with coins.', 'これはコインでは買えません。', '코인으로 살 수 없습니다.'],
     'e.max': ['最多放 99 個。', 'You can hold up to 99.', '最大99個までです。', '최대 99개까지입니다.'],
     'e.setHave': ['這套你都有了。', 'You own every part of this set.', 'このセットはすべて所持済みです。', '이 세트는 모두 보유 중입니다.'],
+    'e.locked': ['這個節日活動還沒開放。', 'This holiday event has not opened yet.', 'このイベントはまだ始まっていません。', '이 시즌 이벤트는 아직 열리지 않았습니다.'],
     // membership
     'mb.name': ['轉磚會員', 'Zhuan Zhuan Member', 'Zhuan Zhuan メンバー', 'Zhuan Zhuan 멤버십'],
     'mb.p1': ['用自己的圖片當牆面和磚面', 'Use your own pictures for the wall and the tiles', '自分の画像を壁とタイルに使える', '내 사진을 벽과 타일에 사용'],
@@ -101,6 +102,7 @@
     'sh.festF': ['一般或節日', 'Regular or holiday', '通常・季節', '일반·시즌'],
     'sh.f.all': ['全部', 'All', 'すべて', '전체'], 'sh.f.plain': ['一般', 'Regular', '通常', '일반'], 'sh.f.fest': ['節日', 'Holidays', 'イベント', '시즌'],
     'sh.fest': ['節日', 'Holiday', 'イベント', '시즌'],
+    'sh.locked': ['活動未開放', 'Not open yet', 'イベント未開催', '이벤트 미개최'],
     'it.all': ['全部', 'All', 'すべて', '전체'], 'it.self': ['自己用', 'For you', '自分用', '내게 쓰기'], 'it.foe': ['打對手', 'Against rival', '相手に', '상대에게'],
     'it.combo': ['組合', 'Combos', 'コンボ', '조합'], 'it.owned': ['我有的', 'Mine', '持っている', '보유'],
     'it.count': ['共 {0} 種', '{0} kinds', '{0} 種類', '{0}종'],
@@ -367,6 +369,7 @@
     if (st === 'ok') return on ? '<span class="tag on">' + t('sh.using') + '</span>' : '<button class="btn sm" type="button" data-wear="' + key + '">' + t('sh.wear') + '</button>';
     if (st === 'buy') return '<button class="btn sm buy" type="button" data-buy="' + key + '">' + coin(it.price) + '</button>';
     if (st === 'sub') return '<button class="btn sm" type="button" data-tab="member">' + t('sh.member') + '</button>';
+    if (st === 'locked') return '<span class="tag lock">' + t('sh.locked') + '</span>';
     return '<span class="tag">' + t('sh.rank', t('tier' + it.rank)) + '</span>';
   }
   // regular looks or holiday ones, per tab
@@ -376,13 +379,19 @@
     ['all', 'plain', 'fest'].forEach(function (c) { h += '<button type="button" role="radio" aria-checked="' + (lookCat === c) + '" data-lcat="' + c + '">' + t('sh.f.' + c) + '</button>'; });
     return h + '</div>';
   }
-  function festOk(it) { return lookCat === 'all' || (lookCat === 'fest') === !!it.fest; }
+  // holidays of the player's own region (and of everywhere); the rest are not listed
+  // a holiday on sale now comes before the ones still to open
+  function openFirst(list) { var rank = function (it) { return !it.fest ? 0 : Meta.FEST_OPEN.indexOf(it.id) >= 0 ? 1 : 2; }; return list.map(function (it, i) { return [rank(it), i, it]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; }).map(function (x) { return x[2]; }); }
+  function festOk(it) {
+    if (it.fest && !Meta.festShown(it.id, ZZ.Consent ? ZZ.Consent.region() : '')) return false;
+    return lookCat === 'all' || (lookCat === 'fest') === !!it.fest;
+  }
   App.clicks.push(function (d) {
     if (d.lcat == null || ['all', 'plain', 'fest'].indexOf(d.lcat) < 0) return false;
     lookCat = d.lcat; App.openSheet('shop'); return true;
   });
   function cardsHtml(kind) {
-    var list = Meta.CATALOG[kind].filter(festOk), h = festSeg() + '<div class="cards">', i;
+    var list = openFirst(Meta.CATALOG[kind].filter(festOk)), h = festSeg() + '<div class="cards">', i;
     for (i = 0; i < list.length; i++) {
       var it = list[i], on = Meta.data.equip[kind] === it.id, pv;
       if (kind === 'theme') {
@@ -394,11 +403,12 @@
     return h + '</div>';
   }
   function setsHtml() {
-    var list = Meta.CATALOG.set.filter(festOk), h = festSeg() + '<div class="cards wide">', i;
+    var list = openFirst(Meta.CATALOG.set.filter(festOk)), h = festSeg() + '<div class="cards wide">', i;
     for (i = 0; i < list.length; i++) {
       var st = list[i], p = Meta.setPrice(st.id), usable = Meta.setUsable(st.id), e = Meta.data.equip;
       var on = Meta.KINDS.every(function (k) { return e[k] === st.parts[k]; }), names = Meta.KINDS.map(function (k) { return t('c.' + k + '.' + st.parts[k]); }).join('・'), act;
-      if (usable) act = on ? '<span class="tag on">' + t('sh.using') + '</span>' : '<button class="btn sm" type="button" data-wearset="' + st.id + '">' + t('sh.wear') + '</button>';
+      if (st.fest && Meta.FEST_OPEN.indexOf(st.id) < 0 && !usable) act = '<span class="tag lock">' + t('sh.locked') + '</span>';
+      else if (usable) act = on ? '<span class="tag on">' + t('sh.using') + '</span>' : '<button class="btn sm" type="button" data-wearset="' + st.id + '">' + t('sh.wear') + '</button>';
       else act = '<button class="btn sm buy" type="button" data-buyset="' + st.id + '">' + coin(p.price) + '</button><small>' + t('sh.setWas', L.num(p.miss)) + '</small>';
       h += '<div class="card' + (on ? ' on' : '') + '"><canvas class="pv" data-pv="set|' + st.id + '"></canvas><b>' + esc(t('c.set.' + st.id)) + '</b><span class="parts">' + esc(names) + '</span>' + act + '</div>';
     }

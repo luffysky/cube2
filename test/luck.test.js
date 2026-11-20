@@ -78,5 +78,11 @@ M.data.daily.jobs = M.data.daily.jobs.map(j => ({ id: 'box', n: 0, paid: false }
 M.data.coins = 0; M.data.daily.draws = 0; M.draw(2);
 ok(M.data.daily.jobs[0].n === 2, 'opening boxes counts for a box job');
 
+// ---------- holiday looks: only the open ones are on sale; each region sees its own ----------
+M.data.coins = 1e6; M.cancelSub && M.cancelSub();
+ok(M.buy('tile', 'xmas').ok, 'Christmas is open');
+ok(M.buy('tile', 'cny').why === 'locked' && M.state('bg', 'cny') === 'locked' && M.buySet('cny').why === 'locked', 'the Lunar New Year waits');
+M.subscribe(); ok(M.state('theme', 'halloween') === 'locked', 'not even a member can use a holiday before it opens'); M.cancelSub();
+ok(M.festShown('cny', 'tw') && !M.festShown('cny', 'us') && M.festShown('thanks', 'us') && !M.festShown('thanks', 'jp') && M.festShown('xmas', 'jp') && M.festShown('hina', 'other'), 'each region sees its own holidays and the shared ones');
 console.log('luck tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

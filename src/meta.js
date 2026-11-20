@@ -81,6 +81,20 @@
     { id: 'school', n: ['開學季', 'Back to school', '新学期', '개학 시즌'], pal: ['#FFFDE7', '#F44336', '#FFEB3B', '#2196F3', '#4CAF50', '#FF9800', '#9C27B0'], mark: 'dots', wall: [['#F4F7FB', '#E2E9F3'], 'star', 'rgba(60,110,200,0.25)'], th: ['#F2F5FA', '#1D2F4F', 0], fx: ['note', '#FFFFFF', 0.4] },
     { id: 'winter', n: ['冬至', 'Winter solstice', '冬至', '동지'], pal: ['#FFFFFF', '#F8BBD0', '#FFE0E9', '#ECEFF1', '#F48FB1', '#FFF3F6', '#E1BEE7'], mark: 'dots', wall: [['#2B3A5C', '#121B30'], 'flake', 'rgba(255,255,255,0.45)'], th: ['#172036', '#080D1A', 1], fx: ['snow', '#FFE0E9', 0.7] }
   ];
+  // Where each holiday is shown (by the region the player picked; 'all' everywhere, and 'other' sees every holiday),
+  // and which are on sale now. The rest show as "not open yet". Christmas first, then the Lunar New Year.
+  var FEST_RG = {
+    cny: ['tw', 'hk', 'mo', 'cn', 'kr', 'my', 'sg'], lantern: ['tw', 'hk', 'mo', 'cn', 'my', 'sg'], dragonboat: ['tw', 'hk', 'mo', 'cn', 'my', 'sg'],
+    qixi: ['tw', 'hk', 'mo', 'cn', 'jp', 'kr'], midautumn: ['tw', 'hk', 'mo', 'cn', 'kr', 'my', 'sg'], winter: ['tw', 'hk', 'mo', 'cn'], teacher: ['tw', 'kr', 'sg', 'my'],
+    hanami: ['jp', 'kr', 'tw'], hina: ['jp'], whiteday: ['jp', 'kr', 'tw'], kids: ['jp', 'kr', 'tw', 'hk', 'mo', 'cn'], snowfest: ['jp', 'kr'],
+    thanks: ['us'], stpatrick: ['uk', 'us', 'au'], easter: ['uk', 'us', 'au', 'sg'], diwali: ['my', 'sg', 'uk'], songkran: ['my', 'sg'], harvest: ['uk', 'au', 'kr'],
+    valentine: ['all'], halloween: ['all'], xmas: ['all'], newyear: ['all'], birthday: ['all'], fireworks: ['all'], earth: ['all'], graduation: ['all'], school: ['all'], carnival: ['all'], mother: ['all'], father: ['all']
+  };
+  var FEST_OPEN = ['xmas'];
+  FESTIVE.forEach(function (f) { f.rg = FEST_RG[f.id] || ['all']; f.open = FEST_OPEN.indexOf(f.id) >= 0; });
+  function festLocked(it) { return !!(it && it.fest && FEST_OPEN.indexOf(it.id) < 0); }
+  // shown for a region: everything for 'other' or no answer, otherwise the holidays of everywhere and of that region
+  function festShown(id, region) { var r = FEST_RG[id] || ['all']; return !region || region === 'other' || r.indexOf('all') >= 0 || r.indexOf(region) >= 0; }
   var CATALOG = {
     tile: [
       { id: 'glaze', name: '釉面磚', price: 0 },
@@ -337,7 +351,7 @@
   }
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
-    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
+    TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
     SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
     TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
@@ -533,6 +547,7 @@
     if (!it) return 'none';
     if (it.sub) return Meta.isSub() ? 'ok' : 'sub';
     if (it.price === 0 || Meta.owns(kind, id)) return 'ok';
+    if (festLocked(it)) return 'locked';
     if (it.rank != null) return rankOf(Math.max(Meta.data.peak, Meta.data.rp)).tier >= it.rank ? 'ok' : (Meta.isSub() ? 'ok' : 'rank');
     return Meta.isSub() ? 'ok' : 'buy';
   };
@@ -541,6 +556,7 @@
     var it = find(kind, id);
     if (!it || it.sub || it.rank != null || !it.price) return { ok: false, why: 'no' };
     if (Meta.owns(kind, id)) return { ok: false, why: 'have' };
+    if (festLocked(it)) return { ok: false, why: 'locked' };
     if (!Meta.spend(it.price)) return { ok: false, why: 'poor', n: it.price - Meta.data.coins };
     Meta.data.owned[kind].push(id);
     Meta.save();
@@ -560,6 +576,7 @@
   };
   Meta.buySet = function (id) {
     var st = find('set', id), p = Meta.setPrice(id);
+    if (festLocked(st)) return { ok: false, why: 'locked' };
     if (!st || !p.miss) return { ok: false, why: 'setHave' };
     if (!Meta.spend(p.price)) return { ok: false, why: 'poor', n: p.price - Meta.data.coins };
     KINDS.forEach(function (k) { var it = find(k, st.parts[k]); if (it && it.price && !Meta.owns(k, it.id)) Meta.data.owned[k].push(it.id); });
@@ -712,7 +729,7 @@
     var d = Meta.data, box = pick(BOX, Meta.rand()), prize = pick(box.prizes, Meta.rand()), got = [], i;
     if (prize.kind === 'look') {
       var pool = [];
-      KINDS.forEach(function (k) { CATALOG[k].forEach(function (it) { if (it.price > 0 && it.price <= prize.max && !Meta.owns(k, it.id)) pool.push({ k: k, id: it.id, price: it.price }); }); });
+      KINDS.forEach(function (k) { CATALOG[k].forEach(function (it) { if (it.price > 0 && it.price <= prize.max && !festLocked(it) && !Meta.owns(k, it.id)) pool.push({ k: k, id: it.id, price: it.price }); }); });
       if (pool.length) { var one = pool[Math.floor(Meta.rand() * pool.length) % pool.length]; d.owned[one.k].push(one.id); got.push({ kind: 'look', k: one.k, id: one.id }); }
       else got.push({ kind: 'coins', n: Math.round(prize.max >= 99999 ? 800 : prize.max / 2) });      // owns everything that could come: coins instead
     } else if (prize.kind === 'items') {

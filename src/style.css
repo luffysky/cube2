@@ -799,3 +799,4 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .foes.many { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .foes.many .foe { min-height: 38px; padding: 4px 6px 6px; font-size: 11px; }
 .festtag { font-size: 10px; font-weight: 700; color: var(--alarm); border: 1px solid currentColor; border-radius: 6px; padding: 0 4px; margin-left: 2px; vertical-align: 2px; }
+.tag.lock { color: var(--muted); border-style: dashed; }
