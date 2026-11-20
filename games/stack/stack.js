@@ -103,7 +103,8 @@
   var level = 'normal', bests = {}, startAt = 0;
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
-  var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var LV_NAME = { easy: T('g.easy'), normal: T('g.normal'), hard: T('g.hard') };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function bestOf(lv) { return +bests[lv] || 0; }
 
@@ -162,7 +163,7 @@
       x.globalAlpha = 1;
     }
     if (flash > 0) { x.fillStyle = 'rgba(224,79,95,' + (flash * 0.35).toFixed(3) + ')'; x.fillRect(0, 0, W, H); flash = Math.max(0, flash - dt / 400); }
-    if (state === 'play' && hgt === 0) { x.fillStyle = 'rgba(232,237,242,0.8)'; x.font = '700 14px sans-serif'; x.textAlign = 'center'; x.fillText(window.matchMedia('(hover: none)').matches ? '點一下放下磚塊' : '按空白鍵或點一下放下磚塊', W / 2, 120); }
+    if (state === 'play' && hgt === 0) { x.fillStyle = 'rgba(232,237,242,0.8)'; x.font = '700 14px sans-serif'; x.textAlign = 'center'; x.fillText(window.matchMedia('(hover: none)').matches ? T('st.dropTouch') : T('st.drop'), W / 2, 120); }
     x.restore();
   }
   function mix(a, b, k) {
@@ -194,7 +195,7 @@
       var h = '';
       for (var i = 0; i < LIVES; i++) h += i < n ? '♥' : '♡';
       var el = $('hearts');
-      el.textContent = h; el.setAttribute('aria-label', '剩 ' + n + ' 條命');
+      el.textContent = h; el.setAttribute('aria-label', T('g.livesN', n));
       if (heartsShown > n) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
       heartsShown = n;
     }
@@ -219,7 +220,7 @@
     if (nb) { bests[level] = g.score; try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (e) { /* no storage */ } }
     show('ouch', false);
     $('endScore').textContent = g.score;
-    $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・疊了 ' + g.floors() + ' 層・完美 ' + g.perfects + ' 次' + (g.bestCombo > 1 ? '・最多連續 ' + g.bestCombo + ' 次' : '');
+    $('endNote').textContent = [LV_NAME[level], (nb ? T('g.newBest') : T('g.bestPts', bestOf(level))), T('st.end', g.floors()), T('st.endPerfect', g.perfects)].concat(g.bestCombo > 1 ? [T('st.endCombo', g.bestCombo)] : []).join(SEP);
     show('end', true);
     if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'stack', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
@@ -231,7 +232,7 @@
     if (state !== 'play' && state !== 'pause') return;
     state = on ? 'pause' : 'play';
     show('paused', on);
-    $('pause').textContent = on ? '繼續' : '暫停';
+    $('pause').textContent = on ? T('g.resume') : T('g.pause');
     if (on) $('resume').focus();
   }
   function drop() {
@@ -243,15 +244,15 @@
       else if (e.type === 'perfect') {
         var tp = g.tower[e.y];
         fx.push({ kind: 'ring', x: tp.x, y: y, w: tp.w, t: 0, life: 450 });
-        fx.push({ kind: 'txt', text: e.grew ? '變寬了！' : e.combo > 1 ? '完美 ×' + e.combo : '完美', x: tp.x + tp.w / 2, y: y - 6, t: 0, life: 800 });
+        fx.push({ kind: 'txt', text: e.grew ? T('st.grew') : e.combo > 1 ? T('st.perfectN', e.combo) : T('st.perfect'), x: tp.x + tp.w / 2, y: y - 6, t: 0, life: 800 });
         tone(SCALE[Math.min(9, e.combo - 1)], 0.14, 'sine', 0.08);
       }
       else if (e.type === 'miss') {
         bits.push({ x: e.x, y: y, w: e.w, c: e.c, t: 0, vx: 0, vy: 0, a: 0, va: 0.002 });
-        if (e.lives > 0) { $('ouchT').textContent = '沒放到塔上'; $('ouchP').textContent = '還剩 ' + e.lives + ' 條命'; show('ouch', true); state = 'ouch'; wait = 1000; }
+        if (e.lives > 0) { $('ouchT').textContent = T('st.missed'); $('ouchP').textContent = T('g.livesLeft', e.lives); show('ouch', true); state = 'ouch'; wait = 1000; }
         flash = 1; shake = 6; tone(260, 0.22, 'triangle', 0.09, 150);
       }
-      else if (e.type === 'height') { fx.push({ kind: 'txt', text: e.floors + ' 層！', x: W / 2, y: 90, t: 0, life: 1200 }); [0, 2, 4].forEach(function (k, j) { setTimeout(function () { tone(SCALE[k + 3], 0.16, 'sine', 0.06); }, j * 80); }); }
+      else if (e.type === 'height') { fx.push({ kind: 'txt', text: T('st.height', e.floors), x: W / 2, y: 90, t: 0, life: 1200 }); [0, 2, 4].forEach(function (k, j) { setTimeout(function () { tone(SCALE[k + 3], 0.16, 'sine', 0.06); }, j * 80); }); }
     });
     if (r === 'over') finish();
     hud();
@@ -282,7 +283,7 @@
   $('pause').disabled = true;
   document.addEventListener('visibilitychange', function () { if (document.hidden && state === 'play') pause(true); });
   window.addEventListener('resize', size);
-  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = '點一下場地放下磚塊';
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = T('st.touch');
   pickLevel(level);
   size();
   window.requestAnimationFrame(loop);

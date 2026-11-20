@@ -95,7 +95,8 @@
   var level = 'normal', bests = {};
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
-  var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var LV_NAME = { easy: T('g.easy'), normal: T('g.normal'), hard: T('g.hard') };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function fmt(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
 
@@ -176,7 +177,7 @@
       var nb = !bests[level] || time < bests[level];
       if (nb) { bests[level] = time; try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (e) { /* no storage */ } }
       $('endScore').textContent = fmt(time);
-      $('endNote').textContent = LV_NAME[level] + '・轉了 ' + g.taps + ' 下・' + (nb ? '新紀錄！' : '最快 ' + fmt(bests[level]));
+      $('endNote').textContent = [LV_NAME[level], T('pp.end', g.taps), nb ? T('g.newBest') : T('g.fastest', fmt(bests[level]))].join(SEP);
       if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'pipes', lv: ['easy', 'normal', 'hard'].indexOf(level), value: Math.round(time), ms: Math.round(time) });
       setTimeout(function () { if (state === 'won') { show('end', true); $('again').focus(); } }, reduce ? 200 : 900);
       [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone([523, 587, 659, 784, 880, 1047, 1175, 1319][k], 0.2, 'sine', 0.07); }, j * 90); });

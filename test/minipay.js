@@ -12,7 +12,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
   const problems = [];
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const page = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     page.on('pageerror', e => problems.push(e.message));
     await page.goto(BASE + 'index.html?sw=off&lang=zh-Hant'); await sleep(800);
     const c0 = await page.evaluate(() => ZZ.Meta.data.coins);

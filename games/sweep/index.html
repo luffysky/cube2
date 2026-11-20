@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-title="n.sweep" data-desc="sw.desc">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,39 +14,41 @@
 <body>
 <main class="game">
   <div class="bar">
-    <a href="../" aria-label="回到全部遊戲">← 遊戲</a>
-    <h1>掃磚</h1>
+    <a href="../" data-ta="g.backA" data-t="g.back">← 遊戲</a>
+    <h1 data-t="n.sweep">掃磚</h1>
     <span></span>
   </div>
   <div class="stats">
-    <div class="hearts-box" style="align-items:flex-start"><b id="hearts" aria-label="剩下的命">♥♥♥♥♥</b><span>時間 <i id="time">0:00</i>・裂縫 <i id="left">0</i></span></div>
-    <div class="row mode" role="group" aria-label="點磚塊要做什麼"><button class="btn plain" type="button" id="modeDig" aria-pressed="true">敲開</button><button class="btn plain" type="button" id="modeFlag" aria-pressed="false">插旗</button></div>
+    <div class="hearts-box" style="align-items:flex-start"><b id="hearts" data-ta="g.livesA" aria-label="剩下的命">♥♥♥♥♥</b><span data-th="sw.status">時間 <i id="time">0:00</i>・裂縫 <i id="left">0</i></span></div>
+    <div class="row mode" role="group" data-ta="sw.modeA" aria-label="點磚塊要做什麼"><button class="btn plain" type="button" id="modeDig" aria-pressed="true" data-t="sw.dig">敲開</button><button class="btn plain" type="button" id="modeFlag" aria-pressed="false" data-t="sw.flag">插旗</button></div>
   </div>
   <div class="board" id="board">
-    <canvas id="cv" aria-label="掃磚的場地"></canvas>
+    <canvas id="cv" data-ta="sw.board" aria-label="掃磚的場地"></canvas>
     <div class="over" id="intro">
-      <h2>掃磚</h2>
-      <p>點一下敲開水泥磚。數字是周圍 8 塊裡藏了幾道裂縫；周圍都沒有的會自己一起打開。第一下一定安全。</p>
-      <p>覺得有裂縫的磚就插旗（長按、滑鼠右鍵或切到插旗）。敲到裂縫少一條命，有 5 條命。把沒裂縫的磚全部敲開就完成，記最快時間。</p>
-      <div class="seg" role="radiogroup" aria-label="難度">
-        <button type="button" role="radio" data-lv="easy">簡單</button>
-        <button type="button" role="radio" data-lv="normal">普通</button>
-        <button type="button" role="radio" data-lv="hard">困難</button>
+      <h2 data-t="n.sweep">掃磚</h2>
+      <p data-t="sw.p1">點一下敲開水泥磚。數字是周圍 8 塊裡藏了幾道裂縫；周圍都沒有的會自己一起打開。第一下一定安全。</p>
+      <p data-t="sw.p2">覺得有裂縫的磚就插旗（長按、滑鼠右鍵或切到插旗）。敲到裂縫少一條命，有 5 條命。把沒裂縫的磚全部敲開就完成，記最快時間。</p>
+      <div class="seg" role="radiogroup" data-ta="g.lvA" aria-label="難度">
+        <button type="button" role="radio" data-lv="easy" data-t="g.easy">簡單</button>
+        <button type="button" role="radio" data-lv="normal" data-t="g.normal">普通</button>
+        <button type="button" role="radio" data-lv="hard" data-t="g.hard">困難</button>
       </div>
-      <div class="row"><button class="btn" type="button" id="go">開始</button></div>
+      <div class="row"><button class="btn" type="button" id="go" data-t="g.start">開始</button></div>
       
     </div>
     <div class="over reveal" id="end" hidden>
-      <h2 id="endTitle">全部敲完了！</h2>
+      <h2 id="endTitle" data-t="sw.done">全部敲完了！</h2>
       <div class="big" id="endScore">0:00</div>
       <p id="endNote"></p>
-      <div class="row"><button class="btn" type="button" id="again">再一局</button><button class="btn plain" type="button" id="toIntro">換難度</button><a class="btn plain" href="../">其他遊戲</a></div>
+      <div class="row"><button class="btn" type="button" id="again" data-t="g.again2">再一局</button><button class="btn plain" type="button" id="toIntro" data-t="g.change">換難度</button><a class="btn plain" href="../" data-t="g.other">其他遊戲</a></div>
     </div>
   </div>
 </main>
-<script src="../rewards.js?v=4028e3604e"></script>
-<script src="sweep.js?v=438436b1be"></script>
+<script src="../words.js?v=549b329472"></script>
+<script src="../i18n.js?v=cad39cbd3e"></script>
+<script src="../rewards.js?v=2453e265fc"></script>
+<script src="sweep.js?v=16e9ce76a3"></script>
 <script src="../drawer-icons.js?v=1cc7c12d5f"></script>
-<script src="../nav.js?v=2b878d2cca"></script>
+<script src="../nav.js?v=e35d4478a3"></script>
 </body>
 </html>

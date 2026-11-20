@@ -150,7 +150,8 @@
   var level = 'normal', bests = {}, startAt = 0;
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
-  var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var LV_NAME = { easy: T('g.easy'), normal: T('g.normal'), hard: T('g.hard') };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function bestOf(lv) { return +bests[lv] || 0; }
   var TOPH = 1.3;      // rows of room above the field for the brick about to drop
@@ -215,7 +216,7 @@
       x.fillStyle = 'rgba(232,237,242,0.55)'; x.font = '700 ' + Math.round(cell * 0.2) + 'px sans-serif'; x.textAlign = 'right'; x.textBaseline = 'middle';
       var nx = W - 6;
       for (var q = g.queue.length - 1; q >= 1; q--) { var sc = 0.5; x.save(); x.translate(nx - cell * sc, 0.25 * cell); x.scale(sc, sc); brick(0, 0, g.queue[q], 1); x.restore(); nx -= cell * sc + 4; }
-      x.fillText('下一個', nx - 2, 0.55 * cell);
+      x.fillText(T('me.next'), nx - 2, 0.55 * cell);
     }
     for (var i = fx.length - 1; i >= 0; i--) {
       var f = fx[i];
@@ -255,7 +256,7 @@
       var h = '';
       for (var i = 0; i < LIVES; i++) h += i < n ? '♥' : '♡';
       var el = $('hearts');
-      el.textContent = h; el.setAttribute('aria-label', '剩 ' + n + ' 條命');
+      el.textContent = h; el.setAttribute('aria-label', T('g.livesN', n));
       if (heartsShown > n) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
       heartsShown = n;
     }
@@ -281,7 +282,7 @@
     if (nb) { bests[level] = g.score; try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (e) { /* no storage */ } }
     show('ouch', false);
     $('endScore').textContent = g.score;
-    $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・最大合到 ' + label(g.top) + '・放了 ' + g.drops + ' 塊' + (g.bestChain > 1 ? '・最多 ' + g.bestChain + ' 連鎖' : '');
+    $('endNote').textContent = [LV_NAME[level], (nb ? T('g.newBest') : T('g.bestPts', bestOf(level))), T('me.end', label(g.top)), T('me.endDrops', g.drops)].concat(g.bestChain > 1 ? [T('me.endChain', g.bestChain)] : []).join(SEP);
     show('end', true);
     if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'merge', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
@@ -293,7 +294,7 @@
     if (state !== 'play' && state !== 'pause') return;
     state = on ? 'pause' : 'play';
     show('paused', on);
-    $('pause').textContent = on ? '繼續' : '暫停';
+    $('pause').textContent = on ? T('g.resume') : T('g.pause');
     if (on) $('resume').focus();
   }
   function drop(c) {
@@ -309,13 +310,13 @@
         fx.push({ kind: 'txt', text: '+' + e.v, x: e.c * cell + cell / 2, y: rowY(e.r) + cell * 0.4, t: 0, life: 700 });
         setTimeout(function () { tone(SCALE[Math.min(11, Math.round(Math.log2(e.v)) - 1)], 0.12, 'sine', 0.07); }, merges * 70);
       }
-      else if (e.type === 'chain') fx.push({ kind: 'txt', text: e.n + ' 連鎖！', x: g.C * cell / 2, y: TOPH * cell + cell, t: 0, life: 1000 });
+      else if (e.type === 'chain') fx.push({ kind: 'txt', text: T('me.chain', e.n), x: g.C * cell / 2, y: TOPH * cell + cell, t: 0, life: 1000 });
       else if (e.type === 'cement') { tone(140, 0.12, 'square', 0.03); }
       else if (e.type === 'crack') { burst(e.c, e.r, '#8C939B'); }
       else if (e.type === 'crumble') { burst(e.c, e.r, colOf(e.v)); }
       else if (e.type === 'overflow') {
         flash = 1; shake = 8; tone(260, 0.22, 'triangle', 0.09, 150);
-        if (e.lives > 0) { $('ouchT').textContent = '這排滿了'; $('ouchP').textContent = '最上面三排碎掉了・還剩 ' + e.lives + ' 條命'; show('ouch', true); state = 'ouch'; wait = 1300; }
+        if (e.lives > 0) { $('ouchT').textContent = T('me.full'); $('ouchP').textContent = T('me.fullP', e.lives); show('ouch', true); state = 'ouch'; wait = 1300; }
       }
     });
     if (res === 'over') finish();
@@ -349,7 +350,7 @@
   $('pause').disabled = true;
   document.addEventListener('visibilitychange', function () { if (document.hidden && state === 'play') pause(true); });
   window.addEventListener('resize', size);
-  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = '點一下要放的那一排';
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = T('me.touch');
   pickLevel(level);
   size();
   window.requestAnimationFrame(loop);

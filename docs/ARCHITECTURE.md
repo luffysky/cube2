@@ -413,8 +413,9 @@ node test/levels.js          # 七個電腦等級、設定裡的「電腦難度�
 - 字典仍寫在各檔案的 `L.add({...})`。一條字可以只寫中文（字串，或缺後面幾欄的陣列），表示「交給機器翻」。
 - `tools/dict.js`：讀出所有字典，算出缺哪些語言（`todo`），以及把機器翻譯補進空欄（`merged`）。人寫的欄位永遠優先；中文改過，舊的機器翻譯自動作廢、重翻。
 - `tools/i18n-scan.js`：寫出 `i18n/todo.json`；`--check` 有待翻就失敗。
-- `tools/i18n-auto.py`：用 Argos Translate（MIT 開源、模型在本機跑）翻：繁中→英文，英文→日文、韓文（Argos 沒有中日、中韓直譯模型）。`{0}` 空格與 `<標籤>` 會保留，整句翻壞了就分段翻；結果寫進 `i18n/auto.json`（含原中文、引擎、日期）。`--engine mark` 是測試用的假引擎。
-- `.github/workflows/i18n.yml`：推到 main 而且動到字典時，在 GitHub 的機器上跑上面兩步，重新建置、跑測試，把翻譯 commit 回 main（Vercel 接著部署）。翻譯模型快取在 Actions。
+- `tools/i18n-auto.py`：預設用 Google Gemini（`GEMINI_API_KEY`，免費額度即可；只送遊戲介面文字），一次 40 條、要求回傳 JSON，`{0}` 空格與 `<標籤>` 不一致的就不收、留給人翻；結果寫進 `i18n/auto.json`（含原中文、模型、日期）。Argos Translate 留著當選項，但 Owner 決定不用（C-025，品質不足）。`--engine mark` 是測試用的假引擎。
+- `.github/workflows/i18n.yml`：推到 main 而且動到字典時掃描；repo 有 `GEMINI_API_KEY` 這個 secret 才翻譯、重新建置、跑測試、commit 回 main（Vercel 接著部署）。沒有金鑰就只列出待翻清單。現階段由 Claude 直接寫好四種語言。
 - `build.js`：把機器翻譯補進頁面（`ZZ.L.machine` 記哪些欄是機器翻的；設定頁在外語時會提示「有些文字是機器翻譯」），並輸出 `server/i18n-data.json`（每條字五種語言、來源 human／machine／hans／zh）。
 - `server/words.js`：每個伺服器執行個體處理第一個 `/api/rpc` 時，版本不同就把 `server/i18n-data.json` 寫進 `zz.i18n`（`zz.i18nmeta` 記版本）。`src = 'admin'` 的列（後台人工改的）不會被覆蓋。
-- 不在自動翻譯範圍：隱私政策、使用條款（應依地區客製，不是翻譯）；磚塊小遊戲頁面目前是寫死的中文，尚未接字典。
+- 磚塊小遊戲：文字寫在 `src/games-dict.js`（同樣四欄），`build.js` 產生 `games/words.js`（五欄：繁、簡、英、日、韓）。`games/i18n.js` 依 `?lang=`、轉磚的語言設定、瀏覽器語言決定語言，填入 `data-t`（文字）、`data-ta`（aria-label）、`data-th`（含標記）、`data-tk`＋`data-tv`（含會變動的數字）；遊戲程式用 `SRW.t()`。
+- 不在自動翻譯範圍：隱私政策、使用條款（依地區另寫，見 `legal/`）。

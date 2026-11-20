@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Machine-translates what tools/i18n-scan.js put in i18n/todo.json and adds it to i18n/auto.json.
 
-Free and open source, nothing leaves the machine: Argos Translate (OpenNMT models, MIT/CC0).
-Chinese goes to English first, and English to Japanese and Korean (Argos has no direct Chinese-Japanese model).
-{0}-style blanks and <tags> are kept as they are; a line whose blanks do not survive is translated in pieces.
+Engines:
+  gemini  Google Gemini API (the free tier is enough). Needs GEMINI_API_KEY in the environment (in GitHub it is a
+          repository secret; it is never written anywhere). GEMINI_MODEL picks a model; by default the newest
+          "flash" model the key can use. Only the game's own words are sent: never player data or legal texts.
+  argos   Argos Translate, free and open source, runs locally (Chinese→English→Japanese/Korean). Kept only as an
+          option: the Owner chose not to use it (C-025) because its quality is too low.
+  mark    no translation: "[en] 中文" (for tests).
+{0}-style blanks and <tags> must come back unchanged; a line where they do not is left for a person.
 
-  python3 tools/i18n-auto.py                 translate with Argos (downloads the models the first time)
-  python3 tools/i18n-auto.py --engine mark   no translation: "[en] 中文" etc. (for tests)
+  GEMINI_API_KEY=… python3 tools/i18n-auto.py --engine gemini
 """
 import json, os, re, sys, time
 
@@ -35,6 +39,49 @@ def argos():
     models = {(a, b): langs[a].get_translation(langs[b]) for a, b in PAIRS}
     version = 'argos-' + ','.join('%s%s' % (a, b) for a, b in PAIRS)
     return (lambda text, a, b: models[(a, b)].translate(text)), version
+
+
+def gemini():
+    import urllib.request, urllib.error
+    key = os.environ.get('GEMINI_API_KEY', '')
+    if not key:
+        sys.exit('GEMINI_API_KEY is not set')
+    base = 'https://generativelanguage.googleapis.com/v1beta/'
+    def call(path, body=None):
+        req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body else None,
+                                     headers={'x-goog-api-key': key, 'Content-Type': 'application/json'})
+        for tries in range(5):
+            try:
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    return json.loads(r.read().decode())
+            except urllib.error.HTTPError as e:
+                if e.code in (429, 500, 503) and tries < 4:
+                    time.sleep(10 * (tries + 1))
+                    continue
+                raise
+    model = os.environ.get('GEMINI_MODEL', '')
+    if not model:
+        names = [m['name'].split('/')[-1] for m in call('models?pageSize=200').get('models', [])
+                 if 'generateContent' in m.get('supportedGenerationMethods', [])]
+        flash = [n for n in names if 'flash' in n and not re.search(r'image|tts|live|audio|thinking|exp|preview', n)]
+        def ver(n):
+            m = re.search(r'(\d+(?:\.\d+)?)', n)
+            return (float(m.group(1)) if m else 0, 'lite' not in n, n)
+        if not flash:
+            sys.exit('no Gemini flash model available to this key')
+        model = sorted(flash, key=ver)[-1]
+    guide = ('You translate the user-interface words of 轉磚, a casual web block-puzzle game (Taiwan, Traditional Chinese), '
+             'into natural, short game UI language: English (en), Japanese (ja), Korean (ko). Keep {0} {1} blanks and '
+             '<tags> exactly as they are. Keep 轉磚 and SnowRealm untranslated. Answer only JSON: '
+             '{"<key>": {"en": "...", "ja": "...", "ko": "..."}} for every key given.')
+    def batch(items):
+        body = {'systemInstruction': {'parts': [{'text': guide}]},
+                'contents': [{'role': 'user', 'parts': [{'text': json.dumps({i['k']: i['zh'] for i in items}, ensure_ascii=False)}]}],
+                'generationConfig': {'responseMimeType': 'application/json', 'temperature': 0.2}}
+        out = call('models/%s:generateContent' % model, body)
+        text = out['candidates'][0]['content']['parts'][0]['text']
+        return json.loads(text)
+    return batch, 'gemini:' + model
 
 
 def marker():
@@ -67,13 +114,34 @@ def safe(run, text, a, b):
 
 
 def main():
-    engine = 'argos'
+    engine = 'gemini'
     if '--engine' in sys.argv:
         engine = sys.argv[sys.argv.index('--engine') + 1]
-    run, version = marker() if engine == 'mark' else argos()
     todo = json.load(open(TODO, encoding='utf-8')) if os.path.exists(TODO) else []
     auto = json.load(open(AUTO, encoding='utf-8')) if os.path.exists(AUTO) else {}
     done = 0
+    if engine == 'gemini':
+        batch, version = gemini()
+        for i in range(0, len(todo), 40):
+            part = todo[i:i + 40]
+            got = batch(part)
+            for item in part:
+                k, zh = item['k'], item['zh']
+                t = got.get(k) or {}
+                row = dict(auto[k]) if auto.get(k, {}).get('zh') == zh else {'zh': zh}
+                bad = [c for c in item['langs'] if not isinstance(t.get(c), str) or not t[c].strip() or keeps(t[c]) != keeps(zh)]
+                if bad:
+                    print('skip %s: %s came back wrong' % (k, ','.join(bad)), file=sys.stderr)
+                    continue
+                for c in item['langs']:
+                    row[c] = t[c].strip()
+                row['by'] = version
+                row['at'] = time.strftime('%Y-%m-%d')
+                auto[k] = row
+                done += 1
+        todo = []
+    else:
+        run, version = marker() if engine == 'mark' else argos()
     for item in todo:
         k, zh, langs = item['k'], item['zh'], item['langs']
         row = auto.get(k) if auto.get(k, {}).get('zh') == zh else None

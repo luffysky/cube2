@@ -31,8 +31,17 @@ for (const f of ['modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'l
 // words written only in Chinese get their machine translation (i18n/auto.json, made by tools/i18n-auto.py)
 const DICT = require('./tools/dict.js');
 const auto = DICT.merged(DICT.raw().dict, DICT.readAuto());
-const filled = {};
-for (const k of Object.keys(auto.dict)) if (DICT.missing(DICT.raw().dict[k]).length) filled[k] = auto.dict[k];
+const filled = {}, gameKeys = new Set(Object.keys(DICT.raw([DICT.GAMES_FILE]).dict));
+for (const k of Object.keys(auto.dict)) if (!gameKeys.has(k) && DICT.missing(DICT.raw().dict[k]).length) filled[k] = auto.dict[k];
+// the brick games' words, five columns each (繁體, 简体, English, 日本語, 한국어), for games/i18n.js
+{
+  const gw = {};
+  for (const k of [...gameKeys].sort()) {
+    const e = auto.dict[k], zh = DICT.zhOf(e);
+    gw[k] = [zh, L.hans(zh), e[1] || zh, e[2] || zh, e[3] || zh];
+  }
+  fs.writeFileSync(path.join(root, 'games', 'words.js'), '/* made by build.js from src/games-dict.js (and i18n/auto.json): do not edit */\nwindow.SRW_WORDS = ' + JSON.stringify(gw) + ';\n');
+}
 L.add(filled);
 // every word in every language, with where it came from, for the database (server/words.js copies it in)
 {

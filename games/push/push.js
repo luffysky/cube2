@@ -73,7 +73,8 @@
 
   // ---------- the screen ----------
   var LEVELS = root.PUSH_LEVELS || [];
-  var GROUPS = [{ name: '簡單', from: 0, to: 10, note: '2 塊磚' }, { name: '普通', from: 10, to: 30, note: '3 塊磚' }, { name: '困難', from: 30, to: 60, note: '4 塊磚' }];
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var GROUPS = [{ name: T('g.easy'), from: 0, to: 10, note: T('pu.g1') }, { name: T('g.normal'), from: 10, to: 30, note: T('pu.g2') }, { name: T('g.hard'), from: 30, to: 60, note: T('pu.g3') }];
   var $ = function (id) { return document.getElementById(id); };
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.push.done';
@@ -148,20 +149,20 @@
   function hud() {
     $('moves').textContent = g ? g.moves : 0;
     $('pushes').textContent = g ? g.pushes : 0;
-    $('lvName').textContent = g ? '第 ' + (n + 1) + ' 關' : '關卡';
-    $('lvGoal').textContent = g ? '最少 ' + LEVELS[n].p + ' 推' : '';
+    $('lvName').textContent = g ? T('g.levelN', n + 1) : T('g.levels');
+    $('lvGoal').textContent = g ? T('pu.goal', LEVELS[n].p) : '';
     $('undo').disabled = !g || !g.hist.length || state !== 'play';
     $('restart').disabled = !g || state !== 'play';
   }
   // the level list, in three groups
   function list() {
     state = 'list'; g = null;
-    var h = '<h2>推磚倉庫</h2><p>把每塊磚推到黃色虛線框裡。只能推、不能拉，一次推一塊。用最少推數完成拿 3 顆星，可以無限次上一步。</p><p class="tot">已拿 ' + total() + ' / ' + LEVELS.length * 3 + ' 顆星</p>';
+    var h = '<h2>' + T('n.push') + '</h2><p>' + T('pu.how') + '</p><p class="tot">' + T('g.starsTot', total(), LEVELS.length * 3) + '</p>';
     GROUPS.forEach(function (gr) {
       h += '<h3>' + gr.name + '<small>' + gr.note + '</small></h3><div class="lvs">';
       for (var i = gr.from; i < gr.to && i < LEVELS.length; i++) {
         var s = starsOf(i), o = open(i);
-        h += '<button type="button" class="lv' + (s ? ' done' : '') + '" data-lv="' + i + '"' + (o ? '' : ' disabled aria-label="先過前一關"') + '><b>' + (i + 1) + '</b><span>' + (s ? stars(s) : o ? '' : '🔒') + '</span></button>';
+        h += '<button type="button" class="lv' + (s ? ' done' : '') + '" data-lv="' + i + '"' + (o ? '' : ' disabled aria-label="' + T('g.lockFirst') + '"') + '><b>' + (i + 1) + '</b><span>' + (s ? stars(s) : o ? '' : '🔒') + '</span></button>';
       }
       h += '</div>';
     });
@@ -191,7 +192,7 @@
     if (!done[n] || s > was || (s === was && g.pushes < done[n].p)) done[n] = { s: Math.max(s, was), p: done[n] ? Math.min(done[n].p, g.pushes) : g.pushes };
     try { window.localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* no storage */ }
     $('winStars').textContent = stars(s);
-    $('winNote').textContent = '推了 ' + g.pushes + ' 次（最少 ' + LEVELS[n].p + ' 次）・走了 ' + g.moves + ' 步' + (s < 3 ? '・推數再少一點就能拿更多星' : '');
+    $('winNote').textContent = [T('pu.win', g.pushes, LEVELS[n].p), T('pu.winMoves', g.moves)].concat(s < 3 ? [T('pu.winMore')] : []).join(SEP);
     if (root.SnowRealmMini) root.SnowRealmMini.show($('winNote'), { game: 'push', value: n, stars: s, ms: Date.now() - startAt });
     $('next').hidden = n + 1 >= LEVELS.length;
     setTimeout(function () { if (state === 'won') { show('win', true); $(n + 1 < LEVELS.length ? 'next' : 'toList').focus(); } }, reduce ? 0 : 350);
@@ -230,7 +231,7 @@
   $('again').addEventListener('click', function () { play(n); });
   $('toList').addEventListener('click', list);
   window.addEventListener('resize', size);
-  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = '用下面的方向鍵或在場地上滑動';
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = T('g.padHint');
   // straight back to the first level not done yet
   var first = 0; while (first < LEVELS.length - 1 && done[first]) first++;
   list();

@@ -48,7 +48,8 @@
 
   // ---------- the screen ----------
   var LEVELS = root.SORT_LEVELS || [];
-  var GROUPS = [{ name: '簡單', from: 0, to: 18, note: '3–4 種顏色' }, { name: '普通', from: 18, to: 30, note: '5 種顏色' }, { name: '困難', from: 30, to: 60, note: '6–7 種顏色' }];
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var GROUPS = [{ name: T('g.easy'), from: 0, to: 18, note: T('so.g1') }, { name: T('g.normal'), from: 18, to: 30, note: T('so.g2') }, { name: T('g.hard'), from: 30, to: 60, note: T('so.g3') }];
   var COL = ['#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#B49CFF', '#F0704F', '#8C939B'];
   var $ = function (id) { return document.getElementById(id); };
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
@@ -148,18 +149,18 @@
   function hud() {
     $('moves').textContent = g ? g.moves : 0;
     $('goal').textContent = g ? LEVELS[n].p : 0;
-    $('lvName').textContent = g ? '第 ' + (n + 1) + ' 關' : '關卡';
+    $('lvName').textContent = g ? T('g.levelN', n + 1) : T('g.levels');
     $('undo').disabled = !g || !g.hist.length || state !== 'play';
     $('restart').disabled = !g || state !== 'play';
   }
   function list() {
     state = 'list'; g = null; sel = -1;
-    var h = '<h2>分磚</h2><p>點一疊，再點另一疊，最上面的磚就會移過去（同顏色連在一起的會一起走）。磚只能放在空的疊或同顏色的磚上，一疊最多 4 塊。每疊都變成同一種顏色就過關。</p><p class="tot">已拿 ' + total() + ' / ' + LEVELS.length * 3 + ' 顆星</p>';
+    var h = '<h2>' + T('n.sort') + '</h2><p>' + T('so.how') + '</p><p class="tot">' + T('g.starsTot', total(), LEVELS.length * 3) + '</p>';
     GROUPS.forEach(function (gr) {
       h += '<h3>' + gr.name + '<small>' + gr.note + '</small></h3><div class="lvs">';
       for (var i = gr.from; i < gr.to && i < LEVELS.length; i++) {
         var s = starsOf(i), o = open(i);
-        h += '<button type="button" class="lv' + (s ? ' done' : '') + '" data-lv="' + i + '"' + (o ? '' : ' disabled aria-label="先過前一關"') + '><b>' + (i + 1) + '</b><span>' + (s ? stars(s) : o ? '' : '🔒') + '</span></button>';
+        h += '<button type="button" class="lv' + (s ? ' done' : '') + '" data-lv="' + i + '"' + (o ? '' : ' disabled aria-label="' + T('g.lockFirst') + '"') + '><b>' + (i + 1) + '</b><span>' + (s ? stars(s) : o ? '' : '🔒') + '</span></button>';
       }
       h += '</div>';
     });
@@ -192,7 +193,7 @@
     if (!done[n] || s > was || (s === was && g.moves < done[n].m)) done[n] = { s: Math.max(s, was), m: done[n] ? Math.min(done[n].m, g.moves) : g.moves };
     try { window.localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* no storage */ }
     $('winStars').textContent = stars(s);
-    $('winNote').textContent = '用了 ' + g.moves + ' 步（最少 ' + LEVELS[n].p + ' 步）' + (s < 3 ? '・步數再少一點就能拿更多星' : '');
+    $('winNote').textContent = [T('so.win', g.moves, LEVELS[n].p)].concat(s < 3 ? [T('so.winMore')] : []).join(SEP);
     if (root.SnowRealmMini) root.SnowRealmMini.show($('winNote'), { game: 'sort', value: n, stars: s, ms: Date.now() - startAt });
     $('next').hidden = n + 1 >= LEVELS.length;
     setTimeout(function () { if (state === 'won') { show('win', true); $(n + 1 < LEVELS.length ? 'next' : 'toList').focus(); } }, reduce ? 0 : 400);
@@ -227,7 +228,7 @@
   $('again').addEventListener('click', function () { play(n); });
   $('toList').addEventListener('click', list);
   window.addEventListener('resize', layout);
-  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = '點一疊再點另一疊';
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = T('so.touch');
   list();
   window.requestAnimationFrame(loop);
   root.__sort = function () { return { g: g, n: n, state: state, play: play, tap: tap }; };      // for the browser test

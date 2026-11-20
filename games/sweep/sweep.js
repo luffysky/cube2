@@ -99,7 +99,8 @@
   var level = 'normal', bests = {};
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
-  var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var LV_NAME = { easy: T('g.easy'), normal: T('g.normal'), hard: T('g.hard') };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function fmt(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
 
@@ -166,7 +167,7 @@
     var k = g ? g.lives : LIVES;
     if (k !== heartsShown) {
       var h = ''; for (var i = 0; i < LIVES; i++) h += i < k ? '♥' : '♡';
-      var el = $('hearts'); el.textContent = h; el.setAttribute('aria-label', '剩 ' + k + ' 條命');
+      var el = $('hearts'); el.textContent = h; el.setAttribute('aria-label', T('g.livesN', k));
       if (heartsShown > k) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
       heartsShown = k;
     }
@@ -202,9 +203,9 @@
     state = won ? 'won' : 'lost';
     var nb = false;
     if (won) { nb = !bests[level] || time < bests[level]; if (nb) { bests[level] = time; try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (e) { /* no storage */ } } }
-    $('endTitle').textContent = won ? '全部敲完了！' : '命用完了';
+    $('endTitle').textContent = won ? T('sw.done') : T('g.over');
     $('endScore').textContent = fmt(time);
-    $('endNote').textContent = LV_NAME[level] + (won ? '・踩到 ' + g.hits + ' 次裂縫・' + (nb ? '新紀錄！' : '最快 ' + fmt(bests[level])) : '・還剩 ' + g.left + ' 塊沒敲');
+    $('endNote').textContent = (won ? [LV_NAME[level], T('sw.endHits', g.hits), nb ? T('g.newBest') : T('g.fastest', fmt(bests[level]))] : [LV_NAME[level], T('sw.endLeft', g.left)]).join(SEP);
     var cn = document.querySelector('#end p.coins'); if (cn) cn.remove();
     if (won && root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'sweep', lv: ['easy', 'normal', 'hard'].indexOf(level), value: Math.round(time), ms: Math.round(time) });
     setTimeout(function () { show('end', true); $('again').focus(); }, reduce ? 200 : 900);

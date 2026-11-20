@@ -203,7 +203,8 @@
   var level = 'normal', bests = {}, startAt = 0;
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { /* no storage */ }
   if (!LEVELS[level]) level = 'normal';
-  var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' }, POWER = { wide: '加寬', multi: '多球', slow: '變慢', heart: '+1 命' };
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var LV_NAME = { easy: T('g.easy'), normal: T('g.normal'), hard: T('g.hard') }, POWER = { wide: T('bo.wide'), multi: T('bo.multi'), slow: T('bo.slow'), heart: T('bo.heart') };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function bestOf(lv) { return +bests[lv] || 0; }
 
@@ -249,7 +250,7 @@
       x.beginPath(); x.arc(b.x, b.y, R, 0, 6.283); x.fill();
       x.fillStyle = 'rgba(0,0,0,0.12)'; x.beginPath(); x.arc(b.x + 1.5, b.y + 1.5, R * 0.6, 0, 6.283); x.fill();
     });
-    if (g.held && state === 'play') { x.fillStyle = 'rgba(232,237,242,0.75)'; x.font = '700 14px sans-serif'; x.textAlign = 'center'; x.fillText(window.matchMedia('(hover: none)').matches ? '點一下發球' : '按空白鍵或點一下發球', W / 2, PY - 40); }
+    if (g.held && state === 'play') { x.fillStyle = 'rgba(232,237,242,0.75)'; x.font = '700 14px sans-serif'; x.textAlign = 'center'; x.fillText(window.matchMedia('(hover: none)').matches ? T('bo.serveTouch') : T('bo.serve'), W / 2, PY - 40); }
     for (i = fx.length - 1; i >= 0; i--) {
       var f = fx[i];
       f.t += dt;
@@ -288,7 +289,7 @@
       var h = '';
       for (var i = 0; i < LIVES; i++) h += i < n ? '♥' : '♡';
       var el = $('hearts');
-      el.textContent = h; el.setAttribute('aria-label', '剩 ' + n + ' 條命');
+      el.textContent = h; el.setAttribute('aria-label', T('g.livesN', n));
       if (heartsShown > n) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
       heartsShown = n;
     }
@@ -313,7 +314,7 @@
     if (nb) { bests[level] = g.score; try { window.localStorage.setItem(KEY, JSON.stringify(bests)); } catch (e) { /* no storage */ } }
     show('ouch', false);
     $('endScore').textContent = g.score;
-    $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・打到第 ' + g.n + ' 關・打破 ' + g.broken + ' 塊磚';
+    $('endNote').textContent = [LV_NAME[level], (nb ? T('g.newBest') : T('g.bestPts', bestOf(level))), T('bo.end', g.n), T('bo.endBroke', g.broken)].join(SEP);
     show('end', true);
     if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'breakout', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
@@ -325,7 +326,7 @@
     if (state !== 'play' && state !== 'pause') return;
     state = on ? 'pause' : 'play';
     show('paused', on);
-    $('pause').textContent = on ? '繼續' : '暫停';
+    $('pause').textContent = on ? T('g.resume') : T('g.pause');
     if (on) $('resume').focus();
   }
   function say(t1, t2, ms) { $('ouchT').textContent = t1; $('ouchP').textContent = t2; show('ouch', true); state = 'ouch'; wait = ms; }
@@ -346,11 +347,11 @@
         else if (e.type === 'break') {
           tone(SCALE[Math.min(8, e.combo - 1)], 0.08, 'sine', 0.07);
           burst(e.x, e.y, COL[e.kind]);
-          if (e.combo >= 4 && e.combo % 4 === 0) pop(e.combo + ' 連打', e.x, e.y);
+          if (e.combo >= 4 && e.combo % 4 === 0) pop(T('bo.combo', e.combo), e.x, e.y);
         }
         else if (e.type === 'power') { tone(880, 0.12, 'sine', 0.07, 1320); pop(POWER[e.kind], g.paddle.x, PY - 14); }
-        else if (e.type === 'clear') { say('第 ' + e.n + ' 關過關！', '加 ' + e.bonus + ' 分・下一關快一點', 1500); [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone(SCALE[k], 0.2, 'sine', 0.07); }, j * 90); }); }
-        else if (e.type === 'miss' && e.lives > 0) { say('漏接了', '還剩 ' + e.lives + ' 條命', 1100); tone(260, 0.22, 'triangle', 0.09, 150); shake = 6; }
+        else if (e.type === 'clear') { say(T('bo.clear', e.n), T('bo.clearP', e.bonus), 1500); [0, 2, 4, 7].forEach(function (k, j) { setTimeout(function () { tone(SCALE[k], 0.2, 'sine', 0.07); }, j * 90); }); }
+        else if (e.type === 'miss' && e.lives > 0) { say(T('bo.miss'), T('g.livesLeft', e.lives), 1100); tone(260, 0.22, 'triangle', 0.09, 150); shake = 6; }
       });
       if (g.over) finish();
       hud();
@@ -387,7 +388,7 @@
   $('pause').disabled = true;
   document.addEventListener('visibilitychange', function () { if (document.hidden && state === 'play') pause(true); });
   window.addEventListener('resize', size);
-  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = '在場地上左右拖曳移動板子，點一下發球';
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = T('bo.touch');
   pickLevel(level);
   size();
   window.requestAnimationFrame(loop);

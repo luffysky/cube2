@@ -14,7 +14,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   const problems = [];
   try {
     for (const [w, h, m] of [[390, 844, true], [1280, 800, false]]) {
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: m, isMobile: m });
+      const ctx = await browser.newContext({ locale: 'zh-TW', viewport: { width: w, height: h }, hasTouch: m, isMobile: m });
       const p = await ctx.newPage(); p.on('pageerror', e => problems.push(e.message));
       await p.goto(BASE + 'index.html?sw=off&lang=zh-Hant'); await sleep(700);
       const st = () => p.evaluate(() => ({ open: document.getElementById('drawer').classList.contains('open'), sheet: ZZ.peek().sheet, inert: document.querySelector('#menu .menu-in').hasAttribute('inert') }));
@@ -40,7 +40,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       await ctx.close();
     }
     // the brick games
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true });
+    const ctx = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true });
     const g = await ctx.newPage(); g.on('pageerror', e => problems.push('games: ' + e.message));
     await g.goto(BASE + 'games/snake/'); await sleep(400);
     await g.tap('#go'); await sleep(250);

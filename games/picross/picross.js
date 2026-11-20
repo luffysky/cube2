@@ -52,6 +52,8 @@
   // ---------- the screen ----------
   var PICS = root.PICROSS || [];
   var GROUPS = [{ name: '5 × 5', from: 0, to: 10 }, { name: '10 × 10', from: 10, to: PICS.length }];
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var picName = function (n) { var k = 'pic.' + n, v = T(k); return v === k ? n : v; };
   var $ = function (id) { return document.getElementById(id); };
   var cv = $('cv'), x = cv.getContext('2d'), board = $('board');
   var KEY = 'snowrealm.picross.done';
@@ -130,11 +132,11 @@
   function show(id, on) { $(id).hidden = !on; }
   var heartsShown = -1;
   function hud() {
-    $('lvName').textContent = g ? '第 ' + (n + 1) + ' 幅' : '磚畫謎';
+    $('lvName').textContent = g ? T('pi.picN', n + 1) : T('n.picross');
     var k = g ? g.lives : LIVES;
     if (k !== heartsShown) {
       var h = ''; for (var i = 0; i < LIVES; i++) h += i < k ? '♥' : '♡';
-      var el = $('hearts'); el.textContent = h; el.setAttribute('aria-label', '剩 ' + k + ' 條命');
+      var el = $('hearts'); el.textContent = h; el.setAttribute('aria-label', T('g.livesN', k));
       if (heartsShown > k) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
       heartsShown = k;
     }
@@ -143,12 +145,12 @@
   }
   function list() {
     state = 'list'; g = null;
-    var h = '<h2>磚畫謎</h2><p>旁邊和上面的數字，是這一排有幾塊連在一起的磚，依順序排，每組中間至少空一格。把磚都填對，會出現一幅畫。填錯一格少一條命（5 條），確定是空的可以打叉。沒填錯拿 3 顆星。</p><p class="tot">已拿 ' + total() + ' / ' + PICS.length * 3 + ' 顆星</p>';
+    var h = '<h2>' + T('n.picross') + '</h2><p>' + T('pi.how') + '</p><p class="tot">' + T('g.starsTot', total(), PICS.length * 3) + '</p>';
     GROUPS.forEach(function (gr) {
       h += '<h3>' + gr.name + '</h3><div class="lvs">';
       for (var i = gr.from; i < gr.to; i++) {
         var s = starsOf(i), o = open(i);
-        h += '<button type="button" class="lv' + (s ? ' done' : '') + '" data-lv="' + i + '"' + (o ? '' : ' disabled aria-label="先完成前一幅"') + '><b>' + (s ? esc(PICS[i].n) : i + 1) + '</b><span>' + (s ? stars(s) : o ? '' : '🔒') + '</span></button>';
+        h += '<button type="button" class="lv' + (s ? ' done' : '') + '" data-lv="' + i + '"' + (o ? '' : ' disabled aria-label="' + T('pi.lockFirst') + '"') + '><b>' + (s ? esc(picName(PICS[i].n)) : i + 1) + '</b><span>' + (s ? stars(s) : o ? '' : '🔒') + '</span></button>';
       }
       h += '</div>';
     });
@@ -178,9 +180,9 @@
     var s = Picross.stars(g.mistakes), was = starsOf(n);
     if (!done[n] || s > was) done[n] = { s: Math.max(s, was) };
     try { window.localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* no storage */ }
-    $('winName').textContent = '是「' + g.pic.n + '」！';
+    $('winName').textContent = T('pi.itIs', picName(g.pic.n));
     $('winStars').textContent = stars(s);
-    $('winNote').textContent = g.mistakes ? '填錯 ' + g.mistakes + ' 格' + (s < 3 ? '・不填錯就能拿 3 顆星' : '') : '一格都沒填錯';
+    $('winNote').textContent = g.mistakes ? [T('pi.wrong', g.mistakes)].concat(s < 3 ? [T('pi.wrongMore')] : []).join(SEP) : T('pi.perfect');
     if (root.SnowRealmMini) root.SnowRealmMini.show($('winNote'), { game: 'picross', value: n, stars: s, ms: Date.now() - startAt });
     $('next').hidden = n + 1 >= PICS.length;
     setTimeout(function () { if (state === 'won') { show('win', true); $(n + 1 < PICS.length ? 'next' : 'toList').focus(); } }, reduce ? 300 : 1500);

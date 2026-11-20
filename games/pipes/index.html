@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-title="n.pipes" data-desc="pp.desc">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,40 +14,42 @@
 <body>
 <main class="game">
   <div class="bar">
-    <a href="../" aria-label="回到全部遊戲">← 遊戲</a>
-    <h1>磚道</h1>
+    <a href="../" data-ta="g.backA" data-t="g.back">← 遊戲</a>
+    <h1 data-t="n.pipes">磚道</h1>
     <span></span>
   </div>
   <div class="stats">
-    <div><b id="time">0:00</b><span>時間</span></div>
-    <div class="hearts-box"><b id="taps" class="lvname">0</b><span>轉了幾下</span></div>
-    <div><b id="best">—</b><span>最快</span></div>
+    <div><b id="time">0:00</b><span data-t="g.time">時間</span></div>
+    <div class="hearts-box"><b id="taps" class="lvname">0</b><span data-t="pp.taps">轉了幾下</span></div>
+    <div><b id="best">—</b><span data-t="g.fast">最快</span></div>
   </div>
   <div class="board" id="board">
-    <canvas id="cv" aria-label="磚道的場地"></canvas>
+    <canvas id="cv" data-ta="pp.board" aria-label="磚道的場地"></canvas>
     <div class="over" id="intro">
-      <h2>磚道</h2>
-      <p>點一塊水管磚就轉 90 度（滑鼠右鍵反著轉）。水從中間的金色磚流出來，讓水流進每一格、沒有水管開口朝外，就完成了。</p>
-      <p>每一局都是新的，一定解得出來。三種難度是 5×5、7×7、9×9，記最快的時間。</p>
-      <div class="seg" role="radiogroup" aria-label="難度">
-        <button type="button" role="radio" data-lv="easy">簡單</button>
-        <button type="button" role="radio" data-lv="normal">普通</button>
-        <button type="button" role="radio" data-lv="hard">困難</button>
+      <h2 data-t="n.pipes">磚道</h2>
+      <p data-t="pp.p1">點一塊水管磚就轉 90 度（滑鼠右鍵反著轉）。水從中間的金色磚流出來，讓水流進每一格、沒有水管開口朝外，就完成了。</p>
+      <p data-t="pp.p2">每一局都是新的，一定解得出來。三種難度是 5×5、7×7、9×9，記最快的時間。</p>
+      <div class="seg" role="radiogroup" data-ta="g.lvA" aria-label="難度">
+        <button type="button" role="radio" data-lv="easy" data-t="g.easy">簡單</button>
+        <button type="button" role="radio" data-lv="normal" data-t="g.normal">普通</button>
+        <button type="button" role="radio" data-lv="hard" data-t="g.hard">困難</button>
       </div>
-      <div class="row"><button class="btn" type="button" id="go">開始</button></div>
+      <div class="row"><button class="btn" type="button" id="go" data-t="g.start">開始</button></div>
       
     </div>
     <div class="over reveal" id="end" hidden>
-      <h2>水都流到了！</h2>
+      <h2 data-t="pp.done">水都流到了！</h2>
       <div class="big" id="endScore">0:00</div>
       <p id="endNote"></p>
-      <div class="row"><button class="btn" type="button" id="again">再一局</button><button class="btn plain" type="button" id="toIntro">換難度</button><a class="btn plain" href="../">其他遊戲</a></div>
+      <div class="row"><button class="btn" type="button" id="again" data-t="g.again2">再一局</button><button class="btn plain" type="button" id="toIntro" data-t="g.change">換難度</button><a class="btn plain" href="../" data-t="g.other">其他遊戲</a></div>
     </div>
   </div>
 </main>
-<script src="../rewards.js?v=4028e3604e"></script>
-<script src="pipes.js?v=e4a007c043"></script>
+<script src="../words.js?v=549b329472"></script>
+<script src="../i18n.js?v=cad39cbd3e"></script>
+<script src="../rewards.js?v=2453e265fc"></script>
+<script src="pipes.js?v=403c843995"></script>
 <script src="../drawer-icons.js?v=1cc7c12d5f"></script>
-<script src="../nav.js?v=2b878d2cca"></script>
+<script src="../nav.js?v=e35d4478a3"></script>
 </body>
 </html>

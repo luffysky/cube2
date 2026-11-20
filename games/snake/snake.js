@@ -228,7 +228,8 @@
   try { level = window.localStorage.getItem(LVKEY) || 'normal'; bests = JSON.parse(window.localStorage.getItem(KEY + 's') || '{}') || {}; var old = +window.localStorage.getItem(KEY) || 0; if (old && !bests.normal) bests.normal = old; } catch (e) { /* no storage */ }
   if (!Snake.LEVELS[level]) level = 'normal';
   function bestOf(lv) { return +bests[lv] || 0; }
-  var LV_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; }, SEP = window.SRW ? window.SRW.t('g.sep') : '・';
+  var LV_NAME = { easy: T('g.easy'), normal: T('g.normal'), hard: T('g.hard') };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function size() {
@@ -350,7 +351,7 @@
       var h = '';
       for (var i = 0; i < Snake.LIVES; i++) h += i < n ? '♥' : '♡';
       var el = $('hearts');
-      el.textContent = h; el.setAttribute('aria-label', '剩 ' + n + ' 條命');
+      el.textContent = h; el.setAttribute('aria-label', T('g.livesN', n));
       if (heartsShown > n) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
       heartsShown = n;
     }
@@ -374,9 +375,9 @@
     var nb = g.score > bestOf(level);
     if (nb) { bests[level] = g.score; try { window.localStorage.setItem(KEY + 's', JSON.stringify(bests)); } catch (e) { /* no storage */ } }
     show('ouch', false);
-    $('endTitle').textContent = '命用完了';
+    $('endTitle').textContent = T('g.over');
     $('endScore').textContent = g.score;
-    $('endNote').textContent = LV_NAME[level] + '・' + (nb ? '新紀錄！' : '最佳 ' + bestOf(level) + ' 分') + '・吃了 ' + g.eaten + ' 塊・消掉 ' + g.cleared + ' 塊' + (g.chainBest > 1 ? '・最多 ' + g.chainBest + ' 連消' : '');
+    $('endNote').textContent = [LV_NAME[level], (nb ? T('g.newBest') : T('g.bestPts', bestOf(level))), T('sn.end', g.eaten), T('sn.endClear', g.cleared)].concat(g.chainBest > 1 ? [T('sn.endChain', g.chainBest)] : []).join(SEP);
     show('end', true);
     if (root.SnowRealmMini) root.SnowRealmMini.show($('endNote'), { game: 'snake', lv: ['easy', 'normal', 'hard'].indexOf(level), value: g.score, ms: Date.now() - startAt });
     $('pause').disabled = true;
@@ -388,7 +389,7 @@
     if (state !== 'play' && state !== 'pause') return;
     state = on ? 'pause' : 'play';
     show('paused', on);
-    $('pause').textContent = on ? '繼續' : '暫停';
+    $('pause').textContent = on ? T('g.resume') : T('g.pause');
     if (on) $('resume').focus();
   }
   function loop(now) {
@@ -407,19 +408,19 @@
           else if (e.type === 'gold') { pop('+100', e.x, e.y); tone(1320, 0.18, 'sine', 0.08, 1760); }
           else if (e.type === 'cement') { tone(140, 0.12, 'square', 0.03); }
           else if (e.type === 'portal') { tone(440, 0.16, 'sine', 0.06, 1320); }
-          else if (e.type === 'trap') { if (e.kind === 'portal') pop('傳送門出現', N / 2 - 0.5, 2); else pop('小心尖刺', e.x, e.y); }
+          else if (e.type === 'trap') { if (e.kind === 'portal') pop(T('sn.portal'), N / 2 - 0.5, 2); else pop(T('sn.spikes'), e.x, e.y); }
           else if (e.type === 'crash' && e.lives > 0) {
             // a heart gone: a moment to see where the snake came back before it moves again
             state = 'ouch'; wait = 1300; flash = 1; shake = 8;
-            $('ouchT').textContent = { wall: '撞到牆了', cement: '撞到水泥了', spike: '被尖刺刺到了', self: '咬到自己了' }[e.why] || '撞到了';
-            $('ouchP').textContent = '還剩 ' + e.lives + ' 條命';
+            $('ouchT').textContent = { wall: T('sn.wall'), cement: T('sn.cement'), spike: T('sn.spike'), self: T('sn.self') }[e.why] || T('sn.hit');
+            $('ouchP').textContent = T('g.livesLeft', e.lives);
             show('ouch', true);
             tone(260, 0.22, 'triangle', 0.09, 150);
           }
           else if (e.type === 'crumble') {
             e.cells.forEach(function (c) { burst(c.x, c.y, e.c); });
             var m = e.cells[Math.floor(e.cells.length / 2)];
-            pop(e.chain > 1 ? e.chain + ' 連消！' : '消 ' + e.n, m.x, m.y);
+            pop(e.chain > 1 ? T('sn.chain', e.chain) : T('sn.clear', e.n), m.x, m.y);
             for (var i = 0; i < 3; i++) setTimeout(function (k) { tone(SCALE[Math.min(7, k + e.chain * 2)], 0.12, 'sine', 0.07); }, i * 55, i);
             shake = 4;
           }
@@ -464,7 +465,7 @@
   $('pause').disabled = true;
   document.addEventListener('visibilitychange', function () { if (document.hidden && state === 'play') pause(true); });
   window.addEventListener('resize', size);
-  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = '用下面的方向鍵或在場地上滑動';
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches) $('keysHint').textContent = T('g.padHint');
   pickLevel(level);
   size();
   window.requestAnimationFrame(loop);

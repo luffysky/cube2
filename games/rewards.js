@@ -95,7 +95,9 @@
     if (old) old.remove();
     var p = doc.createElement('p');
     p.className = 'coins';
-    p.innerHTML = c ? '<b>+' + c + ' 金幣</b>・<a href="../../?from=games">回到轉磚入帳</a>' : '<a href="../../?from=games">轉磚</a>的金幣：這場沒有' + (r && GAMES[r.game] && GAMES[r.game].kind === 'levels' ? '新的星星' : '更多金幣') + '（磚塊小遊戲每天最多 ' + DAY_CAP + '）';
+    var W = root.SRW, T = function () { return W ? W.t.apply(null, arguments) : arguments[0]; };
+    p.innerHTML = c ? '<b>' + T('rw.plus', c) + '</b>' + T('g.sep') + '<a href="../../?from=games">' + T('rw.claim') + '</a>'
+      : T('rw.none', T(r && GAMES[r.game] && GAMES[r.game].kind === 'levels' ? 'rw.noStars' : 'rw.noCoins'), DAY_CAP);
     after.parentNode.insertBefore(p, after.nextSibling);
     return c;
   }

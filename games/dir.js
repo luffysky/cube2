@@ -5,6 +5,7 @@
   if (!M || !el) return;
   var b = M.balance(), w = M.waiting();
   if (b == null && !w) return;
-  el.innerHTML = '轉磚金幣 <b>' + (b == null ? 0 : b) + '</b>' + (w ? '・<a href="../?from=games">+' + w + ' 待入帳，回轉磚領取</a>' : '');
+  var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; };
+  el.innerHTML = T('dir.wallet', b == null ? 0 : b) + (w ? T('g.sep') + '<a href="../?from=games">' + T('dir.walletWait', w) + '</a>' : '');
   el.hidden = false;
 })();

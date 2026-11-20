@@ -12,7 +12,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
   const problems = [];
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const page = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     page.on('pageerror', e => problems.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/Failed to load/.test(m.text())) problems.push(m.text()); });
     await page.goto(BASE + 'index.html?sw=off&lang=zh-Hant'); await sleep(500);
@@ -73,7 +73,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => +document.getElementById('best').textContent > 0 && document.querySelector('[data-lv="easy"]').getAttribute('aria-checked') === 'true'), 'the best and the difficulty are still there after a reload');
 
     // a phone: the pad and swiping
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, colorScheme: 'dark' });
+    const ctx = await browser.newContext({ locale: 'zh-TW', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, colorScheme: 'dark' });
     const ph = await ctx.newPage();
     ph.on('pageerror', e => problems.push('phone: ' + e.message));
     await ph.goto(BASE + 'games/snake/'); await sleep(500);
@@ -90,7 +90,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await ph.screenshot({ path: path.join(OUT, 'snake-over-dark.png') });
     await ctx.close();
     // 打磚塊
-    const bk = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const bk = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     bk.on('pageerror', e => problems.push('breakout: ' + e.message));
     await bk.goto(BASE + 'games/breakout/'); await sleep(400);
     ok(await bk.evaluate(() => !document.getElementById('intro').hidden && document.querySelectorAll('[data-lv]').length === 3), '打磚塊 opens on its start card with three difficulties');
@@ -111,7 +111,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await bk.waitForFunction(() => window.__breakout().state === 'over', null, { timeout: 5000 });
     ok(await bk.evaluate(() => JSON.parse(localStorage.getItem('snowrealm.breakout.bests')).easy === window.__breakout().g.score), 'the end keeps the best for that difficulty');
     await bk.screenshot({ path: path.join(OUT, 'breakout-over.png') });
-    const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx2 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const bp = await ctx2.newPage();
     bp.on('pageerror', e => problems.push('breakout phone: ' + e.message));
     await bp.goto(BASE + 'games/breakout/'); await sleep(400);
@@ -124,7 +124,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await bp.screenshot({ path: path.join(OUT, 'breakout-phone.png') });
     await ctx2.close();
     // 疊磚塔
-    const st = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const st = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     st.on('pageerror', e => problems.push('stack: ' + e.message));
     await st.goto(BASE + 'games/stack/'); await sleep(400);
     ok(await st.evaluate(() => !document.getElementById('intro').hidden && document.querySelectorAll('[data-lv]').length === 3), '疊磚塔 opens on its start card with three difficulties');
@@ -146,7 +146,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await st.keyboard.press(' '); await sleep(300);
     ok(await st.evaluate(() => window.__stack().state === 'over' && JSON.parse(localStorage.getItem('snowrealm.stack.bests')).normal === window.__stack().g.score), 'the last heart ends it and keeps the best');
     await st.screenshot({ path: path.join(OUT, 'stack-over.png') });
-    const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx3 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const sp = await ctx3.newPage();
     sp.on('pageerror', e => problems.push('stack phone: ' + e.message));
     await sp.goto(BASE + 'games/stack/'); await sleep(400);
@@ -158,7 +158,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await sp.screenshot({ path: path.join(OUT, 'stack-phone.png') });
     await ctx3.close();
     // 推磚倉庫
-    const pu = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const pu = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     pu.on('pageerror', e => problems.push('push: ' + e.message));
     await pu.goto(BASE + 'games/push/'); await sleep(400);
     ok(await pu.evaluate(() => document.querySelectorAll('.lv').length === 60 && !document.querySelector('[data-lv="0"]').disabled && document.querySelector('[data-lv="1"]').disabled), 'the list: sixty levels, only the first open');
@@ -187,7 +187,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     const moved = await pu.evaluate(() => window.__push().g.moves);
     await pu.click('#undo'); await sleep(50);
     ok(await pu.evaluate(m => window.__push().g.moves === m - 1 || m === 0, moved), 'the undo button');
-    const ctx4 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, colorScheme: 'dark' });
+    const ctx4 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, colorScheme: 'dark' });
     const pp = await ctx4.newPage();
     pp.on('pageerror', e => problems.push('push phone: ' + e.message));
     await pp.goto(BASE + 'games/push/'); await sleep(400);
@@ -199,7 +199,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await pp.screenshot({ path: path.join(OUT, 'push-phone.png') });
     await ctx4.close();
     // 磚塊合成
-    const mg = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const mg = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     mg.on('pageerror', e => problems.push('merge: ' + e.message));
     await mg.goto(BASE + 'games/merge/'); await sleep(400);
     ok(await mg.evaluate(() => !document.getElementById('intro').hidden && document.querySelectorAll('[data-lv]').length === 3), '磚塊合成 opens on its start card');
@@ -218,7 +218,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await mg.keyboard.press('3'); await sleep(300);
     ok(await mg.evaluate(() => window.__merge().state === 'over' && JSON.parse(localStorage.getItem('snowrealm.merge.bests')).easy === window.__merge().g.score), 'a full column on the last heart ends it; the best is kept');
     await mg.screenshot({ path: path.join(OUT, 'merge-over.png') });
-    const ctx5 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx5 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const mp = await ctx5.newPage();
     mp.on('pageerror', e => problems.push('merge phone: ' + e.message));
     await mp.goto(BASE + 'games/merge/'); await sleep(400);
@@ -230,7 +230,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await mp.screenshot({ path: path.join(OUT, 'merge-phone.png') });
     await ctx5.close();
     // 分磚
-    const so = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const so = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     so.on('pageerror', e => problems.push('sort: ' + e.message));
     await so.goto(BASE + 'games/sort/'); await sleep(400);
     ok(await so.evaluate(() => document.querySelectorAll('.lv').length === 60 && document.querySelector('[data-lv="1"]').disabled), 'the list: sixty levels, only the first open');
@@ -248,7 +248,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await sleep(700);
     ok(await so.evaluate(() => window.__sort().state === 'won' && /★★★/.test(document.getElementById('winStars').textContent)), 'done in the fewest moves: three stars');
     await so.screenshot({ path: path.join(OUT, 'sort-win.png') });
-    const ctx6 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx6 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const sph = await ctx6.newPage();
     sph.on('pageerror', e => problems.push('sort phone: ' + e.message));
     await sph.goto(BASE + 'games/sort/'); await sleep(400);
@@ -265,7 +265,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     void before;
     await ctx6.close();
     // 磚畫謎
-    const pc = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const pc = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     pc.on('pageerror', e => problems.push('picross: ' + e.message));
     await pc.goto(BASE + 'games/picross/'); await sleep(400);
     ok(await pc.evaluate(() => document.querySelectorAll('.lv').length === window.PICROSS.length && !document.querySelector('[data-lv="0"]').disabled && !document.querySelector('[data-lv="10"]').disabled && document.querySelector('[data-lv="1"]').disabled), 'the list: the first of each size open');
@@ -291,7 +291,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await pc.screenshot({ path: path.join(OUT, 'picross-win.png') });
     await pc.click('#toList'); await pc.click('[data-lv="10"]'); await sleep(300);
     await pc.screenshot({ path: path.join(OUT, 'picross-10.png') });
-    const ctx7 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx7 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const pp2 = await ctx7.newPage();
     pp2.on('pageerror', e => problems.push('picross phone: ' + e.message));
     await pp2.goto(BASE + 'games/picross/'); await sleep(400);
@@ -301,7 +301,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await pp2.screenshot({ path: path.join(OUT, 'picross-phone.png') });
     await ctx7.close();
     // 磚道
-    const pi = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const pi = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     pi.on('pageerror', e => problems.push('pipes: ' + e.message));
     await pi.goto(BASE + 'games/pipes/'); await sleep(400);
     await pi.click('[data-lv="easy"]'); await pi.click('#go'); await sleep(300);
@@ -312,7 +312,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await sleep(1300);
     ok(await pi.evaluate(() => window.__pipes().state === 'won' && !document.getElementById('end').hidden && !!JSON.parse(localStorage.getItem('snowrealm.pipes.bests')).easy), 'clicking every tile into place: done, and the time is kept');
     await pi.screenshot({ path: path.join(OUT, 'pipes-done.png') });
-    const ctx8 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx8 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const pph = await ctx8.newPage();
     pph.on('pageerror', e => problems.push('pipes phone: ' + e.message));
     await pph.goto(BASE + 'games/pipes/'); await sleep(400);
@@ -325,7 +325,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await pph.screenshot({ path: path.join(OUT, 'pipes-phone.png') });
     await ctx8.close();
     // 掃磚
-    const sw2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const sw2 = await browser.newPage({ locale: 'zh-TW', viewport: { width: 1280, height: 800 } });
     sw2.on('pageerror', e => problems.push('sweep: ' + e.message));
     await sw2.goto(BASE + 'games/sweep/'); await sleep(400);
     await sw2.click('[data-lv="easy"]'); await sw2.click('#go'); await sleep(300);
@@ -342,7 +342,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await sleep(1200);
     ok(await sw2.evaluate(() => window.__sweep().state === 'won' && !document.getElementById('end').hidden && !!JSON.parse(localStorage.getItem('snowrealm.sweep.bests')).easy), 'every sound brick out: done, time kept');
     await sw2.screenshot({ path: path.join(OUT, 'sweep-done.png') });
-    const ctx9 = await browser.newContext({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ctx9 = await browser.newContext({ locale: 'zh-TW', viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const swp = await ctx9.newPage();
     swp.on('pageerror', e => problems.push('sweep phone: ' + e.message));
     await swp.goto(BASE + 'games/sweep/'); await sleep(400);

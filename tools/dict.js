@@ -4,13 +4,14 @@
 // "only Chinese so far": tools/i18n-auto.py fills the rest into i18n/auto.json.
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
-const FILES = ['i18n.js', 'modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'minis.js', 'drawer.js'];
+const FILES = ['i18n.js', 'modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'minis.js', 'drawer.js', 'games-dict.js'];
+const GAMES_FILE = 'games-dict.js';    // the brick games' words: they go to games/words.js, not into 轉磚's page
 const COLS = ['en', 'ja', 'ko'];           // the columns after Chinese, in order
 const AUTO = path.join(ROOT, 'i18n', 'auto.json');
 
-function raw() {
+function raw(only) {
   const dict = {}, from = {};
-  for (const f of FILES) {
+  for (const f of only || FILES) {
     const s = fs.readFileSync(path.join(ROOT, 'src', f), 'utf8'), a = s.indexOf('L.add({'), b = s.indexOf('});', a);
     if (a < 0) continue;
     new Function('L', s.slice(a, b + 3))({ add: o => { for (const k in o) { dict[k] = o[k]; from[k] = f; } } });
@@ -54,4 +55,4 @@ function merged(dict, auto) {
   }
   return { dict: out, machine };
 }
-module.exports = { ROOT, FILES, COLS, AUTO, raw, zhOf, missing, readAuto, todo, merged };
+module.exports = { ROOT, FILES, GAMES_FILE, COLS, AUTO, raw, zhOf, missing, readAuto, todo, merged };

@@ -337,3 +337,17 @@
 - 結論：Argos 只適合當備援；新增文字時 Claude 會照舊直接寫好四種語言，只有漏掉的才交給自動翻譯。
 - 檔案：`src/i18n.js`、`i18n/auto.json`、`i18n/todo.json`、`index.html`、`server/i18n-data.json`。｜資料庫：未異動（部署後由 `server/words.js` 同步）。｜刪除：無。
 - 測試：`node test/run.js` 全過。
+- 補記：上一條的 commit 為 [`94c8914`](https://github.com/luffysky/cube2/commit/94c8914)，Vercel `dpl_ERnKUB1GWFA5VTh7czLLGEazravo` READY，1 小時內無執行錯誤。
+
+## 2026-11-20 22:08（Asia/Taipei）｜九款小遊戲接上字典（五語）；翻譯引擎改 Gemini、停用 Argos
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-025、C-026（音樂，僅記錄）
+- 實際變更：
+  - 新增 `src/games-dict.js`（約 230 條，Claude 親自寫英、日、韓）、`games/i18n.js`；建置產生 `games/words.js`。九款遊戲、遊戲目錄、側邊選單、金幣提示全部改用字典；遊戲頁標題與描述跟著語言換；語言依 `?lang=`、轉磚設定、瀏覽器語言。
+  - `tools/i18n-auto.py` 加 Gemini 引擎（自動挑金鑰可用的最新 flash 模型、40 條一批、空格與標籤不符就不收）；workflow 只在 repo 有 `GEMINI_API_KEY` secret 時翻譯，沒有就只列清單；不再安裝或使用 Argos（移除 `tools/i18n-requirements.txt`）。
+- 檔案：`src/games-dict.js`、`games/i18n.js`、`games/words.js`、`games/*/index.html`、`games/*/*.js`、`games/index.html`、`games/nav.js`、`games/dir.js`、`games/rewards.js`、`build.js`、`tools/dict.js`、`tools/i18n-auto.py`、`.github/workflows/i18n.yml`、`test/gameslang.js`（新）、`test/bricks.js`、`test/minipay.js`、`test/drawer.js`、`docs/ARCHITECTURE.md`、`docs/OWNER_DECISIONS.md`。
+- 資料庫：未改結構；小遊戲文字也會隨 `server/i18n-data.json` 同步進 `zz.i18n`。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `gameslang` 113（十頁 × 英日韓簡，每個 key 都存在、英韓頁面沒有殘留中文、簡體已轉換、側邊選單英文、沿用轉磚的語言設定）、`bricks` 73、`minipay` 10、`drawer` 28。（瀏覽器測試改用 zh-TW 語系開啟，原本的中文斷言不變。）
+- Gemini 尚未實測：要等 Owner 在 GitHub 加 `GEMINI_API_KEY` secret 後，下一次有待翻文字時才會跑。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

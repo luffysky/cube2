@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-title="n.push" data-desc="pu.desc">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,38 +14,40 @@
 <body>
 <main class="game">
   <div class="bar">
-    <a href="../" aria-label="回到全部遊戲">← 遊戲</a>
-    <h1>推磚倉庫</h1>
-    <button type="button" id="levels">關卡</button>
+    <a href="../" data-ta="g.backA" data-t="g.back">← 遊戲</a>
+    <h1 data-t="n.push">推磚倉庫</h1>
+    <button type="button" id="levels" data-t="g.levels">關卡</button>
   </div>
   <div class="stats">
-    <div><b id="moves">0</b><span>步數</span></div>
+    <div><b id="moves">0</b><span data-t="g.moves">步數</span></div>
     <div class="hearts-box"><b class="lvname" id="lvName">關卡</b><span id="lvGoal"></span></div>
-    <div><b id="pushes">0</b><span>推數</span></div>
+    <div><b id="pushes">0</b><span data-t="pu.pushes">推數</span></div>
   </div>
   <div class="board push" id="board">
-    <canvas id="cv" aria-label="推磚倉庫的場地"></canvas>
+    <canvas id="cv" data-ta="pu.board" aria-label="推磚倉庫的場地"></canvas>
     <div class="over list" id="list"></div>
     <div class="over" id="win" hidden>
-      <h2>過關！</h2>
+      <h2 data-t="g.win">過關！</h2>
       <div class="big stars" id="winStars">★★★</div>
       <p id="winNote"></p>
-      <div class="row"><button class="btn" type="button" id="next">下一關</button><button class="btn plain" type="button" id="again">再玩一次</button><button class="btn plain" type="button" id="toList">關卡列表</button></div>
+      <div class="row"><button class="btn" type="button" id="next" data-t="g.next">下一關</button><button class="btn plain" type="button" id="again" data-t="g.again">再玩一次</button><button class="btn plain" type="button" id="toList" data-t="g.list">關卡列表</button></div>
     </div>
   </div>
-  <div class="row tools"><button class="btn plain" type="button" id="undo">上一步</button><button class="btn plain" type="button" id="restart">重來</button></div>
+  <div class="row tools"><button class="btn plain" type="button" id="undo" data-t="g.undo">上一步</button><button class="btn plain" type="button" id="restart" data-t="g.restart">重來</button></div>
   <div class="pad" id="pad">
-    <button type="button" data-d="up" aria-label="上">▲</button>
-    <button type="button" data-d="left" aria-label="左">◀</button>
-    <button type="button" data-d="down" aria-label="下">▼</button>
-    <button type="button" data-d="right" aria-label="右">▶</button>
+    <button type="button" data-d="up" data-ta="g.up" aria-label="上">▲</button>
+    <button type="button" data-d="left" data-ta="g.left" aria-label="左">◀</button>
+    <button type="button" data-d="down" data-ta="g.down" aria-label="下">▼</button>
+    <button type="button" data-d="right" data-ta="g.right" aria-label="右">▶</button>
   </div>
-  <p class="hint" id="keysHint">方向鍵或 WASD 移動，Z 上一步，R 重來</p>
+  <p class="hint" id="keysHint" data-t="pu.keys">方向鍵或 WASD 移動，Z 上一步，R 重來</p>
 </main>
-<script src="../rewards.js?v=4028e3604e"></script>
+<script src="../words.js?v=549b329472"></script>
+<script src="../i18n.js?v=cad39cbd3e"></script>
+<script src="../rewards.js?v=2453e265fc"></script>
 <script src="levels.js?v=7a6f2b871a"></script>
-<script src="push.js?v=d8a4dc0ae8"></script>
+<script src="push.js?v=03d9756b62"></script>
 <script src="../drawer-icons.js?v=1cc7c12d5f"></script>
-<script src="../nav.js?v=2b878d2cca"></script>
+<script src="../nav.js?v=e35d4478a3"></script>
 </body>
 </html>
