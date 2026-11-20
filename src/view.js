@@ -10,7 +10,7 @@
     dpr: Math.min(window.devicePixelRatio || 1, 3)
   };
   // Tile glazes by piece id: I ivory, O pink, T gold, S sky, Z jade, J coral, L lilac, 8 = cement.
-  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B'];
+  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B', '#EEF5FB'];   // 9: snow (weather mode only)
   var theme = {};
 
   function hex(c) {
@@ -85,6 +85,16 @@
     lookRev++;
   }
 
+  // settled snow: a soft white lump with a blue shadow underneath
+  function snowTile(x, px) {
+    var g = Math.max(0.5, px * 0.04), w = px - 2 * g;
+    rr(x, g, g, w, w, px * 0.32);
+    var gr = x.createLinearGradient(0, 0, 0, px);
+    gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(1, '#C9DCEC');
+    x.fillStyle = gr; x.fill();
+    x.fillStyle = 'rgba(255,255,255,0.9)';
+    x.beginPath(); x.arc(px * 0.32, px * 0.3, px * 0.1, 0, 6.283); x.fill();
+  }
   function cementTile(x, px, col) {
     var g = Math.max(0.5, px * 0.04), r = px * 0.18, w = px - 2 * g;
     rr(x, g, g, w, w, r);
@@ -444,6 +454,7 @@
       x.fillRect(0, 0, px - gap, px - gap);
       return c;
     }
+    if (id === 9) { snowTile(x, px); return c; }
     if (id === 8 && style !== 'neon' && style !== 'pixel') { cementTile(x, px, col); return c; }
     (TILE_DRAW[style] || TILE_DRAW.glaze)(x, px, col, id);
     return c;
@@ -814,7 +825,7 @@
     var key = style + '|' + px;
     if (!spriteCache[key]) {
       var t = [null];
-      for (var i = 1; i <= 8; i++) t.push(makeTile(px, i, style));
+      for (var i = 1; i <= 9; i++) t.push(makeTile(px, i, style));
       spriteCache[key] = t;
     }
     return spriteCache[key];
@@ -1444,6 +1455,10 @@
     undo: function (s) { s.clip('undo', 0.5) || s.tone(660, 0.05, 'triangle', 0.05, 440); },
     tick: function (s) { s.clip('ui', 0.4) || s.tone(880, 0.04, 'sine', 0.05); },
     // the clock running out: a woodblock-like tock each second, then a brighter double beep for 3-2-1
+    // the weather mode: a whoosh of wind, a soft pat of snow, and thunder
+    gust: function (s) { s.noise(0.32, 0.035, 300, 1600); },
+    drift: function (s) { s.noise(0.08, 0.05, 2000, 6000); },
+    thunder: function (s) { s.noise(0.08, 0.2, 800, 9000); s.noise(1.1, 0.24, 30, 420, 0.06); s.tone(70, 0.9, 'sawtooth', 0.07, 38, 0.05); },
     tock: function (s) { s.tone(1046, 0.07, 'sine', 0.11, 880); s.noise(0.02, 0.05, 1800, 5000); },
     tockHi: function (s) { s.tone(1568, 0.09, 'square', 0.05); s.tone(1568, 0.12, 'sine', 0.12, null, 0); }
   };

@@ -18,7 +18,7 @@ const LIMIT = {
   BOARD_ROWS: 50,
   SAVE_TRIES: 4
 };
-const BOARDS = { rp: 1, score: 1, sprint: 1 };
+const BOARDS = { rp: 1, score: 1, sprint: 1, wx: 1 };
 const TITLE_ID = /^[a-z0-9]{1,12}$/;
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0 or 1: nothing to misread
 const PUB_ABC = 'abcdefghjkmnpqrstuvwxyz23456789';

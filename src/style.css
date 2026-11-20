@@ -815,3 +815,21 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .edrow { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
 .edrow span { min-width: 6em; }
 .edrow b { min-width: 2.5em; text-align: center; font: 800 16px var(--num); }
+
+/* ---------- weather mode (挑戰大自然) ---------- */
+.wxcv { position: absolute; left: 0; top: 0; pointer-events: none; }
+.wxinfo { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border-radius: 10px; background: var(--panel); border: 1px solid var(--edge); font-size: 12px; line-height: 1.25; }
+.wxinfo div { display: flex; flex-direction: column; }
+.wxinfo span { color: var(--muted); font-size: 11px; }
+.wxinfo b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wxinfo p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.wxpick { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 6px 0 10px; }
+.wxp { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--edge); background: var(--panel); color: inherit; font: inherit; cursor: pointer; }
+.wxp i { font-style: normal; font-size: 22px; line-height: 1.1; }
+.wxp b { font-size: 13px; }
+.wxp span { font-size: 12px; color: var(--muted); }
+.wxp.wide { grid-column: 1 / -1; }
+.wxp[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.wxres b { font-size: 22px; }
+.wxres em { font-style: normal; color: var(--accent); font-weight: 700; }
+@media (max-width: 420px) { .wxpick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

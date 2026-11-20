@@ -292,6 +292,7 @@
     { id: 'sprint90', need: 1, coin: 90, on: function (m) { return m.mode === 'sprint' && m.result > 0 && m.ms < 90000 ? 1 : 0; } },
     { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
     { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } },
+    { id: 'wx', need: 2, coin: 50, ev: 'wx', on: function () { return 0; } },
     // level jobs
     { id: 'lv3', cat: 'lvl', need: 3, coin: 60, ev: 'lvl', on: function () { return 0; } },
     { id: 'lvNew', cat: 'lvl', need: 1, coin: 50, ev: 'lvlNew', on: function () { return 0; } },
@@ -352,7 +353,7 @@
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
-      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0 },
+      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -515,6 +516,23 @@
     emit('endless', [stage]);
     return { ok: true, best: best };
   };
+  // a weather run (挑戰大自然) ended: sec survived, lines cleared, score; practice runs (one kind of weather) pay nothing
+  Meta.wxDone = function (sec, lines, score, practice) {
+    sec = Math.max(0, Math.min(3600, Math.floor(+sec) || 0));
+    lines = Math.max(0, Math.min(sec * 5 + 8, Math.floor(+lines) || 0));
+    score = Math.max(0, Math.min(sec * 3000 + 5000, Math.floor(+score) || 0));
+    practice = !!practice;
+    var d = Meta.data, out = { ok: true, coins: 0, best: false, bestSec: false };
+    if (!practice) {
+      if (score > d.lv.wx) { d.lv.wx = score; out.best = true; }
+      if (sec > d.lv.wxs) { d.lv.wxs = sec; out.bestSec = true; }
+      if (sec >= 20) out.coins = Meta.earn(Math.min(60, Math.floor(sec / 20) + Math.floor(lines / 4)));
+    }
+    jobEvent('wx', 1);
+    Meta.save();
+    emit('wx', [sec, lines, score, practice ? 1 : 0]);
+    return out;
+  };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
@@ -658,6 +676,8 @@
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
     d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
+    d.lv.wx = Math.max(0, Math.floor(+d.lv.wx) || 0);
+    d.lv.wxs = Math.max(0, Math.min(3600, Math.floor(+d.lv.wxs) || 0));
   };
 
   // ---------- items carried into a match ----------
@@ -983,6 +1003,7 @@
     lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
     endless: function (a) { return Meta.endlessDone(a[0]); },
     custom: function () { return Meta.customPlayed(); },
+    wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },

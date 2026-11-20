@@ -87,6 +87,7 @@
     'j.sprint90': ['40 行競速 90 秒內完成', 'Finish 40 lines in under 90 s', '40ラインを90秒以内', '40줄을 90초 안에'],
     'j.box': ['開 3 個寶箱', 'Open 3 boxes', '宝箱を3個開ける', '보물상자 3개 열기'],
     'j.wheel': ['轉 1 次轉盤', 'Spin the wheel once', 'ルーレットを1回', '룰렛 1번 돌리기'],
+    'j.wx': ['玩 2 場挑戰大自然', 'Play 2 weather runs', '大自然チャレンジを2回', '대자연 도전 2판'],
     'j.lv3': ['過 3 個關卡', 'Clear 3 levels', 'ステージを3つクリア', '스테이지 3개 클리어'],
     'j.lvNew': ['過一個沒過過的關卡', 'Clear a level you have not cleared yet', '未クリアのステージをクリア', '처음 깨는 스테이지 클리어'],
     'j.lvStar': ['在一個關卡拿 3 顆星', 'Get 3 stars on a level', 'ステージで星3つ', '스테이지에서 별 3개'],

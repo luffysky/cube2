@@ -865,6 +865,24 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 .edrow { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
 .edrow span { min-width: 6em; }
 .edrow b { min-width: 2.5em; text-align: center; font: 800 16px var(--num); }
+
+/* ---------- weather mode (挑戰大自然) ---------- */
+.wxcv { position: absolute; left: 0; top: 0; pointer-events: none; }
+.wxinfo { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border-radius: 10px; background: var(--panel); border: 1px solid var(--edge); font-size: 12px; line-height: 1.25; }
+.wxinfo div { display: flex; flex-direction: column; }
+.wxinfo span { color: var(--muted); font-size: 11px; }
+.wxinfo b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wxinfo p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.wxpick { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 6px 0 10px; }
+.wxp { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--edge); background: var(--panel); color: inherit; font: inherit; cursor: pointer; }
+.wxp i { font-style: normal; font-size: 22px; line-height: 1.1; }
+.wxp b { font-size: 13px; }
+.wxp span { font-size: 12px; color: var(--muted); }
+.wxp.wide { grid-column: 1 / -1; }
+.wxp[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.wxres b { font-size: 22px; }
+.wxres em { font-style: normal; color: var(--accent); font-weight: 700; }
+@media (max-width: 420px) { .wxpick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 </style>
 </head>
 <body>
@@ -892,6 +910,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       <h2 class="group" data-t="m.train">練功</h2>
       <nav class="modes two" data-ta="m.train">
         <button class="mode" type="button" data-go="levels"><b data-t="lv.menuT">關卡挑戰</b><span data-t="lv.menuS">1000 關，每關的地形和目標都不一樣</span><em id="mLevels"></em></button>
+        <button class="mode" type="button" data-go="weather"><b data-t="wx.menuT">挑戰大自然</b><span data-t="wx.menuS">風、雨、雪、雷、霧，撐越久越好</span></button>
         <button class="mode" type="button" data-go="dojo"><b data-t="m.dojo">旋轉道場</b><span data-t="m.dojo.s">有提示有示範，一關一關練</span><em id="mDojo"></em></button>
         <button class="mode" type="button" data-go="openers"><b data-t="m.open">開局定式</b><span data-t="m.open.s">照著放，把起手背起來</span><em id="mOpen"></em></button>
         <button class="mode" type="button" data-go="practice"><b data-t="m.practice">自由練習</b><span data-t="m.practice.s">可以悔棋，雷達幫你找洞</span></button>
@@ -2868,6 +2887,178 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
+/* 轉磚 weather (挑戰大自然): wind, rain, snow, thunderstorms and fog that push the game around.
+
+   Only the weather mode uses this; every other mode plays without it. Everything here comes from the seed and the
+   time played, so two players given the same seed get the same weather at the same moment (that is what lets the
+   online version share one sky).
+
+   What each one does to the game:
+     wind   the falling piece drifts one column at a time in the wind's direction (stronger wind, more often)
+     rain   pieces fall faster, lock sooner, and slide along the wet stack after they land
+     snow   pieces fall slower, but snow settles on the stack a cell at a time
+     storm  wind and rain together, and lightning now and then turns a block into cement
+     fog    the lower rows are hidden behind fog
+
+   The weather changes every 20 to 30 seconds and gets stronger the longer the run goes. */
+(function (root) {
+  'use strict';
+  var ZZ = root.ZZ, COLS = ZZ.COLS, ROWS = ZZ.ROWS, TOP = ZZ.TOP, GARBAGE = ZZ.GARBAGE, RNG = ZZ.RNG, SHAPES = ZZ.SHAPES;
+  var SNOW = 9;
+  var KINDS = ['wind', 'rain', 'snow', 'storm', 'fog'];
+  var CALM = 6000;          // a short calm at the start
+  var MINUTE = 60000;
+
+  function Weather(o) {
+    o = o || {};
+    this.seed = (o.seed >>> 0) || 1;
+    this.only = KINDS.indexOf(o.only) >= 0 ? o.only : '';       // practice one kind of weather all the way through
+    this.rng = new RNG(this.seed ^ 0x5bd1e995);
+    this.t = 0;
+    this.kind = 'clear'; this.lvl = 0; this.left = CALM; this.n = 0;
+    this.dir = 1; this.wind = 0; this.rain = 0; this.snow = 0; this.fog = 0;
+    this.pushAcc = 0; this.driftAcc = 0; this.boltAt = 0; this.gustT = 0;
+    this.baseGrav = 1 / 900; this.baseLock = 500;
+    if (this.only) this.next();
+  }
+
+  // the next spell of weather
+  Weather.prototype.next = function () {
+    var r = this.rng, prev = this.kind, k;
+    if (this.only) k = this.only;
+    else do { k = KINDS[Math.floor(r.next() * KINDS.length)]; } while (k === prev);
+    this.n++;
+    this.kind = k;
+    // stronger as the run goes: level 1 for the first minute and a half, up to 3 after four minutes
+    var age = this.t / MINUTE;
+    this.lvl = Math.max(1, Math.min(3, 1 + Math.floor(age / 1.5) + (r.next() < 0.3 ? 1 : 0)));
+    this.left = 20000 + Math.floor(r.next() * 10000);
+    this.dir = r.next() < 0.5 ? -1 : 1;
+    this.boltAt = 3000 + r.next() * 4000;
+    this.driftAcc = 0; this.pushAcc = 0;
+    return k;
+  };
+
+  // How hard the wind blows right now, in metres a second (shown to the player); gusts come and go.
+  Weather.prototype.windNow = function () {
+    var k = this.kind, base = k === 'wind' ? 4 + this.lvl * 4 : k === 'storm' ? 6 + this.lvl * 4 : k === 'rain' ? 1 + this.lvl : 0;
+    if (!base) return 0;
+    var gust = Math.sin(this.t / 1700) * 0.25 + Math.sin(this.t / 610 + this.n) * 0.15;
+    return Math.max(0, Math.round(base * (1 + gust)));
+  };
+
+  // The board (a ZZ.Game) under this weather for dt milliseconds. Gives back what happened, for the screen and the sound:
+  // { type: 'change', kind } | { type: 'gust', dir } | { type: 'drift', x, y } | { type: 'bolt', x, y }
+  Weather.prototype.step = function (g, dt) {
+    var out = [];
+    this.t += dt;
+    this.left -= dt;
+    if (this.left <= 0) { this.next(); out.push({ type: 'change', kind: this.kind, lvl: this.lvl }); }
+    var k = this.kind, L = this.lvl, wet = k === 'rain' || k === 'storm';
+    this.wind = this.windNow();
+    this.rain = wet ? Math.round((k === 'storm' ? 20 : 8) * L + Math.sin(this.t / 2300) * 3 + 3) : 0;
+    this.snow = k === 'snow' ? L : 0;
+    this.fog = k === 'fog' ? 2 + L * 2 : 0;
+
+    // fall speed and how long a landed piece waits
+    var fall = wet ? 1 + 0.22 * L : k === 'snow' ? 0.6 : 1;
+    g.gravity = this.baseGrav * fall;
+    g.lockDelay = wet ? Math.max(260, Math.round(this.baseLock * (1 - 0.13 * L))) : this.baseLock;
+
+    var c = g.cur;
+    // the wind pushes the piece; on a wet stack it keeps sliding after it lands
+    if (c && this.wind > 0) {
+      var grounded = g.grounded();
+      if (!grounded || wet) {
+        this.pushAcc += this.wind * dt / (grounded ? 26000 : 13000);
+        if (this.pushAcc >= 1) {
+          this.pushAcc -= 1;
+          if (g.fits(c.type, c.rot, c.x + this.dir, c.y)) {
+            c.x += this.dir;
+            g.lastMove = 'wind';
+            g.emit('move', { dx: this.dir, x: c.x, y: c.y, rot: c.rot, wind: true });
+            out.push({ type: 'gust', dir: this.dir });
+          }
+        }
+      }
+    } else this.pushAcc = 0;
+
+    // snow settles: one cell at a time on top of a column, never filling a row by itself
+    if (k === 'snow') {
+      this.driftAcc += dt;
+      var every = 6500 - L * 1500;
+      if (this.driftAcc >= every) {
+        this.driftAcc = Math.min(every - 1, this.driftAcc - every);
+        var d = this.settle(g);
+        if (d) out.push(d);
+      }
+    }
+
+    // lightning: the top block of a column turns to cement
+    if (k === 'storm') {
+      this.boltAt -= dt;
+      if (this.boltAt <= 0) {
+        this.boltAt = 9000 - L * 1500 + this.rng.next() * 3000;
+        var b = this.strike(g);
+        out.push(b || { type: 'bolt', x: Math.floor(this.rng.next() * COLS), y: -1 });
+      }
+    }
+    return out;
+  };
+
+  function top(g, x) { for (var y = 0; y < ROWS; y++) if (g.grid[y][x]) return y; return ROWS; }
+  function underPiece(g, x, y) {
+    var c = g.cur;
+    if (!c) return false;
+    var cells = SHAPES[c.type][c.rot];
+    for (var i = 0; i < 4; i++) if (c.x + cells[i][0] === x && c.y + cells[i][1] === y) return true;
+    return false;
+  }
+  Weather.prototype.settle = function (g) {
+    var r = this.rng, start = Math.floor(r.next() * COLS);
+    for (var i = 0; i < COLS; i++) {
+      var x = (start + i) % COLS, y = top(g, x) - 1;
+      if (y < TOP + 2 || underPiece(g, x, y)) continue;
+      var row = g.grid[y], filled = 0;
+      for (var j = 0; j < COLS; j++) if (row[j]) filled++;
+      if (filled >= COLS - 1) continue;
+      row[x] = SNOW;
+      g.emit('drift', { x: x, y: y });
+      return { type: 'drift', x: x, y: y };
+    }
+    return null;
+  };
+  Weather.prototype.strike = function (g) {
+    var r = this.rng, start = Math.floor(r.next() * COLS);
+    for (var i = 0; i < COLS; i++) {
+      var x = (start + i * 3) % COLS, y = top(g, x);
+      if (y >= ROWS) continue;
+      g.grid[y][x] = GARBAGE;
+      g.emit('bolt', { x: x, y: y });
+      return { type: 'bolt', x: x, y: y };
+    }
+    return null;
+  };
+
+  // what the screen shows beside the next pieces
+  Weather.prototype.info = function () {
+    return { kind: this.kind, lvl: this.lvl, dir: this.dir, wind: this.wind, rain: this.rain, snow: this.snow, fog: this.fog, left: Math.max(0, this.left) };
+  };
+
+  // How the run is scored: the game's own score plus 5 for every second survived.
+  function scoreOf(g, ms) { return (g.stats.score || 0) + Math.floor(ms / 1000) * 5; }
+  // the fall speed of the run itself, before the weather: quicker every minute
+  function gravAt(ms) { return 1 / Math.max(110, 900 - ms / 1000 * 2.6); }
+
+  ZZ.SNOW = SNOW;
+  ZZ.Weather = Weather;
+  Weather.KINDS = KINDS;
+  Weather.scoreOf = scoreOf;
+  Weather.gravAt = gravAt;
+  if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
 /* 轉磚 meta: coins, ranked ladder, daily jobs, the shop catalogue and what the player owns.
    Pure logic plus one localStorage record. Runs in the page, in Node tests and on the server:
    the page works out every change at once so nothing waits on the network, and when a cloud save is linked
@@ -3162,6 +3353,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     { id: 'sprint90', need: 1, coin: 90, on: function (m) { return m.mode === 'sprint' && m.result > 0 && m.ms < 90000 ? 1 : 0; } },
     { id: 'box', need: 3, coin: 30, ev: 'box', on: function () { return 0; } },
     { id: 'wheel', need: 1, coin: 20, ev: 'wheel', on: function () { return 0; } },
+    { id: 'wx', need: 2, coin: 50, ev: 'wx', on: function () { return 0; } },
     // level jobs
     { id: 'lv3', cat: 'lvl', need: 3, coin: 60, ev: 'lvl', on: function () { return 0; } },
     { id: 'lvNew', cat: 'lvl', need: 1, coin: 50, ev: 'lvlNew', on: function () { return 0; } },
@@ -3222,7 +3414,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       sub: { until: 0, demo: true },
       custom: { tile: false, bg: false, dim: 45 },
       daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0 },
-      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0 },
+      box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0 },
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       note: null
@@ -3385,6 +3577,23 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     emit('endless', [stage]);
     return { ok: true, best: best };
   };
+  // a weather run (挑戰大自然) ended: sec survived, lines cleared, score; practice runs (one kind of weather) pay nothing
+  Meta.wxDone = function (sec, lines, score, practice) {
+    sec = Math.max(0, Math.min(3600, Math.floor(+sec) || 0));
+    lines = Math.max(0, Math.min(sec * 5 + 8, Math.floor(+lines) || 0));
+    score = Math.max(0, Math.min(sec * 3000 + 5000, Math.floor(+score) || 0));
+    practice = !!practice;
+    var d = Meta.data, out = { ok: true, coins: 0, best: false, bestSec: false };
+    if (!practice) {
+      if (score > d.lv.wx) { d.lv.wx = score; out.best = true; }
+      if (sec > d.lv.wxs) { d.lv.wxs = sec; out.bestSec = true; }
+      if (sec >= 20) out.coins = Meta.earn(Math.min(60, Math.floor(sec / 20) + Math.floor(lines / 4)));
+    }
+    jobEvent('wx', 1);
+    Meta.save();
+    emit('wx', [sec, lines, score, practice ? 1 : 0]);
+    return out;
+  };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
   Meta.claimJobId = function (id) {
@@ -3528,6 +3737,8 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
     d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
+    d.lv.wx = Math.max(0, Math.floor(+d.lv.wx) || 0);
+    d.lv.wxs = Math.max(0, Math.min(3600, Math.floor(+d.lv.wxs) || 0));
   };
 
   // ---------- items carried into a match ----------
@@ -3853,6 +4064,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
     endless: function (a) { return Meta.endlessDone(a[0]); },
     custom: function () { return Meta.customPlayed(); },
+    wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },
@@ -3890,7 +4102,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     dpr: Math.min(window.devicePixelRatio || 1, 3)
   };
   // Tile glazes by piece id: I ivory, O pink, T gold, S sky, Z jade, J coral, L lilac, 8 = cement.
-  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B'];
+  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B', '#EEF5FB'];   // 9: snow (weather mode only)
   var theme = {};
 
   function hex(c) {
@@ -3965,6 +4177,16 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     lookRev++;
   }
 
+  // settled snow: a soft white lump with a blue shadow underneath
+  function snowTile(x, px) {
+    var g = Math.max(0.5, px * 0.04), w = px - 2 * g;
+    rr(x, g, g, w, w, px * 0.32);
+    var gr = x.createLinearGradient(0, 0, 0, px);
+    gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(1, '#C9DCEC');
+    x.fillStyle = gr; x.fill();
+    x.fillStyle = 'rgba(255,255,255,0.9)';
+    x.beginPath(); x.arc(px * 0.32, px * 0.3, px * 0.1, 0, 6.283); x.fill();
+  }
   function cementTile(x, px, col) {
     var g = Math.max(0.5, px * 0.04), r = px * 0.18, w = px - 2 * g;
     rr(x, g, g, w, w, r);
@@ -4324,6 +4546,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
       x.fillRect(0, 0, px - gap, px - gap);
       return c;
     }
+    if (id === 9) { snowTile(x, px); return c; }
     if (id === 8 && style !== 'neon' && style !== 'pixel') { cementTile(x, px, col); return c; }
     (TILE_DRAW[style] || TILE_DRAW.glaze)(x, px, col, id);
     return c;
@@ -4694,7 +4917,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var key = style + '|' + px;
     if (!spriteCache[key]) {
       var t = [null];
-      for (var i = 1; i <= 8; i++) t.push(makeTile(px, i, style));
+      for (var i = 1; i <= 9; i++) t.push(makeTile(px, i, style));
       spriteCache[key] = t;
     }
     return spriteCache[key];
@@ -5324,6 +5547,10 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     undo: function (s) { s.clip('undo', 0.5) || s.tone(660, 0.05, 'triangle', 0.05, 440); },
     tick: function (s) { s.clip('ui', 0.4) || s.tone(880, 0.04, 'sine', 0.05); },
     // the clock running out: a woodblock-like tock each second, then a brighter double beep for 3-2-1
+    // the weather mode: a whoosh of wind, a soft pat of snow, and thunder
+    gust: function (s) { s.noise(0.32, 0.035, 300, 1600); },
+    drift: function (s) { s.noise(0.08, 0.05, 2000, 6000); },
+    thunder: function (s) { s.noise(0.08, 0.2, 800, 9000); s.noise(1.1, 0.24, 30, 420, 0.06); s.tone(70, 0.9, 'sawtooth', 0.07, 38, 0.05); },
     tock: function (s) { s.tone(1046, 0.07, 'sine', 0.11, 880); s.noise(0.02, 0.05, 1800, 5000); },
     tockHi: function (s) { s.tone(1568, 0.09, 'square', 0.05); s.tone(1568, 0.12, 'sine', 0.12, null, 0); }
   };
@@ -6950,7 +7177,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     });
   }
   // One of the menu's entries, by name (also used by links that open the game straight into a mode).
-  var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1 };
+  var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1 };
   function goTo(go) {
     if (typeof go !== 'string' || !MODES.hasOwnProperty(go)) return false;
     if (typeof App.go[go] === 'function') App.go[go]();
@@ -8687,6 +8914,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'j.sprint90': ['40 行競速 90 秒內完成', 'Finish 40 lines in under 90 s', '40ラインを90秒以内', '40줄을 90초 안에'],
     'j.box': ['開 3 個寶箱', 'Open 3 boxes', '宝箱を3個開ける', '보물상자 3개 열기'],
     'j.wheel': ['轉 1 次轉盤', 'Spin the wheel once', 'ルーレットを1回', '룰렛 1번 돌리기'],
+    'j.wx': ['玩 2 場挑戰大自然', 'Play 2 weather runs', '大自然チャレンジを2回', '대자연 도전 2판'],
     'j.lv3': ['過 3 個關卡', 'Clear 3 levels', 'ステージを3つクリア', '스테이지 3개 클리어'],
     'j.lvNew': ['過一個沒過過的關卡', 'Clear a level you have not cleared yet', '未クリアのステージをクリア', '처음 깨는 스테이지 클리어'],
     'j.lvStar': ['在一個關卡拿 3 顆星', 'Get 3 stars on a level', 'ステージで星3つ', '스테이지에서 별 3개'],
@@ -9690,6 +9918,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
     'lb.score': ['單場最高分', 'Best score', '最高スコア', '최고 점수'],
     'lb.sprint': ['40 行競速', '40-line sprint', '40ライン', '40줄 스프린트'],
+    'lb.wx': ['挑戰大自然', 'Weather', '大自然チャレンジ', '대자연 도전'],
     'lb.season': ['本季', 'This season', '今シーズン', '이번 시즌'],
     'lb.all': ['歷來', 'All time', '歴代', '역대'],
     'lb.loading': ['讀取中…', 'Loading…', '読み込み中…', '불러오는 중…'],
@@ -9850,7 +10079,7 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
   });
 
   // ---------- leaderboards ----------
-  var BOARDS = ['rp', 'score', 'sprint'];
+  var BOARDS = ['rp', 'score', 'sprint', 'wx'];
   function valueOf(b, v) {
     if (b === 'rp') return '<small>' + esc(rankText(v)) + '</small>' + L.num(v);
     return b === 'sprint' ? App.fmtTime(v) : L.num(v);
@@ -10603,6 +10832,255 @@ table.cmp.odds tbody td.ow, table.cmp.odds tbody td.oc { font: 400 14px/1.4 var(
     var m = /[?&]lv=([A-Za-z0-9_-]{4,64})/.exec(window.location.search), lv = m && Lv.decode(m[1]);
     if (lv) { view.invite = lv; view.inviteCode = m[1]; setTimeout(function () { if (!App.sheet()) App.openSheet('lvInvite'); }, 500); }
   });
+})();
+</script>
+<script>
+/* 轉磚 weather mode (挑戰大自然): survive as long as you can while the weather changes. The weather itself is in
+   weather.js; this file is the screen side: the setup sheet, the run, what the sky looks like over the board, and the
+   result. A run on changing weather counts for coins and the leaderboard; a practice run on one kind of weather does not. */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta, W = ZZ.Weather, esc = App.esc, btn = App.btn;
+  var COLS = ZZ.COLS, ROWS = ZZ.ROWS;
+
+  L.add({
+    'wx.menuT': ['挑戰大自然', 'Weather run', '大自然チャレンジ', '대자연 도전'],
+    'wx.menuS': ['風、雨、雪、雷、霧，撐越久越好', 'Wind, rain, snow, storms and fog. Last as long as you can', '風・雨・雪・雷・霧の中で生き残れ', '바람, 비, 눈, 번개, 안개 속에서 버티기'],
+    'wx.title': ['挑戰大自然', 'Weather run', '大自然チャレンジ', '대자연 도전'],
+    'wx.p': ['天氣每 20–30 秒換一次，越後面越強。風會把方塊吹歪，下雨方塊掉得快、落地還會滑，下雪會在牆上積雪，雷雨會把方塊劈成水泥，起霧看不到下面幾排。', 'The weather changes every 20 to 30 seconds and gets stronger. Wind blows pieces sideways, rain makes them fall faster and slide, snow piles up on the stack, lightning turns blocks to cement, and fog hides the lower rows.', '天気は20〜30秒ごとに変わり、だんだん強くなります。風でブロックが流され、雨で速く落ちて滑り、雪が積もり、雷でブロックがセメントに、霧で下の段が見えなくなります。', '날씨는 20~30초마다 바뀌고 점점 강해져요. 바람은 블록을 밀고, 비는 빨리 떨어지고 미끄러지며, 눈은 쌓이고, 번개는 블록을 시멘트로, 안개는 아래 줄을 가려요.'],
+    'wx.best': ['最佳：{0} 分，撐了 {1}', 'Best: {0} points, lasted {1}', 'ベスト：{0}点・{1}', '최고: {0}점, {1} 버팀'],
+    'wx.mix': ['天氣輪替', 'Changing weather', '天気が変わる', '날씨 변화'],
+    'wx.mixS': ['算金幣、上排行榜', 'Counts for coins and the leaderboard', 'コインとランキング対象', '코인과 랭킹에 반영'],
+    'wx.only': ['只練一種天氣（不算獎勵）', 'Practise one kind (no rewards)', '1種類だけ練習（報酬なし）', '한 가지만 연습 (보상 없음)'],
+    'wx.go': ['出發', 'Start', 'スタート', '시작'],
+    'wx.k.clear': ['晴天', 'Clear', '晴れ', '맑음'],
+    'wx.k.wind': ['強風', 'Wind', '強風', '강풍'],
+    'wx.k.rain': ['大雨', 'Rain', '大雨', '폭우'],
+    'wx.k.snow': ['下雪', 'Snow', '雪', '눈'],
+    'wx.k.storm': ['雷雨', 'Thunderstorm', '雷雨', '뇌우'],
+    'wx.k.fog': ['濃霧', 'Fog', '濃霧', '짙은 안개'],
+    'wx.lvl': ['{0} 級', 'level {0}', 'レベル{0}', '{0}단계'],
+    'wx.wind': ['風速', 'Wind', '風速', '풍속'],
+    'wx.rain': ['雨量', 'Rain', '雨量', '강우량'],
+    'wx.snow': ['積雪', 'Snow', '積雪', '적설'],
+    'wx.fog': ['能見度', 'Visibility', '視界', '가시거리'],
+    'wx.next': ['{0} 秒後變天', 'Changes in {0}s', '{0}秒後に変化', '{0}초 후 변화'],
+    'wx.time': ['撐了', 'Time', '時間', '시간'],
+    'wx.over': ['被大自然打敗了', 'Nature wins this one', '大自然に負けた', '대자연에 졌어요'],
+    'wx.lasted': ['撐了 {0}', 'Lasted {0}', '{0} 耐えた', '{0} 버팀'],
+    'wx.lines': ['消了 {0} 行', '{0} lines', '{0}ライン', '{0}줄'],
+    'wx.score': ['{0} 分', '{0} points', '{0}点', '{0}점'],
+    'wx.newBest': ['新紀錄！', 'New best!', '自己ベスト！', '신기록!'],
+    'wx.practice': ['練習場，不算獎勵', 'Practice: no rewards', '練習：報酬なし', '연습: 보상 없음'],
+    'wx.again': ['再挑戰', 'Go again', 'もう一度', '다시 도전'],
+    'wx.short': ['撐 20 秒以上才有金幣。', 'Last 20 seconds or more for coins.', '20秒以上でコイン獲得。', '20초 이상 버텨야 코인을 받아요.']
+  });
+
+  var KIND_ICON = { clear: '☀️', wind: '🌬️', rain: '🌧️', snow: '❄️', storm: '⛈️', fog: '🌫️' };
+  function kindName(k) { return t('wx.k.' + k); }
+  function clock(ms) { var s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
+
+  // ---------- setup ----------
+  var pick = { only: '' };
+  App.go.weather = function () { App.openSheet('wxSetup'); };
+  App.sheets.wxSetup = function () {
+    var d = Meta.data.lv, h = '<h2>' + t('wx.title') + '</h2><p class="note">' + t('wx.p') + '</p>';
+    if (d.wx) h += '<p><b>' + esc(t('wx.best', L.num(d.wx), clock(d.wxs * 1000))) + '</b></p>';
+    h += '<div class="wxpick" role="radiogroup" aria-label="' + esc(t('wx.title')) + '">';
+    h += '<button type="button" role="radio" class="wxp wide" aria-checked="' + (!pick.only) + '" data-wxonly=""><b>' + t('wx.mix') + '</b><span>' + t('wx.mixS') + '</span></button>';
+    h += '</div><h3>' + t('wx.only') + '</h3><div class="wxpick" role="radiogroup" aria-label="' + esc(t('wx.only')) + '">';
+    W.KINDS.forEach(function (k) {
+      h += '<button type="button" role="radio" class="wxp" aria-checked="' + (pick.only === k) + '" data-wxonly="' + k + '"><i aria-hidden="true">' + KIND_ICON[k] + '</i><b>' + esc(kindName(k)) + '</b></button>';
+    });
+    return h + '</div><div class="row">' + btn('wxGo', 'wx.go', true) + btn('close', 'close') + '</div>';
+  };
+  App.clicks.push(function (d) {
+    if (d.wxonly != null) { pick.only = W.KINDS.indexOf(d.wxonly) >= 0 ? d.wxonly : ''; App.openSheet('wxSetup'); return true; }
+    return false;
+  });
+  App.acts.wxGo = function () { App.begin('weather', { only: pick.only, seed: (Math.random() * 4294967296) >>> 0 }); };
+
+  // ---------- the run ----------
+  var K = App.kinds.weather = {
+    begin: function (S, o) {
+      S.wx = new W({ seed: o.seed, only: o.only });
+      S.wx.baseLock = App.set.lock;
+      S.me = new ZZ.Game({ seed: o.seed, gravity: W.gravAt(0), lockDelay: App.set.lock, garbage: false, sdf: App.sdfVal() });
+      S.infoKey = '';
+      sky.reset();
+    },
+    hud: function () {
+      var el = App.el;
+      el.hudL.innerHTML = '<span class="who">' + t('wx.title') + '</span>';
+      el.hudC.innerHTML = '<div class="hud-title" id="wxNow"></div>';
+      el.hudR.innerHTML = '<div class="stat"><b id="wxTime">0:00</b><span>' + t('wx.time') + '</span></div>';
+    },
+    tools: function () { return '<div class="wxinfo" id="wxInfo" aria-live="off"></div>' + App.tool('restart', 'restart'); },
+    tick: function (dt) {
+      var S = App.S(), wx = S.wx;
+      wx.baseGrav = W.gravAt(S.time);
+      var ev = wx.step(S.me, dt);
+      for (var i = 0; i < ev.length; i++) {
+        var e = ev[i];
+        if (e.type === 'change') { App.banner(KIND_ICON[e.kind] + ' ' + kindName(e.kind), '', 1100); sky.change(); }
+        else if (e.type === 'gust') { if (S.time - sky.gustAt > 900) { sky.gustAt = S.time; App.sfx.play('gust'); } }
+        else if (e.type === 'drift') App.sfx.play('drift');
+        else if (e.type === 'bolt') { App.sfx.play('thunder'); App.buzz([30, 40, 60]); sky.bolt(e); App.V.me.kick(0, 5); }
+      }
+    },
+    update: function () {
+      var S = App.S(), wx = S.wx, n = wx.info();
+      App.txt('wxTime', clock(S.time));
+      var key = n.kind + n.lvl + '|' + n.wind + n.dir + '|' + n.rain + '|' + n.snow + '|' + n.fog + '|' + Math.ceil(n.left / 1000) + L.lang;
+      if (key === S.infoKey) return;
+      S.infoKey = key;
+      var now = document.getElementById('wxNow');
+      if (now) now.textContent = KIND_ICON[n.kind] + ' ' + kindName(n.kind) + (n.lvl && n.kind !== 'clear' ? ' · ' + t('wx.lvl', n.lvl) : '');
+      var box = document.getElementById('wxInfo');
+      if (!box) return;
+      var h = '<div><span>' + t('wx.wind') + '</span><b>' + (n.wind ? (n.dir < 0 ? '← ' : '→ ') + n.wind + ' m/s' : '0') + '</b></div>' +
+        '<div><span>' + t('wx.rain') + '</span><b>' + n.rain + ' mm</b></div>';
+      if (n.kind === 'snow') h += '<div><span>' + t('wx.snow') + '</span><b>' + (n.snow * 5) + ' cm</b></div>';
+      if (n.kind === 'fog') h += '<div><span>' + t('wx.fog') + '</span><b>' + (60 - n.fog * 6) + ' m</b></div>';
+      if (!wx.only) h += '<p>' + esc(t('wx.next', Math.ceil(n.left / 1000))) + '</p>';
+      box.innerHTML = h;
+    },
+    topout: function () { K.end(); },
+    empty: function () { /* the queue never runs out */ },
+    restart: function () { var S = App.S(); App.begin('weather', { only: S.o.only, seed: (Math.random() * 4294967296) >>> 0 }); },
+    end: function () {
+      var S = App.S();
+      if (S.state !== 'play') return;
+      S.state = 'wait'; S.wait = 1100; S.target = null;
+      App.sfx.play('lose');
+      var sec = Math.floor(S.time / 1000), st = S.me.stats, score = W.scoreOf(S.me, S.time);
+      S.res = Meta.wxDone(sec, st.lines, score, !!S.o.only);
+      S.res.sec = sec; S.res.lines = st.lines; S.res.score = score;
+      S.after = function () { App.openSheet('wxOver'); };
+    }
+  };
+
+  App.sheets.wxOver = function () {
+    var S = App.S(), r = S.res || {}, h = '<h2 class="verdict lose">' + t('wx.over') + '</h2>';
+    h += '<p class="wxres"><b>' + esc(t('wx.score', L.num(r.score || 0))) + '</b>' + (r.best ? ' <em>' + t('wx.newBest') + '</em>' : '') + '</p>';
+    h += '<p>' + esc(t('wx.lasted', clock((r.sec || 0) * 1000))) + '　' + esc(t('wx.lines', r.lines || 0)) + (r.coins ? '　' + App.coin(r.coins) : '') + '</p>';
+    if (S.o.only) h += '<p class="note">' + t('wx.practice') + '</p>';
+    else if ((r.sec || 0) < 20) h += '<p class="note">' + t('wx.short') + '</p>';
+    return h + '<div class="row">' + btn('again', 'wx.again', true) + btn('wxSetupBack', 'wx.title') + btn('menu', 'toMenu') + '</div>';
+  };
+  App.acts.wxSetupBack = function () { App.toMenu(); App.openSheet('wxSetup'); };
+
+  // ---------- the sky over the board ----------
+  // A canvas laid over the board: rain, snow, wind streaks, lightning and fog. Purely for looks; the weather's effect on
+  // the game is all in weather.js.
+  var sky = {
+    cv: null, x: null, w: 0, h: 0, parts: [], flash: 0, bolts: [], fade: 1, gustAt: -1e9, last: 0, on: false,
+    reset: function () { this.parts = []; this.bolts = []; this.flash = 0; this.fade = 1; this.gustAt = -1e9; this.start(); },
+    change: function () { this.fade = 0; },
+    bolt: function (e) {
+      var v = App.V.me, cell = v.cell, x0 = v.mw + (e.x + 0.5) * cell, y1 = e.y >= 0 ? v.cellXY(e.x, e.y)[1] + cell * 0.5 : this.h * 0.6, pts = [[x0 + (Math.random() - 0.5) * cell * 3, 0]];
+      for (var y = cell * 1.2; y < y1; y += cell * (0.8 + Math.random() * 0.8)) pts.push([x0 + (Math.random() - 0.5) * cell * 1.6, y]);
+      pts.push([x0, y1]);
+      this.bolts.push({ pts: pts, life: 380 });
+      this.flash = App.env.reduce ? 0.25 : 0.7;
+    },
+    start: function () {
+      if (!this.cv) {
+        var wrap = App.el.wellWrap, c = document.createElement('canvas');
+        c.className = 'wxcv'; c.setAttribute('aria-hidden', 'true');
+        wrap.insertBefore(c, App.el.pops);
+        this.cv = c;
+      }
+      this.cv.hidden = false;
+      if (!this.on) { this.on = true; this.last = 0; window.requestAnimationFrame(this.frame); }
+    },
+    stop: function () { this.on = false; if (this.cv) { this.cv.hidden = true; this.parts = []; } },
+    frame: function (now) {
+      var s = sky, S = App.S();
+      if (!S || S.kind !== 'weather' || App.screen() !== 'play') { s.stop(); return; }
+      window.requestAnimationFrame(s.frame);
+      var dt = s.last ? Math.min(50, now - s.last) : 16;
+      s.last = now;
+      if (S.state === 'pause') dt = 0;
+      s.size();
+      s.draw(S.wx, dt);
+    },
+    size: function () {
+      var wc = App.el.wellCv, w = wc.offsetWidth, h = wc.offsetHeight;
+      if (w === this.w && h === this.h) return;
+      this.w = w; this.h = h;
+      this.x = ZZ.View.sizeCanvas(this.cv, w, h);
+    },
+    draw: function (wx, dt) {
+      var x = this.x, w = this.w, h = this.h, v = App.V.me, cell = v.cell || 20, reduce = App.env.reduce, i, p;
+      if (!x) return;
+      x.clearRect(0, 0, w, h);
+      var n = wx.info(), k = n.kind, wet = k === 'rain' || k === 'storm', windX = n.wind * n.dir;
+      this.fade = Math.min(1, this.fade + dt / 900);
+      // how many of each there should be right now
+      var wantRain = wet ? Math.round(n.rain * (reduce ? 0.6 : 1.6)) : 0, wantSnow = k === 'snow' ? (reduce ? 20 : 30 + n.lvl * 20) : 0, wantWind = n.wind && !wet ? Math.round(n.wind * (reduce ? 0.6 : 1.2)) : wet && n.wind > 6 ? 6 : 0;
+      var counts = { r: 0, s: 0, w: 0 };
+      for (i = 0; i < this.parts.length; i++) counts[this.parts[i].k]++;
+      while (counts.r < wantRain) { this.parts.push(this.spawn('r', w, h, true)); counts.r++; }
+      while (counts.s < wantSnow) { this.parts.push(this.spawn('s', w, h, true)); counts.s++; }
+      while (counts.w < wantWind) { this.parts.push(this.spawn('w', w, h, true)); counts.w++; }
+      var keep = [], drop = { r: counts.r - wantRain, s: counts.s - wantSnow, w: counts.w - wantWind }, f = dt / 1000;
+      for (i = 0; i < this.parts.length; i++) {
+        p = this.parts[i];
+        p.x += (p.vx + (p.k === 'w' ? 0 : windX * (p.k === 's' ? 5 : 9))) * f;
+        p.y += p.vy * f;
+        if (p.k === 's') p.x += Math.sin((p.y + p.ph) / 23) * 12 * f;
+        var out = p.y > h + 20 || p.x < -60 || p.x > w + 60;
+        if (out) { if (drop[p.k] > 0) { drop[p.k]--; continue; } this.parts[i] = p = this.spawn(p.k, w, h, false, windX); }
+        keep.push(p);
+      }
+      this.parts = keep;
+      x.globalAlpha = this.fade;
+      // rain: thin slanted streaks
+      x.strokeStyle = 'rgba(190,215,240,0.55)'; x.lineWidth = Math.max(1, cell * 0.05); x.lineCap = 'round';
+      x.beginPath();
+      for (i = 0; i < this.parts.length; i++) { p = this.parts[i]; if (p.k !== 'r') continue; var sl = windX * 9 / p.vy; x.moveTo(p.x, p.y); x.lineTo(p.x - sl * p.len, p.y - p.len); }
+      x.stroke();
+      // snow: soft round flakes
+      x.fillStyle = 'rgba(255,255,255,0.9)';
+      for (i = 0; i < this.parts.length; i++) { p = this.parts[i]; if (p.k !== 's') continue; x.beginPath(); x.arc(p.x, p.y, p.r, 0, 6.283); x.fill(); }
+      // wind: long faint streaks
+      x.strokeStyle = 'rgba(255,255,255,0.35)'; x.lineWidth = Math.max(1, cell * 0.06);
+      x.beginPath();
+      for (i = 0; i < this.parts.length; i++) { p = this.parts[i]; if (p.k !== 'w') continue; x.moveTo(p.x, p.y); x.quadraticCurveTo(p.x - p.len * 0.5 * Math.sign(p.vx || 1), p.y - cell * 0.2, p.x - p.len * Math.sign(p.vx || 1), p.y); }
+      x.stroke();
+      x.globalAlpha = 1;
+      // fog: the lower rows behind a thick bank
+      if (n.fog) {
+        var fy = v.cellXY(0, ROWS - n.fog)[1], top = fy - cell * 1.5, g = x.createLinearGradient(0, top, 0, fy + cell);
+        g.addColorStop(0, 'rgba(214,220,228,0)'); g.addColorStop(1, 'rgba(214,220,228,' + (0.94 * this.fade).toFixed(3) + ')');
+        x.fillStyle = g; x.fillRect(v.mw, top, COLS * cell, cell * 2.5);
+        x.fillStyle = 'rgba(214,220,228,' + (0.94 * this.fade).toFixed(3) + ')';
+        x.fillRect(v.mw, fy + cell, COLS * cell, h);
+      }
+      // a dark sky for storms
+      if (k === 'storm') { x.fillStyle = 'rgba(20,24,40,' + (0.18 * this.fade).toFixed(3) + ')'; x.fillRect(0, 0, w, h); }
+      // lightning
+      for (i = this.bolts.length - 1; i >= 0; i--) {
+        var b = this.bolts[i];
+        b.life -= dt;
+        if (b.life <= 0) { this.bolts.splice(i, 1); continue; }
+        x.strokeStyle = 'rgba(255,250,210,' + Math.min(1, b.life / 200).toFixed(3) + ')'; x.lineWidth = Math.max(2, cell * 0.14); x.lineJoin = 'round';
+        x.shadowColor = '#FFF6B0'; x.shadowBlur = cell * 0.8;
+        x.beginPath(); x.moveTo(b.pts[0][0], b.pts[0][1]);
+        for (var j = 1; j < b.pts.length; j++) x.lineTo(b.pts[j][0], b.pts[j][1]);
+        x.stroke(); x.shadowBlur = 0;
+      }
+      if (this.flash > 0) { x.fillStyle = 'rgba(255,255,255,' + this.flash.toFixed(3) + ')'; x.fillRect(0, 0, w, h); this.flash = Math.max(0, this.flash - dt / 260); }
+    },
+    spawn: function (k, w, h, anywhere, windX) {
+      var cell = App.V.me.cell || 20, from = windX > 0 ? -30 : windX < 0 ? w + 30 : 0, side = windX && Math.random() < 0.35;
+      if (k === 'r') return { k: k, x: side ? from : Math.random() * w, y: anywhere ? Math.random() * h : side ? Math.random() * h * 0.5 : -20, vx: 0, vy: 700 + Math.random() * 300, len: cell * (0.5 + Math.random() * 0.5) };
+      if (k === 's') return { k: k, x: side ? from : Math.random() * w, y: anywhere ? Math.random() * h : -10, vx: 0, vy: 40 + Math.random() * 50, r: Math.max(1.2, cell * (0.05 + Math.random() * 0.08)), ph: Math.random() * 300 };
+      var dir = (App.S() && App.S().wx.dir) || 1;
+      return { k: k, x: anywhere ? Math.random() * w : dir > 0 ? -60 : w + 60, y: Math.random() * h, vx: dir * (300 + Math.random() * 300), vy: 0, len: cell * (1.5 + Math.random() * 2) };
+    }
+  };
 })();
 </script>
 <script>

@@ -1325,7 +1325,7 @@
     });
   }
   // One of the menu's entries, by name (also used by links that open the game straight into a mode).
-  var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1 };
+  var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1 };
   function goTo(go) {
     if (typeof go !== 'string' || !MODES.hasOwnProperty(go)) return false;
     if (typeof App.go[go] === 'function') App.go[go]();

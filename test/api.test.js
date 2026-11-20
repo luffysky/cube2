@@ -696,6 +696,21 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(lg[0].n >= 1, 'level coins are in the coin ledger');
   }
 
+  // ---------- weather runs: paid by time, never faster than they could be played, on their own board ----------
+  {
+    const X = await newPlayer(null, '203.0.113.65');
+    const c0 = (await sync(X)).json.st.coins;
+    r = await sync(X, [op('wx', [120, 20, 30000, 0])]);
+    ok(r.json.res[0].ok && r.json.st.coins === c0 + 6 + 5 && r.json.st.lv.wx === 30000 && r.json.st.lv.wxs === 120, 'a two-minute run pays and is kept as the best', [r.json.res, r.json.st.coins - c0, r.json.st.lv]);
+    r = await call('board', { url: '/api/board?b=wx&s=all' });
+    ok(r.status === 200 && r.json.top.some(x => x.v === 30000), 'and it is on the weather board', r.json);
+    r = await sync(X, [op('wx', [3000, 999, 1e9, 0])]);
+    ok(r.json.res[0].ok === false && r.json.res[0].why === 'fast', 'an hour-long run cannot be reported straight after', r.json.res);
+    r = await sync(X, [op('wx', [10, 2, 1e9, 1])]);
+    const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'wx'", [X.id]);
+    ok(lg[0].n === 1, 'only the paid run is in the coin ledger', lg);
+  }
+
   // ---------- when the database is in trouble ----------
   const logged = []; const realErr = console.error; console.error = (...a) => logged.push(a.join(' '));
   dbm.use({ query: async () => { const e = new Error('connect failed for postgresql://neondb_owner:s3cretPass@ep-x.neon.tech/neondb?sslmode=require'); e.code = 'XX000'; throw e; }, batch: async () => { throw new Error('boom'); } });
