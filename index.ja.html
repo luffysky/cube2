@@ -1020,6 +1020,37 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .seg.wrap { flex-wrap: wrap; }
 .seg.wrap > button { flex: 1 1 30%; }
 
+/* 載入畫面：轉、磚兩塊掉下來，下面的小牆一塊塊疊滿、整行消掉，一直重複 */
+#boot { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; background: var(--floor); color: var(--ink); transition: opacity .35s ease, visibility .35s; }
+#boot.done { opacity: 0; visibility: hidden; pointer-events: none; }
+/* never stuck: if the game has not taken it down after a while (a script failed), it fades by itself */
+#boot { animation: btGone .4s 15s forwards; }
+@keyframes btGone { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+.bt-logo { display: flex; gap: 10px; font-size: 52px; line-height: 1; font-weight: 900; }
+.bt-a { animation: btDropA .7s cubic-bezier(.3, 1.4, .5, 1) both; }
+.bt-b { animation: btDropB .7s .12s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes btDropA { from { transform: translateY(-120px) rotate(-30deg); opacity: 0; } to { transform: rotate(-9deg); opacity: 1; } }
+@keyframes btDropB { from { transform: translateY(-120px) rotate(20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* the little wall: 4 cells wide, 3 tall (cell 18 px) */
+.bt-well { transform: scale(1.3); margin: 8px 0; position: relative; width: 80px; height: 62px; padding: 4px; border-radius: 9px; background: var(--wall); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); overflow: hidden; }
+.bt-p { position: absolute; width: 18px; height: 18px; border-radius: 4px; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18), inset 0 2px 0 rgba(255, 255, 255, .45); }
+.bt-p1 { left: 4px; background: #5DB7F5; animation: btP1 2.4s infinite; }
+.bt-p2 { left: 22px; width: 36px; background: #FF9DB5; animation: btP2 2.4s infinite; }
+.bt-p3 { left: 58px; background: #37C29A; animation: btP3 2.4s infinite; }
+.bt-row { position: absolute; left: 4px; right: 4px; bottom: 4px; height: 18px; border-radius: 4px; background: #fff; opacity: 0; animation: btRow 2.4s infinite; }
+@keyframes btP1 { 0% { top: -20px; } 12%, 70% { top: 40px; } 78%, 100% { top: 40px; opacity: 0; } }
+@keyframes btP2 { 0%, 18% { top: -20px; } 32%, 70% { top: 40px; } 78%, 100% { top: 40px; opacity: 0; } }
+@keyframes btP3 { 0%, 38% { top: -20px; } 52%, 70% { top: 40px; } 78%, 100% { top: 40px; opacity: 0; } }
+@keyframes btRow { 0%, 56% { opacity: 0; } 62% { opacity: .9; } 70% { opacity: .2; } 74% { opacity: .9; } 82%, 100% { opacity: 0; } }
+.bt-t { margin: 0; font-size: 15px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.bt-d i { font-style: normal; animation: btDot 1.2s infinite; }
+.bt-d i:nth-child(2) { animation-delay: .2s; } .bt-d i:nth-child(3) { animation-delay: .4s; }
+@keyframes btDot { 0%, 60%, 100% { opacity: .2; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .bt-a, .bt-b, .bt-p, .bt-row, .bt-d i { animation: none !important; }
+  .bt-p { top: 40px; }
+}
+
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
    into 轉磚's page (build.js) and is linked by every brick-game page (games/theme.js puts the attribute on).
@@ -1103,6 +1134,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 </style>
 </head>
 <body>
+<!-- the loading screen: painted as soon as this much of the page has arrived, gone once the game has started -->
+<div id="boot" role="status" aria-live="polite">
+  <div class="bt-logo" aria-hidden="true"><span class="lt lt-t bt-a">轉</span><span class="lt lt-b bt-b">磚</span></div>
+  <div class="bt-well" aria-hidden="true">
+    <i class="bt-p bt-p1"></i><i class="bt-p bt-p2"></i><i class="bt-p bt-p3"></i>
+    <i class="bt-row"></i>
+  </div>
+  <p class="bt-t"><span>読み込み中</span><b class="bt-d"><i>.</i><i>.</i><i>.</i></b></p>
+</div>
 <div id="app">
 
   <section id="menu" class="screen">
@@ -8733,7 +8773,14 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   if (hot && hot.snapshot) {
     try { hot.snapshot(function () { return { screen: S ? S.kind : 'menu', dojo: !!(S && S.kind === 'dojo'), drill: S && S.kind === 'dojo' ? S.drill : 0 }; }); } catch (e) { /* viewer feature only */ }
   }
-  function boot(data) { try { start(data || {}); } catch (e) { if (window.console) console.error(e); } }
+  // the loading screen fades out once the game is up (or failed to start: then it would only hide the error)
+  function bootDone() {
+    var b = document.getElementById('boot');
+    if (!b) return;
+    b.classList.add('done');
+    setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 400);
+  }
+  function boot(data) { try { start(data || {}); } catch (e) { if (window.console) console.error(e); } bootDone(); }
   // Feature files load after this one; start once they have all registered.
   ZZ.start = function () { if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {}); };
 })();

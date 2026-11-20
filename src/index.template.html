@@ -48,6 +48,15 @@
 </style>
 </head>
 <body>
+<!-- the loading screen: painted as soon as this much of the page has arrived, gone once the game has started -->
+<div id="boot" role="status" aria-live="polite">
+  <div class="bt-logo" aria-hidden="true"><span class="lt lt-t bt-a">轉</span><span class="lt lt-b bt-b">磚</span></div>
+  <div class="bt-well" aria-hidden="true">
+    <i class="bt-p bt-p1"></i><i class="bt-p bt-p2"></i><i class="bt-p bt-p3"></i>
+    <i class="bt-row"></i>
+  </div>
+  <p class="bt-t"><span>{{BOOT}}</span><b class="bt-d"><i>.</i><i>.</i><i>.</i></b></p>
+</div>
 <div id="app">
 
   <section id="menu" class="screen">

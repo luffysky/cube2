@@ -661,3 +661,14 @@
 - GitHub 上 `flow` 失敗：它拿 `smoke` 測試留下的 `shots/s_menu.png` 當會員自選圖片，GitHub 上沒跑 smoke 就沒有這張圖。改成 flow 自己先截一張圖再用。其他 18 個在 GitHub 上都過了。
 - 檔案：`test/flow.js`。｜資料庫：未異動。｜刪除：無。
 - 測試：本機刪掉那張圖後 `flow` 60 全過。
+- 補記：上一條的 commit 為 [`9f1ef06`](https://github.com/luffysky/cube2/commit/9f1ef06)。
+
+## 2026-11-21 07:20（Asia/Taipei）｜載入動畫
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「幫我做個遊戲載入的Loading動畫」
+- 實際變更：主頁一打開就先顯示載入畫面（在 1 MB 的程式還在下載、解析時就畫得出來）：「轉」「磚」兩塊從上面掉下來彈一下，下面一個小牆三塊方塊依序落下、整行閃白消掉、一直重複，底下「載入中…」三個點輪流亮（五種語言的頁面各用自己的字，建置時填入）。遊戲啟動完成就淡出移除；萬一程式出錯沒啟動，15 秒後也會自己淡掉，不會擋住畫面。系統設定「減少動態」時只顯示靜態畫面。純 CSS，不多載任何檔案。
+- 檔案：`src/index.template.html`、`src/style.css`、`src/ui.js`、`build.js`、`index*.html`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `pwa` 52、`rwd` 258、`consent` 31、`howto` 11、`flow` 60；關掉 JavaScript 截圖確認動畫畫面、正常開啟時啟動後消失。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

@@ -93,7 +93,8 @@ for (const lang of PAGE_LANGS) {
   };
   const words = {
     SITE, LANG: lang, PATH: pathOf(lang), NAME: t('title'), SHORT: '轉磚', TITLE: t('seo.title'), DESC: t('seo.desc'),
-    OG_TITLE: t('seo.og'), OG_DESC: t('seo.ogDesc'), OG_ALT: t('seo.ogAlt')
+    OG_TITLE: t('seo.og'), OG_DESC: t('seo.ogDesc'), OG_ALT: t('seo.ogAlt'),
+    BOOT: { 'zh-Hant': '載入中', 'zh-Hans': '加载中', en: 'Loading', ja: '読み込み中', ko: '불러오는 중' }[lang]
   };
   h = h.replace(/\{\{(\w+)\}\}/g, (all, k) => {
     if (k === 'JSONLD') return JSON.stringify(jsonld).replace(/</g, '\\u003c');

@@ -1834,7 +1834,14 @@
   if (hot && hot.snapshot) {
     try { hot.snapshot(function () { return { screen: S ? S.kind : 'menu', dojo: !!(S && S.kind === 'dojo'), drill: S && S.kind === 'dojo' ? S.drill : 0 }; }); } catch (e) { /* viewer feature only */ }
   }
-  function boot(data) { try { start(data || {}); } catch (e) { if (window.console) console.error(e); } }
+  // the loading screen fades out once the game is up (or failed to start: then it would only hide the error)
+  function bootDone() {
+    var b = document.getElementById('boot');
+    if (!b) return;
+    b.classList.add('done');
+    setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 400);
+  }
+  function boot(data) { try { start(data || {}); } catch (e) { if (window.console) console.error(e); } bootDone(); }
   // Feature files load after this one; start once they have all registered.
   ZZ.start = function () { if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {}); };
 })();
