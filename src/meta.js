@@ -262,6 +262,7 @@
     { id: 'slate', name: '灰藍', tier: 'free' },
     { id: 'sage', name: '淺綠', tier: 'free' },
     { id: 'sand', name: '米杏', tier: 'free' },
+    { id: 'blush', name: '淺粉', tier: 'free' },
     { id: 'mist', name: '晨霧', tier: 'coin', price: 800 },
     { id: 'maple', name: '楓紅', tier: 'coin', price: 1000 },
     { id: 'seasalt', name: '海鹽', tier: 'coin', price: 1000 },

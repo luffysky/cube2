@@ -11,6 +11,7 @@
 :root[data-site="slate"] { --floor: #DCE3EA; --floor-chip: #BCC8D4; --panel: #F4F7FA; --edge: #AEBBC9; --edge-deep: #7F8FA1; --ink: #1A2633; --muted: #4F5F70; --gold-ink: #7E5900; color-scheme: light; }
 :root[data-site="sage"] { --floor: #E2EADF; --floor-chip: #C3D3BD; --panel: #F7FAF5; --edge: #B4C6AD; --edge-deep: #849A7C; --ink: #1E2B1C; --muted: #52634E; --gold-ink: #6E5000; color-scheme: light; }
 :root[data-site="sand"] { --floor: #F1E9DD; --floor-chip: #DDCDB5; --panel: #FFFBF4; --edge: #D3C2A6; --edge-deep: #A99271; --ink: #2E241A; --muted: #6D5D4A; --gold-ink: #7A5200; color-scheme: light; }
+:root[data-site="blush"] { --floor: #F8E6EA; --floor-chip: #EDC9D1; --panel: #FFF8F9; --edge: #E3B8C2; --edge-deep: #B98894; --ink: #3A1F27; --muted: #7A5560; --gold-ink: #7A5200; color-scheme: light; }
 
 /* ---- bought with coins ---- */
 :root[data-site="mist"] { --floor: #E6EAF2; --floor-chip: #CDD4E3; --panel: #FAFBFE; --edge: #C2CADB; --edge-deep: #8D98B3; --ink: #1C2235; --muted: #59617A; --gold-ink: #6F5100; color-scheme: light; }

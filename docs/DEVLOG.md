@@ -218,3 +218,13 @@
 - 測試：`node test/run.js` 全過；瀏覽器 `minipay` 10、`cloudui` 39。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
 - 交接 GPT：Identity 上線後提供授權端點、token 交換端點、登記 callback `https://cube2-xi.vercel.app/api/auth/callback`、client 註冊與測試帳號；轉磚即做「已登入→一鍵連結」並跑驗收。
+- 補記：上一條的 commit 為 [`89dce94`](https://github.com/luffysky/cube2/commit/89dce94)，Vercel `dpl_496V5uF1V2fjDDi1nyKuwnYHpZua` READY。
+
+## 2026-11-20 18:50（Asia/Taipei）｜網站主題：免費加「淺粉」，共 18 款
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：C-019（Owner 指定第 18 款：免費淺粉色）
+- 實際變更：`Meta.SITE` 新增 `blush` 淺粉（免費）；`src/site-themes.css` 加配色；免費 4 款，總數 18。
+- 檔案：`src/meta.js`、`src/site-themes.css`、`games/site-themes.css`（建置產生）、`index.html`、`test/meta.test.js`、`test/sites.js`、`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除操作：無。
+- 測試：`node test/run.js` 全過（meta 166）；瀏覽器 `sites` 25。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。

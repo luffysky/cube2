@@ -21,7 +21,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       const before = await floor();
       await p.click('#mDrawer'); await sleep(300); await p.click('.dr-body [data-sitepick]'); await sleep(400);
       let s = await p.evaluate(() => ({ sheet: ZZ.peek().sheet, cards: document.querySelectorAll('#sheetCard .pv.sw.site').length, h3: [...document.querySelectorAll('#sheetCard h3')].map(x => x.textContent), steam: [...document.querySelectorAll('#sheetCard .steamtag')].map(x => x.textContent), locks: document.querySelectorAll('#sheetCard .tag.lock').length, buys: document.querySelectorAll('#sheetCard [data-sbuy]').length }));
-      ok(s.sheet === 'shop' && s.cards === 17, w + ': the side menu opens the site themes, all 17', s);
+      ok(s.sheet === 'shop' && s.cards === 18, w + ': the side menu opens the site themes, all 18', s);
       ok(['基本', '免費', '金幣購買', '會員限定', 'Steam 限定'].every(x => s.h3.includes(x)), w + ': grouped by tier', s.h3);
       ok(s.steam.length === 2 && s.steam.every(x => x === 'Steam 限定'), w + ': the two Steam ones say Steam 限定', s.steam);
       ok(s.locks === 6 && s.buys === 5, w + ': members and Steam locked, coins to buy', s);
@@ -38,7 +38,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       await p.evaluate(() => ZZ.App.closeSheet()); await sleep(200);
       await p.evaluate(() => ZZ.App.openSheet('settings')); await sleep(200);
       await p.click('#sheetCard [data-tab="site"]'); await sleep(300);
-      ok(await p.evaluate(() => ZZ.peek().sheet === 'shop' && document.querySelectorAll('#sheetCard .pv.sw.site').length === 17), w + ': Settings reaches it too');
+      ok(await p.evaluate(() => ZZ.peek().sheet === 'shop' && document.querySelectorAll('#sheetCard .pv.sw.site').length === 18), w + ': Settings reaches it too');
       await p.evaluate(() => ZZ.App.closeSheet());
       // a brick game follows
       const g = await ctx.newPage(); g.on('pageerror', e => problems.push(e.message));

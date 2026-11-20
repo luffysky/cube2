@@ -254,10 +254,10 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
 {
   M.reset();
   const tiers = {}; M.SITE.forEach(t => { tiers[t.tier] = (tiers[t.tier] || 0) + 1; });
-  eq(tiers, { base: 3, free: 3, coin: 5, sub: 4, steam: 2 }, 'site themes: 3 basic, 3 free, 5 for coins, 4 for members, 2 Steam only');
+  eq(tiers, { base: 3, free: 4, coin: 5, sub: 4, steam: 2 }, 'site themes: 3 basic, 4 free, 5 for coins, 4 for members, 2 Steam only');
   eq(new Set(M.SITE.map(t => t.id)).size, M.SITE.length, 'site theme ids are all different');
   eq(M.data.equip.site, 'default', 'the site starts on the default look');
-  ok(['default', 'dark', 'white', 'slate', 'sage', 'sand'].every(id => M.siteState(id) === 'ok'), 'basic and free themes need nothing');
+  ok(['default', 'dark', 'white', 'slate', 'sage', 'sand', 'blush'].every(id => M.siteState(id) === 'ok'), 'basic and free themes need nothing');
   eq(M.siteState('mist'), 'buy', 'a coin theme has to be bought');
   eq(M.siteState('aurora'), 'sub', 'a member theme waits for membership');
   eq(M.siteState('furnace'), 'steam', 'a Steam theme waits for the Steam version');
