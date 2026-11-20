@@ -107,6 +107,8 @@
     'net.m.only2': ['挑戰大自然和競速只限兩人，這房間會用普通對戰。', 'Nature and the race are for two players; this room plays an ordinary battle.', '大自然とレースは二人用。この部屋は通常バトルになります。', '대자연과 레이스는 2인 전용이라 이 방은 일반 대전으로 해요.'],
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
     'net.m.raceP': ['不互相攻擊，誰先消完 40 行誰贏；時間到了還沒人消完，就比誰消得多。只限兩人房。', 'No attacks: first to clear 40 lines wins; if time runs out first, most lines wins. Two players only.', '攻撃なし。先に40ライン消した方の勝ち。時間切れならライン数が多い方。二人部屋のみ。', '공격 없음. 먼저 40줄을 지우면 승리, 시간이 다 되면 더 많이 지운 쪽이 이겨요. 2인 방 전용.'],
+    'net.quickH': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
+    'net.quickGo': ['開始配對', 'Find a player', 'マッチング開始', '매칭 시작'],
     'net.raceOn': ['40 行競速：先消完 {0} 行的人贏', 'Race: first to {0} lines wins', 'レース：先に{0}ラインで勝ち', '레이스: 먼저 {0}줄이면 승리'],
     'net.raceNot': ['沒消完（{0} 行）', 'not done ({0} lines)', '未完了（{0}ライン）', '미완료 ({0}줄)'],
     'net.raceLines': ['/ {0} 行', '/ {0}', '/ {0}', '/ {0}줄'],
@@ -382,7 +384,13 @@
       if (st === 'error') h += '<p class="warn">' + t('net.e.' + Net.err) + '</p>';
       // arriving through a friend's invite link, joining is the main thing to do
       var hosted = ZZ.Cloud && ZZ.Cloud.hosted();
-      if (hosted) h += '<div class="row">' + btn('netQuick', 'net.quick', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
+      // random matching: pick what to play first; only players who picked the same are matched
+      if (hosted) {
+        h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
+        ['battle', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        h += '</div><p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
+        h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
+      }
       // a room of the game's own server holds 4, 6 or 8
       if (hosted) { h += '<h3>' + t('mp.size') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('mp.size')) + '">'; [4, 6, 8].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (Net.size === k) + '" data-nsize="' + k + '">' + t('mp.sizeN', k) + '</button>'; }); h += '</div>'; }
       h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode && !hosted) + '</div><h3>' + t('net.or') + '</h3>' +
@@ -392,14 +400,19 @@
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  App.acts.netQuick = function () { copied = false; Net.quick(myName()); };
-  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o && S.o.wx ? 'wx' : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
+  var QUICK_POOL = { battle: '', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
+  App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
+  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
+  App.clicks.push(function (d) {
+    if (d.qmode == null || !(d.qmode in QUICK_POOL)) return false;
+    quickMode = d.qmode; App.openSheet('online'); return true;
+  });
   // nobody real in time: a computer at about the player's own level, named as a computer
   Net.onNoOne = function () {
     var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
     App.closeSheet(true);
     App.toast(t('net.noOne'), 4200);
-    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0 });
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0, lv: Net.pool === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0 });
   };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };

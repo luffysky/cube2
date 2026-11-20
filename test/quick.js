@@ -46,6 +46,16 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await A.evaluate(() => ZZ.Net.leave()); await B.evaluate(() => ZZ.Net.leave());
     await sleep(600);
 
+    // the mode is picked first: two who picked the race meet each other, and play a race
+    const D = await open('D'), E = await open('E');
+    for (const P of [D, E]) { await P.evaluate(() => ZZ.App.go.online()); await sleep(300); await P.click('[data-qmode="race"]'); await sleep(150); }
+    ok(await D.evaluate(() => document.querySelector('[data-qmode="race"]').getAttribute('aria-checked') === 'true' && /開始配對/.test(document.getElementById('sheetCard').textContent)), 'the mode is chosen before looking');
+    await D.click('[data-do="netQuick"]'); await sleep(800); await E.click('[data-do="netQuick"]');
+    const raced = await until(async () => (await D.evaluate(() => !!(ZZ.peek().S && ZZ.peek().S.race))) && (await E.evaluate(() => !!(ZZ.peek().S && ZZ.peek().S.race))), 15000);
+    ok(raced, 'two who chose the race are matched and play a race');
+    await D.evaluate(() => ZZ.Net.leave()); await E.evaluate(() => ZZ.Net.leave());
+    await sleep(600);
+
     // alone: the computer, after the wait
     const C = await open('C');
     await C.evaluate(() => { ZZ.Net.QUICK_WAIT = 4000; ZZ.App.go.online(); });

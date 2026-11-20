@@ -140,7 +140,18 @@
     else if (k === 'CW') me.rotate(1);
     else if (k === 'CCW') me.rotate(-1);
     else if (k === '180') me.rotate(2);
-    else if (k === 'HOLD' && S.kind !== 'dojo') me.hold();
+    else if (k === 'HOLD') { if (S.kind === 'dojo') holdNo('hold.dojo'); else if (!me.hold() && me.holdUsed) holdNo('hold.once'); }
+  }
+
+  // Hold refused: each piece can be held once (until it lands). Say so, so the key does not feel dead: the hold box
+  // shakes every time, and the reason shows the first few times in a session.
+  var holdNoN = 0;
+  function holdNo(why) {
+    var b = el.holdBox;
+    b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope');
+    buzz(12);
+    sfx.play('tick');
+    if (holdNoN++ < 3) toast(t(why), 1800);
   }
 
   function bindInput() {

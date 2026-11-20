@@ -314,7 +314,7 @@ function devOf(v) { return v === 'pc' ? 'pc' : v === 'touch' ? 'touch' : ''; }
 async function roomQuick(db, body, ip, now) {
   if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
   if (await bump(db, 'quick', ip, QUICK.WINDOW, now) > QUICK.TRIES) return fail(429, 'slow');
-  const hash = sha(body.key), pool = body.pool === 'wx' ? 'wx' : '';      // weather battles are matched only with each other
+  const hash = sha(body.key), pool = ['wx', 'lv', 'race'].indexOf(body.pool) >= 0 ? body.pool : '';      // each mode is matched only with itself
   const dev = devOf(body.dev), mix = body.mix === true || !dev;
   for (let tries = 0; tries < 3; tries++) {
     const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash, pool, dev, mix, now - QUICK.MIX]);

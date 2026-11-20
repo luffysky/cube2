@@ -418,11 +418,11 @@
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
   // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
   Net.quick = function (name, again, pool) {
-    pool = pool === 'wx' ? 'wx' : '';
+    pool = ['wx', 'lv', 'race'].indexOf(pool) >= 0 ? pool : '';
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
-    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool === 'wx' ? 'wx' : 'battle' };
+    Net.cfg = { minutes: 2, items: false, wx: pool === 'wx', mode: pool || 'battle' };
     setState('matching');
     var run = epoch;
     transport(function (kind) {

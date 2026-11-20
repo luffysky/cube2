@@ -6,7 +6,7 @@ const { spawn, spawnSync } = require('child_process');
 const http = require('http');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
-const ALL = ['flow', 'rwd', 'drawer', 'onehand', 'howto', 'bag', 'cele', 'music', 'skies', 'wxnet', 'legal', 'pwa', 'gameslang', 'cloudui', 'consent', 'sites', 'bricks', 'minipay'];
+const ALL = ['flow', 'rwd', 'drawer', 'onehand', 'howto', 'bag', 'cele', 'music', 'skies', 'wxnet', 'legal', 'pwa', 'gameslang', 'cloudui', 'consent', 'sites', 'bricks', 'minipay', 'quick'];
 const list = process.argv.slice(2).length ? process.argv.slice(2) : ALL;
 const up = port => new Promise(res => { const r = http.get({ host: '127.0.0.1', port, path: '/index.html', timeout: 1500 }, s => { s.resume(); res(s.statusCode === 200); }); r.on('error', () => res(false)); r.on('timeout', () => { r.destroy(); res(false); }); });
 (async () => {
