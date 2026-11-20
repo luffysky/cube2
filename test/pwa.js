@@ -44,7 +44,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(icoSize > 1000 && /rel="icon" href="favicon\.ico"/.test(head) && /rel="icon" href="icons\/favicon\.svg"/.test(head) && /rel="apple-touch-icon" href="icons\/apple-touch-icon\.png"/.test(head), 'favicon, in three kinds');
   const robots = fs.readFileSync(path.join(ROOT, 'robots.txt'), 'utf8'), smap = fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8');
   ok(/Disallow: \/api\//.test(robots) && robots.indexOf('Sitemap: ' + site + 'sitemap.xml') > 0, 'robots.txt keeps crawlers out of the API and points at the sitemap');
-  ok((smap.match(/<loc>/g) || []).length === 5 && smap.indexOf('<loc>' + site + '</loc>') > 0 && smap.indexOf(site + '?lang=ja') > 0, 'the sitemap lists the page in each language');
+  ok((smap.match(/<loc>/g) || []).length === 7 && smap.indexOf(site + 'games/snake/') > 0 && smap.indexOf('<loc>' + site + '</loc>') > 0 && smap.indexOf(site + '?lang=ja') > 0, 'the sitemap lists the page in each language, and the brick games');
 
   // ---------- in a browser ----------
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'zh-TW' });

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>磚蛇 · SnowRealm 磚塊遊戲</title>
+<meta name="description" content="磚蛇：吃磚變長，身上同色的磚連成 3 塊就會消掉。打開瀏覽器就能玩。">
+<link rel="icon" href="../../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../games.css">
+</head>
+<body>
+<main class="game">
+  <div class="bar">
+    <a href="../">← 磚塊遊戲</a>
+    <h1>磚蛇</h1>
+    <button type="button" id="pause">暫停</button>
+  </div>
+  <div class="stats">
+    <div><b id="score">0</b><span>分數</span></div>
+    <div><b id="len">3</b><span>長度</span></div>
+    <div><b id="best">0</b><span>最佳</span></div>
+  </div>
+  <div class="board" id="board">
+    <canvas id="cv" aria-label="磚蛇的場地"></canvas>
+    <div class="over" id="intro">
+      <h2>磚蛇</h2>
+      <p>吃磚會變長，吃到的磚接在頭後面。身上同一個顏色的磚連成 3 塊以上就會消掉，蛇變短、分數加倍。</p>
+      <p>撞到牆、水泥或自己就結束。金磚過幾秒會消失，吃到加 100 分。</p>
+      <div class="row"><button class="btn" type="button" id="go">開始</button></div>
+      <p id="keysHint">方向鍵或 WASD 控制，空白鍵暫停</p>
+    </div>
+    <div class="over" id="end" hidden>
+      <h2 id="endTitle">撞到了</h2>
+      <div class="big" id="endScore">0</div>
+      <p id="endNote"></p>
+      <div class="row"><button class="btn" type="button" id="again">再玩一次</button><a class="btn plain" href="../">其他遊戲</a></div>
+    </div>
+    <div class="over" id="paused" hidden>
+      <h2>暫停中</h2>
+      <div class="row"><button class="btn" type="button" id="resume">繼續</button></div>
+    </div>
+  </div>
+  <div class="pad" id="pad">
+    <button type="button" data-d="up" aria-label="上">▲</button>
+    <button type="button" data-d="left" aria-label="左">◀</button>
+    <button type="button" data-d="down" aria-label="下">▼</button>
+    <button type="button" data-d="right" aria-label="右">▶</button>
+  </div>
+  <p class="hint">也可以在場地上滑動來轉彎</p>
+</main>
+<script src="snake.js"></script>
+</body>
+</html>

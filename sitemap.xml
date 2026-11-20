@@ -50,4 +50,12 @@
     <xhtml:link rel="alternate" hreflang="ko" href="https://cube2-xi.vercel.app/?lang=ko"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://cube2-xi.vercel.app/"/>
   </url>
+  <url>
+    <loc>https://cube2-xi.vercel.app/games/</loc>
+    <lastmod>2026-11-20</lastmod>
+  </url>
+  <url>
+    <loc>https://cube2-xi.vercel.app/games/snake/</loc>
+    <lastmod>2026-11-20</lastmod>
+  </url>
 </urlset>
