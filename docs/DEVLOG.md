@@ -814,3 +814,14 @@
 - 測試：`node test/run.js` 全過（bff 99：staging 設定 15 種拒絕、production 忽略、staging 整輪、錯 host、重放、換瀏覽器；staging 5）。瀏覽器：`authui` 9、`cloudui` 41。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）；另開 `staging` 分支給 Preview 用。
 - 補記：上一條的 commit 為 [`7ea477f`](https://github.com/luffysky/cube2/commit/7ea477f)，Vercel production `dpl_7QMamS2yuvU4G7c2Lx4uAPvRsgm8` READY，CI run 44890326000 兩個 job 都成功；正式站 `/api/health` 仍是 `link: false`。`brickduel-staging.snowrealm.pet` 已加到 Vercel 專案、綁 `staging` 分支；同一個 commit 推到 `staging` 時 Vercel 沒有另外建 Preview，這次補記會再推一次 `staging` 讓它建出來。
+- 補記：上一條的 commit 為 [`3493e89`](https://github.com/luffysky/cube2/commit/3493e89)；`staging` 分支 Preview `dpl_7xCFuT43TP5iZhNhp5kVMX4AQSJ8` READY。Owner 加好 Cloudflare CNAME 後，Vercel 顯示 `misconfigured: false`，`https://brickduel-staging.snowrealm.pet` 的 TLS 已生效；打開會被導到 Vercel 登入頁，原因是 Preview 有部署保護。
+
+## 2026-11-21 18:25（Asia/Taipei）｜音樂播放器：本來就在這台的歌也能上傳到雲端
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「音樂播放器那裡已經有的檔案要可以上傳雲端 不是只有新加入的才能」
+- 選了「也上傳到雲端」以後，還沒有雲端副本的歌，每首旁邊會出現「上傳到雲端」，清單上方也有「把這台已有的 N 首也上傳到雲端」可以一次全傳。傳好的歌會標 ☁，按鈕跟著消失。
+- 加歌時沒有存檔案類型，所以從檔案開頭判斷是 WAV、OGG、FLAC、MP4、WebM 還是 MP3。
+- 說明文字（四語）加上「原本就有的可以補傳」。
+- 檔案：`src/music.js`、`src/devstore.js`、`test/r2.js`。｜資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `r2` 18（先存本機、再切到雲端、一次補傳、在 bucket 裡是 WAV、按鈕消失）、`music`、`cloudui`。

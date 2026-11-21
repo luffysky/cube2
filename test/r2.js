@@ -62,6 +62,18 @@ function wav() {
     ok(await (async () => { for (let i = 0; i < 40; i++) { if (await p.evaluate(() => { const r = document.querySelector('.ds-trash'); return r && /雲端的歌/.test(r.textContent) && /30/.test(r.textContent); })) return true; await sleep(150); } return false; })(), 'listed under recently removed with 30 days left');
     await p.click('[data-dsback^="music:"]');
     ok(await (async () => { for (let i = 0; i < 60; i++) { if (await p.evaluate(() => document.querySelectorAll('[data-mudel]').length === 1)) return true; await sleep(150); } return false; })(), 'brought back, and onto this device again');
+    // a song added while "this device only" was chosen can be uploaded afterwards
+    await p.click('[data-dswhere="music:local"]'); await sleep(200);
+    await p.setInputFiles('#muFile', [{ name: '本機的歌.wav', mimeType: 'audio/wav', buffer: wav() }]);
+    ok(await (async () => { for (let i = 0; i < 60; i++) { if (await p.evaluate(() => (JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).some(o => /本機/.test(o.name) && !o.cid))) return true; await sleep(150); } return false; })(), 'a song kept on this device only');
+    const before = Object.keys(bucket).filter(k => /\/music\//.test(k)).length;
+    await p.click('[data-dswhere="music:cloud"]'); await sleep(300);
+    ok(await p.evaluate(() => document.querySelectorAll('[data-muup]').length === 1 && /1/.test((document.querySelector('[data-do="muUpAll"]') || {}).textContent || '')), 'switching to the cloud offers to upload the one already here', await p.evaluate(() => document.getElementById('sheetCard').textContent.slice(0, 300)));
+    await p.click('[data-do="muUpAll"]');
+    ok(await (async () => { for (let i = 0; i < 60; i++) { if (await p.evaluate(() => (JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).every(o => !!o.cid))) return true; await sleep(150); } return false; })(), 'after "upload them too" every song has a cloud copy');
+    const up = Object.keys(bucket).filter(k => /\/music\//.test(k));
+    ok(up.length === before + 1 && bucket[up[up.length - 1]].type === 'audio/wav', 'it went to the bucket as a WAV', up.map(k => bucket[k].type));
+    ok(await p.evaluate(() => !document.querySelector('[data-muup]') && !document.querySelector('[data-do="muUpAll"]')), 'and the upload buttons are gone');
     // a picture too
     await p.evaluate(() => { ZZ.App.closeSheet(); ZZ.App.openSheet('shop'); }); await sleep(200);
     await p.click('[data-tab="member"]'); await sleep(200);

@@ -46,6 +46,10 @@
     'mu.bad': ['「{0}」不是這個瀏覽器能播的音樂檔', '"{0}" is not a music file this browser can play', '「{0}」はこのブラウザで再生できない音楽ファイルです', '"{0}"은(는) 이 브라우저에서 재생할 수 없는 파일이에요'],
     'mu.big': ['「{0}」超過 15 MB', '"{0}" is over 15 MB', '「{0}」は 15 MB を超えています', '"{0}"이(가) 15MB를 넘어요'],
     'mu.full': ['已經滿了（最多 30 首、200 MB）', 'Full (30 tracks or 200 MB at most)', 'いっぱいです（30 曲・200 MB まで）', '가득 찼어요(최대 30곡, 200MB)'],
+    'mu.up': ['上傳到雲端', 'Upload to the cloud', 'クラウドに保存', '클라우드에 업로드'],
+    'mu.upping': ['上傳中…', 'Uploading…', 'アップロード中…', '업로드 중…'],
+    'mu.upAll': ['把這台已有的 {0} 首也上傳到雲端', 'Upload the {0} songs already here to the cloud too', 'この端末にある {0} 曲もクラウドに保存', '이 기기에 있는 {0}곡도 클라우드에 업로드'],
+    'mu.upDone': ['已上傳 {0} 首到雲端', 'Uploaded {0} songs to the cloud', '{0} 曲をクラウドに保存しました', '{0}곡을 클라우드에 업로드했어요'],
     'mu.del': ['刪除', 'Remove', '削除', '삭제'],
     'mu.delAskCloud': ['刪除「{0}」？這台裝置上的會馬上刪掉；雲端那份會放在「最近移除」30 天，期間可以復原，之後才真的刪除。', 'Remove "{0}"? It goes from this device now; the cloud copy waits in "Recently removed" for 30 days, when you can still bring it back, and is deleted after that.', '「{0}」を削除しますか？この端末からはすぐ消えます。クラウドの分は「最近削除した項目」に30日間残り、その間は元に戻せます。その後削除されます。', '"{0}"을(를) 삭제할까요? 이 기기에서는 바로 지워져요. 클라우드 사본은 "최근 삭제"에 30일 동안 남아 되돌릴 수 있고, 그 뒤에 삭제돼요.'],
     'mu.delAsk': ['從這台裝置刪除「{0}」？', 'Remove "{0}" from this device?', '「{0}」をこの端末から削除しますか？', '"{0}"을(를) 이 기기에서 삭제할까요?'],
@@ -191,12 +195,49 @@
   }
 
   function ownOf(id) { var k = String(id).replace(/^own:/, ''); for (var i = 0; i < st.own.length; i++) if (st.own[i].id === k) return st.own[i]; return null; }
+  // ---------- songs already on this device, up to the cloud ----------
+  function cloudOn() { return canOwn() && ZZ.DevStore && ZZ.DevStore.choice('music') === 'cloud' && ZZ.Cloud && ZZ.Cloud.upload; }
+  var upping = {};
+  // what kind of sound a stored file is, from its first bytes (the type was not kept when it was added)
+  function soundType(buf) {
+    var b = new Uint8Array(buf.slice(0, 12)), at = function (i, s) { for (var k = 0; k < s.length; k++) if (b[i + k] !== s.charCodeAt(k)) return false; return true; };
+    if (at(0, 'RIFF') && at(8, 'WAVE')) return 'audio/wav';
+    if (at(0, 'OggS')) return 'audio/ogg';
+    if (at(0, 'fLaC')) return 'audio/flac';
+    if (at(4, 'ftyp')) return 'audio/mp4';
+    if (b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3) return 'audio/webm';
+    return 'audio/mpeg';
+  }
+  function upOne(id, done) {
+    var o = ownOf(id);
+    if (!o || o.cid || upping[id] || !cloudOn()) return done(false);
+    upping[id] = true;
+    if (App.sheet() === 'music') App.openSheet('music');
+    getFile(o.id, function (data) {
+      ZZ.Cloud.upload('music', o.name, data, soundType(data)).then(function (cid) {
+        delete upping[id];
+        if (cid) { o.cid = cid; keep(); }
+        if (App.sheet() === 'music') App.openSheet('music');
+        done(!!cid);
+      }, function () { delete upping[id]; done(false); });
+    }, function () { delete upping[id]; done(false); });
+  }
+  App.acts.muUpAll = function () {
+    var ids = st.own.filter(function (o) { return !o.cid; }).map(function (o) { return 'own:' + o.id; }), n = 0, bad = 0;
+    App.toast(t('mu.upping'), 1500);
+    (function next() {
+      var id = ids.shift();
+      if (!id) { App.toast(bad ? t('ds.upFail') : t('mu.upDone', n), 3200); return; }
+      upOne(id, function (ok) { if (ok) n++; else bad++; next(); });
+    })();
+  };
   // ---------- the sheet ----------
   function trackRow(id) {
     var on = st.list.indexOf(id) >= 0, own = /^own:/.test(id), locked = own && !canOwn(), playing = App.sfx.mname === id;
     return '<div class="mu-row' + (playing ? ' on' : '') + '"><label class="mu-check"><input type="checkbox" data-mulist="' + App.esc(id) + '"' + (on ? ' checked' : '') + (locked ? ' disabled' : '') + '><span>' + App.esc(nameOf(id)) + '</span></label>' +
       (locked ? '<span class="tag lock">' + t('st.sub') + '</span>' : '<button class="btn sm" type="button" data-muplay="' + App.esc(id) + '">' + (playing ? '♪' : t('mu.playNow')) + '</button>') +
       (own && ownOf(id) && ownOf(id).cid ? '<span class="tag" title="' + App.esc(t('ds.cloud')) + '">☁</span>' : '') +
+      (own && !locked && cloudOn() && ownOf(id) && !ownOf(id).cid ? '<button class="btn sm" type="button" data-muup="' + App.esc(id) + '"' + (upping[id] ? ' disabled' : '') + '>' + t(upping[id] ? 'mu.upping' : 'mu.up') + '</button>' : '') +
       (own ? '<button class="btn sm plain" type="button" data-mudel="' + App.esc(id) + '">' + t('mu.del') + '</button>' : '') + '</div>';
   }
   App.dismiss = App.dismiss || {};
@@ -216,6 +257,8 @@
     }
     h += '<h3>' + t('mu.builtin') + '</h3><div class="mu-list">' + BUILT.map(trackRow).join('') + '</div>';
     h += '<h3>' + t('mu.own') + '</h3><p class="note">' + t('mu.ownP') + '</p>' + (ZZ.DevStore && canOwn() ? ZZ.DevStore.html('music') : '');
+    var notUp = cloudOn() ? st.own.filter(function (o) { return !o.cid; }).length : 0;
+    if (notUp) h += '<div class="row"><button class="btn" type="button" data-do="muUpAll">' + t('mu.upAll', notUp) + '</button></div>';
     if (st.own.length) h += (canOwn() ? '' : '<p class="note">' + t('mu.lapsed') + '</p>') + '<div class="mu-list">' + st.own.map(function (o) { return trackRow('own:' + o.id); }).join('') + '</div>';
     h += canOwn() ? '<div class="row"><label class="btn" for="muFile">' + t('mu.add') + '</label><input id="muFile" type="file" accept="audio/*" multiple hidden>' + (ZZ.DevStore && ZZ.DevStore.choice('music') === 'cloud' ? '<button class="btn" type="button" data-do="muPull">' + t('ds.pull') + '</button>' : '') + '</div>'
       : '<p class="note">' + t('mu.member') + '</p><div class="row"><button class="btn" type="button" data-tab="member">' + t('k.member') + '</button></div>';
@@ -277,6 +320,7 @@
       App.sfx.wake(); replay(); App.openSheet('music');
       return true;
     }
+    if (d.muup) { upOne(d.muup, function (ok) { if (!ok) App.toast(t('ds.upFail'), 3000); }); return true; }
     if (d.mudel) {
       var did = d.mudel, nm = nameOf(did);
       var gone = ownOf(did), cid = gone && gone.cid;
