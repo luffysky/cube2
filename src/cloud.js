@@ -397,16 +397,127 @@
       return call('POST', 'rpc', body, true).then(function (r) { return r.status === 200 && r.body && r.body.ok ? r.body : null; }, function () { return null; });
     });
   };
-  // puts one file (a Blob or ArrayBuffer) into the cloud: asks for an address, sends it straight there, reports it done
-  Cloud.upload = function (kind, name, data, type) {
-    var size = data.byteLength != null ? data.byteLength : data.size;
-    return Cloud.file({ a: 'fileUp', kind: kind, name: name, size: size, type: type }).then(function (b) {
-      if (!b || !b.url) return null;
-      return root.fetch(b.url, { method: 'PUT', body: data, headers: { 'Content-Type': type } }).then(function (res) {
-        if (!res.ok) return null;
-        return Cloud.file({ a: 'fileOk', id: b.id }).then(function (d) { return d ? b.id : null; });
-      }, function () { return null; });
+  // ---------- files are locked in the browser before they leave it ----------
+  // Every file gets its own random AES-256-GCM key, and that key is locked with one of two keys:
+  //   mode 's': the player's file key kept by our server (not in R2). A leaked bucket or address shows nothing; another
+  //             device opens it as usual.
+  //   mode 'p': the player's own key M, which only ever exists unlocked in their browser. Our server keeps M locked
+  //             twice (the "vault"): once with a key made from their password, once with a key made from a recovery
+  //             code shown to them once (PBKDF2-SHA-256, 600 000 rounds). Nobody, us included, can open these files
+  //             without the password or the code. Forgetting both cannot be helped.
+  // The stored object: 'ZZE1' | mode | wrap iv(12) | locked file key(48) | iv(12) | locked bytes. Files uploaded
+  // before this, without the 'ZZE1' mark, are read as they are.
+  var MAGIC = [90, 90, 69, 49], ROUNDS = 600000, keys = { s: null, p: null };
+  function wc() { var c = root.crypto || (typeof require === 'function' ? require('crypto').webcrypto : null); return c && c.subtle ? c : null; }
+  function bytesOf(data) {
+    if (data instanceof ArrayBuffer) return Promise.resolve(new Uint8Array(data));
+    if (ArrayBuffer.isView(data)) return Promise.resolve(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    return new Response(data).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+  }
+  function b64d(s) { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); var bin = atob(s + '==='.slice((s.length + 3) % 4)), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  function b64e(u) { var s = ''; u = new Uint8Array(u); for (var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function aes(raw, use) { return wc().subtle.importKey('raw', raw, 'AES-GCM', false, use || ['encrypt', 'decrypt']); }
+  function fromSecret(secret, salt, rounds) {
+    var c = wc().subtle;
+    return c.importKey('raw', new TextEncoder().encode(secret), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+      return c.deriveKey({ name: 'PBKDF2', salt: salt, iterations: rounds || ROUNDS, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     });
+  }
+  // a recovery code: 20 letters and digits (about 100 bits), shown as XXXX-XXXX-XXXX-XXXX-XXXX
+  var CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function newCode() { var b = wc().getRandomValues(new Uint8Array(20)), s = ''; for (var i = 0; i < 20; i++) { s += CODE_ABC[b[i] % 32]; if (i % 4 === 3 && i < 19) s += '-'; } return s; }
+  function cleanCode(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function seal(secret, raw) {
+    var salt = wc().getRandomValues(new Uint8Array(16)), iv = wc().getRandomValues(new Uint8Array(12));
+    return fromSecret(secret, salt).then(function (k) { return wc().subtle.encrypt({ name: 'AES-GCM', iv: iv }, k, raw); })
+      .then(function (w) { return { salt: b64e(salt), iv: b64e(iv), w: b64e(w) }; });
+  }
+  function unseal(secret, box, rounds) {
+    return fromSecret(secret, b64d(box.salt), rounds).then(function (k) { return wc().subtle.decrypt({ name: 'AES-GCM', iv: b64d(box.iv) }, k, b64d(box.w)); });
+  }
+  function keyInfo() { return Cloud.file({ a: 'fileKey' }).then(function (b) { if (!b || !b.key) throw new Error('no key'); return b; }); }
+  function putVault(v, replace) { return Cloud.file({ a: 'fileVault', vault: v, replace: !!replace }).then(function (b) { if (!b) throw new Error('vault'); return true; }); }
+  // the server-kept key
+  function serverKey() {
+    if (keys.s) return Promise.resolve(keys.s);
+    return keyInfo().then(function (b) { return aes(b64d(b.key)); }).then(function (k) { keys.s = k; return k; });
+  }
+  // the player's own key, opened with their password (asked once a visit through Cloud.askPass)
+  function ownKey() {
+    if (keys.p) return Promise.resolve(keys.p);
+    return keyInfo().then(function (b) {
+      if (!b.vault) throw new Error('no vault');
+      var ask = Cloud.askPass || function () { return Promise.resolve(null); };
+      return Promise.resolve(ask('unlock')).then(function (pw) {
+        if (!pw) throw new Error('no password');
+        return unseal(pw, b.vault.p, b.vault.rounds).then(function (raw) { return aes(raw); }, function (e) { if (Cloud.onWrongPass) Cloud.onWrongPass(); throw e; });
+      });
+    }).then(function (k) { keys.p = k; return k; });
+  }
+  Cloud.forgetPass = function () { keys.p = null; };
+  Cloud.vaultThere = function () { return keyInfo().then(function (b) { return !!b.vault; }, function () { return null; }); };
+  // sets a password: makes the player's own key and a recovery code; gives the code (to be shown once), or null
+  Cloud.makeVault = function (pw) {
+    var raw = wc().getRandomValues(new Uint8Array(32)), code = newCode();
+    return Promise.all([seal(pw, raw), seal(cleanCode(code), raw)]).then(function (r) { return putVault({ rounds: ROUNDS, p: r[0], r: r[1] }, false); })
+      .then(function () { return aes(raw); }).then(function (k) { keys.p = k; return code; }, function () { return null; });
+  };
+  // forgot the password: the recovery code opens the key, and a new password locks it again (the code stays the same)
+  Cloud.recoverVault = function (code, pw) {
+    return keyInfo().then(function (b) {
+      if (!b.vault) throw new Error('no vault');
+      return unseal(cleanCode(code), b.vault.r, b.vault.rounds).then(function (raw) {
+        return seal(pw, raw).then(function (p) { return putVault({ rounds: ROUNDS, p: p, r: b.vault.r }, true); }).then(function () { return aes(raw); });
+      });
+    }).then(function (k) { keys.p = k; return true; }, function () { return false; });
+  };
+  // a new password, knowing the old one
+  Cloud.changePass = function (oldPw, pw) {
+    return keyInfo().then(function (b) {
+      if (!b.vault) throw new Error('no vault');
+      return unseal(oldPw, b.vault.p, b.vault.rounds).then(function (raw) {
+        return seal(pw, raw).then(function (p) { return putVault({ rounds: ROUNDS, p: p, r: b.vault.r }, true); }).then(function () { return aes(raw); });
+      });
+    }).then(function (k) { keys.p = k; return true; }, function () { return false; });
+  };
+  Cloud.lock = function (data, mode) {
+    var c = wc();
+    if (!c) return Promise.reject(new Error('no crypto'));
+    var wiv = c.getRandomValues(new Uint8Array(12)), iv = c.getRandomValues(new Uint8Array(12)), raw = c.getRandomValues(new Uint8Array(32));
+    return Promise.all([bytesOf(data), mode === 'p' ? ownKey() : serverKey(), aes(raw, ['encrypt'])]).then(function (r) {
+      return Promise.all([c.subtle.encrypt({ name: 'AES-GCM', iv: wiv }, r[1], raw), c.subtle.encrypt({ name: 'AES-GCM', iv: iv }, r[2], r[0])]);
+    }).then(function (r) {
+      var wrapped = new Uint8Array(r[0]), body = new Uint8Array(r[1]), out = new Uint8Array(77 + body.length);
+      out.set(MAGIC, 0); out[4] = mode === 'p' ? 112 : 115; out.set(wiv, 5); out.set(wrapped, 17); out.set(iv, 65); out.set(body, 77);
+      return out;
+    });
+  };
+  // the bytes back; a file without the mark as it is. Rejects on a wrong key.
+  Cloud.unlock = function (buf) {
+    var u = new Uint8Array(buf);
+    if (u.length < 77 || u[0] !== 90 || u[1] !== 90 || u[2] !== 69 || u[3] !== 49) return Promise.resolve(u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength));
+    var mode = u[4] === 112 ? 'p' : 's', c = wc().subtle;
+    return (mode === 'p' ? ownKey() : serverKey()).then(function (k) { return c.decrypt({ name: 'AES-GCM', iv: u.slice(5, 17) }, k, u.slice(17, 65)); })
+      .then(function (raw) { return aes(raw, ['decrypt']); })
+      .then(function (fk) { return c.decrypt({ name: 'AES-GCM', iv: u.slice(65, 77) }, fk, u.slice(77)); });
+  };
+  // puts one file (a Blob or ArrayBuffer) into the cloud: locks it here, asks for an address, sends it straight there,
+  // reports it done. mode: 's' (default) or 'p' (the player's own password).
+  Cloud.upload = function (kind, name, data, type, mode) {
+    mode = mode || (ZZ.DevStore && ZZ.DevStore.lockMode ? ZZ.DevStore.lockMode() : 's');
+    return Cloud.lock(data, mode).then(function (locked) {
+      return Cloud.file({ a: 'fileUp', kind: kind, name: name, size: locked.byteLength, type: type, enc: mode }).then(function (b) {
+        if (!b || !b.url) return null;
+        return root.fetch(b.url, { method: 'PUT', body: locked, headers: { 'Content-Type': type } }).then(function (res) {
+          if (!res.ok) return null;
+          return Cloud.file({ a: 'fileOk', id: b.id }).then(function (d) { return d ? b.id : null; });
+        }, function () { return null; });
+      });
+    }, function () { return null; });
+  };
+  // one file from the list fileList gave, opened here: an ArrayBuffer, or null (gone, or the password was wrong)
+  Cloud.fetchFile = function (f) {
+    return root.fetch(f.url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (b) { return b ? Cloud.unlock(b) : null; }).then(null, function () { return null; });
   };
   Cloud.code = function () {
     return Cloud.ensure().then(function (ok) {

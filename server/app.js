@@ -223,13 +223,14 @@ const routes = {
         out = await db.run(d => core.restore(d, cred, clock()));
         break;
       // a member's own files in the cloud (R2; off until its keys are set, see server/files.js)
-      case 'fileUp': case 'fileOk': case 'fileList': case 'fileHide': case 'fileBack': {
+      case 'fileUp': case 'fileOk': case 'fileList': case 'fileHide': case 'fileBack': case 'fileKey': case 'fileVault': {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(async d => {
           const row = await core.findPlayer(d, cred);
           if (!row || row.pending) return { status: 401, body: { ok: false, why: 'auth' } };
           return body.a === 'fileUp' ? files.up(d, row, body, now) : body.a === 'fileOk' ? files.done(d, row, body, now) : body.a === 'fileList' ? files.list(d, row, body, now)
-            : body.a === 'fileBack' ? files.back(d, row, body, now) : files.hide(d, row, body, now);
+            : body.a === 'fileBack' ? files.back(d, row, body, now) : body.a === 'fileKey' ? files.key(d, row, now)
+            : body.a === 'fileVault' ? files.vault(d, row, body, now) : files.hide(d, row, body, now);
         });
         break;
       }

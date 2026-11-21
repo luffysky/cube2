@@ -295,7 +295,7 @@
       (function next() {
         var f = want.shift();
         if (!f || st.own.length >= MAX_COUNT) { keep(); App.toast(t('ds.pulled', got)); if (App.sheet() === 'music') App.openSheet('music'); return; }
-        fetch(f.url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (data) {
+        ZZ.Cloud.fetchFile(f).then(function (data) {
           if (!data) return next();
           App.sfx.wake();
           App.sfx.decode(data.slice(0), function () {

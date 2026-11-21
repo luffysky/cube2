@@ -470,8 +470,9 @@
       (function next() {
         var k = keys.shift();
         if (!k) { App.toast(t('ds.pulled', got)); if (App.sheet() === 'shop') App.openSheet('shop'); return; }
-        fetch(newest[k].url).then(function (r) { return r.ok ? r.blob() : null; }).then(function (blob) {
-          if (!blob) return next();
+        ZZ.Cloud.fetchFile(newest[k]).then(function (buf) {
+          if (!buf) return next();
+          var blob = new Blob([buf], { type: newest[k].type || 'image/jpeg' });
           var rd = new FileReader();
           rd.onload = function () { Pics.put(k, rd.result); Meta.data.custom[k] = true; Meta.equip(k, 'custom'); Meta.save(); got++; useUrl(k, rd.result, next); };
           rd.onerror = next;

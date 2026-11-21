@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 22, 'twenty-two tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 23, 'twenty-three tables in their own schema');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -862,6 +862,26 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     eq((await rpc({ a: 'fileUp', kind: 'music', name: 'x.exe', size: 1000, type: 'application/x-msdownload' }, F)).json.why, 'type', 'only sound files for music');
     eq((await rpc({ a: 'fileUp', kind: 'pics', name: 'p', size: 1000, type: 'image/svg+xml' }, F)).json.why, 'type', 'and only plain pictures (no SVG) for pictures');
     eq((await rpc({ a: 'fileOk', id: fid }, G)).status, 404, 'nobody else can touch the file');
+    // the keys files are locked with in the browser
+    let k1 = await rpc({ a: 'fileKey' }, F);
+    ok(k1.json.ok && /^[A-Za-z0-9_-]{43}$/.test(k1.json.key) && k1.json.vault === null, 'fileKey: this player\'s server-kept key, no vault yet', k1.json);
+    eq((await rpc({ a: 'fileKey' }, F)).json.key, k1.json.key, 'the same key every time');
+    ok((await rpc({ a: 'fileKey' }, G)).json.key !== k1.json.key, 'another player has another key');
+    eq((await rpc({ a: 'fileKey' })).status, 401, 'no key without the device key');
+    const box = { salt: 'c2FsdHNhbHRzYWx0c2FsdA', iv: 'aXZpdml2aXZpdml2', w: 'd3JhcHBlZHdyYXBwZWR3cmFwcGVkd3JhcHBlZA' };
+    eq((await rpc({ a: 'fileVault', vault: { rounds: 600000, p: box } }, F)).json.why, 'vault', 'a vault needs both locks');
+    eq((await rpc({ a: 'fileVault', vault: { rounds: 10, p: box, r: box } }, F)).json.why, 'vault', 'and enough rounds');
+    ok((await rpc({ a: 'fileVault', vault: { rounds: 600000, p: box, r: box, extra: 'x' } }, F)).json.ok, 'a vault is kept');
+    k1 = await rpc({ a: 'fileKey' }, F);
+    ok(k1.json.vault && k1.json.vault.rounds === 600000 && k1.json.vault.p.w === box.w && !('extra' in k1.json.vault), 'and given back as it was locked (nothing else kept)', k1.json.vault);
+    eq((await rpc({ a: 'fileVault', vault: { rounds: 600000, p: box, r: box } }, F)).status, 409, 'not replaced by accident');
+    ok((await rpc({ a: 'fileVault', vault: { rounds: 700000, p: box, r: box }, replace: true }, F)).json.ok && (await rpc({ a: 'fileKey' }, F)).json.vault.rounds === 700000, 'replaced when asked (a new password)');
+    const keyRows = JSON.stringify(await pg.query('SELECT * FROM zz.files'));
+    ok(keyRows.indexOf(k1.json.key) < 0, 'the key is not kept with the files');
+    x = await rpc({ a: 'fileUp', kind: 'music', name: 'locked', size: 2000, type: 'audio/mpeg', enc: 'p' }, F);
+    await rpc({ a: 'fileOk', id: x.json.id }, F);
+    ok((await rpc({ a: 'fileList', kind: 'music' }, F)).json.files.some(f => f.id === x.json.id && f.enc === 'p'), 'the list says how each file is locked');
+    await pg.query('DELETE FROM zz.files WHERE id = $1', [x.json.id]);      // (the test's own row, so the counts below stay as they were)
     ok((await rpc({ a: 'fileHide', id: fid }, F)).json.ok && (await rpc({ a: 'fileList', kind: 'music' }, F)).json.files.length === 0, 'taken off the list');
     eq((await pg.query('SELECT count(*)::int AS n FROM zz.files WHERE id = $1', [fid]))[0].n, 1, 'but the record stays for now');
     // "recently removed": 30 days to change one's mind, then the daily job deletes it (C-034)

@@ -54,13 +54,13 @@ async function up(db, row, body, now) {
   const K = KINDS[body.kind];
   if (!K) return no(400, 'kind');
   if (!isMember(row.state, now)) return no(403, 'member');
-  const size = Math.floor(+body.size), type = String(body.type || '');
+  const size = Math.floor(+body.size), type = String(body.type || ''), enc = body.enc === 'p' || body.enc === 's' ? body.enc : '';
   if (!(size > 0) || size > K.max) return no(413, 'big');
   if (!K.type.test(type)) return no(415, 'type');
   const used = (await db.query('SELECT count(*)::int AS n, COALESCE(sum(size), 0)::bigint AS s FROM zz.files WHERE pid = $1 AND kind = $2 AND NOT hidden', [row.id, body.kind]))[0];
   if (used.n >= K.count || +used.s + size > K.total) return no(409, 'full');
   const id = crypto.randomBytes(9).toString('base64url'), key = keyOf(row.id, body.kind, id);
-  await db.query('INSERT INTO zz.files (id, pid, kind, name, size, type, at, ready, hidden) VALUES ($1, $2, $3, $4, $5, $6, $7, false, false)', [id, row.id, body.kind, cleanName(body.name), size, type, now]);
+  await db.query('INSERT INTO zz.files (id, pid, kind, name, size, type, at, ready, hidden, enc) VALUES ($1, $2, $3, $4, $5, $6, $7, false, false, $8)', [id, row.id, body.kind, cleanName(body.name), size, type, now, enc]);
   return ok({ id, url: presign('PUT', key, PUT_SECS, now, { 'content-type': type }), type, exp: now + PUT_SECS * 1000 });
 }
 // the upload went through: the file goes on the list. A picture replaces the earlier one of the same name (the wall,
@@ -81,8 +81,8 @@ async function list(db, row, body, now) {
     const gone = await db.query('SELECT id, name, size, type, at, hidden_at FROM zz.files WHERE pid = $1 AND kind = $2 AND ready AND hidden AND COALESCE(hidden_at, $3) > $4 ORDER BY hidden_at DESC NULLS FIRST', [row.id, kind, now, now - KEEP_DAYS * DAY]);
     return ok({ files: gone.map(f => ({ id: f.id, name: f.name, size: +f.size, type: f.type, at: f.at, left: Math.max(1, Math.ceil(((f.hidden_at == null ? now : +f.hidden_at) + KEEP_DAYS * DAY - now) / DAY)) })) });
   }
-  const rows = await db.query('SELECT id, name, size, type, at FROM zz.files WHERE pid = $1 AND kind = $2 AND ready AND NOT hidden ORDER BY at', [row.id, kind]);
-  return ok({ files: rows.map(f => ({ id: f.id, name: f.name, size: +f.size, type: f.type, at: f.at, url: presign('GET', 'u/' + row.id + '/' + kind + '/' + f.id, GET_SECS, now) })) });
+  const rows = await db.query('SELECT id, name, size, type, at, enc FROM zz.files WHERE pid = $1 AND kind = $2 AND ready AND NOT hidden ORDER BY at', [row.id, kind]);
+  return ok({ files: rows.map(f => ({ id: f.id, name: f.name, size: +f.size, type: f.type, at: f.at, enc: f.enc || '', url: presign('GET', 'u/' + row.id + '/' + kind + '/' + f.id, GET_SECS, now) })) });
 }
 // off the list: one file by id, or (kind + name) every picture of that name. Kept 30 days before it is deleted.
 async function hide(db, row, body, now) {
@@ -129,4 +129,24 @@ async function purge(db, now, drop) {
   return { status: 200, body: { ok: true, due: due.length, gone, kept } };
 }
 
-module.exports = { configured, presign, up, done, list, hide, back, purge, KINDS, KEEP_DAYS };
+// ---------- the keys files are locked with in the browser ----------
+// fileKey: this player's server-kept key (made the first time), and their vault if they set a password.
+async function key(db, row, now) {
+  await db.query('INSERT INTO zz.filekeys (pid, k, at) VALUES ($1, $2, $3) ON CONFLICT (pid) DO NOTHING', [row.id, crypto.randomBytes(32).toString('base64url'), now]);
+  const r = (await db.query('SELECT k, vault FROM zz.filekeys WHERE pid = $1', [row.id]))[0];
+  return ok({ key: r.k, vault: r.vault || null });
+}
+// fileVault: keeps the player's locked key. The browser locks it; the server only checks the shape. Replacing a vault
+// that is there needs { replace: true } (changing the password, or a new one after the recovery code was used).
+const B64 = /^[A-Za-z0-9_-]{16,200}$/;
+const lockOk = v => v && typeof v === 'object' && B64.test(v.salt || '') && B64.test(v.iv || '') && B64.test(v.w || '');
+async function vault(db, row, body, now) {
+  const v = body.vault;
+  if (!v || !lockOk(v.p) || !lockOk(v.r) || !Number.isSafeInteger(v.rounds) || v.rounds < 100000 || v.rounds > 5000000) return no(400, 'vault');
+  const clean = { v: 1, rounds: v.rounds, p: { salt: v.p.salt, iv: v.p.iv, w: v.p.w }, r: { salt: v.r.salt, iv: v.r.iv, w: v.r.w } };
+  await db.query('INSERT INTO zz.filekeys (pid, k, at) VALUES ($1, $2, $3) ON CONFLICT (pid) DO NOTHING', [row.id, crypto.randomBytes(32).toString('base64url'), now]);
+  const r = await db.query('UPDATE zz.filekeys SET vault = $2, at = $3 WHERE pid = $1 AND (vault IS NULL OR $4) RETURNING pid', [row.id, JSON.stringify(clean), now, body.replace === true]);
+  return r[0] ? ok({}) : no(409, 'exists');
+}
+
+module.exports = { configured, presign, up, done, list, hide, back, purge, key, vault, KINDS, KEEP_DAYS };

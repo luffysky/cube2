@@ -227,6 +227,16 @@ const SCHEMA = [
      ver text NOT NULL,
      at double precision NOT NULL
    )`,
+  // each member's file keys (server/files.js). k: the key our server keeps, used to lock files in the browser before
+  // upload (mode s). vault: the player's own key for mode p, locked twice in the browser, once with their password and
+  // once with their recovery code; the server cannot open it. Never sent to R2.
+  `CREATE TABLE IF NOT EXISTS zz.filekeys (
+     pid uuid PRIMARY KEY REFERENCES zz.players(id) ON DELETE CASCADE,
+     k text NOT NULL,
+     vault jsonb,
+     at double precision NOT NULL
+   )`,
+  "ALTER TABLE zz.files ADD COLUMN IF NOT EXISTS enc text NOT NULL DEFAULT ''",
   // "connect to SnowRealm Games" sessions (server/bff.js): id is the hash of the cookie's session id; box and res are
   // encrypted with a key derived from that id (so this table alone cannot read them) and cleared once used
   `CREATE TABLE IF NOT EXISTS zz.authsess (

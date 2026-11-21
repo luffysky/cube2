@@ -230,6 +230,7 @@ API 只給同一個網址的頁面用：不送任何 CORS 標頭，請求如果�
 | `zz.rate` | 限流計數 |
 | `zz.rooms` | 連線對戰的房間：代碼、每個座位鑰匙的雜湊（`ks`）、座位數（`cap`）、到期時間（三小時）。`hk`、`jk` 是舊欄位 |
 | `zz.post` | 房間裡每個座位的信箱，記著是哪個座位寄的。收件人讀過就刪，房間到期或關閉時整批清掉（取代舊的 `zz.mail`） |
+| `zz.filekeys` | 會員雲端檔案的金鑰：轉磚保管的那把（模式 s），以及玩家自己密碼鎖住的 vault（模式 p，用密碼和救援碼各鎖一次，伺服器打不開）。檔案在瀏覽器先用 AES-256-GCM 加密才上傳（`src/cloud.js` 的 `Cloud.lock`） |
 | `zz.admin_log` | 唯讀後台 API 每次驗過 token 的呼叫：時間、`sub`、`jti`、路徑、狀態碼。不存 token、查詢字串、IP。清除規則待 Owner 核准 |
 | `zz.authsess` | 連結 SnowRealm Games 的暫存工作階段：session id 的雜湊、用途、加密的 PKCE／state／nonce 與結果（用過即清）。過期列的清除待 Owner 核准 |
 

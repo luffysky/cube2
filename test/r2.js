@@ -45,6 +45,8 @@ function wav() {
     await p.setInputFiles('#muFile', [{ name: '雲端的歌.wav', mimeType: 'audio/wav', buffer: wav() }]);
     ok(await (async () => { for (let i = 0; i < 60; i++) { if (await p.evaluate(() => { const o = JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []; return o.length === 1 && !!o[0].cid; })) return true; await sleep(150); } return false; })(), 'the song is kept here and uploaded (it has a cloud id)');
     ok(Object.keys(bucket).length === 1 && /\/zzb\/u\/[0-9a-f-]{36}\/music\//.test(Object.keys(bucket)[0]), 'it landed in the bucket under the player\'s own folder', Object.keys(bucket));
+    const first = bucket[Object.keys(bucket)[0]].body;
+    ok(first.slice(0, 4).toString() === 'ZZE1' && first[4] === 115 && first.indexOf(Buffer.from('RIFF')) < 0 && first.indexOf(Buffer.from('WAVEfmt')) < 0, 'what reached the bucket is locked (mode s): no WAV inside to read', first.slice(0, 8));
     // as if on another device: nothing here any more
     await p.evaluate(() => new Promise(res => { const st = JSON.parse(localStorage.getItem('zhuanzhuan.music.v1')); st.own = []; st.list = []; localStorage.setItem('zhuanzhuan.music.v1', JSON.stringify(st)); const r = indexedDB.deleteDatabase('zhuanzhuan-music'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
     await p.reload(); await sleep(800);
@@ -74,6 +76,51 @@ function wav() {
     const up = Object.keys(bucket).filter(k => /\/music\//.test(k));
     ok(up.length === before + 1 && bucket[up[up.length - 1]].type === 'audio/wav', 'it went to the bucket as a WAV', up.map(k => bucket[k].type));
     ok(await p.evaluate(() => !document.querySelector('[data-muup]') && !document.querySelector('[data-do="muUpAll"]')), 'and the upload buttons are gone');
+    // ---------- my own password: set it, get a recovery code, lock with it ----------
+    await p.click('[data-dslock="p"]');
+    for (let i = 0; i < 40 && !(await p.evaluate(() => !!document.getElementById('vtPw2'))); i++) await sleep(100);
+    await p.fill('#vtPw', 'short'); await p.fill('#vtPw2', 'short'); await p.click('[data-vt="ok"]'); await sleep(200);
+    ok(await p.evaluate(() => /8/.test(document.getElementById('sheetCard').textContent)), 'too short a password is refused');
+    await p.fill('#vtPw', 'brick-pass-1'); await p.fill('#vtPw2', 'brick-pass-1'); await p.click('[data-vt="ok"]');
+    let code = null;
+    for (let i = 0; i < 100 && !code; i++) { code = await p.evaluate(() => { const e = document.querySelector('.roomcode.xfer'); return e && /^[A-Z0-9]{4}(-[A-Z0-9]{4}){4}$/.test(e.textContent) ? e.textContent : null; }); await sleep(100); }
+    ok(!!code, 'a recovery code is shown once', code);
+    await p.click('[data-vt="codeOk"]'); await sleep(300);
+    ok(await p.evaluate(() => document.querySelector('[data-dslock="p"]').getAttribute('aria-checked') === 'true'), 'back in the player, "my own password" is on');
+    const nBefore = Object.keys(bucket).length;
+    await p.setInputFiles('#muFile', [{ name: '密碼的歌.wav', mimeType: 'audio/wav', buffer: wav() }]);
+    for (let i = 0; i < 80 && Object.keys(bucket).length === nBefore; i++) await sleep(150);
+    const pk = Object.keys(bucket).find(k => bucket[k].body[4] === 112);
+    ok(pk && bucket[pk].body.slice(0, 4).toString() === 'ZZE1', 'the new song is locked with the password (mode p)', Object.keys(bucket).map(k => bucket[k].body[4]));
+    const dbText = await (await fetch('http://127.0.0.1:' + PORT + '/_dev/state')).text().catch(() => '');
+    ok(dbText.indexOf('brick-pass-1') < 0 && code && dbText.indexOf(code) < 0, 'neither the password nor the recovery code is on the server');
+    // another visit: the password is asked for to open it; a wrong one is refused
+    await p.evaluate(() => new Promise(res => { const st = JSON.parse(localStorage.getItem('zhuanzhuan.music.v1')); st.own = []; st.list = []; localStorage.setItem('zhuanzhuan.music.v1', JSON.stringify(st)); const r = indexedDB.deleteDatabase('zhuanzhuan-music'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await p.reload(); await sleep(800);
+    for (let i = 0; i < 60 && !(await p.evaluate(() => ZZ.Cloud.on && ZZ.Cloud.files)); i++) await sleep(100);
+    await sleep(600);
+    await p.evaluate(() => ZZ.App.openSheet('music')); await sleep(300);
+    await p.click('[data-do="muPull"]');
+    for (let i = 0; i < 60 && !(await p.evaluate(() => !!document.getElementById('vtPw') && !document.getElementById('vtPw2'))); i++) await sleep(100);
+    ok(await p.evaluate(() => !!document.getElementById('vtPw')), 'getting it back asks for the password');
+    await p.fill('#vtPw', 'not-the-password'); await p.click('[data-vt="ok"]');
+    await sleep(2500);
+    ok(await p.evaluate(() => !(JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).some(o => /密碼/.test(o.name))), 'a wrong password opens nothing');
+    // forgot it: the recovery code sets a new one
+    await p.evaluate(() => ZZ.App.openSheet('music')); await sleep(200);
+    await p.click('[data-dsvault="recover"]'); await sleep(200);
+    await p.fill('#vtCode', code.toLowerCase().replace(/-/g, ' ')); await p.fill('#vtPw', 'brick-pass-2'); await p.fill('#vtPw2', 'brick-pass-2'); await p.click('[data-vt="ok"]');
+    for (let i = 0; i < 100 && !(await p.evaluate(() => /新密碼生效/.test((document.getElementById('mtoast') || {}).textContent || ''))); i++) await sleep(100);
+    ok(await p.evaluate(() => /新密碼生效/.test(document.getElementById('mtoast').textContent)), 'the recovery code (typed loosely) resets the password', await p.evaluate(() => [document.getElementById('sheetCard').getAttribute('data-name'), document.getElementById('sheetCard').textContent.slice(0, 200), document.getElementById('mtoast').textContent]));
+    await p.evaluate(() => ZZ.Cloud.forgetPass());
+    await p.evaluate(() => ZZ.App.openSheet('music')); await sleep(200);
+    await p.click('[data-do="muPull"]');
+    for (let i = 0; i < 60 && !(await p.evaluate(() => !!document.getElementById('vtPw'))); i++) await sleep(100);
+    await p.fill('#vtPw', 'brick-pass-2'); await p.click('[data-vt="ok"]');
+    ok(await (async () => { for (let i = 0; i < 100; i++) { if (await p.evaluate(() => (JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).some(o => /密碼/.test(o.name)))) return true; await sleep(150); } return false; })(), 'with the new password the song comes back, and the server-locked ones too');
+    ok(await p.evaluate(() => (JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).length >= 3), 'all of them');
+    ok(await p.evaluate(() => ZZ.Cloud.changePass('wrong-old-pass', 'brick-pass-3')) === false && await p.evaluate(() => ZZ.Cloud.changePass('brick-pass-2', 'brick-pass-3')) === true, 'changing the password needs the current one');
+    await p.click('[data-dslock="s"]').catch(() => {}); await sleep(200);
     // a picture too
     await p.evaluate(() => { ZZ.App.closeSheet(); ZZ.App.openSheet('shop'); }); await sleep(200);
     await p.click('[data-tab="member"]'); await sleep(200);
