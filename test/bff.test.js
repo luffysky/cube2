@@ -35,12 +35,13 @@ const U1 = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b', U2 = '0b9c8d7e-6f5a-4b3c-9d2e
 // ---------- the stand-in Identity ----------
 const codes = {}, seenBodies = [];
 let tokenMode = 'ok', statusMode = 'ok', claimsExtra = {};
+const want = { client: 'brickduel-bff', redirect: 'https://brickduel.snowrealm.pet/api/auth/callback' };
 function portal(url, sub) {
   const u = new URL(url), code = crypto.randomBytes(32).toString('base64url');
   codes[code] = { sub, state: u.searchParams.get('state'), nonce: u.searchParams.get('nonce'), challenge: u.searchParams.get('code_challenge'), used: false };
   return { code, state: u.searchParams.get('state') };
 }
-bff.setFetch(async (url, o) => {
+const lastFetch = async (url, o) => {
   const body = JSON.parse(o.body || '{}'), h = o.headers;
   seenBodies.push({ url, headers: Object.assign({}, h), body });
   const reply = (status, j) => ({ status, json: async () => j });
@@ -49,7 +50,7 @@ bff.setFetch(async (url, o) => {
     if (tokenMode === '503') return reply(503, { error: 'authorization_unavailable' });
     if (h['x-snowrealm-client-secret'] !== SECRET) return reply(401, { error: 'invalid_client' });
     const c = codes[body.code];
-    if (!c || c.used || body.clientId !== 'brickduel-bff' || body.redirectUri !== 'https://brickduel.snowrealm.pet/api/auth/callback' ||
+    if (!c || c.used || body.clientId !== want.client || body.redirectUri !== want.redirect ||
       crypto.createHash('sha256').update(body.codeVerifier, 'ascii').digest('base64url') !== c.challenge || body.state !== c.state || body.nonce !== c.nonce) return reply(400, { error: 'invalid_grant' });
     c.used = true;
     return reply(200, { access_token: sign(Object.assign({ sub: c.sub, nonce: c.nonce }, claimsExtra)), token_type: 'Bearer', expires_in: 300, scope: 'brickduel:account:link' });
@@ -64,7 +65,8 @@ bff.setFetch(async (url, o) => {
     return reply(200, { active: true });
   }
   return reply(404, {});
-});
+};
+bff.setFetch(lastFetch);
 
 // ---------- requests ----------
 function call(name, o) {
@@ -83,9 +85,10 @@ const auth = c => c ? { authorization: 'Bearer ' + c.id + '.' + c.key } : {};
 const rpc = (body, cred) => call('rpc', { body, headers: auth(cred) });
 async function newPlayer() { const r = await rpc({ a: 'hello' }); return { id: r.json.id, key: r.json.key }; }
 const cookieFrom = r => { const m = /__Host-zzauth=([A-Za-z0-9_-]*)/.exec(r.headers['set-cookie'] || ''); return m ? m[1] : null; };
-const startIt = (intent, cred, o) => call('authStart', Object.assign({ body: { intent }, headers: auth(cred) }, o || {}));
-const back = (q, cookie) => call('authCallback', { method: 'GET', url: '/api/auth/callback?' + q, headers: cookie ? { cookie: '__Host-zzauth=' + cookie } : {} });
-const resultOf = cookie => call('authResult', { body: {}, headers: cookie ? { cookie: 'other=1; __Host-zzauth=' + cookie } : {} });
+let HOST = 'brickduel.snowrealm.pet';
+const startIt = (intent, cred, o) => call('authStart', Object.assign({ body: { intent }, headers: Object.assign({ host: HOST }, auth(cred)) }, o || {}));
+const back = (q, cookie, host) => call('authCallback', { method: 'GET', url: '/api/auth/callback?' + q, headers: Object.assign({ host: host || HOST }, cookie ? { cookie: '__Host-zzauth=' + cookie } : {}) });
+const resultOf = cookie => call('authResult', { body: {}, headers: Object.assign({ host: HOST }, cookie ? { cookie: 'other=1; __Host-zzauth=' + cookie } : {}) });
 const where = r => r.headers.location;
 // a whole round: start, the portal, the callback; gives the cookie and the callback's answer
 async function round(intent, cred, sub, tweak) {
@@ -255,6 +258,60 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   let last = 0;
   for (let i = 0; i < 12; i++) last = (await startIt('recover', null, { ip: 99 })).status;
   eq(last, 429, 'starting too often from one place: 429');
+
+  // ---------- the host: start and callback only where the callback lives ----------
+  eq((await startIt('recover', null, { headers: { host: 'cube2-xi.vercel.app' } })).json.why, 'host', 'start on another host (the cookie would land in the wrong place): refused');
+  x = await round('recover', null, U1, p => 'code=' + p.code + '&state=' + p.state);
+  ok(where(x.cb) === '/?auth=recovered', 'on the right host it works', where(x.cb));
+  const s5 = await startIt('recover'), p5 = portal(s5.json.url, U1);
+  eq(where(await back('code=' + p5.code + '&state=' + p5.state, cookieFrom(s5), 'cube2-xi.vercel.app')), '/?auth=session', 'a callback that arrives on another host: refused');
+
+  // ---------- staging (a Vercel Preview only) ----------
+  const STG = 'https://brickduel-staging.snowrealm.pet/api/auth/callback';
+  const stg = { IDENTITY_STAGING: '1', IDENTITY_STAGING_REDIRECT: STG, IDENTITY_STAGING_CLIENT_SECRET: 'staging-secret-'.padEnd(48, 's'), IDENTITY_AUTHORIZE_URL: 'https://games-staging.test.example/', VERCEL_ENV: 'preview' };
+  const cfg = extra => bff.settings(Object.assign({}, ENV, stg, extra || {}));
+  const st = cfg();
+  ok(st && st.staging && st.clientId === 'brickduel-bff-staging' && st.redirect === STG && st.host === 'brickduel-staging.snowrealm.pet' && st.secret !== SECRET, 'a Preview with the staging settings: its own client, callback, secret', st && { c: st.clientId, r: st.redirect });
+  const pr = cfg({ VERCEL_ENV: 'production' });
+  ok(pr && !pr.staging && pr.clientId === 'brickduel-bff' && pr.redirect === 'https://brickduel.snowrealm.pet/api/auth/callback' && pr.secret === SECRET, 'on production every staging setting is ignored', pr && { c: pr.clientId, r: pr.redirect });
+  for (const [name, extra] of [
+    ['a wildcard', { IDENTITY_STAGING_REDIRECT: 'https://*.vercel.app/api/auth/callback' }],
+    ['plain http', { IDENTITY_STAGING_REDIRECT: 'http://brickduel-staging.snowrealm.pet/api/auth/callback' }],
+    ['a port', { IDENTITY_STAGING_REDIRECT: 'https://brickduel-staging.snowrealm.pet:8443/api/auth/callback' }],
+    ['a query', { IDENTITY_STAGING_REDIRECT: STG + '?x=1' }],
+    ['another path', { IDENTITY_STAGING_REDIRECT: 'https://brickduel-staging.snowrealm.pet/callback' }],
+    ['the production host', { IDENTITY_STAGING_REDIRECT: 'https://brickduel.snowrealm.pet/api/auth/callback' }],
+    ['no callback', { IDENTITY_STAGING_REDIRECT: '' }],
+    ['the production client id', { IDENTITY_STAGING_CLIENT_ID: 'brickduel-bff' }],
+    ['the production secret', { IDENTITY_STAGING_CLIENT_SECRET: SECRET }],
+    ['no staging secret', { IDENTITY_STAGING_CLIENT_SECRET: '' }],
+    ['the production issuer', { IDENTITY_ISSUER: 'https://identity.snowrealm.pet' }],
+    ['the production portal', { IDENTITY_AUTHORIZE_URL: 'https://games.snowrealm.pet/' }],
+    ['no portal given', { IDENTITY_AUTHORIZE_URL: '' }],
+    ['the production token endpoint', { IDENTITY_TOKEN_URL: 'https://identity.snowrealm.pet/oauth/token' }],
+    ['local http outside tests', { IDENTITY_STAGING_REDIRECT: 'http://127.0.0.1:8786/api/auth/callback' }]
+  ]) ok(!cfg(extra), 'staging refused with ' + name);
+  // a whole staging round, on the staging host
+  Object.assign(process.env, stg); HOST = 'brickduel-staging.snowrealm.pet';
+  want.client = 'brickduel-bff-staging'; want.redirect = STG;
+  const sSecret = stg.IDENTITY_STAGING_CLIENT_SECRET;
+  const origSecret = SECRET;
+  // the stand-in Identity checks the staging secret now
+  bff.setFetch((f => async (url, o) => { if (o.headers['x-snowrealm-client-secret'] === sSecret) o.headers['x-snowrealm-client-secret'] = origSecret; else o.headers['x-snowrealm-client-secret'] = 'wrong'; return f(url, o); })(lastFetch));
+  r = await startIt('recover');
+  const su = new URL(r.json.url);
+  ok(r.status === 200 && su.origin === 'https://games-staging.test.example' && su.searchParams.get('client_id') === 'brickduel-bff-staging' && su.searchParams.get('redirect_uri') === STG, 'staging start: staging portal, client and callback', r.json.url);
+  ok(/^__Host-zzauth=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=600; Secure; HttpOnly; SameSite=Lax$/.test(r.headers['set-cookie']), 'the same __Host- cookie (Secure, HttpOnly, Lax, host only, 10 minutes)', r.headers['set-cookie']);
+  eq((await startIt('recover', null, { headers: { host: 'brickduel.snowrealm.pet' } })).json.why, 'host', 'a staging start on the production host: refused');
+  x = await round('recover', null, U1);
+  eq(where(x.cb), '/?auth=recovered', 'a whole staging round');
+  const sentTok = seenBodies.filter(b => /oauth\/token/.test(b.url)).pop();
+  ok(sentTok.body.clientId === 'brickduel-bff-staging' && sentTok.body.redirectUri === STG, 'the token request names the staging client and callback');
+  eq(where(await back('code=' + x.p.code + '&state=' + x.p.state, x.cookie)), '/?auth=replay', 'staging: replay refused');
+  const s6 = await startIt('recover'), p6 = portal(s6.json.url, U1);
+  eq(where(await back('code=' + p6.code + '&state=' + p6.state)), '/?auth=session', 'staging: another browser refused');
+  for (const k of Object.keys(stg)) delete process.env[k];
+  HOST = 'brickduel.snowrealm.pet';
 
   console.log('bff tests: ' + pass + ' passed, ' + fail + ' failed');
   for (const k of Object.keys(ENV)) delete process.env[k];

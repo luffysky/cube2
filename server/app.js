@@ -91,7 +91,7 @@ const routes = {
     if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
     if (!bff.enabled()) return send(res, 503, { ok: false, why: 'off' });
     const body = await readBody(req), now = clock(), cred = core.readCred(header(req, 'authorization'));
-    const out = await db.run(d => bff.start(d, body, cred, ipTag(req), now));
+    const out = await db.run(d => bff.start(d, body, cred, ipTag(req), now, undefined, String(header(req, 'host') || '').toLowerCase()));
     send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
   },
   async authCallback(req, res, url) {
@@ -99,7 +99,7 @@ const routes = {
     let outcome;
     if (!bff.enabled()) outcome = 'off';
     else {
-      try { outcome = (await db.run(d => bff.finish(d, url.searchParams, header(req, 'cookie'), clock()))).outcome; }
+      try { outcome = (await db.run(d => bff.finish(d, url.searchParams, header(req, 'cookie'), clock(), undefined, String(header(req, 'host') || '').toLowerCase()))).outcome; }
       catch (e) { log('auth', e); outcome = 'unavailable'; }
     }
     if (bff.OUTCOMES.indexOf(outcome) < 0) outcome = 'unavailable';

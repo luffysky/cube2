@@ -11,8 +11,16 @@
 let impl = null, tried = false;
 const TIMEOUT_MS = 8000;
 
+// A staging setup (a Vercel Preview with IDENTITY_STAGING=1 or BRICKDUEL_ADMIN_TEST_TRUST=1) never reads the
+// production database, even though Preview deployments are given the same DATABASE_URL: it uses STAGING_DATABASE_URL
+// only, and with that not set it has no database at all (everything that needs one answers 503).
+function staging(env) {
+  env = env || process.env;
+  return env.VERCEL_ENV !== 'production' && (env.IDENTITY_STAGING === '1' || env.BRICKDUEL_ADMIN_TEST_TRUST === '1');
+}
 function fromEnv() {
-  const url = process.env.DATABASE_URL || process.env.DATABASE_POSTGRES_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || '';
+  const e = process.env;
+  const url = staging(e) ? (e.STAGING_DATABASE_URL || '') : (e.DATABASE_URL || e.DATABASE_POSTGRES_URL || e.POSTGRES_URL || e.DATABASE_URL_UNPOOLED || '');
   if (!url) return null;
   const { neon } = require('@neondatabase/serverless');
   const sql = neon(url);
@@ -274,4 +282,4 @@ async function run(fn) {
   }
 }
 
-module.exports = { get, use, configured, run, migrate, missing, SCHEMA };
+module.exports = { get, use, configured, run, migrate, missing, SCHEMA, staging };

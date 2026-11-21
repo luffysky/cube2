@@ -794,3 +794,22 @@
 - 待決：callback 寫死是正式網址，Preview 收不到。兩條路二選一：staging 專用 callback（要改 cube2 程式），或在 production 短暫打開驗收、驗完就關（要 Owner 同意）。
 - 沒有動 `IDENTITY_LINK_ENABLED`、`BRICKDUEL_ADMIN_SUBJECTS`，也沒有新增刪除。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`（新）、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`07767a1`](https://github.com/luffysky/cube2/commit/07767a1)。
+
+## 2026-11-21 17:50（Asia/Taipei）｜Staging 回呼（只在 Preview）、staging 不讀正式資料庫
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的 GPT「Staging Callback 與 A1–A14／B1–B13 對接補充」（C-037）
+- **staging 回呼**：
+  - 只有 Vercel Preview 加上 `IDENTITY_STAGING=1` 時才生效。只接受 `IDENTITY_STAGING_REDIRECT` 這一個精確的 https 回呼：不能有萬用字元、port、query，不能是正式站的 host。
+  - client 預設 `brickduel-bff-staging`，不能用正式的 client。secret 是獨立的一組，不能跟正式相同。issuer、token、status 也都不能用正式的值，入口網址必須另外給。
+  - production 上一律忽略這些 staging 設定。
+  - 開始登入和 callback 都必須在回呼的 host 上；在別的 host（例如 `cube2-xi.vercel.app`）一律拒絕，所以 cookie 只會落在正確的 host。
+- **安全發現與處理**：Preview 拿到的 `DATABASE_URL` 跟 production 是同一個。改成只要開了 staging（`IDENTITY_STAGING=1` 或 `BRICKDUEL_ADMIN_TEST_TRUST=1`），就只用 `STAGING_DATABASE_URL`，沒設就沒有資料庫，不會讀到正式玩家資料。另外，一般 Preview 部署本來就連著正式資料庫，這次沒有改；建議 Owner 讓 Neon 整合幫 Preview 建分支。
+- **網域**：`brickduel-staging.snowrealm.pet` 已在 Vercel 綁到 `staging` 分支。DNS 在 Cloudflare，要 Owner 加 CNAME；**還沒生效**，不能宣稱已經存在。
+- `docs/JOINT_ACCEPTANCE.md` 加了 staging 說明和實測報告表：A、B 目前都是 BLOCKED。給 cube1 的補充寫在 `docs/CUBE1_REPLY_20261121.md`。
+- 正式站的 `IDENTITY_LINK_ENABLED`、回呼、cookie、存檔、金幣、匿名遊戲都沒動；沒有刪任何東西。
+- 檔案：`server/bff.js`、`server/app.js`、`server/db.js`、`test/bff.test.js`、`test/authui.js`、`test/staging.test.js`（新）、`test/run.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/CUBE1_REPLY_20261121.md`、`docs/BRICKDUEL_IDENTITY_ADAPTER_SPEC.md`、`docs/OWNER_DECISIONS.md`、`docs/TODO.md`。
+- 資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過（bff 99：staging 設定 15 種拒絕、production 忽略、staging 整輪、錯 host、重放、換瀏覽器；staging 5）。瀏覽器：`authui` 9、`cloudui` 41。
+- 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）；另開 `staging` 分支給 Preview 用。

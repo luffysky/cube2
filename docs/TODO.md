@@ -55,6 +55,9 @@
 - [x] OAuth BFF callback（C-035，開關關著）
 - [x] BFF：`nonce` 改成必填（契約補充 2026-11-21）
 - [x] 管理 API：`sub` 限定 `svc:snowrealm-games-admin`
+- [x] Staging callback（只在 Preview 生效、正式站忽略）、staging 不讀正式資料庫
+- [ ] Owner：Cloudflare 加 CNAME `brickduel-staging` → `a2b850ffbe7b21ab.vercel-dns-016.com`（DNS only）
+- [ ] Owner：Vercel Preview（staging 分支）設 `STAGING_DATABASE_URL`（建議 Neon 分支）與 staging Identity 的值
 - [ ] cube1 提供受控 staging signer → 跑有效、錯 audience／issuer／scope／sub、換鑰、缺 key 的實測
 - [ ] 機器簽發端與 `admin-jwks.json` 上線 → Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS`
 - [ ] Identity `/oauth/authorize`、`/oauth/token` 上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開 `IDENTITY_LINK_ENABLED`

@@ -74,7 +74,7 @@
 
 | 項目 | cube2 實作 |
 |---|---|
-| Client | `brickduel-bff`；callback 固定 `https://brickduel.snowrealm.pet/api/auth/callback` |
+| Client | `brickduel-bff`；callback 固定 `https://brickduel.snowrealm.pet/api/auth/callback`。Staging（只在 Vercel Preview、`IDENTITY_STAGING=1`）：client `brickduel-bff-staging`、單一精確 callback `IDENTITY_STAGING_REDIRECT`（提案 `https://brickduel-staging.snowrealm.pet/api/auth/callback`，尚未生效）、獨立 secret／issuer；production 一律忽略 staging 設定；開始與 callback 都必須在 callback 的 host 上 |
 | 開始 | `POST /api/auth/start {intent:'link'|'recover'|'restore'}`，只接受同站；`link` 要帶這台裝置的金鑰（證明擁有這份存檔）。每 10 分鐘同一份存檔／同一網路位置最多 10 次 |
 | 工作階段 | 伺服器產生 32 bytes 的 session id、state、nonce 和 PKCE verifier（S256）。瀏覽器只拿到 `__Host-zzauth` cookie（Secure、HttpOnly、SameSite=Lax、Path=/、10 分鐘）。資料庫 `zz.authsess` 只存 session id 的雜湊；verifier／state／nonce 用從 session id 衍生的金鑰（HKDF-SHA256 → AES-256-GCM）加密保存，只有資料庫讀不出來 |
 | 導向 | `https://games.snowrealm.pet/?sso=brickduel&client_id=brickduel-bff&redirect_uri=…&response_type=code&code_challenge=…&code_challenge_method=S256&state=…&nonce=…`（與 cube1 `dist/sso-flow.mjs` 相符）。使用者同意由 Games 平台的可信後端確認，cube2 不採信瀏覽器的 `consent:true` |

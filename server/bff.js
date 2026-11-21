@@ -38,22 +38,50 @@ const identity = require('./identity.js');
 const core = require('./core.js');
 
 const CLIENT_ID = 'brickduel-bff', REDIRECT = 'https://brickduel.snowrealm.pet/api/auth/callback';
-const PORTAL = 'https://games.snowrealm.pet/';
+const PORTAL = 'https://games.snowrealm.pet/', PROD_ISS = 'https://identity.snowrealm.pet';
+const PROD_HOST = 'brickduel.snowrealm.pet', CLIENT_RE = /^[a-z0-9][a-z0-9_-]{2,79}$/;
 const COOKIE = '__Host-zzauth', LIFE = 10 * 60000, RESULT_LIFE = 5 * 60000, TOKEN_MS = 5000, STATUS_MS = 4000;
 const INTENTS = ['link', 'recover', 'restore'];
 const OUTCOMES = ['linked', 'recovered', 'conflict', 'pending', 'none', 'ban', 'purged', 'session', 'expired', 'replay', 'state', 'denied', 'code', 'token', 'revoked', 'unavailable', 'off'];
 let fetcher = null;
 
+// Production: client brickduel-bff, callback https://brickduel.snowrealm.pet/api/auth/callback, secret
+// IDENTITY_BRICKDUEL_CLIENT_SECRET. Nothing else is ever used when VERCEL_ENV is production.
+// Staging (a Vercel Preview, never production) only with IDENTITY_STAGING=1, and then everything is its own:
+//   IDENTITY_STAGING_REDIRECT       the one exact https callback that was deployed and checked, e.g. the proposed
+//                                   https://brickduel-staging.snowrealm.pet/api/auth/callback (no wildcard, no port,
+//                                   no query; not the production host)
+//   IDENTITY_STAGING_CLIENT_ID      default brickduel-bff-staging (never brickduel-bff)
+//   IDENTITY_STAGING_CLIENT_SECRET  its own secret (never the production one)
+//   IDENTITY_ISSUER / _JWKS_URL / _AUDIENCE, IDENTITY_AUTHORIZE_URL, _TOKEN_URL, _STATUS_URL: the staging service
+//                                   (the production issuer is refused; the portal address must be given)
+// A start or callback on any other host than the callback's own is refused, so the cookie is always on that host.
 function settings(env) {
   env = env || process.env;
   const id = identity.settings(env);
   if (!id || !id.on) return null;
-  const secret = env.IDENTITY_BRICKDUEL_CLIENT_SECRET || '';
-  if (secret.length < 32) return null;
   const http = !!env.IDENTITY_ALLOW_HTTP_FOR_TESTS, base = id.iss.replace(/\/+$/, '');
-  const authorize = env.IDENTITY_AUTHORIZE_URL || PORTAL, token = env.IDENTITY_TOKEN_URL || base + '/oauth/token', status = env.IDENTITY_STATUS_URL || base + '/v1/token/status';
-  if (!http && ![authorize, token, status].every(u => /^https:\/\//.test(u))) return null;
-  return { iss: id.iss, secret, authorize, token, status, env };
+  const staging = env.VERCEL_ENV !== 'production' && env.IDENTITY_STAGING === '1';
+  let clientId = CLIENT_ID, redirect = REDIRECT, secret = env.IDENTITY_BRICKDUEL_CLIENT_SECRET || '', authorize = env.IDENTITY_AUTHORIZE_URL || PORTAL;
+  if (staging) {
+    clientId = env.IDENTITY_STAGING_CLIENT_ID || 'brickduel-bff-staging';
+    if (!CLIENT_RE.test(clientId) || clientId === CLIENT_ID) return null;
+    redirect = env.IDENTITY_STAGING_REDIRECT || '';
+    let u;
+    try { u = new URL(redirect); } catch (e) { return null; }
+    // (the local browser test may point it at its own http://127.0.0.1:port; never outside tests)
+    const local = http && u.protocol === 'http:' && u.hostname === '127.0.0.1';
+    if ((u.protocol !== 'https:' && !local) || u.href !== redirect || (u.port && !local) || u.username || u.password || u.search || u.hash ||
+      u.pathname !== '/api/auth/callback' || u.hostname === PROD_HOST || /\*/.test(redirect)) return null;
+    secret = env.IDENTITY_STAGING_CLIENT_SECRET || '';
+    if (env.IDENTITY_BRICKDUEL_CLIENT_SECRET && secret === env.IDENTITY_BRICKDUEL_CLIENT_SECRET) return null;
+    if (base === PROD_ISS || !env.IDENTITY_AUTHORIZE_URL || authorize === PORTAL) return null;
+  }
+  if (secret.length < 32) return null;
+  const token = env.IDENTITY_TOKEN_URL || base + '/oauth/token', status = env.IDENTITY_STATUS_URL || base + '/v1/token/status';
+  if (staging && [token, status].some(x => x.indexOf(PROD_ISS) === 0)) return null;
+  if (!http && ![authorize, token, status].every(x => /^https:\/\//.test(x))) return null;
+  return { iss: id.iss, secret, authorize, token, status, env, clientId, redirect, host: new URL(redirect).host, staging };
 }
 const enabled = env => !!settings(env);
 
@@ -89,9 +117,10 @@ function claimsOf(token) { try { return JSON.parse(Buffer.from(token.split('.')[
 
 // ---------- start ----------
 // who: { id, hash } from the device's own key (needed for 'link'); tag: a keyed hash of the network address, for the limit
-async function start(db, body, who, tag, now, env) {
+async function start(db, body, who, tag, now, env, host) {
   const s = settings(env);
   if (!s) return { status: 503, body: { ok: false, why: 'off' } };
+  if (host !== s.host) return { status: 400, body: { ok: false, why: 'host' } };
   const intent = body && body.intent;
   if (INTENTS.indexOf(intent) < 0) return { status: 400, body: { ok: false, why: 'intent' } };
   let pid = null, cred = null;
@@ -111,8 +140,8 @@ async function start(db, body, who, tag, now, env) {
     [sha(sid), intent, pid, cred, seal(sid, { state, nonce, verifier }), now, now + LIFE]);
   const u = new URL(s.authorize);
   u.searchParams.set('sso', 'brickduel');
-  u.searchParams.set('client_id', CLIENT_ID);
-  u.searchParams.set('redirect_uri', REDIRECT);
+  u.searchParams.set('client_id', s.clientId);
+  u.searchParams.set('redirect_uri', s.redirect);
   u.searchParams.set('response_type', 'code');
   u.searchParams.set('code_challenge', challenge);
   u.searchParams.set('code_challenge_method', 'S256');
@@ -123,9 +152,10 @@ async function start(db, body, who, tag, now, env) {
 
 // ---------- callback ----------
 // gives { outcome } (and writes it into the session for result to read). Never throws a token anywhere.
-async function finish(db, q, cookie, now, env) {
+async function finish(db, q, cookie, now, env, host) {
   const s = settings(env);
   if (!s) return { outcome: 'off' };
+  if (host !== s.host) return { outcome: 'session' };
   const sid = cookieOf(cookie);
   if (!sid) return { outcome: 'session' };
   // used up right here, whatever follows: a second visit with the same session finds nothing
@@ -152,7 +182,7 @@ async function finish(db, q, cookie, now, env) {
   // the code for a token, from the server, with the client secret and the original state and nonce
   let t;
   try {
-    t = await post(s.token, { 'x-snowrealm-client-secret': s.secret }, { clientId: CLIENT_ID, redirectUri: REDIRECT, code, codeVerifier: box.verifier, state: box.state, nonce: box.nonce }, TOKEN_MS);
+    t = await post(s.token, { 'x-snowrealm-client-secret': s.secret }, { clientId: s.clientId, redirectUri: s.redirect, code, codeVerifier: box.verifier, state: box.state, nonce: box.nonce }, TOKEN_MS);
   } catch (e) { return done('unavailable'); }
   if (t.status >= 500) return done('unavailable');
   const token = t.body && t.body.access_token;

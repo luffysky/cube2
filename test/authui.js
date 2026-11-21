@@ -14,7 +14,9 @@ function server(port, env) {
   return new Promise(r => s.stdout.once('data', () => r(s)));
 }
 (async () => {
-  const on = { IDENTITY_ISSUER: 'https://identity.test.example', IDENTITY_JWKS_URL: 'https://identity.test.example/.well-known/jwks.json', IDENTITY_AUDIENCE: 'snowrealm:brickduel:api', IDENTITY_LINK_ENABLED: '1', IDENTITY_BRICKDUEL_CLIENT_SECRET: 'x'.repeat(48) };
+  const on = { IDENTITY_ISSUER: 'https://identity.test.example', IDENTITY_JWKS_URL: 'https://identity.test.example/.well-known/jwks.json', IDENTITY_AUDIENCE: 'snowrealm:brickduel:api', IDENTITY_LINK_ENABLED: '1', IDENTITY_BRICKDUEL_CLIENT_SECRET: 'x'.repeat(48),
+    // the page is served from 127.0.0.1 here, so this runs as a staging setup pointed at it (tests only)
+    IDENTITY_STAGING: '1', IDENTITY_STAGING_REDIRECT: 'http://127.0.0.1:' + (PORT + 1) + '/api/auth/callback', IDENTITY_STAGING_CLIENT_SECRET: 'y'.repeat(48), IDENTITY_AUTHORIZE_URL: 'https://games-staging.test.example/', IDENTITY_ALLOW_HTTP_FOR_TESTS: '1' };
   const s1 = await server(PORT), s2 = await server(PORT + 1, on);
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
   const problems = [];
@@ -37,7 +39,7 @@ function server(port, env) {
     await p.click('[data-do="srLink"]');
     let went = null;
     for (let i = 0; i < 40 && !went; i++) { went = await p.evaluate(() => window.__went); await sleep(100); }
-    ok(went && /^https:\/\/games\.snowrealm\.pet\/\?sso=brickduel&client_id=brickduel-bff&redirect_uri=https%3A%2F%2Fbrickduel\.snowrealm\.pet%2Fapi%2Fauth%2Fcallback/.test(went) && /code_challenge_method=S256/.test(went), 'link goes to the portal with the fixed callback', went);
+    ok(went && /^https:\/\/games-staging\.test\.example\/\?sso=brickduel&client_id=brickduel-bff-staging&redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A\d+%2Fapi%2Fauth%2Fcallback/.test(went) && /code_challenge_method=S256/.test(went), 'link goes to the portal with the exact callback', went);
     const cookies = await ctx.cookies();
     const c = cookies.find(x => x.name === '__Host-zzauth');
     ok(c && c.httpOnly && c.secure && c.sameSite === 'Lax', 'a HttpOnly, Secure, Lax session cookie', cookies);

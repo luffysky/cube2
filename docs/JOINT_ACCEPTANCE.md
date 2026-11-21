@@ -19,9 +19,19 @@
 | `IDENTITY_BRICKDUEL_CLIENT_SECRET` | — | staging 專用，不可跟正式共用 |
 | `IDENTITY_LINK_ENABLED` | — | `1`（只設在 Preview） |
 
-- 注意：BFF 的 callback 寫死是 `https://brickduel.snowrealm.pet/api/auth/callback`。Preview 網址收不到這個 callback，B 線有兩條路可以走（要 Owner 和 cube1 選一條）：
-  1. staging Identity 允許一個 staging 專用的 callback，cube2 加一個只在 Preview 生效的 callback 設定。這要改程式，cube2 可以做。
-  2. 直接在 production 跑，但 `IDENTITY_LINK_ENABLED` 只在驗收的那段時間打開、驗完立刻關。這要 Owner 明確同意。
+- **Staging 回呼（2026-11-21 已實作，`server/bff.js`）**：
+  - 只有 `VERCEL_ENV` 不是 `production` 且設了 `IDENTITY_STAGING=1` 才生效。production 上所有 staging 設定一律忽略。
+  - 回呼網址只接受 `IDENTITY_STAGING_REDIRECT` 這一個精確值：
+    - 必須是 https，路徑必須是 `/api/auth/callback`
+    - 不能帶 port、query、`#`、帳密，不能有萬用字元，不能是正式站的 host
+  - 只有在這個 host 上才能開始登入、接收 callback，cookie 也只會設在這個 host。
+  - Client ID 用 `IDENTITY_STAGING_CLIENT_ID`，預設 `brickduel-bff-staging`，不能是 `brickduel-bff`。
+  - Secret 用 `IDENTITY_STAGING_CLIENT_SECRET`，不能跟正式的相同。
+  - 以下不能用正式的值：issuer、token、status；入口網址必須明確給，不能是正式入口。
+- **Staging 不讀正式資料庫（`server/db.js`）**：Preview 現在拿到的 `DATABASE_URL` 跟 production 是同一個。所以只要設了 `IDENTITY_STAGING=1` 或 `BRICKDUEL_ADMIN_TEST_TRUST=1`，就只會用 `STAGING_DATABASE_URL`；沒設就完全沒有資料庫（相關端點回 503），不會碰到正式玩家資料。
+- **提案的固定網址**：`https://brickduel-staging.snowrealm.pet/api/auth/callback`。
+  - 目前狀態：**尚未生效**。Vercel 上已綁定（只給 `staging` 分支的 Preview 用）；DNS 在 Cloudflare，要 Owner 加一筆 CNAME `brickduel-staging` → `a2b850ffbe7b21ab.vercel-dns-016.com`，並設成 DNS only（灰雲）。
+  - TLS 驗證通過、實際打開能看到網站之前，**不要**拿去 cube1 登記。
 
 ## A. Admin 機器 token（staged admin JWT／JWKS）
 
@@ -75,3 +85,12 @@ cube1 提供：
 - 每一項的時間、結果、cube1 與 cube2 的 commit，雙方各寫進自己的 DEVLOG。
 - 兩邊都通過以後，才由 Owner 決定要不要打開 production 的 `BRICKDUEL_ADMIN_SUBJECTS` 和 `IDENTITY_LINK_ENABLED`。
 - 驗收用的測試帳號和資料，事後要不要刪，由 Owner 另外決定。
+
+## 實測報告
+
+只記錄真的打過 staging 的結果。本機的模擬測試（CI）不寫在這裡。
+
+| # | 結果 | 時間 | staging URL | cube2 SHA | HTTP／結果字 | 備註 |
+|---|---|---|---|---|---|---|
+| A1–A14 | BLOCKED | 2026-11-21 | — | — | — | 等 cube1 staging admin signer／JWKS；Preview 也還沒設 `STAGING_DATABASE_URL` |
+| B1–B13 | BLOCKED | 2026-11-21 | — | — | — | 等 staging 網域 DNS／TLS、cube1 staging Identity 與登記 callback、`STAGING_DATABASE_URL` |
