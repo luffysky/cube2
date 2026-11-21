@@ -813,3 +813,4 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過（bff 99：staging 設定 15 種拒絕、production 忽略、staging 整輪、錯 host、重放、換瀏覽器；staging 5）。瀏覽器：`authui` 9、`cloudui` 41。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）；另開 `staging` 分支給 Preview 用。
+- 補記：上一條的 commit 為 [`7ea477f`](https://github.com/luffysky/cube2/commit/7ea477f)，Vercel production `dpl_7QMamS2yuvU4G7c2Lx4uAPvRsgm8` READY，CI run 44890326000 兩個 job 都成功；正式站 `/api/health` 仍是 `link: false`。`brickduel-staging.snowrealm.pet` 已加到 Vercel 專案、綁 `staging` 分支；同一個 commit 推到 `staging` 時 Vercel 沒有另外建 Preview，這次補記會再推一次 `staging` 讓它建出來。
