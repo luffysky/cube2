@@ -784,3 +784,13 @@
 - 資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過（bff 72、admin 105、api 382）。
 - 部署：隨本次 commit 部署正式環境（SHA 見下一條紀錄）。
+- 補記：上一條的 commit 為 [`b20f521`](https://github.com/luffysky/cube2/commit/b20f521)，Vercel `dpl_9UgAhTLySqWXqmi8Q58DscPmGNgX` READY，CI run 44840380067 **兩個 job 都成功**（rules／server／sync、Chrome 頁面）。正式站 `/api/cron` 回 `watch: {adminLog: {rows: 0, pastKeep: 0}, authSessions: {rows: 0, expired: 0}}`，沒有刪任何東西。
+
+## 2026-11-21 08:25（Asia/Taipei）｜聯合驗收清單（staged，非正式 E2E）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的 GPT「PR #17 契約已對齊，現況核對與剩餘驗收」：確認 CI 結果，然後只跟 Work 對齊 staged Admin JWT／JWKS 和 staged player nonce 簽章的聯合驗收。
+- 新增 `docs/JOINT_ACCEPTANCE.md`：Admin 14 項（A1–A14）、登入 13 項（B1–B13），寫明每項的預期結果、cube1 要提供什麼，以及 cube2 怎麼只在 Preview 接 staging。
+- 待決：callback 寫死是正式網址，Preview 收不到。兩條路二選一：staging 專用 callback（要改 cube2 程式），或在 production 短暫打開驗收、驗完就關（要 Owner 同意）。
+- 沒有動 `IDENTITY_LINK_ENABLED`、`BRICKDUEL_ADMIN_SUBJECTS`，也沒有新增刪除。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`（新）、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
