@@ -842,3 +842,24 @@
 - 檔案：`src/cloud.js`、`src/devstore.js`、`src/music.js`、`src/shop.js`、`src/style.css`、`server/files.js`、`server/app.js`、`server/db.js`、`legal/src/privacy.*.html`、`test/api.test.js`、`test/r2.js`。
 - 資料庫：新表 `zz.filekeys`、`zz.files` 加欄位 `enc`（都是只新增，不動既有資料）。｜刪除：無。
 - 測試：`node test/run.js` 全過（api 394：伺服器金鑰、vault 格式、不會意外覆蓋、`enc`）。瀏覽器 `r2` 30：bucket 裡看不到 WAV、設密碼、救援碼只顯示一次、密碼和救援碼不在伺服器、錯的密碼打不開、救援碼可以隨意大小寫和空格、重設後取回、換密碼要舊密碼。另外 `music`、`cloudui`、`pwa`、`flow`、`consent`、`authui`、`legal` 都通過。
+- 補記：上一條的 commit 為 [`7e38f9d`](https://github.com/luffysky/cube2/commit/7e38f9d)。
+
+## 2026-11-22 01:30（Asia/Taipei）｜救援碼：可以重新產生，也可以選擇留信箱代管
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「救援碼如果一開始沒記 給個機會用信箱方式取得吧 然後每個人的救援碼記各自db」；以及「信箱 SnowRealm Games註冊的時候填 到時候會綁一起 但如果沒綁的就只能問了 你給信箱輸入欄再說明用途然後看玩家自己要不要綁」。
+- **重新產生**：記得密碼時，可以隨時按「產生新的救援碼」，舊的那組就失效。一開始沒抄到救援碼的人，也有辦法補救。
+- **選填的信箱代管**：
+  - 救援碼畫面下方多一個信箱欄位，先說明用途：只用來寄回救援碼，不寄廣告、不給別人。也清楚寫出代價：留了信箱，轉磚技術上就拿得到救援碼；不留，就只有你自己能開。
+  - 送出前要先輸入寄到信箱的 6 位數驗證碼。驗證碼 15 分鐘失效，最多試 5 次，伺服器只存它的雜湊。
+  - 驗證通過後，救援碼才會存進新表 `zz.mailbox`。存的時候用 `ESCROW_KEY` 加密，這把金鑰放在伺服器設定，不在資料庫裡。
+  - 救援碼弄丟時，可以按「把救援碼寄到我的信箱」，只會寄到已驗證的那個信箱，而且要用同一份存檔的裝置才能按。
+  - 寄信次數限制：每份存檔每小時 3 封、每天 6 封。信箱在畫面上只顯示成 a***@example.com 這樣。
+  - 產生新的救援碼時，代管的那份會跟著換成新的。
+  - 13 歲以下不提供信箱代管。之後綁定 SnowRealm Games 帳號時，改用帳號的信箱。
+- **寄信服務**：用 Resend。要設 `RESEND_API_KEY`、`MAIL_FROM`、`ESCROW_KEY` 三個環境變數才會打開；沒設時一律回 503，畫面顯示「寄信服務準備中」，`/api/health` 的 `mail` 為 false。
+- 隱私權政策（四語）補上這一段：信箱是唯一的例外、用途、驗證方式、由轉磚代管、透過 Resend（美國）寄信、保存到你換信箱或刪除存檔為止。給玩家看的保護說明也同步更新。
+- 檔案：`server/mail.js`（新）、`server/app.js`、`server/core.js`、`server/db.js`、`src/cloud.js`、`src/devstore.js`、`legal/src/privacy.*.html`、`test/mail.test.js`（新）、`test/r2.js`、`test/run.js`、`test/api.test.js`。
+- 資料庫：新表 `zz.mailbox`（`CREATE TABLE IF NOT EXISTS`）。｜刪除：無（刪除雲端存檔時，跟著存檔一起移除）。
+- 測試：`node test/run.js` 全過（新增 mail 27 項）。瀏覽器 `r2` 37：說明先出現、驗證碼、寄回救援碼、新救援碼取代舊的、代管的也跟著換。另外 `cloudui`、`pwa`、`consent`、`music`、`authui`、`legal` 都通過。
+- 部署：正式站還沒設寄信的那三個環境變數，所以信箱代管目前顯示「寄信服務準備中」。

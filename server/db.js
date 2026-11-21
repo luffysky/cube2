@@ -237,6 +237,21 @@ const SCHEMA = [
      at double precision NOT NULL
    )`,
   "ALTER TABLE zz.files ADD COLUMN IF NOT EXISTS enc text NOT NULL DEFAULT ''",
+  // an email address a member chose to give, so the recovery code of "my own password" can be mailed back to them
+  // (server/mail.js). rcode is locked with ESCROW_KEY (a server setting, not here). pend_*: an address waiting to be
+  // proven with the six-digit code (pin holds its hash).
+  `CREATE TABLE IF NOT EXISTS zz.mailbox (
+     pid uuid PRIMARY KEY REFERENCES zz.players(id) ON DELETE CASCADE,
+     email text NOT NULL,
+     rcode text NOT NULL,
+     verified boolean NOT NULL,
+     pend_email text,
+     pend_rcode text,
+     pin text,
+     pin_exp double precision NOT NULL DEFAULT 0,
+     tries smallint NOT NULL DEFAULT 0,
+     at double precision NOT NULL
+   )`,
   // "connect to SnowRealm Games" sessions (server/bff.js): id is the hash of the cookie's session id; box and res are
   // encrypted with a key derived from that id (so this table alone cannot read them) and cleared once used
   `CREATE TABLE IF NOT EXISTS zz.authsess (

@@ -49,6 +49,8 @@
 - [x] 同意畫面與隱私權政策改成「會用一個必要 cookie」並說明用途
 - [ ] （可選）Vercel 加 `CRON_SECRET` 環境變數，讓每日清理只接受 Vercel 自己的呼叫
 
+- [ ] Owner：開 Resend 帳號（免費方案）、驗證 snowrealm.pet 寄件網域、在 Vercel Production 設 `RESEND_API_KEY`、`MAIL_FROM`、`ESCROW_KEY` → 打開救援碼信箱代管
+
 ## 等 GPT
 
 - [x] 唯讀後台 API 七支（C-035，未設定前 503）

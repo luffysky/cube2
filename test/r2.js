@@ -18,7 +18,11 @@ function wav() {
   return b;
 }
 (async () => {
-  const env = Object.assign({}, process.env, { R2_ACCOUNT_ID: 'acct123', R2_ACCESS_KEY_ID: 'AKIDTEST', R2_SECRET_ACCESS_KEY: 'SECRETTEST', R2_BUCKET: 'zzb' });
+  const OUTBOX = path.join(require('os').tmpdir(), 'zz-r2-outbox-' + process.pid + '.jsonl');
+  try { require('fs').unlinkSync(OUTBOX); } catch (e) { /* none yet */ }
+  const env = Object.assign({}, process.env, { R2_ACCOUNT_ID: 'acct123', R2_ACCESS_KEY_ID: 'AKIDTEST', R2_SECRET_ACCESS_KEY: 'SECRETTEST', R2_BUCKET: 'zzb',
+    RESEND_API_KEY: 're_test', MAIL_FROM: 'test <t@example.com>', ESCROW_KEY: 'e'.repeat(40), MAIL_TEST_OUTBOX: OUTBOX });
+  const mails = () => { try { return require('fs').readFileSync(OUTBOX, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (e) { return []; } };
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'dev-server.js'), String(PORT)], { stdio: ['ignore', 'pipe', 'inherit'], env });
   await new Promise(r => srv.stdout.once('data', r));
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
@@ -85,7 +89,15 @@ function wav() {
     let code = null;
     for (let i = 0; i < 100 && !code; i++) { code = await p.evaluate(() => { const e = document.querySelector('.roomcode.xfer'); return e && /^[A-Z0-9]{4}(-[A-Z0-9]{4}){4}$/.test(e.textContent) ? e.textContent : null; }); await sleep(100); }
     ok(!!code, 'a recovery code is shown once', code);
-    await p.click('[data-vt="codeOk"]'); await sleep(300);
+    // optional: keep it with an email address (explained first, proven with a mailed code)
+    ok(await p.evaluate(() => /技術上轉磚也拿得到/.test(document.getElementById('sheetCard').textContent) && !!document.getElementById('vtMail')), 'the email option says what it means before anything is given');
+    await p.fill('#vtMail', 'player@example.com'); await p.click('[data-vt="mailGo"]');
+    for (let i = 0; i < 40 && !(await p.evaluate(() => !!document.getElementById('vtPin'))); i++) await sleep(100);
+    const pin = (/(\d{6})/.exec((mails().pop() || {}).text || '') || [])[1];
+    ok(!!pin && await p.evaluate(() => /p\*\*\*@example\.com/.test(document.getElementById('sheetCard').textContent)), 'a six-digit code went to the address (shown hidden)', pin);
+    await p.fill('#vtPin', pin); await p.click('[data-vt="pinOk"]');
+    for (let i = 0; i < 40 && !(await p.evaluate(() => /保管/.test(document.getElementById('mtoast').textContent))); i++) await sleep(100);
+    ok(await p.evaluate(() => /保管/.test(document.getElementById('mtoast').textContent)), 'the address is kept');
     ok(await p.evaluate(() => document.querySelector('[data-dslock="p"]').getAttribute('aria-checked') === 'true'), 'back in the player, "my own password" is on');
     const nBefore = Object.keys(bucket).length;
     await p.setInputFiles('#muFile', [{ name: '密碼的歌.wav', mimeType: 'audio/wav', buffer: wav() }]);
@@ -106,9 +118,16 @@ function wav() {
     await p.fill('#vtPw', 'not-the-password'); await p.click('[data-vt="ok"]');
     await sleep(2500);
     ok(await p.evaluate(() => !(JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).some(o => /密碼/.test(o.name))), 'a wrong password opens nothing');
-    // forgot it: the recovery code sets a new one
+    // forgot it, and lost the code too: it can be mailed to the kept address
     await p.evaluate(() => ZZ.App.openSheet('music')); await sleep(200);
-    await p.click('[data-dsvault="recover"]'); await sleep(200);
+    await p.click('[data-dsvault="recover"]');
+    for (let i = 0; i < 40 && !(await p.evaluate(() => !!document.querySelector('#sheetCard [data-dsvault="remind"]'))); i++) await sleep(100);
+    const n0 = mails().length;
+    await p.click('#sheetCard [data-dsvault="remind"]');
+    for (let i = 0; i < 40 && mails().length === n0; i++) await sleep(100);
+    const mailed = mails().pop();
+    ok(mailed && mailed.to === 'player@example.com' && mailed.text.indexOf(code) >= 0, 'the recovery code is mailed to the kept address', mailed && mailed.text.slice(0, 80));
+    // the recovery code sets a new one
     await p.fill('#vtCode', code.toLowerCase().replace(/-/g, ' ')); await p.fill('#vtPw', 'brick-pass-2'); await p.fill('#vtPw2', 'brick-pass-2'); await p.click('[data-vt="ok"]');
     for (let i = 0; i < 100 && !(await p.evaluate(() => /新密碼生效/.test((document.getElementById('mtoast') || {}).textContent || ''))); i++) await sleep(100);
     ok(await p.evaluate(() => /新密碼生效/.test(document.getElementById('mtoast').textContent)), 'the recovery code (typed loosely) resets the password', await p.evaluate(() => [document.getElementById('sheetCard').getAttribute('data-name'), document.getElementById('sheetCard').textContent.slice(0, 200), document.getElementById('mtoast').textContent]));
@@ -119,6 +138,14 @@ function wav() {
     await p.fill('#vtPw', 'brick-pass-2'); await p.click('[data-vt="ok"]');
     ok(await (async () => { for (let i = 0; i < 100; i++) { if (await p.evaluate(() => (JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).some(o => /密碼/.test(o.name)))) return true; await sleep(150); } return false; })(), 'with the new password the song comes back, and the server-locked ones too');
     ok(await p.evaluate(() => (JSON.parse(localStorage.getItem('zhuanzhuan.music.v1') || '{}').own || []).length >= 3), 'all of them');
+    // a new recovery code (while the password is known): the old one stops working, the kept copy follows
+    const code2 = await p.evaluate(() => ZZ.Cloud.newRecovery());
+    ok(/^[A-Z0-9]{4}(-[A-Z0-9]{4}){4}$/.test(code2 || '') && code2 !== code, 'a new recovery code can be made', code2);
+    ok(await p.evaluate(c => ZZ.Cloud.recoverVault(c, 'x-pass-old'), code) === false && await p.evaluate(c => ZZ.Cloud.recoverVault(c, 'brick-pass-2'), code2) === true, 'the old code no longer works, the new one does');
+    const n1 = mails().length;
+    await p.evaluate(() => ZZ.Cloud.mailAsk({ a: 'mailRemind' }));
+    for (let i = 0; i < 40 && mails().length === n1; i++) await sleep(100);
+    ok((mails().pop() || {}).text.indexOf(code2) >= 0, 'and the mailed one is the new code');
     ok(await p.evaluate(() => ZZ.Cloud.changePass('wrong-old-pass', 'brick-pass-3')) === false && await p.evaluate(() => ZZ.Cloud.changePass('brick-pass-2', 'brick-pass-3')) === true, 'changing the password needs the current one');
     await p.click('[data-dslock="s"]').catch(() => {}); await sleep(200);
     // a picture too

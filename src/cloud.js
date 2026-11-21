@@ -300,7 +300,7 @@
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
         if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true;      // files: members may upload their own pictures and music (R2)
+        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true; Cloud.mail = b.mail === true;      // files: members may upload their own pictures and music (R2)
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
@@ -407,7 +407,7 @@
   //             without the password or the code. Forgetting both cannot be helped.
   // The stored object: 'ZZE1' | mode | wrap iv(12) | locked file key(48) | iv(12) | locked bytes. Files uploaded
   // before this, without the 'ZZE1' mark, are read as they are.
-  var MAGIC = [90, 90, 69, 49], ROUNDS = 600000, keys = { s: null, p: null };
+  var MAGIC = [90, 90, 69, 49], ROUNDS = 600000, keys = { s: null, p: null, raw: null };
   function wc() { var c = root.crypto || (typeof require === 'function' ? require('crypto').webcrypto : null); return c && c.subtle ? c : null; }
   function bytesOf(data) {
     if (data instanceof ArrayBuffer) return Promise.resolve(new Uint8Array(data));
@@ -450,32 +450,49 @@
       var ask = Cloud.askPass || function () { return Promise.resolve(null); };
       return Promise.resolve(ask('unlock')).then(function (pw) {
         if (!pw) throw new Error('no password');
-        return unseal(pw, b.vault.p, b.vault.rounds).then(function (raw) { return aes(raw); }, function (e) { if (Cloud.onWrongPass) Cloud.onWrongPass(); throw e; });
+        return unseal(pw, b.vault.p, b.vault.rounds).then(function (raw) { keys.raw = new Uint8Array(raw); return aes(raw); }, function (e) { if (Cloud.onWrongPass) Cloud.onWrongPass(); throw e; });
       });
     }).then(function (k) { keys.p = k; return k; });
   }
-  Cloud.forgetPass = function () { keys.p = null; };
+  Cloud.forgetPass = function () { keys.p = null; keys.raw = null; };
   Cloud.vaultThere = function () { return keyInfo().then(function (b) { return !!b.vault; }, function () { return null; }); };
   // sets a password: makes the player's own key and a recovery code; gives the code (to be shown once), or null
   Cloud.makeVault = function (pw) {
     var raw = wc().getRandomValues(new Uint8Array(32)), code = newCode();
     return Promise.all([seal(pw, raw), seal(cleanCode(code), raw)]).then(function (r) { return putVault({ rounds: ROUNDS, p: r[0], r: r[1] }, false); })
-      .then(function () { return aes(raw); }).then(function (k) { keys.p = k; return code; }, function () { return null; });
+      .then(function () { return aes(raw); }).then(function (k) { keys.p = k; keys.raw = raw; return code; }, function () { return null; });
   };
   // forgot the password: the recovery code opens the key, and a new password locks it again (the code stays the same)
   Cloud.recoverVault = function (code, pw) {
     return keyInfo().then(function (b) {
       if (!b.vault) throw new Error('no vault');
       return unseal(cleanCode(code), b.vault.r, b.vault.rounds).then(function (raw) {
+        keys.raw = new Uint8Array(raw);
         return seal(pw, raw).then(function (p) { return putVault({ rounds: ROUNDS, p: p, r: b.vault.r }, true); }).then(function () { return aes(raw); });
       });
     }).then(function (k) { keys.p = k; return true; }, function () { return false; });
+  };
+  // a new recovery code (the old one stops working), with the password already given or asked now. Gives the code,
+  // to be shown once, or null. A copy kept with the player's email (if they chose that) follows it.
+  Cloud.newRecovery = function () {
+    return ownKey().then(function () {
+      return keyInfo().then(function (b) {
+        var code = newCode();
+        return seal(cleanCode(code), keys.raw).then(function (r) { return putVault({ rounds: ROUNDS, p: b.vault.p, r: r }, true); })
+          .then(function () { return Cloud.mailAsk({ a: 'mailSwap', code: code }); }).then(function () { return code; });
+      });
+    }).then(null, function () { return null; });
+  };
+  // the email side (server/mail.js): each gives the server's answer body
+  Cloud.mailAsk = function (body) {
+    return Cloud.ensure().then(function (ok) { return ok ? call('POST', 'rpc', body, true).then(answer, offline) : offline(); });
   };
   // a new password, knowing the old one
   Cloud.changePass = function (oldPw, pw) {
     return keyInfo().then(function (b) {
       if (!b.vault) throw new Error('no vault');
       return unseal(oldPw, b.vault.p, b.vault.rounds).then(function (raw) {
+        keys.raw = new Uint8Array(raw);
         return seal(pw, raw).then(function (p) { return putVault({ rounds: ROUNDS, p: p, r: b.vault.r }, true); }).then(function () { return aes(raw); });
       });
     }).then(function (k) { keys.p = k; return true; }, function () { return false; });

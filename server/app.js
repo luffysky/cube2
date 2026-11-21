@@ -21,6 +21,7 @@ const files = require('./files.js');
 const admin = require('./admin.js');
 const bff = require('./bff.js');
 const retention = require('./retention.js');
+const mail = require('./mail.js');
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
@@ -75,7 +76,7 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), link: bff.enabled(), region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), region: process.env.VERCEL_REGION || '', now: clock() };
     if (url.searchParams.get('deep') && out.db) {
       // a look at the database itself: is it reachable, how long does one round trip take
       const t0 = Date.now();
@@ -231,6 +232,18 @@ const routes = {
           return body.a === 'fileUp' ? files.up(d, row, body, now) : body.a === 'fileOk' ? files.done(d, row, body, now) : body.a === 'fileList' ? files.list(d, row, body, now)
             : body.a === 'fileBack' ? files.back(d, row, body, now) : body.a === 'fileKey' ? files.key(d, row, now)
             : body.a === 'fileVault' ? files.vault(d, row, body, now) : files.hide(d, row, body, now);
+        });
+        break;
+      }
+      // keeping the recovery code with the player's own email address (server/mail.js; opt-in)
+      case 'mailStatus': case 'mailStart': case 'mailVerify': case 'mailRemind': case 'mailSwap': {
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(async d => {
+          const row = await core.findPlayer(d, cred);
+          if (!row || row.pending) return { status: 401, body: { ok: false, why: 'auth' } };
+          const a = body.a;
+          return a === 'mailStatus' ? mail.status(d, row) : a === 'mailStart' ? mail.start(d, row, body, now) : a === 'mailVerify' ? mail.verify(d, row, body, now)
+            : a === 'mailRemind' ? mail.remind(d, row, now) : mail.swap(d, row, body, now);
         });
         break;
       }

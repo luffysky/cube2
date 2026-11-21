@@ -27,15 +27,38 @@
     'ds.lockS': ['金鑰由轉磚保管', 'Key kept by 轉磚', '鍵は轉磚が保管', '키는 轉磚가 보관'],
     'ds.lockP': ['用我自己的密碼', 'My own password', '自分のパスワード', '내 비밀번호'],
     'ds.lockSP': ['檔案在你的瀏覽器裡先加密才上傳。金鑰放在轉磚的伺服器，不和檔案放一起：雲端空間的檔案就算外流也打不開；換裝置照常取回。', 'Files are locked in your browser before they are uploaded. The key is kept on 轉磚\'s server, apart from the files: even if the cloud copies leaked they could not be opened, and another device gets them back as usual.', 'ファイルはブラウザで暗号化してからアップロードします。鍵は轉磚のサーバーにファイルとは別に保管します。クラウドの分が流出しても開けず、別の端末ではいつもどおり取り戻せます。', '파일은 브라우저에서 먼저 암호화한 뒤 올라가요. 키는 파일과 따로 轉磚 서버에 보관해요. 클라우드 사본이 유출돼도 열 수 없고, 다른 기기에서는 평소처럼 되찾을 수 있어요.'],
-    'ds.lockPP': ['用只有你知道的密碼加密，連轉磚也打不開。換裝置取回時要輸入密碼。忘記密碼可以用設定時給你的救援碼重設；密碼和救援碼都不見的話，雲端的檔案就再也打不開。', 'Locked with a password only you know; not even 轉磚 can open them. You enter it to get them back on another device. If you forget it, the recovery code you were given resets it; with both lost, the cloud copies can never be opened.', 'あなただけが知るパスワードで暗号化し、轉磚でも開けません。別の端末で取り戻すときに入力します。忘れたら設定時の回復コードで再設定できます。両方なくすと、クラウドの分は二度と開けません。', '나만 아는 비밀번호로 암호화해서 轉磚도 열 수 없어요. 다른 기기에서 되찾을 때 입력해요. 잊으면 설정할 때 받은 복구 코드로 다시 정할 수 있고, 둘 다 잃으면 클라우드 파일은 다시는 열 수 없어요.'],
+    'ds.lockPP': ['用只有你知道的密碼加密，連轉磚也打不開。換裝置取回時要輸入密碼。忘記密碼可以用設定時給你的救援碼重設；記得密碼時也能隨時產生新的救援碼。救援碼可以選擇留信箱讓我們代為保管（會在畫面上先說明）。密碼和救援碼都不見的話，雲端的檔案就再也打不開。', 'Locked with a password only you know; not even 轉磚 can open them. You enter it to get them back on another device. If you forget it, the recovery code you were given resets it, and while you know the password you can make a new code at any time. You may choose to leave an email address so we keep the code for you (explained on screen first). With both lost, the cloud copies can never be opened.', 'あなただけが知るパスワードで暗号化し、轉磚でも開けません。別の端末で取り戻すときに入力します。忘れたら設定時の回復コードで再設定でき、パスワードがわかるうちはいつでも新しいコードを作れます。メールアドレスを登録してコードを預けることもできます（先に画面で説明します）。両方なくすと、クラウドの分は二度と開けません。', '나만 아는 비밀번호로 암호화해서 轉磚도 열 수 없어요. 다른 기기에서 되찾을 때 입력해요. 잊으면 설정할 때 받은 복구 코드로 다시 정할 수 있고, 비밀번호를 아는 동안은 언제든 새 코드를 만들 수 있어요. 이메일을 남겨 코드를 맡길 수도 있어요(먼저 화면에서 설명해요). 둘 다 잃으면 클라우드 파일은 다시는 열 수 없어요.'],
     'ds.lockPOld': ['已經上傳的檔案維持原本的加密方式；之後新上傳的才用新的方式。', 'Files already uploaded keep the way they were locked; new uploads use the new way.', 'すでにアップロードしたファイルは元の方式のままで、新しいものから新しい方式になります。', '이미 올린 파일은 원래 방식 그대로이고, 새로 올리는 것부터 새 방식을 써요.'],
+    'vt.newCode': ['產生新的救援碼', 'Make a new recovery code', '新しい回復コードを作る', '새 복구 코드 만들기'],
+    'vt.newCodeP': ['舊的救援碼會失效，換成新的這組。', 'The old recovery code stops working; this new one replaces it.', '古い回復コードは使えなくなり、新しいものに置き換わります。', '이전 복구 코드는 더 이상 쓸 수 없고 새 코드로 바뀌어요.'],
+    'vt.mailTitle': ['用信箱保管救援碼（選填）', 'Keep the recovery code with your email (optional)', 'メールで回復コードを保管（任意）', '이메일로 복구 코드 보관 (선택)'],
+    'vt.mailP': ['如果怕救援碼弄丟，可以留一個信箱。用途只有一個：你之後按「把救援碼寄到我的信箱」時，把這組救援碼寄給你。不會寄廣告，也不會給別人。要先收驗證碼確認是你的信箱。', 'If you might lose the code, you can leave an email address. It has one use: when you later press "Mail me my recovery code", the code is sent there. No ads, never shared. You confirm it is yours with a code we mail first.', '回復コードをなくしそうなら、メールアドレスを登録できます。用途は一つだけで、あとで「回復コードをメールで送る」を押したときにこのコードを送ります。広告は送らず、第三者にも渡しません。まず確認コードで本人のアドレスか確かめます。', '복구 코드를 잃어버릴까 걱정되면 이메일을 남길 수 있어요. 용도는 하나뿐이에요: 나중에 "복구 코드를 메일로 받기"를 누르면 이 코드를 보내요. 광고를 보내지 않고 남에게 주지 않아요. 먼저 확인 코드로 내 이메일인지 확인해요.'],
+    'vt.mailWarn': ['留了信箱的話，轉磚會加密保管一份救援碼，所以技術上轉磚也拿得到它；不留信箱就只有你自己能打開。', 'With an address, 轉磚 keeps a locked copy of the recovery code, so 轉磚 could technically get it; without one, only you can open your files.', 'アドレスを登録すると、轉磚が回復コードの暗号化コピーを保管するため、技術的には轉磚も取得できます。登録しなければ開けるのはあなただけです。', '이메일을 남기면 轉磚가 복구 코드의 암호화 사본을 보관해서, 기술적으로는 轉磚도 그 코드를 얻을 수 있어요. 남기지 않으면 나만 열 수 있어요.'],
+    'vt.mailLater': ['之後綁定 SnowRealm Games 帳號時，會改用帳號的信箱。', 'Once you link a SnowRealm Games account, its address can take this place.', 'SnowRealm Games アカウントと連携すると、そのアドレスに切り替わります。', 'SnowRealm Games 계정을 연결하면 그 계정의 이메일로 바뀌어요.'],
+    'vt.mailNotReady': ['寄信服務準備中，這個選項暫時不能用。', 'The mail service is not ready yet, so this option is not available for now.', 'メール送信の準備中のため、今は使えません。', '메일 서비스를 준비 중이라 지금은 쓸 수 없어요.'],
+    'vt.mailKids': ['13 歲以下不提供信箱保管。', 'Not offered to players under 13.', '13歳未満の方には提供していません。', '13세 미만에게는 제공하지 않아요.'],
+    'vt.email': ['信箱', 'Email', 'メールアドレス', '이메일'],
+    'vt.sendPin': ['寄驗證碼', 'Send code', '確認コードを送る', '확인 코드 보내기'],
+    'vt.skip': ['不用了', 'No thanks', '使わない', '괜찮아요'],
+    'vt.pinTitle': ['輸入驗證碼', 'Enter the code', '確認コードを入力', '확인 코드 입력'],
+    'vt.pinP': ['驗證碼已寄到 {0}，15 分鐘內有效。', 'A code was sent to {0}; it lasts 15 minutes.', '{0} に確認コードを送りました。15分間有効です。', '{0}(으)로 확인 코드를 보냈어요. 15분 동안 유효해요.'],
+    'vt.pin': ['6 位數驗證碼', '6-digit code', '6桁の確認コード', '6자리 확인 코드'],
+    'vt.resend': ['重寄', 'Send again', '再送', '다시 보내기'],
+    'vt.mailKept': ['好了，救援碼已用 {0} 保管。', 'Done. The recovery code is kept with {0}.', '完了。回復コードを {0} で保管しました。', '완료. 복구 코드를 {0}(으)로 보관했어요.'],
+    'vt.badEmail': ['信箱格式不對。', 'That email address does not look right.', 'メールアドレスの形式が正しくありません。', '이메일 형식이 맞지 않아요.'],
+    'vt.badPin': ['驗證碼不對。', 'That code is not right.', '確認コードが違います。', '확인 코드가 틀려요.'],
+    'vt.pinGone': ['驗證碼過期或試太多次了，請重寄一封。', 'The code has run out or was tried too often; send a new one.', 'コードの期限切れか試行回数超過です。もう一度送ってください。', '코드가 만료됐거나 너무 많이 시도했어요. 다시 보내세요.'],
+    'vt.slowMail': ['寄太多次了，等一小時再試。', 'Too many mails; try again in an hour.', '送信回数が多すぎます。1時間後にお試しください。', '너무 많이 보냈어요. 한 시간 뒤에 다시 해 보세요.'],
+    'vt.remind': ['把救援碼寄到我的信箱', 'Mail me my recovery code', '回復コードをメールで送る', '복구 코드를 메일로 받기'],
+    'vt.reminded': ['救援碼已寄到 {0}。', 'The recovery code was sent to {0}.', '回復コードを {0} に送りました。', '복구 코드를 {0}(으)로 보냈어요.'],
+    'vt.mailFail': ['信沒有寄出去，稍後再試。', 'The mail did not go out; try again later.', 'メールを送れませんでした。後でお試しください。', '메일을 보내지 못했어요. 나중에 다시 해 보세요.'],
     'vt.ok': ['確定', 'OK', 'OK', '확인'],
     'ds.how': ['我們怎麼保護你的檔案', 'How we protect your files', 'ファイルの守り方', '파일을 지키는 방법'],
     'ds.how1': ['先加密再上傳：檔案在你自己的瀏覽器裡用 AES-256-GCM（銀行和通訊軟體常用的加密標準）加密，離開你的裝置時已經是一堆看不懂的資料。', 'Locked before it leaves: each file is encrypted in your own browser with AES-256-GCM (the standard banks and messaging apps use), so what leaves your device is already unreadable.', '送る前に暗号化：ファイルはあなたのブラウザで AES-256-GCM（銀行やメッセージアプリでも使われる標準）で暗号化され、端末を出るときにはもう読めないデータです。', '보내기 전에 암호화: 파일은 내 브라우저에서 AES-256-GCM(은행과 메신저가 쓰는 표준)으로 암호화돼서, 기기를 떠날 때 이미 읽을 수 없는 데이터예요.'],
     'ds.how2': ['一個檔案一把鑰匙：每個檔案都有自己的隨機金鑰，就算有一把出事，其他檔案也不受影響。', 'One key per file: every file has its own random key, so one problem never opens the rest.', '1ファイルに1つの鍵：ファイルごとに別のランダムな鍵を使うので、1つに問題があってもほかは開けません。', '파일마다 다른 키: 파일마다 무작위 키를 따로 써서, 하나에 문제가 생겨도 나머지는 열리지 않아요.'],
     'ds.how3': ['鑰匙和檔案分開放：檔案存在 Cloudflare R2，鑰匙存在轉磚自己的資料庫。只拿到其中一邊什麼都打不開。傳輸全程走 HTTPS，R2 本身也會再加密一層。', 'Keys and files apart: files are in Cloudflare R2, keys in 轉磚\'s own database; one without the other opens nothing. Everything travels over HTTPS, and R2 adds its own encryption at rest.', '鍵とファイルは別々に：ファイルは Cloudflare R2、鍵は轉磚のデータベースにあり、片方だけでは開けません。通信はすべて HTTPS で、R2 自体も保存時に暗号化します。', '키와 파일은 따로: 파일은 Cloudflare R2에, 키는 轉磚 데이터베이스에 있어서 한쪽만으로는 열 수 없어요. 전송은 모두 HTTPS이고 R2도 저장할 때 한 번 더 암호화해요.'],
     'ds.how4': ['只有你：只有登入你這份存檔的裝置拿得到下載網址，網址一小時就失效。我們不看、不分析、不分享你的檔案。', 'Only you: only devices on your save can get a download address, and it expires within an hour. We do not look at, analyse or share your files.', 'あなただけ：ダウンロード用のアドレスはあなたのセーブの端末だけが受け取れ、1時間で無効になります。ファイルを見たり分析したり共有したりしません。', '나만: 다운로드 주소는 내 저장 데이터의 기기만 받을 수 있고 1시간이면 만료돼요. 파일을 보거나 분석하거나 공유하지 않아요.'],
-    'ds.how5': ['想更保險：選「用我自己的密碼」，鑰匙改由你的密碼鎖住（PBKDF2 運算 60 萬次，很難猜），密碼不會傳到我們這裡，連轉磚也打不開。忘記密碼用救援碼重設。', 'Even safer: choose "My own password" and the key is locked with your password (PBKDF2, 600,000 rounds, very hard to guess). The password never reaches us, so not even 轉磚 can open the files. If you forget it, use the recovery code.', 'さらに安全に：「自分のパスワード」を選ぶと、鍵はあなたのパスワード（PBKDF2 60万回、推測は困難）で守られます。パスワードはこちらに届かないので、轉磚でも開けません。忘れたら回復コードで再設定。', '더 안전하게: "내 비밀번호"를 고르면 키가 내 비밀번호(PBKDF2 60만 번, 추측이 매우 어려움)로 잠겨요. 비밀번호는 저희에게 오지 않아서 轉磚도 열 수 없어요. 잊으면 복구 코드로 다시 정해요.'],
+    'ds.how5': ['想更保險：選「用我自己的密碼」，鑰匙改由你的密碼鎖住（PBKDF2 運算 60 萬次，很難猜），密碼不會傳到我們這裡，連轉磚也打不開。忘記密碼用救援碼重設。救援碼可以選擇留信箱讓轉磚加密代管，代管的話轉磚技術上也拿得到；不留就只有你自己能開。', 'Even safer: choose "My own password" and the key is locked with your password (PBKDF2, 600,000 rounds, very hard to guess). The password never reaches us, so not even 轉磚 can open the files. If you forget it, use the recovery code. You may let 轉磚 keep a locked copy of the code with your email; then 轉磚 could technically get it, and without that only you can open them.', 'さらに安全に：「自分のパスワード」を選ぶと、鍵はあなたのパスワード（PBKDF2 60万回、推測は困難）で守られます。パスワードはこちらに届かないので、轉磚でも開けません。忘れたら回復コードで再設定。回復コードはメールアドレスを登録して轉磚に暗号化保管させることもでき、その場合は技術的に轉磚も取得できます。登録しなければ開けるのはあなただけです。', '더 안전하게: "내 비밀번호"를 고르면 키가 내 비밀번호(PBKDF2 60만 번, 추측이 매우 어려움)로 잠겨요. 비밀번호는 저희에게 오지 않아서 轉磚도 열 수 없어요. 잊으면 복구 코드로 다시 정해요. 복구 코드는 이메일을 남겨 轉磚에 암호화 보관을 맡길 수 있고, 그러면 기술적으로 轉磚도 얻을 수 있어요. 남기지 않으면 나만 열 수 있어요.'],
     'ds.pwChange': ['換密碼', 'Change password', 'パスワードを変更', '비밀번호 변경'],
     'vt.setTitle': ['設定加密密碼', 'Set a password', 'パスワードを設定', '비밀번호 설정'],
     'vt.setP': ['至少 8 個字。這個密碼不會傳到伺服器，我們也查不到、救不回。', 'At least 8 characters. It never goes to the server; we cannot look it up or get it back.', '8文字以上。サーバーには送られず、こちらでも調べたり戻したりできません。', '8자 이상. 서버로 보내지 않아서 저희도 찾거나 되돌릴 수 없어요.'],
@@ -98,7 +121,11 @@
         return '<button type="button" role="radio" aria-checked="' + (st.lock === m) + '" data-dslock="' + m + '">' + t(m === 's' ? 'ds.lockS' : 'ds.lockP') + '</button>';
       }).join('') + '</div><p class="note">' + t(st.lock === 'p' ? 'ds.lockPP' : 'ds.lockSP') + ' ' + t('ds.lockPOld') + '</p>';
       h += '<details class="ds-how"><summary>' + t('ds.how') + '</summary><ul>' + ['ds.how1', 'ds.how2', 'ds.how3', 'ds.how4', 'ds.how5'].map(function (k) { return '<li>' + t(k) + '</li>'; }).join('') + '</ul></details>';
-      if (st.lock === 'p') h += '<div class="row"><button class="btn sm plain" type="button" data-dsvault="change">' + t('ds.pwChange') + '</button><button class="btn sm plain" type="button" data-dsvault="recover">' + t('vt.forgot') + '</button></div>';
+      if (st.lock === 'p') {
+        if (mailInfo === null) loadMail();
+        h += '<div class="row"><button class="btn sm plain" type="button" data-dsvault="change">' + t('ds.pwChange') + '</button><button class="btn sm plain" type="button" data-dsvault="recover">' + t('vt.forgot') + '</button><button class="btn sm plain" type="button" data-dsvault="newcode">' + t('vt.newCode') + '</button>' +
+          (mailInfo && mailInfo.kept ? '<button class="btn sm plain" type="button" data-dsvault="remind">' + t('vt.remind') + ' (' + App.esc(mailInfo.to) + ')</button>' : '') + '</div>';
+      }
       var tr = trash[kind];
       if (!tr) h += '<div class="row"><button class="btn sm plain" type="button" data-dstrash="' + kind + '">' + t('ds.trash') + '</button></div>';
       else {
@@ -112,14 +139,29 @@
     return h;
   }
   // ---------- the password for "my own password" (never stored, never sent) ----------
-  var vt = { mode: '', back: '', msg: '', busy: false, code: '', wait: null };
+  var vt = { mode: '', back: '', msg: '', busy: false, code: '', wait: null, email: '', to: '' };
   function vaultOpen(mode, msg) { if (App.sheet() && App.sheet() !== 'dsVault') vt.back = App.sheet(); vt.mode = mode; vt.msg = msg || ''; vt.busy = false; App.openSheet('dsVault'); }
   function vaultClose() { var b = vt.back; vt.mode = ''; vt.code = ''; if (b) App.openSheet(b); else App.closeSheet(); }
   function field(id, label, auto) { return '<label class="vt-field"><span>' + t(label) + '</span><input id="' + id + '" type="' + (id === 'vtCode' ? 'text' : 'password') + '" autocomplete="' + auto + '" spellcheck="false" maxlength="200"></label>'; }
   App.dismiss = App.dismiss || {}; App.opened = App.opened || {};
   App.sheets.dsVault = function () {
     var m = vt.mode, h = '';
-    if (m === 'code') return '<h2>' + t('vt.codeTitle') + '</h2><p>' + t('vt.codeP') + '</p><div class="roomcode xfer" aria-label="' + App.esc(vt.code) + '">' + App.esc(vt.code) + '</div><div class="row"><button class="btn main" type="button" data-vt="codeOk">' + t('vt.codeOk') + '</button></div>';
+    if (m === 'code') {
+      h = '<h2>' + t('vt.codeTitle') + '</h2><p>' + t('vt.codeP') + '</p><div class="roomcode xfer" aria-label="' + App.esc(vt.code) + '">' + App.esc(vt.code) + '</div>';
+      h += '<h3>' + t('vt.mailTitle') + '</h3>';
+      if (ZZ.Consent && ZZ.Consent.child && ZZ.Consent.child()) h += '<p class="note">' + t('vt.mailKids') + '</p>';
+      else if (!ZZ.Cloud.mail) h += '<p class="note">' + t('vt.mailNotReady') + '</p>';
+      else h += '<p class="note">' + t('vt.mailP') + '</p><p class="warn">' + t('vt.mailWarn') + '</p><p class="note">' + t('vt.mailLater') + '</p>' +
+        '<label class="vt-field"><span>' + t('vt.email') + '</span><input id="vtMail" type="email" inputmode="email" autocomplete="email" maxlength="254" value="' + App.esc(vt.email || '') + '"></label>' +
+        '<div class="row"><button class="btn" type="button" data-vt="mailGo"' + (vt.busy ? ' disabled' : '') + '>' + t('vt.sendPin') + '</button></div>';
+      if (vt.msg) h += '<p class="warn" role="status">' + App.esc(vt.msg) + '</p>';
+      return h + '<div class="row"><button class="btn main" type="button" data-vt="codeOk">' + t('vt.codeOk') + '</button></div>';
+    }
+    if (m === 'pin') {
+      h = '<h2>' + t('vt.pinTitle') + '</h2><p class="note">' + App.esc(t('vt.pinP', vt.to || '')) + '</p><label class="vt-field"><span>' + t('vt.pin') + '</span><input id="vtPin" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>';
+      if (vt.msg) h += '<p class="warn" role="status">' + App.esc(vt.msg) + '</p>';
+      return h + '<div class="row"><button class="btn" type="button" data-vt="mailGo">' + t('vt.resend') + '</button><button class="btn" type="button" data-vt="codeOk">' + t('vt.skip') + '</button><button class="btn main" type="button" data-vt="pinOk"' + (vt.busy ? ' disabled' : '') + '>' + t('vt.ok') + '</button></div>';
+    }
     if (m === 'set') h = '<h2>' + t('vt.setTitle') + '</h2><p class="note">' + t('vt.setP') + '</p>' + field('vtPw', 'vt.pw', 'new-password') + field('vtPw2', 'vt.pw2', 'new-password');
     else if (m === 'ask') h = '<h2>' + t('vt.askTitle') + '</h2><p class="note">' + t('vt.askP') + '</p>' + field('vtPw', 'vt.pw', 'current-password');
     else if (m === 'change') h = '<h2>' + t('ds.pwChange') + '</h2>' + field('vtOld', 'vt.old', 'current-password') + field('vtPw', 'vt.new', 'new-password') + field('vtPw2', 'vt.pw2', 'new-password');
@@ -128,6 +170,8 @@
     if (vt.busy) h += '<p class="note" role="status">' + t('vt.busy') + '</p>';
     h += '<div class="row"><button class="btn" type="button" data-vt="cancel">' + t('cancel') + '</button><button class="btn main" type="button" data-vt="ok"' + (vt.busy ? ' disabled' : '') + '>' + t('vt.ok') + '</button></div>';
     if (m === 'ask') h += '<div class="row"><button class="btn sm plain" type="button" data-vt="forgot">' + t('vt.forgot') + '</button></div>';
+    if (m === 'recover' && mailInfo && mailInfo.kept) h += '<div class="row"><button class="btn sm plain" type="button" data-dsvault="remind">' + t('vt.remind') + ' (' + App.esc(mailInfo.to) + ')</button></div>';
+    if (m === 'recover' && mailInfo === null) loadMail();
     return h;
   };
   App.opened.dsVault = function () { var f = document.querySelector('#sheetCard input'); if (f) { try { f.focus(); } catch (e) { /* fine */ } } };
@@ -147,7 +191,7 @@
     var job = m === 'set' ? ZZ.Cloud.makeVault(p[0]) : m === 'change' ? ZZ.Cloud.changePass(old, p[0]) : ZZ.Cloud.recoverVault(code, p[0]);
     job.then(function (r) {
       vt.busy = false;
-      if (m === 'set') { if (!r) { vt.msg = t('vt.fail'); return App.openSheet('dsVault'); } st.lock = 'p'; save(); vt.code = r; vt.mode = 'code'; return App.openSheet('dsVault'); }
+      if (m === 'set') { if (!r) { vt.msg = t('vt.fail'); return App.openSheet('dsVault'); } st.lock = 'p'; save(); vt.code = r; vt.mode = 'code'; vt.email = ''; return App.openSheet('dsVault'); }
       if (!r) { vt.msg = t(m === 'change' ? 'vt.wrong' : 'vt.badCode'); return App.openSheet('dsVault'); }
       App.toast(t('vt.done'), 3200); vaultClose();
     });
@@ -163,13 +207,57 @@
       return true;
     }
     if (d.dsvault === 'change' || d.dsvault === 'recover') { vaultOpen(d.dsvault); return true; }
+    if (d.dsvault === 'remind') { remind(); return true; }
+    if (d.dsvault === 'newcode') { newCode(); return true; }
     if (!d.vt) return false;
     if (d.vt === 'ok') vtOk();
+    else if (d.vt === 'mailGo') mailGo();
+    else if (d.vt === 'pinOk') pinOk();
     else if (d.vt === 'forgot') { var w = vt.wait; vt.wait = null; if (w) w(null); vaultOpen('recover'); }
     else if (d.vt === 'codeOk') vaultClose();
     else { var w2 = vt.wait; vt.wait = null; vaultClose(); if (w2) w2(null); }
     return true;
   });
+  // ---------- the recovery code kept with the player's email (opt-in; server/mail.js) ----------
+  var mailInfo = null, mailAsking = false;
+  function loadMail() {
+    if (mailAsking || !ZZ.Cloud || !ZZ.Cloud.mailAsk) return;
+    mailAsking = true;
+    ZZ.Cloud.mailAsk({ a: 'mailStatus' }).then(function (b) { mailAsking = false; mailInfo = b && b.ok ? b : { ready: false, kept: false }; if (App.sheet()) App.openSheet(App.sheet()); });
+  }
+  function mailWhy(b) { var w = b && b.why; return t(w === 'email' ? 'vt.badEmail' : w === 'slow' ? 'vt.slowMail' : w === 'pin' ? 'vt.badPin' : w === 'expired' ? 'vt.pinGone' : 'vt.mailFail'); }
+  function mailGo() {
+    var e = document.getElementById('vtMail'), email = e ? e.value.trim() : vt.email;
+    vt.email = email;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '')) { vt.msg = t('vt.badEmail'); return App.openSheet('dsVault'); }
+    vt.busy = true; vt.msg = ''; App.openSheet('dsVault');
+    ZZ.Cloud.mailAsk({ a: 'mailStart', email: email, code: vt.code }).then(function (b) {
+      vt.busy = false;
+      if (b && b.ok) { vt.to = b.to; vt.mode = 'pin'; } else vt.msg = mailWhy(b);
+      App.openSheet('dsVault');
+    });
+  }
+  function pinOk() {
+    var pin = val('vtPin').replace(/\D/g, '');
+    vt.busy = true; vt.msg = ''; App.openSheet('dsVault');
+    ZZ.Cloud.mailAsk({ a: 'mailVerify', pin: pin }).then(function (b) {
+      vt.busy = false;
+      if (b && b.ok) { mailInfo = { ready: true, kept: true, to: vt.to }; App.toast(t('vt.mailKept', vt.to), 4000); vaultClose(); return; }
+      vt.msg = mailWhy(b); App.openSheet('dsVault');
+    });
+  }
+  function remind() {
+    ZZ.Cloud.mailAsk({ a: 'mailRemind' }).then(function (b) { App.toast(b && b.ok ? t('vt.reminded', b.to) : mailWhy(b), 4200); });
+  }
+  function newCode() {
+    ZZ.Cloud.newRecovery().then(function (code) {
+      if (!code) return App.toast(t('vt.fail'), 3000);
+      vt.code = code; vt.msg = ''; vt.email = '';
+      if (App.sheet() !== 'dsVault') vt.back = App.sheet();
+      vt.mode = 'code'; App.openSheet('dsVault');
+    });
+  }
+
   // the cloud code asks for the password here, once a visit
   function askPass() { return new Promise(function (res) { vt.wait = res; vaultOpen('ask'); }); }
   if (ZZ.Cloud) { ZZ.Cloud.askPass = askPass; ZZ.Cloud.onWrongPass = function () { App.toast(t('vt.wrong'), 3000); }; }
