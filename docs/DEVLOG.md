@@ -959,3 +959,19 @@
   - staging 部署 `dpl_8SyzoRNUnZVkhCKsSq3HgY3Ukbtc`（`fcd6d24`）：`/api/health?deep=1` 回 `db: true`、`ready: true`、`dbSource: "staging"`、`admin: true`、`build: "fcd6d24"`。
   - Owner 在 22:46 已在 Preview（只限 `staging` 分支）設了 `BRICKDUEL_ADMIN_TEST_TRUST`、`BRICKDUEL_ADMIN_ISSUER`、`BRICKDUEL_ADMIN_JWKS_URL`、`BRICKDUEL_ADMIN_SUBJECTS`（只看了名稱和範圍）。正式站仍是 `admin: false`、`dbSource: "main"`。
   - `identity-staging.snowrealm.pet` 還是沒有 DNS，所以 staging 管理 API 遇到帶簽章的呼叫會回 503 `unavailable`，A1–A14 仍是 BLOCKED。
+- 補記：上一條的 commit 為 [`caf2071`](https://github.com/luffysky/cube2/commit/caf2071)。
+
+## 2026-11-23 00:05（Asia/Taipei）｜staging 的登入變數（除了 secret 和入口網址）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「這些除了secret跟gpt要給我的其他你幫我設」
+- 用 Vercel 設了五個變數，只給 **Preview**、只限 **`staging` 分支**：
+  - `IDENTITY_ISSUER` = `https://identity-staging.snowrealm.pet`
+  - `IDENTITY_JWKS_URL` = `https://identity-staging.snowrealm.pet/.well-known/jwks.json`
+  - `IDENTITY_AUDIENCE` = `snowrealm:brickduel:api`
+  - `IDENTITY_STAGING_REDIRECT` = `https://brickduel-staging.snowrealm.pet/api/auth/callback`
+  - `IDENTITY_LINK_ENABLED` = `1`
+  - 這些都不是秘密。Production 沒有動。
+- 還缺兩個要等 GPT：`IDENTITY_STAGING_CLIENT_SECRET`（Owner 自己貼進 Vercel）、`IDENTITY_AUTHORIZE_URL`（staging 登入入口）。少了這兩個，staging 的 BFF 會保持關閉（`/api/health` 的 `link` 是 false，`/api/auth/start` 回 503）。
+- 另外 `identity-staging.snowrealm.pet` 目前沒有 DNS，所以就算兩個都補上，驗 token 時也會因為拿不到 JWKS 而拒絕（`unavailable`），不會誤放行。
+- 檔案：`docs/DEVLOG.md`、`docs/JOINT_ACCEPTANCE.md`。｜資料庫：未異動。｜刪除：無。

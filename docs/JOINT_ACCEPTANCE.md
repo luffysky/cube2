@@ -133,7 +133,7 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | A12 | BLOCKED | 2026-11-22 | — | 同 A1 |
 | A13 | BLOCKED | 2026-11-22 | — | 同 A1（POST 要由 cube1 送；cube2 這邊的工具只能發 GET） |
 | A14 | BLOCKED | 2026-11-22 | — | A1–A13 跑完後，Owner 在 Neon staging 分支查 `zz.admin_log` |
-| B1 | BLOCKED | 2026-11-22 | staging `/api/health` → `link: false` | 等 cube1 的 staging Identity（issuer、JWKS、authorize、token、status、client secret），以及登記 callback |
+| B1 | BLOCKED | 2026-11-23 00:05 | staging Preview 已設 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_STAGING_REDIRECT`、`IDENTITY_LINK_ENABLED`；`link` 仍是 false | 等 cube1 的 staging Identity（issuer、JWKS、authorize、token、status、client secret），以及登記 callback |
 | B2 | BLOCKED | 2026-11-22 | 同上 | 同上，另需第二台裝置 |
 | B3 | BLOCKED | 2026-11-22 | 同上 | 同上，另需兩個測試帳號 |
 | B4 | BLOCKED | 2026-11-22 | 同上 | 同上，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
