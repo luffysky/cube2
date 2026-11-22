@@ -871,3 +871,12 @@
 - 關聯 Owner 指令：「好了」（Neon 開好 `staging` 分支，選 schema only、從 main 分出、不自動刪除；Vercel Preview 的 `staging` 分支設好 `STAGING_DATABASE_URL`、`IDENTITY_STAGING`）
 - 我只確認了這兩個變數的名稱和範圍：只在 Preview、只給 `staging` 分支，沒有解密值。這次推一個 commit 到 `staging`，讓它用新設定重新部署。
 - 檔案：`docs/DEVLOG.md`。｜資料庫：未異動（新分支是 Owner 在 Neon 後台建的）。｜刪除：無。
+- 補記：上一條的 commit 為 [`f831e8b`](https://github.com/luffysky/cube2/commit/f831e8b)。staging Preview `dpl_3GZ6yWe2aqDQpedwHSCuQ1j9Vxav` READY；`https://brickduel-staging.snowrealm.pet/api/health?deep=1` 回 `db: true`、`ready: true`（空的資料庫已自動建表）。staging 的排行榜是空的，正式站有玩家，確認兩邊是不同的資料庫。
+
+## 2026-11-22 20:15（Asia/Taipei）｜staging 的部署保護 bypass 已建立
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「好了」（在 Vercel → Deployment Protection 建了 Protection Bypass for Automation，交給 cube1）
+- 密碼沒有經過 Claude，也沒有寫進 repo。其他預覽一樣保留 Vercel Authentication；管理 API 照樣要驗 staging 的 admin token。
+- `docs/JOINT_ACCEPTANCE.md` 的實測表更新：cube2 端已就緒，A、B 兩組仍是 BLOCKED，等 cube1 的 staging signer 和 Identity。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。

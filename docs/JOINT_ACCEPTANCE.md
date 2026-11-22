@@ -30,8 +30,8 @@
   - 以下不能用正式的值：issuer、token、status；入口網址必須明確給，不能是正式入口。
 - **Staging 不讀正式資料庫（`server/db.js`）**：Preview 現在拿到的 `DATABASE_URL` 跟 production 是同一個。所以只要設了 `IDENTITY_STAGING=1` 或 `BRICKDUEL_ADMIN_TEST_TRUST=1`，就只會用 `STAGING_DATABASE_URL`；沒設就完全沒有資料庫（相關端點回 503），不會碰到正式玩家資料。
 - **提案的固定網址**：`https://brickduel-staging.snowrealm.pet/api/auth/callback`。
-  - 目前狀態：**尚未生效**。Vercel 上已綁定（只給 `staging` 分支的 Preview 用）；DNS 在 Cloudflare，要 Owner 加一筆 CNAME `brickduel-staging` → `a2b850ffbe7b21ab.vercel-dns-016.com`，並設成 DNS only（灰雲）。
-  - TLS 驗證通過、實際打開能看到網站之前，**不要**拿去 cube1 登記。
+  - 目前狀態：**已生效**（2026-11-22）。Vercel 綁 `staging` 分支，Cloudflare CNAME 設成 DNS only，TLS 已驗證，可以拿去 cube1 登記。
+  - 網站有 Vercel 部署保護。自動化呼叫要帶 `x-vercel-protection-bypass` 標頭，密碼由 Owner 交給 cube1，不寫進 repo。
 
 ## A. Admin 機器 token（staged admin JWT／JWKS）
 
@@ -92,5 +92,5 @@ cube1 提供：
 
 | # | 結果 | 時間 | staging URL | cube2 SHA | HTTP／結果字 | 備註 |
 |---|---|---|---|---|---|---|
-| A1–A14 | BLOCKED | 2026-11-21 | — | — | — | 等 cube1 staging admin signer／JWKS；Preview 也還沒設 `STAGING_DATABASE_URL` |
-| B1–B13 | BLOCKED | 2026-11-21 | — | — | — | 等 staging 網域 DNS／TLS、cube1 staging Identity 與登記 callback、`STAGING_DATABASE_URL` |
+| A1–A14 | BLOCKED | 2026-11-22 | https://brickduel-staging.snowrealm.pet | `f831e8b` | `/api/health` 200（`db: true`） | cube2 端已就緒：staging 有獨立 Neon 分支（只有結構）、Vercel 部署保護的 bypass 密碼已由 Owner 建立並交給 cube1。等 cube1 的 staging admin signer／JWKS |
+| B1–B13 | BLOCKED | 2026-11-22 | https://brickduel-staging.snowrealm.pet | `f831e8b` | `/api/health` 200（`link: false`） | DNS／TLS 已生效，staging 資料庫已接上。等 cube1 的 staging Identity、登記 callback 和 staging 的 client secret |
