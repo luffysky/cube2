@@ -863,3 +863,11 @@
 - 資料庫：新表 `zz.mailbox`（`CREATE TABLE IF NOT EXISTS`）。｜刪除：無（刪除雲端存檔時，跟著存檔一起移除）。
 - 測試：`node test/run.js` 全過（新增 mail 27 項）。瀏覽器 `r2` 37：說明先出現、驗證碼、寄回救援碼、新救援碼取代舊的、代管的也跟著換。另外 `cloudui`、`pwa`、`consent`、`music`、`authui`、`legal` 都通過。
 - 部署：正式站還沒設寄信的那三個環境變數，所以信箱代管目前顯示「寄信服務準備中」。
+- 補記：上一條的 commit 為 [`7182f42`](https://github.com/luffysky/cube2/commit/7182f42)，CI run 44926836806 兩個 job 都成功。
+
+## 2026-11-22 19:05（Asia/Taipei）｜staging 接上自己的 Neon 分支
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「好了」（Neon 開好 `staging` 分支，選 schema only、從 main 分出、不自動刪除；Vercel Preview 的 `staging` 分支設好 `STAGING_DATABASE_URL`、`IDENTITY_STAGING`）
+- 我只確認了這兩個變數的名稱和範圍：只在 Preview、只給 `staging` 分支，沒有解密值。這次推一個 commit 到 `staging`，讓它用新設定重新部署。
+- 檔案：`docs/DEVLOG.md`。｜資料庫：未異動（新分支是 Owner 在 Neon 後台建的）。｜刪除：無。
