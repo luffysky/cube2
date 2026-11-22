@@ -498,7 +498,7 @@
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
   // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
   Net.quick = function (name, again, pool) {
-    pool = ['wx', 'lv', 'race', 'pr'].indexOf(pool) >= 0 ? pool : '';
+    pool = ['wx', 'lv', 'race', 'pr', 'tower'].indexOf(pool) >= 0 ? pool : '';
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
@@ -557,7 +557,7 @@
 
   // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
   // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
-  var ROOM_MODES = ['battle', 'wx', 'lv', 'race'];
+  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower'];
   Net.ROOM_MODES = ROOM_MODES;
   function readCfg(c) {
     var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
@@ -568,7 +568,7 @@
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx, lv, race) {
+  function startMatch(seed, minutes, items, multi, wx, lv, race, tower) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
@@ -576,8 +576,9 @@
     if (wx && !multi) o.wx = wx >>> 0;
     if (lv) o.lv = lv;
     // ranked against a person: only from random matching, an ordinary two-minute battle with no items
-    if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race) { o.pr = true; o.items = false; }
+    if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race && !tower) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
+    if (tower && !multi && !race) { o.tower = 1; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -596,9 +597,9 @@
     var mode = Net.modeOf();
     var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
     var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
-    var race = mode === 'race' && !multi ? 1 : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race);
+    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -732,7 +733,7 @@
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0); break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a':

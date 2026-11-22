@@ -292,7 +292,7 @@ async function history(db, cred, body, now) {
       pvp: r.pvp == null ? null : !!r.pvp, foes: Array.isArray(r.foes) ? r.foes.filter(n => typeof n === 'string').slice(0, 7) : [],
       level: int(d.level), ms: int(d.ms), ko: int(d.ko), koOpp: int(d.koOpp), as: d.as == null ? null : int(d.as), kr: int(d.kr), score: int(d.score), sent: int(d.sent), lines: int(d.lines),
       pieces: int(d.pieces), spins: int(d.spins), minis: int(d.minis), xspins: int(d.xspins), tst: int(d.tst), quads: int(d.quads),
-      combo: int(d.maxCombo), items: int(d.items), place: int(d.place), team: !!d.team, quick: !!d.quick, pr: !!d.pr };
+      combo: int(d.maxCombo), items: int(d.items), place: int(d.place), tw: !!d.tw, team: !!d.team, quick: !!d.quick, pr: !!d.pr };
   });
   return good({ mode, page, per: HIST.PER, total, pages, items,
     sum: { games: total, win: int(t.win), loss: int(t.loss), draw: int(t.draw), ko: int(t.ko), koOpp: int(t.ko_opp), as: int(t.assists), sent: int(t.sent),
@@ -397,7 +397,7 @@ function devOf(v) { return v === 'pc' ? 'pc' : v === 'touch' ? 'touch' : ''; }
 async function roomQuick(db, body, ip, now) {
   if (typeof body.key !== 'string' || !SEAT.test(body.key)) return fail(400, 'key');
   if (await bump(db, 'quick', ip, QUICK.WINDOW, now) > QUICK.TRIES) return fail(429, 'slow');
-  const hash = sha(body.key), pool = ['wx', 'lv', 'race', 'pr'].indexOf(body.pool) >= 0 ? body.pool : '';      // each mode is matched only with itself
+  const hash = sha(body.key), pool = ['wx', 'lv', 'race', 'pr', 'tower'].indexOf(body.pool) >= 0 ? body.pool : '';      // each mode is matched only with itself
   const dev = devOf(body.dev), mix = body.mix === true || !dev;
   for (let tries = 0; tries < 3; tries++) {
     const got = await db.query(CLAIM, [now - QUICK.STALE, now, hash, pool, dev, mix, now - QUICK.MIX]);

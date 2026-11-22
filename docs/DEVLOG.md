@@ -1117,3 +1117,18 @@
   - 對戰紀錄改成顯示 K／D／A 和 KDA（＝（K＋A）÷ D，D 為 0 時算 1），並加說明。舊場次沒有助攻資料，顯示「—」。
 - 測試：meta 206 項（含判定 6 項）、API 412 項、三人房真瀏覽器 38 項（A 打的 C 被擊倒 → A 得 K、B 什麼都沒有）、對戰紀錄瀏覽器 18 項。
 - 檔案：`src/meta.js`、`src/net.js`、`src/ui.js`、`src/cloud.js`、`server/rules.js`、`server/core.js`、`test/meta.test.js`、`test/api.test.js`、`test/multi.js`、`test/history.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構（`zz.matches.data` 多兩個欄位）。｜刪除：無。
+- 補記：上一條的 commit 為 [`eda7967`](https://github.com/luffysky/cube2/commit/eda7967)。
+
+## 2026-11-23 06:25（Asia/Taipei）｜新模式：守塔戰
+
+- 專案：cube2｜執行者：Claude
+- 規則（`Meta.TOWER`）：雙方各有一座 100 點的塔。對手每送你 1 行攻擊扣 2 點，你被擊倒一次扣 20 點。塔先倒的人輸；時間到就比塔的高度，一樣高再用原本的規則（擊倒、攻擊、分數）。
+  - 兩邊都是用「對方送了幾行」和「自己被擊倒幾次」各自算出同一個數字，所以不用多傳訊息。
+- 哪裡玩：
+  - 對電腦：對戰設定多一個「守塔戰」開關。
+  - 朋友房間：房間模式多一個「守塔戰」，只限兩人房（跟競速一樣）。
+  - 隨機配對：多一個「守塔戰」配對池（伺服器也加上），等太久會改成對電腦，一樣是守塔戰。
+- 畫面：上方兩邊顯示塔的點數和一條會縮短的血條；結算畫面寫「塔：你 X　對手 Y」；對戰紀錄的標籤顯示「守塔戰」。
+- 真人排位不會變成守塔戰（只有普通 2 分鐘、沒道具的對戰才算真人排位）。
+- 測試：meta 208 項（塔的算法、哪些模式能開）；新的瀏覽器測試 `test/tower.js` 13 項（對電腦：開關、100／100、被送 10 行剩 80、擊倒電腦它剩 80、它的塔 0 就結束並獲勝、結算顯示塔；兩人房：選模式、對方看到、兩邊開始、送 50 行房主的塔倒，兩邊結果正確）。房間模式從 4 種變 5 種，`test/wxnet.js` 跟著改，24 項全過；`test/quick.js` 13 項全過。
+- 檔案：`src/meta.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/meta.test.js`、`test/tower.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。

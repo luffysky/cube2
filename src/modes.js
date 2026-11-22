@@ -105,8 +105,15 @@
     'net.m.battleP': ['空場地開打，誰先把對手壓到頂就贏。', 'An empty well; push your rival to the top.', '空のフィールドから。相手を上まで押し上げよう。', '빈 필드에서 시작. 상대를 꼭대기까지 밀어 올리세요.'],
     'net.m.wxP': ['兩人頭上同一片天：風、雨、雪、霧，偶爾還有洪水、龍捲風、地震。只限兩人房。', 'One sky over both walls: wind, rain, snow, fog, and now and then a flood, tornado or quake. Two players only.', '二人の上に同じ空。風・雨・雪・霧、ときどき洪水・竜巻・地震も。二人部屋のみ。', '두 사람 위에 같은 하늘: 바람, 비, 눈, 안개, 가끔 홍수, 토네이도, 지진까지. 2인 방 전용.'],
     'net.m.lvP': ['開打時從 1000 關裡抽一關，大家從同一面地形開始。', 'One of the 1000 levels is drawn at the start; everyone begins on the same wall.', '開始時に1000ステージから1つ抽選、全員同じ地形からスタート。', '시작할 때 1000개 스테이지 중 하나를 뽑아 모두 같은 지형에서 시작해요.'],
-    'net.m.only2': ['挑戰大自然和競速只限兩人，這房間會用普通對戰。', 'Nature and the race are for two players; this room plays an ordinary battle.', '大自然とレースは二人用。この部屋は通常バトルになります。', '대자연과 레이스는 2인 전용이라 이 방은 일반 대전으로 해요.'],
+    'net.m.only2': ['挑戰大自然、競速和守塔戰只限兩人，這房間會用普通對戰。', 'Nature, the race and the tower battle are for two players; this room plays an ordinary battle.', '大自然、レース、タワーバトルは二人用。この部屋は通常バトルになります。', '대자연, 레이스, 타워 배틀은 2인 전용이라 이 방은 일반 대전으로 해요.'],
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
+    'net.m.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
+    'net.m.towerP': ['雙方各有一座 100 點的塔。對手每送你 1 行攻擊扣 2 點，你被擊倒一次扣 20 點；塔先倒的人輸，時間到比誰的塔高。只限兩人房。', 'Each side has a tower of 100. Every line the other side sends you takes 2, every time you are knocked out takes 20; whoever\'s tower falls first loses, and at time-up the taller tower wins. Two players only.', 'お互いに100のタワー。相手から1ライン受けるごとに2、自分がKOされるごとに20減る。先にタワーが倒れた方の負け、時間切れなら高い方の勝ち。二人部屋のみ。', '서로 100점짜리 타워가 있어요. 상대가 보낸 공격 1줄마다 2, 내가 KO당할 때마다 20이 깎여요. 먼저 타워가 무너지면 패배, 시간이 끝나면 높은 쪽이 이겨요. 2인 방 전용.'],
+    'tw.on': ['守塔戰：對手送的每行攻擊扣你的塔 {0} 點，被擊倒扣 {1} 點', 'Tower battle: each line sent at you takes {0}, each knockout takes {1}', 'タワーバトル：受けた攻撃1ラインで{0}、KOで{1}減少', '타워 배틀: 받은 공격 1줄마다 {0}, KO마다 {1} 감소'],
+    'tw.hp': ['塔', 'Tower', 'タワー', '타워'],
+    'tw.toggle': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
+    'tw.rule': ['打開後：雙方各有一座 100 點的塔，對手每送你 1 行攻擊扣 {0} 點、你被擊倒一次扣 {1} 點。塔先倒的輸，時間到比塔高。', 'On: each side has a tower of 100; every line sent at you takes {0}, every knockout takes {1}. The first tower to fall loses; at time-up the taller one wins.', 'オン：お互い100のタワー。受けた攻撃1ラインで{0}、KOで{1}減る。先に倒れた方の負け、時間切れなら高い方の勝ち。', '켜면: 서로 100점 타워, 받은 공격 1줄마다 {0}, KO마다 {1} 감소. 먼저 무너지면 패배, 시간이 끝나면 높은 쪽 승리.'],
+    'tw.end': ['塔：你 {0}　{1} {2}', 'Towers: you {0} · {1} {2}', 'タワー：あなた {0}　{1} {2}', '타워: 나 {0} · {1} {2}'],
     'net.m.raceP': ['不互相攻擊，誰先消完 40 行誰贏；時間到了還沒人消完，就比誰消得多。只限兩人房。', 'No attacks: first to clear 40 lines wins; if time runs out first, most lines wins. Two players only.', '攻撃なし。先に40ライン消した方の勝ち。時間切れならライン数が多い方。二人部屋のみ。', '공격 없음. 먼저 40줄을 지우면 승리, 시간이 다 되면 더 많이 지운 쪽이 이겨요. 2인 방 전용.'],
     'net.m.pr': ['真人排位', 'Ranked (people)', 'ランク（対人）', '랭크 (사람)'],
     'net.m.prP': ['跟真人打兩分鐘、不帶道具。雙方的紀錄都送到伺服器、對得上，才會加減排位分；只靠一邊回報不算。需要雲端存檔。', 'Two minutes against a real player, no items. The rating moves only when both players\' records reach the server and agree; one side alone does not count. Needs a cloud save.', '人間相手に2分・アイテムなし。両者の記録がサーバーに届いて一致したときだけレートが動きます。片方だけの報告は無効。クラウドセーブが必要。', '사람과 2분, 아이템 없음. 양쪽 기록이 서버에 도착해 일치할 때만 레이팅이 바뀌어요. 한쪽만 보고하면 무효. 클라우드 저장 필요.'],
@@ -331,13 +338,13 @@
   // what a player plays on, as a small tag beside the name
   function devTag(d) { return d ? ' <small class="devtag">' + esc(t('dev.' + d)) + '</small>' : ''; }
   App.devTag = devTag;
-  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race') && n > 2 ? 'battle' : m; }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race' || m === 'tower') && n > 2 ? 'battle' : m; }
   function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + ((k === 'wx' || k === 'race') && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
-    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race') && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    ['battle', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + ((k === 'wx' || k === 'race' || k === 'tower') && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
   App.sheets.online = function () {
@@ -394,7 +401,7 @@
       // random matching: pick what to play first; only players who picked the same are matched
       if (hosted) {
         h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-        ['battle', 'pr', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        ['battle', 'pr', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
         h += '</div>' + (quickMode === 'pr' ? '<p><b>' + esc(t('pr.now', App.rankName(Meta.rankOf(Meta.data.pvp.rp)), Meta.data.pvp.rp, Meta.data.pvp.games)) + '</b></p>' : '') + '<p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
         h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
       }
@@ -407,9 +414,9 @@
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
+  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race', tower: 'tower' }, quickMode = 'battle';
   App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
-  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
+  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : S.o.tower ? 'tower' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   App.clicks.push(function (d) {
     if (d.qmode == null || !(d.qmode in QUICK_POOL)) return false;
     quickMode = d.qmode; App.openSheet('online'); return true;
@@ -419,7 +426,7 @@
     var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
     App.closeSheet(true);
     App.toast(t('net.noOne'), 4200);
-    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0, lv: Net.pool === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0 });
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0, lv: Net.pool === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0, tower: Net.pool === 'tower' ? 1 : 0 });
   };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };
@@ -452,15 +459,16 @@
   };
   App.endExtra = function () {
     var S = App.S();
-    if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
-    if (!S || S.mode !== 'net' || S.why) return '';
+    var twNote = S && S.tower && S.towerEnd ? '<p class="note"><b>' + esc(t('tw.end', S.towerEnd.me, S.oppName, S.towerEnd.opp)) + '</b></p>' : '';
+    if (S && S.o && S.o.quickCpu) return twNote + '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
+    if (!S || S.mode !== 'net' || S.why) return twNote;
     var rc = S.o.pr ? '<p class="note"><b>' + t('pr.wait') + '</b></p>' : '';
     // a race: each side's time to 40 lines, or how far they got
     if (S.race) {
       var one = function (who, ms, lines) { return '<b>' + esc(who) + '</b> ' + (ms ? App.fmtTime(ms) : t('net.raceNot', Math.min(S.race, lines))); };
       rc = '<p class="note">' + one(t('you'), S.raceMs, S.me.stats.lines) + '　' + one(S.oppName, S.foeRace, S.opp.stats.lines) + '</p>';
     }
-    return rc + againNote();
+    return twNote + rc + againNote();
   };
   function againNote() {
     if (Net.wantAgain && !Net.foeAgain) return '<p class="note">' + t('net.waitAgain') + '</p>';

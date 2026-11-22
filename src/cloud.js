@@ -649,6 +649,7 @@
     'hi.vs': ['對手：{0}', 'Against: {0}', '相手：{0}', '상대: {0}'],
     'hi.place': ['第 {0} 名／{1} 人', 'Place {0} of {1}', '{1}人中 {0}位', '{1}명 중 {0}위'],
     'hi.team': ['組隊', 'Teams', 'チーム', '팀'],
+    'hi.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'hi.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '랜덤 매치'],
     'hi.pvpOk': ['真人排位・伺服器已核定', 'Ranked vs people · settled by the server', '対人ランク・サーバー確定', '대인 랭크 · 서버 확정'],
     'hi.pvpBad': ['真人排位・雙方紀錄不一致，不計分', 'Ranked vs people · reports disagreed, not counted', '対人ランク・記録不一致のため無効', '대인 랭크 · 기록 불일치로 무효'],
@@ -1045,6 +1046,7 @@
   }
   function matchRow(m, i) {
     var v = verdict(m), open = hi.open === i, sprint = m.mode === 'sprint', tag = [];
+    if (m.tw) tag.push(t('hi.tower'));
     if (m.mode === 'ai') tag.push(t('hi.vsAi', t('lv' + m.level)));
     if (m.mode === 'net') {
       if (m.place && m.seats > 2) tag.push(t('hi.place', m.place, m.seats));

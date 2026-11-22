@@ -1042,6 +1042,10 @@
   // Who gets the knockout when a player in a room of three or more goes down: whoever sent the last cement in the
   // last 15 seconds (the K), and everyone else who sent some in that time (an A, assist). hits: [{ s: seat, t: ms, n }]
   // as the one who went down received them. Nobody in that time: by -1 (they topped out on their own).
+  // 守塔戰 (tower battle): each side has a tower of 100. Every line of cement the other side sends knocks off 2, and
+  // every time your own wall goes down knocks off 20. A tower at 0 ends the match; at time-up the taller tower wins.
+  Meta.TOWER = { hp: 100, perLine: 2, perDown: 20 };
+  Meta.towerHp = function (foeSent, ownDowns) { return Math.max(0, Meta.TOWER.hp - Meta.TOWER.perLine * Math.max(0, foeSent | 0) - Meta.TOWER.perDown * Math.max(0, ownDowns | 0)); };
   Meta.KO_WINDOW = 15000;
   Meta.koCredit = function (hits, now) {
     var recent = [], i, by = -1, as = [];
@@ -1061,6 +1065,7 @@
       team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true, pr: mode === 'net' && m.pr === true,
       // which online room it was played in and how many seats it had, so the reports of one match can be put together
       place: mode === 'net' ? int(m.place, 0, 8) : 0,
+      tower: (mode === 'net' || mode === 'ai') && m.tower === true,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it

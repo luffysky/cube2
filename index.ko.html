@@ -1082,6 +1082,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .hi-k b { color: var(--ink); }
 .hi-pager { flex-wrap: wrap; }
 .hi-pg { text-align: center; }
+/* 守塔戰: the tower's points and a bar that shrinks with them */
+.stat.tower { min-width: 64px; }
+.stat.tower .twbar { display: block; width: 100%; height: 5px; margin-top: 3px; border-radius: 3px; background: var(--floor-chip); overflow: hidden; }
+.stat.tower .twbar i { display: block; height: 100%; width: 100%; background: var(--gold); transition: width .25s; }
+@media (prefers-reduced-motion: reduce) { .stat.tower .twbar i { transition: none; } }
 
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
@@ -4932,6 +4937,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // Who gets the knockout when a player in a room of three or more goes down: whoever sent the last cement in the
   // last 15 seconds (the K), and everyone else who sent some in that time (an A, assist). hits: [{ s: seat, t: ms, n }]
   // as the one who went down received them. Nobody in that time: by -1 (they topped out on their own).
+  // 守塔戰 (tower battle): each side has a tower of 100. Every line of cement the other side sends knocks off 2, and
+  // every time your own wall goes down knocks off 20. A tower at 0 ends the match; at time-up the taller tower wins.
+  Meta.TOWER = { hp: 100, perLine: 2, perDown: 20 };
+  Meta.towerHp = function (foeSent, ownDowns) { return Math.max(0, Meta.TOWER.hp - Meta.TOWER.perLine * Math.max(0, foeSent | 0) - Meta.TOWER.perDown * Math.max(0, ownDowns | 0)); };
   Meta.KO_WINDOW = 15000;
   Meta.koCredit = function (hits, now) {
     var recent = [], i, by = -1, as = [];
@@ -4951,6 +4960,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true, pr: mode === 'net' && m.pr === true,
       // which online room it was played in and how many seats it had, so the reports of one match can be put together
       place: mode === 'net' ? int(m.place, 0, 8) : 0,
+      tower: (mode === 'net' || mode === 'ai') && m.tower === true,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it
@@ -7373,6 +7383,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         S.rec = null; S.tape = null;
         toast(t('net.raceOn', S.race), 3000);
       }
+      // 守塔戰: towers instead of a knockout count (Meta.TOWER); the match ends when a tower falls
+      if (o.tower && (mode === 'net' || mode === 'ai') && !o.multi && !S.race) {
+        S.tower = true;
+        toast(t('tw.on', Meta.TOWER.perLine, Meta.TOWER.perDown), 3200);
+      }
       // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
       if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
         S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
@@ -7527,6 +7542,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       }
       el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
       if (S.race) { el.hudL.innerHTML = you + stat('sentMe', t('net.raceLines', S.race)); el.hudR.innerHTML = stat('sentOpp', t('net.raceLines', S.race)) + name; }
+      if (S.tower) {
+        var bar = function (id) { return '<div class="stat tower"><b id="' + id + '">' + Meta.TOWER.hp + '</b><span>' + t('tw.hp') + '</span><i class="twbar"><i id="' + id + 'Bar"></i></i></div>'; };
+        if (S.flip) { el.hudL.innerHTML = name + bar('towOpp'); el.hudR.innerHTML = bar('towMe') + you; }
+        else { el.hudL.innerHTML = you + bar('towMe'); el.hudR.innerHTML = bar('towOpp') + name; }
+      }
       el.oppName.textContent = S.oppName;
       el.oppNameW.textContent = S.oppName;
     } else if (k === 'sprint') {
@@ -7977,10 +7997,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
+      if (S.tower) { var tw = towers(); S.towerEnd = tw; r = why === 'left' ? 1 : why === 'quit' ? -1 : tw.me !== tw.opp ? (tw.me > tw.opp ? 1 : -1) : r; }
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -8028,7 +8049,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
 
   // ---------- sheets ----------
-  var pick = { level: 1, minutes: 2, items: true };
+  var pick = { level: 1, minutes: 2, items: true, tower: false };
   function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
   // the big centred win / lose line at the top of a battle result
   function verdict() {
@@ -8077,7 +8098,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       }
       h += '</div>' + (aiStep() ? '<p class="note">' + t('aiNow', t('s.ai' + aiKey(aiStep()))) + '</p>' : '') + '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
       for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
-      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' + bringHtml() +
+      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' +
+        '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' + bringHtml() +
         '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
     } else if (name === 'pause') {
       h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
@@ -8300,7 +8322,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     el.sheet.hidden = false;
     el.sheetCard.scrollTop = keep;
     if (name === 'settings') { syncSettings(); if (App.settingsOpened) App.settingsOpened(); }
-    if (name === 'battle') $('bItems').checked = pick.items;
+    if (name === 'battle') { $('bItems').checked = pick.items; $('bTower').checked = !!pick.tower; }
     if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
     if (b && !env.touch && !keep) { try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); } el.sheetCard.scrollTop = 0; }   // (a long sheet opens at its top, not at its button)
@@ -8335,7 +8357,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     else if (a === 'resume') { sheetBack = ''; closeSheet(true); resume(); }
     else if (a === 'fight') {
       save.level = pick.level; save.minutes = pick.minutes; save.items = pick.items ? 1 : 0; saveStore();
-      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, bring: Meta.takeBring() });
+      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, tower: pick.tower ? 1 : 0, bring: Meta.takeBring() });
     }
     else if (a === 'again') {
       sheetBack = '';
@@ -8383,6 +8405,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
+      if (id === 'bTower') { pick.tower = e.target.checked; return; }
       if (id === 'htOff') { set.howto = !e.target.checked; saveStore(); return; }
       if (id === 'sLang') { if (e.type !== 'change') return; setLang(e.target.value); openSheet('settings'); return; }
       if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
@@ -8588,6 +8611,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (me.combo >= 1) h += '<span class="chip">' + t('chip.combo', me.combo) + '</span>';
     el.chips.innerHTML = h;
   }
+  function towers() { return { me: Meta.towerHp(S.opp.stats.sent, S.ko.opp), opp: Meta.towerHp(S.me.stats.sent, S.ko.me) }; }
+  App.towers = function () { return S && S.tower ? towers() : null; };
   function updateHud() {
     var me = S.me, st = me.stats, K = kindOf();
     if (S.kind === 'battle') {
@@ -8595,6 +8620,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
       if (S.race) { txt('sentMe', String(Math.min(S.race, st.lines))); txt('sentOpp', String(Math.min(S.race, S.opp.stats.lines))); }
       else { txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent)); }
+      if (S.tower) {
+        var tw = towers(), bm = $('towMeBar'), bo = $('towOppBar');
+        txt('towMe', String(tw.me)); txt('towOpp', String(tw.opp));
+        if (bm) bm.style.width = (tw.me / Meta.TOWER.hp * 100) + '%';
+        if (bo) bo.style.width = (tw.opp / Meta.TOWER.hp * 100) + '%';
+        if (S.state === 'play' && (tw.me <= 0 || tw.opp <= 0)) endBattle('');
+      }
       txt('ptsMe', t('pts', L.num(st.score)));
       var c = $('clock');
       txt('clock', fmtClock(S.left));
@@ -9356,7 +9388,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
   // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
   Net.quick = function (name, again, pool) {
-    pool = ['wx', 'lv', 'race', 'pr'].indexOf(pool) >= 0 ? pool : '';
+    pool = ['wx', 'lv', 'race', 'pr', 'tower'].indexOf(pool) >= 0 ? pool : '';
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
@@ -9415,7 +9447,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 
   // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
   // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
-  var ROOM_MODES = ['battle', 'wx', 'lv', 'race'];
+  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower'];
   Net.ROOM_MODES = ROOM_MODES;
   function readCfg(c) {
     var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
@@ -9426,7 +9458,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx, lv, race) {
+  function startMatch(seed, minutes, items, multi, wx, lv, race, tower) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
@@ -9434,8 +9466,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (wx && !multi) o.wx = wx >>> 0;
     if (lv) o.lv = lv;
     // ranked against a person: only from random matching, an ordinary two-minute battle with no items
-    if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race) { o.pr = true; o.items = false; }
+    if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race && !tower) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
+    if (tower && !multi && !race) { o.tower = 1; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: multi.teams || null }; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -9454,9 +9487,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var mode = Net.modeOf();
     var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
     var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
-    var race = mode === 'race' && !multi ? 1 : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race);
+    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -9590,7 +9623,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0); break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a':
@@ -9847,8 +9880,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'net.m.battleP': ['空場地開打，誰先把對手壓到頂就贏。', 'An empty well; push your rival to the top.', '空のフィールドから。相手を上まで押し上げよう。', '빈 필드에서 시작. 상대를 꼭대기까지 밀어 올리세요.'],
     'net.m.wxP': ['兩人頭上同一片天：風、雨、雪、霧，偶爾還有洪水、龍捲風、地震。只限兩人房。', 'One sky over both walls: wind, rain, snow, fog, and now and then a flood, tornado or quake. Two players only.', '二人の上に同じ空。風・雨・雪・霧、ときどき洪水・竜巻・地震も。二人部屋のみ。', '두 사람 위에 같은 하늘: 바람, 비, 눈, 안개, 가끔 홍수, 토네이도, 지진까지. 2인 방 전용.'],
     'net.m.lvP': ['開打時從 1000 關裡抽一關，大家從同一面地形開始。', 'One of the 1000 levels is drawn at the start; everyone begins on the same wall.', '開始時に1000ステージから1つ抽選、全員同じ地形からスタート。', '시작할 때 1000개 스테이지 중 하나를 뽑아 모두 같은 지형에서 시작해요.'],
-    'net.m.only2': ['挑戰大自然和競速只限兩人，這房間會用普通對戰。', 'Nature and the race are for two players; this room plays an ordinary battle.', '大自然とレースは二人用。この部屋は通常バトルになります。', '대자연과 레이스는 2인 전용이라 이 방은 일반 대전으로 해요.'],
+    'net.m.only2': ['挑戰大自然、競速和守塔戰只限兩人，這房間會用普通對戰。', 'Nature, the race and the tower battle are for two players; this room plays an ordinary battle.', '大自然、レース、タワーバトルは二人用。この部屋は通常バトルになります。', '대자연, 레이스, 타워 배틀은 2인 전용이라 이 방은 일반 대전으로 해요.'],
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
+    'net.m.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
+    'net.m.towerP': ['雙方各有一座 100 點的塔。對手每送你 1 行攻擊扣 2 點，你被擊倒一次扣 20 點；塔先倒的人輸，時間到比誰的塔高。只限兩人房。', 'Each side has a tower of 100. Every line the other side sends you takes 2, every time you are knocked out takes 20; whoever\'s tower falls first loses, and at time-up the taller tower wins. Two players only.', 'お互いに100のタワー。相手から1ライン受けるごとに2、自分がKOされるごとに20減る。先にタワーが倒れた方の負け、時間切れなら高い方の勝ち。二人部屋のみ。', '서로 100점짜리 타워가 있어요. 상대가 보낸 공격 1줄마다 2, 내가 KO당할 때마다 20이 깎여요. 먼저 타워가 무너지면 패배, 시간이 끝나면 높은 쪽이 이겨요. 2인 방 전용.'],
+    'tw.on': ['守塔戰：對手送的每行攻擊扣你的塔 {0} 點，被擊倒扣 {1} 點', 'Tower battle: each line sent at you takes {0}, each knockout takes {1}', 'タワーバトル：受けた攻撃1ラインで{0}、KOで{1}減少', '타워 배틀: 받은 공격 1줄마다 {0}, KO마다 {1} 감소'],
+    'tw.hp': ['塔', 'Tower', 'タワー', '타워'],
+    'tw.toggle': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
+    'tw.rule': ['打開後：雙方各有一座 100 點的塔，對手每送你 1 行攻擊扣 {0} 點、你被擊倒一次扣 {1} 點。塔先倒的輸，時間到比塔高。', 'On: each side has a tower of 100; every line sent at you takes {0}, every knockout takes {1}. The first tower to fall loses; at time-up the taller one wins.', 'オン：お互い100のタワー。受けた攻撃1ラインで{0}、KOで{1}減る。先に倒れた方の負け、時間切れなら高い方の勝ち。', '켜면: 서로 100점 타워, 받은 공격 1줄마다 {0}, KO마다 {1} 감소. 먼저 무너지면 패배, 시간이 끝나면 높은 쪽 승리.'],
+    'tw.end': ['塔：你 {0}　{1} {2}', 'Towers: you {0} · {1} {2}', 'タワー：あなた {0}　{1} {2}', '타워: 나 {0} · {1} {2}'],
     'net.m.raceP': ['不互相攻擊，誰先消完 40 行誰贏；時間到了還沒人消完，就比誰消得多。只限兩人房。', 'No attacks: first to clear 40 lines wins; if time runs out first, most lines wins. Two players only.', '攻撃なし。先に40ライン消した方の勝ち。時間切れならライン数が多い方。二人部屋のみ。', '공격 없음. 먼저 40줄을 지우면 승리, 시간이 다 되면 더 많이 지운 쪽이 이겨요. 2인 방 전용.'],
     'net.m.pr': ['真人排位', 'Ranked (people)', 'ランク（対人）', '랭크 (사람)'],
     'net.m.prP': ['跟真人打兩分鐘、不帶道具。雙方的紀錄都送到伺服器、對得上，才會加減排位分；只靠一邊回報不算。需要雲端存檔。', 'Two minutes against a real player, no items. The rating moves only when both players\' records reach the server and agree; one side alone does not count. Needs a cloud save.', '人間相手に2分・アイテムなし。両者の記録がサーバーに届いて一致したときだけレートが動きます。片方だけの報告は無効。クラウドセーブが必要。', '사람과 2분, 아이템 없음. 양쪽 기록이 서버에 도착해 일치할 때만 레이팅이 바뀌어요. 한쪽만 보고하면 무효. 클라우드 저장 필요.'],
@@ -10073,13 +10113,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // what a player plays on, as a small tag beside the name
   function devTag(d) { return d ? ' <small class="devtag">' + esc(t('dev.' + d)) + '</small>' : ''; }
   App.devTag = devTag;
-  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race') && n > 2 ? 'battle' : m; }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race' || m === 'tower') && n > 2 ? 'battle' : m; }
   function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + ((k === 'wx' || k === 'race') && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
-    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race') && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    ['battle', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + ((k === 'wx' || k === 'race' || k === 'tower') && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
   App.sheets.online = function () {
@@ -10136,7 +10176,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       // random matching: pick what to play first; only players who picked the same are matched
       if (hosted) {
         h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-        ['battle', 'pr', 'wx', 'lv', 'race'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        ['battle', 'pr', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
         h += '</div>' + (quickMode === 'pr' ? '<p><b>' + esc(t('pr.now', App.rankName(Meta.rankOf(Meta.data.pvp.rp)), Meta.data.pvp.rp, Meta.data.pvp.games)) + '</b></p>' : '') + '<p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
         h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
       }
@@ -10149,9 +10189,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race' }, quickMode = 'battle';
+  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race', tower: 'tower' }, quickMode = 'battle';
   App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
-  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
+  App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : S.o.tower ? 'tower' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   App.clicks.push(function (d) {
     if (d.qmode == null || !(d.qmode in QUICK_POOL)) return false;
     quickMode = d.qmode; App.openSheet('online'); return true;
@@ -10161,7 +10201,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var f = Meta.botFor(Meta.data.rp), lv = f.level >= 0 ? f.level : 2;
     App.closeSheet(true);
     App.toast(t('net.noOne'), 4200);
-    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0, lv: Net.pool === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0 });
+    App.begin('battle', { mode: 'ai', level: lv, minutes: 2, items: false, quickCpu: true, wx: Net.pool === 'wx' ? ((Math.random() * 4294967296) >>> 0 || 1) : 0, lv: Net.pool === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0, tower: Net.pool === 'tower' ? 1 : 0 });
   };
   App.acts.netOpen = function () { copied = false; Net.open(myName()); };
   App.acts.netJoin = function () { var e = $('nCode'); joinCode = e ? e.value : joinCode; Net.join(joinCode, myName()); };
@@ -10194,15 +10234,16 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   };
   App.endExtra = function () {
     var S = App.S();
-    if (S && S.o && S.o.quickCpu) return '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
-    if (!S || S.mode !== 'net' || S.why) return '';
+    var twNote = S && S.tower && S.towerEnd ? '<p class="note"><b>' + esc(t('tw.end', S.towerEnd.me, S.oppName, S.towerEnd.opp)) + '</b></p>' : '';
+    if (S && S.o && S.o.quickCpu) return twNote + '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
+    if (!S || S.mode !== 'net' || S.why) return twNote;
     var rc = S.o.pr ? '<p class="note"><b>' + t('pr.wait') + '</b></p>' : '';
     // a race: each side's time to 40 lines, or how far they got
     if (S.race) {
       var one = function (who, ms, lines) { return '<b>' + esc(who) + '</b> ' + (ms ? App.fmtTime(ms) : t('net.raceNot', Math.min(S.race, lines))); };
       rc = '<p class="note">' + one(t('you'), S.raceMs, S.me.stats.lines) + '　' + one(S.oppName, S.foeRace, S.opp.stats.lines) + '</p>';
     }
-    return rc + againNote();
+    return twNote + rc + againNote();
   };
   function againNote() {
     if (Net.wantAgain && !Net.foeAgain) return '<p class="note">' + t('net.waitAgain') + '</p>';
@@ -11858,6 +11899,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'hi.vs': ['對手：{0}', 'Against: {0}', '相手：{0}', '상대: {0}'],
     'hi.place': ['第 {0} 名／{1} 人', 'Place {0} of {1}', '{1}人中 {0}位', '{1}명 중 {0}위'],
     'hi.team': ['組隊', 'Teams', 'チーム', '팀'],
+    'hi.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'hi.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '랜덤 매치'],
     'hi.pvpOk': ['真人排位・伺服器已核定', 'Ranked vs people · settled by the server', '対人ランク・サーバー確定', '대인 랭크 · 서버 확정'],
     'hi.pvpBad': ['真人排位・雙方紀錄不一致，不計分', 'Ranked vs people · reports disagreed, not counted', '対人ランク・記録不一致のため無効', '대인 랭크 · 기록 불일치로 무효'],
@@ -12254,6 +12296,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
   function matchRow(m, i) {
     var v = verdict(m), open = hi.open === i, sprint = m.mode === 'sprint', tag = [];
+    if (m.tw) tag.push(t('hi.tower'));
     if (m.mode === 'ai') tag.push(t('hi.vsAi', t('lv' + m.level)));
     if (m.mode === 'net') {
       if (m.place && m.seats > 2) tag.push(t('hi.place', m.place, m.seats));

@@ -1032,3 +1032,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .hi-k b { color: var(--ink); }
 .hi-pager { flex-wrap: wrap; }
 .hi-pg { text-align: center; }
+/* 守塔戰: the tower's points and a bar that shrinks with them */
+.stat.tower { min-width: 64px; }
+.stat.tower .twbar { display: block; width: 100%; height: 5px; margin-top: 3px; border-radius: 3px; background: var(--floor-chip); overflow: hidden; }
+.stat.tower .twbar i { display: block; height: 100%; width: 100%; background: var(--gold); transition: width .25s; }
+@media (prefers-reduced-motion: reduce) { .stat.tower .twbar i { transition: none; } }

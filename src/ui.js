@@ -372,6 +372,11 @@
         S.rec = null; S.tape = null;
         toast(t('net.raceOn', S.race), 3000);
       }
+      // 守塔戰: towers instead of a knockout count (Meta.TOWER); the match ends when a tower falls
+      if (o.tower && (mode === 'net' || mode === 'ai') && !o.multi && !S.race) {
+        S.tower = true;
+        toast(t('tw.on', Meta.TOWER.perLine, Meta.TOWER.perDown), 3200);
+      }
       // a weather battle (挑戰大自然): one sky from a shared seed over each wall; no replay, since a replay has no weather
       if (o.wx && ZZ.Weather && !o.multi && mode !== 'rank') {
         S.sky = { me: new ZZ.Weather({ seed: o.wx }), opp: S.remote ? null : new ZZ.Weather({ seed: o.wx, boardOnly: true }) };
@@ -526,6 +531,11 @@
       }
       el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
       if (S.race) { el.hudL.innerHTML = you + stat('sentMe', t('net.raceLines', S.race)); el.hudR.innerHTML = stat('sentOpp', t('net.raceLines', S.race)) + name; }
+      if (S.tower) {
+        var bar = function (id) { return '<div class="stat tower"><b id="' + id + '">' + Meta.TOWER.hp + '</b><span>' + t('tw.hp') + '</span><i class="twbar"><i id="' + id + 'Bar"></i></i></div>'; };
+        if (S.flip) { el.hudL.innerHTML = name + bar('towOpp'); el.hudR.innerHTML = bar('towMe') + you; }
+        else { el.hudL.innerHTML = you + bar('towMe'); el.hudR.innerHTML = bar('towOpp') + name; }
+      }
       el.oppName.textContent = S.oppName;
       el.oppNameW.textContent = S.oppName;
     } else if (k === 'sprint') {
@@ -976,10 +986,11 @@
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
+      if (S.tower) { var tw = towers(); S.towerEnd = tw; r = why === 'left' ? 1 : why === 'quit' ? -1 : tw.me !== tw.opp ? (tw.me > tw.opp ? 1 : -1) : r; }
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -1027,7 +1038,7 @@
   }
 
   // ---------- sheets ----------
-  var pick = { level: 1, minutes: 2, items: true };
+  var pick = { level: 1, minutes: 2, items: true, tower: false };
   function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
   // the big centred win / lose line at the top of a battle result
   function verdict() {
@@ -1076,7 +1087,8 @@
       }
       h += '</div>' + (aiStep() ? '<p class="note">' + t('aiNow', t('s.ai' + aiKey(aiStep()))) + '</p>' : '') + '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
       for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
-      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' + bringHtml() +
+      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' +
+        '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' + bringHtml() +
         '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
     } else if (name === 'pause') {
       h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
@@ -1299,7 +1311,7 @@
     el.sheet.hidden = false;
     el.sheetCard.scrollTop = keep;
     if (name === 'settings') { syncSettings(); if (App.settingsOpened) App.settingsOpened(); }
-    if (name === 'battle') $('bItems').checked = pick.items;
+    if (name === 'battle') { $('bItems').checked = pick.items; $('bTower').checked = !!pick.tower; }
     if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
     if (b && !env.touch && !keep) { try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); } el.sheetCard.scrollTop = 0; }   // (a long sheet opens at its top, not at its button)
@@ -1334,7 +1346,7 @@
     else if (a === 'resume') { sheetBack = ''; closeSheet(true); resume(); }
     else if (a === 'fight') {
       save.level = pick.level; save.minutes = pick.minutes; save.items = pick.items ? 1 : 0; saveStore();
-      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, bring: Meta.takeBring() });
+      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, tower: pick.tower ? 1 : 0, bring: Meta.takeBring() });
     }
     else if (a === 'again') {
       sheetBack = '';
@@ -1382,6 +1394,7 @@
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
+      if (id === 'bTower') { pick.tower = e.target.checked; return; }
       if (id === 'htOff') { set.howto = !e.target.checked; saveStore(); return; }
       if (id === 'sLang') { if (e.type !== 'change') return; setLang(e.target.value); openSheet('settings'); return; }
       if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
@@ -1587,6 +1600,8 @@
     if (me.combo >= 1) h += '<span class="chip">' + t('chip.combo', me.combo) + '</span>';
     el.chips.innerHTML = h;
   }
+  function towers() { return { me: Meta.towerHp(S.opp.stats.sent, S.ko.opp), opp: Meta.towerHp(S.me.stats.sent, S.ko.me) }; }
+  App.towers = function () { return S && S.tower ? towers() : null; };
   function updateHud() {
     var me = S.me, st = me.stats, K = kindOf();
     if (S.kind === 'battle') {
@@ -1594,6 +1609,13 @@
       if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
       if (S.race) { txt('sentMe', String(Math.min(S.race, st.lines))); txt('sentOpp', String(Math.min(S.race, S.opp.stats.lines))); }
       else { txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent)); }
+      if (S.tower) {
+        var tw = towers(), bm = $('towMeBar'), bo = $('towOppBar');
+        txt('towMe', String(tw.me)); txt('towOpp', String(tw.opp));
+        if (bm) bm.style.width = (tw.me / Meta.TOWER.hp * 100) + '%';
+        if (bo) bo.style.width = (tw.opp / Meta.TOWER.hp * 100) + '%';
+        if (S.state === 'play' && (tw.me <= 0 || tw.opp <= 0)) endBattle('');
+      }
       txt('ptsMe', t('pts', L.num(st.score)));
       var c = $('clock');
       txt('clock', fmtClock(S.left));
