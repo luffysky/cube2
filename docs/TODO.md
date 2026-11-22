@@ -65,7 +65,10 @@
 - [x] cube1 提供受控 staging signer → 跑有效、錯 audience／issuer／scope／sub、換鑰、缺 key 的實測（A0–A14 全 PASS，2026-11-23）
 - [x] 機器簽發端與 `admin-jwks.json` 在 staging 上線，A0–A14 全 PASS（證據：cube1 Actions 45051087698、cube1 Issue #18）
 - [ ] 正式站開管理 API：cube1 正式 issuer `identity.snowrealm.pet` 的 admin JWKS 與 signer 上線 → Owner 核准後在 Vercel Production 設 `BRICKDUEL_ADMIN_SUBJECTS`（現在正式站 `admin: false`）
-- [ ] 帳號綁定 staging（B1–B13）：cube1 給 `IDENTITY_AUTHORIZE_URL`（我設）＋ Owner 貼 `IDENTITY_STAGING_CLIENT_SECRET` ＋ 兩個測試帳號 ＋ B4 harness → 跑 B1–B13
+- [x] 帳號綁定 staging 準備：設定核對、合約核對、拒絕路徑實測、B13 PASS（2026-11-23）
+- [ ] cube1：staging 同意頁（`/oauth/authorize` 現在寫死 503；入口頁只認正式 client）→ 給我網址，我換掉 `IDENTITY_AUTHORIZE_URL` 佔位值
+- [ ] Owner：在 Neon 主控台複製 cube1 staging 的 `IDENTITY_BRICKDUEL_CLIENT_SECRET`，直接貼進 Vercel `IDENTITY_STAGING_CLIENT_SECRET`（覆蓋佔位值）→ 我用 `token 400` 驗證兩邊一致
+- [ ] cube1：兩個合成測試帳號、B4 harness → 跑 B1–B12
 - [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`
 - [ ] Owner 同意後刪 `accept-jwks` 分支（A7–A9 驗收用的暫時 JWKS，已不被信任）
 

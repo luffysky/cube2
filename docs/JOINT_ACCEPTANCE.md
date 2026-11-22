@@ -134,19 +134,49 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | A12 | PASS | 2026-11-22 17:44:17–32 | 稽核表：同一分鐘內第 1–60 次有效呼叫 200（id 1–9、13–63），第 61 次（id 64）429 | — |
 | A13 | PASS | 2026-11-22 17:44 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；證據 [cube1 Actions #45051087698](https://github.com/luffysky/cube1/actions/runs/45051087698)、[Issue #18](https://github.com/luffysky/cube1/issues/18#issuecomment-7084081394)）。405 不帶 sub，依設計不寫入稽核表 | — |
 | A14 | PASS | 2026-11-22 17:56（台北 11-23 01:56） | Neon 主控台 SQL Editor，專案 `neon-crimson-envelope`、**`staging` 分支**（`br-raspy-silence-azzokuib`）、資料庫 `neondb`，只執行 SELECT。見下方「A14 稽核查核」 | — |
-| B1 | BLOCKED | 2026-11-23 00:05 | staging Preview 已設 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_STAGING_REDIRECT`、`IDENTITY_LINK_ENABLED`；`link` 仍是 false | identity-staging 已上線、玩家 JWKS 可取得（kid `srstagep_nmkeJAZFwC5B6-ZJ`）；仍缺 `IDENTITY_AUTHORIZE_URL`、`IDENTITY_STAGING_CLIENT_SECRET`、兩個測試帳號，所以 `link` 還是 false |
-| B2 | BLOCKED | 2026-11-22 | 同上 | 同上，另需第二台裝置 |
-| B3 | BLOCKED | 2026-11-22 | 同上 | 同上，另需兩個測試帳號 |
-| B4 | BLOCKED | 2026-11-22 | 同上 | 同上，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
-| B5 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
-| B6 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
-| B7 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
-| B8 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
-| B9 | BLOCKED | 2026-11-22 | 同上 | 同 B1，另需 cube1 可以撤銷 token |
-| B10 | BLOCKED | 2026-11-22 | 同上 | 同 B1，另需 cube1 讓 status 端點暫時失效 |
-| B11 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
-| B12 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
-| B13 | BLOCKED | 2026-11-22 | 正式站排行榜與健康檢查正常，但這是正式站的旁證，不算 staging 的結果 | 同 B1 |
+| B1 | BLOCKED | 2026-11-22 19:38 | staging `acc6f6a`：`link: true`（設定齊全）。`POST /api/auth/start` 回 200，入口網址帶 `client_id=brickduel-bff-staging`、`redirect_uri=https://brickduel-staging.snowrealm.pet/api/auth/callback`、S256、state／nonce／challenge 各 43 字；用測試玩家自己的金鑰 start link 200，錯金鑰 401。cube2 用假 code 換 token，cube1 `/oauth/token` 回 401（`[zz] auth token (token 401)`），代表網路、路徑、header、JSON 欄位都到得了 client 驗證這一步 | ① cube1 staging 沒有可登入的同意頁：`/oauth/authorize` 寫死回 503，`/health/live` 是 `authorizationAvailable: false`；cube1 的入口頁（`sso-flow.mjs`）只接受正式 client `brickduel-bff` 與正式 callback。② `IDENTITY_STAGING_CLIENT_SECRET` 目前是暫時佔位值，要換成 cube1 staging 的 `IDENTITY_BRICKDUEL_CLIENT_SECRET`。③ 兩個合成測試帳號 |
+| B2 | BLOCKED | 2026-11-22 19:40 | 同 B1 | 同 B1，另需第二個瀏覽器設定檔 |
+| B3 | BLOCKED | 2026-11-22 19:40 | 同 B1 | 同 B1（需兩個測試帳號） |
+| B4 | BLOCKED | 2026-11-22 19:40 | — | 同 B1，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
+| B5 | BLOCKED | 2026-11-22 19:40 | — | 同 B1 |
+| B6 | BLOCKED | 2026-11-22 19:34 | cube2 端預先實測：同一個 session 第二次回呼 → `/?auth=replay`（沒有 cube1 的真 code，不算完整流程） | 同 B1 |
+| B7 | BLOCKED | 2026-11-22 19:40 | — | 同 B1（本機測試已涵蓋 10 分鐘過期） |
+| B8 | BLOCKED | 2026-11-22 19:34 | cube2 端預先實測：state 不對 → `/?auth=state`（不算完整流程） | 同 B1 |
+| B9 | BLOCKED | 2026-11-22 19:40 | — | 同 B1，另需 cube1 撤銷 token |
+| B10 | BLOCKED | 2026-11-22 19:40 | cube2 端預先實測：cube1 token 端點還沒開的時候（19:34 UTC）回呼得到 `/?auth=unavailable`，沒有放行 | 同 B1，另需 cube1 讓 status 端點暫時失效 |
+| B11 | BLOCKED | 2026-11-22 19:34 | cube2 端預先實測：回呼帶 `error=access_denied` → `/?auth=denied`（不算完整流程，要 cube1 入口真的按取消） | 同 B1 |
+| B12 | BLOCKED | 2026-11-22 19:40 | — | 同 B1 |
+| B13 | PASS | 2026-11-22 19:38 | staging `acc6f6a`、`link: true` 時，合成匿名玩家 `staging-test-b0`（不連結）照常：`hello` 建檔、`sync` 改名與回報一場 200、`/api/board` 200、`history` 1 場。正式站同時是 `link: false` | — |
+
+### B 組準備（2026-11-23 03:45 台北）
+
+**Preview／staging 分支的 Identity 設定**（敏感值只看名稱）
+
+| 變數 | 狀態 |
+|---|---|
+| `IDENTITY_STAGING` | 敏感、看不到值；但 `link: true` 只有在 staging 模式才可能成立（非 staging 模式要的是正式 secret，這裡沒有），所以實際是 `1` |
+| `IDENTITY_LINK_ENABLED` | `1` |
+| `IDENTITY_ISSUER` | `https://identity-staging.snowrealm.pet`（與 cube1 `/health/live` 回報的 issuer 相同） |
+| `IDENTITY_JWKS_URL` | `…/.well-known/jwks.json`（玩家 kid `srstagep_nmkeJAZFwC5B6-ZJ`） |
+| `IDENTITY_AUDIENCE` | `snowrealm:brickduel:api`（與 cube1 `PLAYER_AUDIENCE` 相同） |
+| `IDENTITY_STAGING_REDIRECT` | `https://brickduel-staging.snowrealm.pet/api/auth/callback`（與 cube1 `STAGING_CLIENT.redirectUri` 相同） |
+| `IDENTITY_STAGING_CLIENT_ID` | 沒設，用預設 `brickduel-bff-staging`（與 cube1 `STAGING_CLIENT.clientId` 相同） |
+| `IDENTITY_STAGING_CLIENT_SECRET` | **暫時佔位值**（19:32 UTC 設，cube1 會拒絕）→ 要換成 cube1 staging 的 `IDENTITY_BRICKDUEL_CLIENT_SECRET` |
+| `IDENTITY_AUTHORIZE_URL` | **暫時佔位值** `…/authorize-placeholder` → 要換成 cube1 的 staging 同意頁 |
+| `IDENTITY_TOKEN_URL`／`_STATUS_URL` | 沒設，用 issuer 加 `/oauth/token`、`/v1/token/status` |
+
+**會讓 `link:false` 的條件**（`server/bff.js` `settings()`）：Identity 三個值缺一、`IDENTITY_LINK_ENABLED` 不是 1、不在 staging 模式、client id 不合格或等於正式的、redirect 不是乾淨的 https 回呼或是正式網域、staging secret 少於 32 字或等於正式 secret、issuer 是正式的、沒有 `IDENTITY_AUTHORIZE_URL`、token／status 網址指向正式 issuer 或不是 https。原本缺的是 secret 和入口網址兩項，現在用佔位值補上，所以拒絕路徑可以在 staging 實測。
+
+**與 cube1 OAuth 合約核對**（cube1 PR #17 `e6488c5`）：
+- `/oauth/token`：cube2 送 `x-snowrealm-client-secret` header、`Content-Type: application/json`、剛好 6 個欄位 `clientId, redirectUri, code, codeVerifier, state, nonce`，伺服器發出不帶 Origin，全部符合 cube1 的檢查。
+- 長度：state、nonce 43 字，verifier 64 字，challenge 43 字，都在 cube1 的格式範圍內。
+- token：cube1 簽 `iss/sub/aud/scope/nonce/iat/nbf/exp/jti`，cube2 驗 EdDSA、kid、iss、aud、sub（UUID）、jti、時間、scope，並要求 nonce 等於自己存的那個。
+- `/v1/token/status`：兩邊都用 Bearer 加 `x-snowrealm-client-secret`。
+- **不相容的地方**：cube1 入口頁 `dist/sso-flow.mjs` 寫死只接受 `client_id=brickduel-bff` 與正式 callback，而且只送正式的 `https://identity.snowrealm.pet/oauth/authorize`。staging 要另做（或讓它認得 staging client 與 issuer），否則 cube2 staging 發出的入口網址會被它當成無效。
+
+**secret 怎麼對上而不經過聊天**：cube2 無法讀 cube1 的 Neon Function 環境變數，也不該讓值經過聊天或日誌。做法是 Owner 在 Neon 主控台複製 cube1 staging 的 `IDENTITY_BRICKDUEL_CLIENT_SECRET`，直接貼進 Vercel 的 `IDENTITY_STAGING_CLIENT_SECRET`（Preview、staging 分支、Sensitive，覆蓋佔位值）。貼好後我用假 code 打一次：伺服器日誌從 `token 401`（secret 不對）變成 `token 400`（secret 對，code 無效），就證明兩邊一致，全程不用看到值。
+
+**本機已過（不算 staging）**：`test/bff.test.js` 101 項（PKCE、state、nonce 必填與不符、replay、過期、換瀏覽器、撤銷、status 503／逾時、JWKS 抓不到、衝突、找回、30 天內 restore）、`test/identity.test.js` 55 項、`test/authui.js` 9 項（瀏覽器實際走連結、找回、衝突的畫面）、`test/api.test.js` 410 項。
 
 ### A14 稽核查核（2026-11-22 17:56 UTC，staging 分支，唯讀）
 
