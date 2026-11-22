@@ -94,6 +94,8 @@ cube1 提供：
 | `BRICKDUEL_ADMIN_ISSUER` | cube1 staging admin signer 的 issuer（不能是 `https://identity.snowrealm.pet`） | cube1 |
 | `BRICKDUEL_ADMIN_JWKS_URL` | cube1 staging 的 `/.well-known/admin-jwks.json`（https，只放公開 JWK） | cube1 |
 | `BRICKDUEL_ADMIN_SUBJECTS` | `svc:snowrealm-games-admin` | 固定 |
+
+cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`。2026-11-22 22:55 查過：這個網域**沒有 DNS 紀錄**，Vercel 也查不到 A 或 CNAME，連線直接失敗，所以**還不存在**。等它實際用 HTTPS 回應、而且 JWKS 只有公鑰，cube2 才會把這四個值設到 Preview（只限 `staging` 分支）。這些值都不是秘密，Claude 用 Vercel 直接設，不需要 Owner 貼任何東西。
 | `aud`／`scope`（token 內） | `snowrealm:brickduel:admin`／`brickduel:admin:read` | 固定 |
 
 - 設了 `BRICKDUEL_ADMIN_TEST_TRUST=1`，staging 就只會用 `STAGING_DATABASE_URL`（見 `server/db.js`）。
@@ -106,6 +108,7 @@ cube1 提供：
 - 能自動產生的情境都會自動跑：A1、A2、A3、A4、A5、A6、A10、A11、A12、A13。A7、A8、A9、A14 會列出要手動做的步驟。
 - 輸出 JSON 報告，裡面沒有 token、bypass 密碼或玩家資料。
 - 2026-11-22 已在本機 dev-server 演練：用測試金鑰跑一次，A1–A13 能自動化的全部照預期回應。這只是演練，**不是** staging 實測。
+- **先做預檢（A0）**：每次執行都先查 `/api/health?deep=1`。必須是 `dbSource: "staging"`、`db: true`、`admin: true`；有給 `EXPECT_BUILD` 時，部署版本也要相符；有給 `ADMIN_JWKS_URL` 時，JWKS 必須是 https、只有公鑰、全部是 Ed25519，而且含 `ADMIN_KID`。任何一項不符就整個停下來，不建資料、不跑任何 A 項。本機演練過：沒設管理信任、或版本不符時，都會在寫入前停下。
 - 加 `SEED=1` 會先在 staging 建一個合成測試玩家（名字 `staging-test-xxxxxx`），再開一次免費寶箱，讓 A1 的 `players/{id}`、`draws` 有東西可讀。正式站一律拒絕這個選項，玩家的金鑰也不會印出來。
 
 ## 實測報告

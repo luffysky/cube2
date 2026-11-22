@@ -941,3 +941,17 @@
 - 新增瀏覽器測試 `test/sound.js`（11 項）：第一次點擊就有聲音；被瀏覽器暫停後會自己恢復；觸控點擊會恢復；被關掉後點擊會重建、音效重新解碼；切走再切回有聲音；按鍵會恢復。
 - 檔案：`src/view.js`、`src/ui.js`、`test/sound.js`（新）、`test/browser-run.js`。｜資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過；瀏覽器 `sound` 11、`music` 10、`flow` 60、`pwa` 52、`onehand` 18。
+- 補記：上一條的 commit 為 [`805b5c0`](https://github.com/luffysky/cube2/commit/805b5c0)，CI run 45032248909 兩個 job 都成功。
+
+## 2026-11-22 23:05（Asia/Taipei）｜驗收工具加預檢；staging 跟上最新 main；identity-staging 還不存在
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的「接續 cube2 staging 聯合驗收」（cube1 預定 staging issuer 為 `https://identity-staging.snowrealm.pet`）
+- **identity-staging 的實況**：2026-11-22 22:55 查過，這個網域沒有 DNS 紀錄（Vercel 查不到 A 或 CNAME，雲端瀏覽器連線失敗），所以不存在。Preview 的管理信任這次不設，A1–A14 和 B1–B13 維持 BLOCKED。
+- **驗收工具加預檢（A0）**：任何寫入（包含 `SEED=1`）或 A 項執行之前，都會先確認：
+  - `/api/health?deep=1` 回 `dbSource: "staging"`、`db: true`、`admin: true`
+  - 有給 `EXPECT_BUILD` 時，部署版本相符
+  - 有給 `ADMIN_JWKS_URL` 時，JWKS 是 https、只有公鑰、全部 Ed25519、而且含 `ADMIN_KID`
+  - 不符就停下來，什麼都不做。本機演練了三種情況：沒設管理信任 → 停；版本不符 → 停；全部符合 → 21 項 PASS、4 項列為手動。
+- 把 `staging` 分支更新到最新 main，讓 staging 也有這次的音效修正和工具更新。部署結果見下一條紀錄。
+- 檔案：`tools/joint-admin-check.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。

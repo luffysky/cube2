@@ -16,7 +16,14 @@
      ADMIN_TOKEN
    and, optional,
      SEED=1             first make one synthetic test player on staging (POST /api/rpc hello, then one free box draw),
-                        so A1 players/{id} and draws have something to read. Refused for any host but staging.
+                        so A1 players/{id} and draws have something to read. Refused for any host but staging, and
+                        refused unless the preflight below passes.
+     EXPECT_BUILD       the 7-character cube2 commit staging should be running (checked in the preflight)
+     ADMIN_JWKS_URL     the staging admin JWKS (checked in the preflight: https, public keys only, ADMIN_KID listed)
+
+   Preflight (always first, recorded as A0): /api/health must say dbSource "staging" and db true (the staging
+   Neon branch, never the production one), admin true (the Preview trust is set), and build = EXPECT_BUILD when given.
+   If it fails, nothing is written and no admin case is run.
 
      node tools/joint-admin-check.js > a-results.json
 
@@ -85,11 +92,46 @@ async function seed() {
   return { seeded: true, player: 'created (id not printed)', draw: drew.status };
 }
 
+async function preflight() {
+  const health = await hit('/api/health?deep=1');
+  let h = null; try { h = JSON.parse(health.text); } catch (e) { h = null; }
+  const why = [];
+  if (health.status !== 200 || !h) why.push('health ' + health.status);
+  else {
+    // (a local rehearsal against tools/dev-server.js runs on its in-memory test database)
+    const local = /^http:\/\/127\.0\.0\.1:\d+$/.test(BASE) && h.dbSource === 'test';
+    if (h.dbSource !== 'staging' && !local) why.push('dbSource is ' + h.dbSource + ', not staging');
+    if (h.db !== true || h.ready === false) why.push('database not ready');
+    if (h.admin !== true) why.push('admin trust not set on the Preview');
+    if (process.env.EXPECT_BUILD && h.build !== process.env.EXPECT_BUILD) why.push('build is ' + h.build + ', expected ' + process.env.EXPECT_BUILD);
+  }
+  let jwks = null;
+  if (process.env.ADMIN_JWKS_URL) {
+    try {
+      if (!/^https:\/\//.test(process.env.ADMIN_JWKS_URL)) throw new Error('not https');
+      const r = await fetch(process.env.ADMIN_JWKS_URL, { redirect: 'error', signal: AbortSignal.timeout(10000) });
+      const j = await r.json();
+      const keys = Array.isArray(j.keys) ? j.keys : [];
+      jwks = { status: r.status, kids: keys.map(k => k.kid), privateParts: keys.some(k => 'd' in k), allEd25519: keys.every(k => k.kty === 'OKP' && k.crv === 'Ed25519') };
+      if (r.status !== 200) why.push('admin JWKS ' + r.status);
+      if (jwks.privateParts) why.push('admin JWKS contains a private key part');
+      if (!jwks.allEd25519 || !keys.length) why.push('admin JWKS keys are not all Ed25519');
+      if (KID && jwks.kids.indexOf(KID) < 0) why.push('ADMIN_KID not in the admin JWKS');
+    } catch (e) { why.push('admin JWKS unreachable: ' + e.message); }
+  }
+  results.push({ caseId: 'A0', what: 'preflight: staging database, admin trust, build, public JWKS', at: new Date().toISOString(), url: BASE + '/api/health?deep=1',
+    status: health.status, result: why.length ? 'FAIL' : 'PASS', health: h ? { db: h.db, dbSource: h.dbSource, admin: h.admin, build: h.build, ready: h.ready } : null, jwks, why });
+  return { ok: !why.length, h };
+}
+
 (async () => {
+  const pf = await preflight();
+  if (!pf.ok) {
+    process.stdout.write(JSON.stringify({ target: BASE, stopped: 'preflight failed: nothing written, no admin case run', ranAt: new Date().toISOString(), results }, null, 2) + '\n');
+    process.exit(2);
+  }
   const seeded = process.env.SEED === '1' ? await seed() : null;
-  const health = await hit('/api/health');
-  let build = null;
-  try { const h = JSON.parse(health.text); build = { build: h.build || null, dbSource: h.dbSource || null, admin: h.admin }; } catch (e) { /* recorded below */ }
+  const build = { build: pf.h.build || null, dbSource: pf.h.dbSource || null, admin: pf.h.admin };
   const T = valid();
   if (!T) note('A1', 'valid token: seven GETs', ADM + '*', null, null, { why: 'no ADMIN_SIGNER_PEM or ADMIN_TOKEN given' });
   else {
