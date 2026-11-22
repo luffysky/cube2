@@ -1079,3 +1079,11 @@
 - B1 記 FAIL（cube1），B2–B12 因 B1 擋住仍是 BLOCKED，B13 維持 PASS。
 - 正式站：`link: false`、`admin: false`。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：staging 多了兩個合成測試玩家（`staging-test-b0`、`staging-b1-x`）。｜刪除：無。
+- 補記：上一條的 commit 為 [`47d9d29`](https://github.com/luffysky/cube2/commit/47d9d29)。cube1 回報 v4 已修（`Referrer-Policy: no-referrer` 讓 Chrome 送出 `Origin: null`，v4 改成 `same-origin`）；cube2 自己驗過，用不存在的帳號登入，v4 顯示「登入失敗」。
+
+## 2026-11-23 04:40（Asia/Taipei）｜B 組改由 cube1 Work 實際登入
+
+- Owner 指示：測試帳號的密碼在 Work 手上，B1–B12 改由 Work 在瀏覽器實際操作；cube2 負責核對伺服器端證據。
+- 新增 `docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`：每一項的操作步驟、預期的 `auth=` 結果、cube2 會核對的伺服器證據，以及交回格式（不含密碼、token、code、cookie）。
+- 測試帳號：Work 在 identity-staging 的 Better Auth 建了兩個（03:34，`@example.test`），密碼不在 repo，也沒經過聊天。
+- 檔案：`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
