@@ -890,7 +890,8 @@
     });
     h += '</div><table class="cmp"><tbody>';
     rows.forEach(function (x) { h += '<tr><td>' + t(x[0]) + '</td><td>' + x[1] + '</td></tr>'; });
-    return h + '</tbody></table>' + (App.profileExtra ? App.profileExtra() : '') + '<div class="row">' + btn('close', 'done', true) + '</div>';
+    h += '</tbody></table><div class="row">' + btn('history', 'hi.open') + '</div>';
+    return h + (App.profileExtra ? App.profileExtra() : '') + '<div class="row">' + btn('close', 'done', true) + '</div>';
   };
 
   App.clicks.push(function (d) {

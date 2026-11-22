@@ -197,7 +197,8 @@ function finish(a, srv, mark) {
   // one line for the match log: what was reported, and whether the piece placements backed it up
   const st = m.stats;
   return { ok: true, rec: { mode: m.mode, result: m.result, proven: !!v, room: m.room, seats: m.seats,
-    data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
+    data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins,
+    minis: st.minis, xspins: st.xspins, tst: st.tst, quads: st.quads, maxCombo: st.maxCombo, place: m.place, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
 }
 // The record as it stands right now (a new day or season may have begun since it was stored).
 function current(state, now) { return clone(open(state, now)); }

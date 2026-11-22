@@ -215,6 +215,10 @@ const routes = {
       case 'redeem':
         out = await db.run(d => core.redeem(d, body, cred, ipTag(req), now));
         break;
+      case 'history':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.history(d, cred, body, now));
+        break;
       case 'delete':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.wipe(d, cred, clock()));

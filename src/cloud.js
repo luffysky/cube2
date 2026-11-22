@@ -601,6 +601,13 @@
       return r.body;
     }, function () { return null; });
   };
+  // the player's own match history from the server: one page (20) of one mode or all; null when it cannot be read
+  Cloud.history = function (mode, page) {
+    if (!Cloud.cred) return Promise.resolve(null);
+    return call('POST', 'rpc', { a: 'history', mode: mode || '', page: page || 1 }, true).then(function (r) {
+      return r.status === 200 && r.body && r.body.ok ? r.body : null;
+    }, function () { return null; });
+  };
   Cloud._forget = function () { boards = {}; };
 
   ZZ.Cloud = Cloud;
@@ -614,6 +621,53 @@
   var $ = function (id) { return document.getElementById(id); };
 
   L.add({
+    'hi.title': ['對戰紀錄', 'Match history', '対戦履歴', '대전 기록'],
+    'hi.open': ['看對戰紀錄', 'Match history', '対戦履歴を見る', '대전 기록 보기'],
+    'hi.all': ['全部', 'All', 'すべて', '전체'],
+    'hi.loading': ['讀取中…', 'Loading…', '読み込み中…', '불러오는 중…'],
+    'hi.fail': ['紀錄現在讀不到，等一下再試。', 'The history cannot be loaded right now. Try again in a moment.', '現在履歴を読み込めません。少し待ってからお試しください。', '지금 기록을 불러올 수 없습니다. 잠시 후 다시 시도하세요.'],
+    'hi.noCloud': ['對戰紀錄存在雲端。打完第一場、雲端存檔建好之後，這裡就會有紀錄。', 'Match history is kept in the cloud. It starts once your first match has made a cloud save.', '対戦履歴はクラウドに保存されます。最初の対戦でクラウドセーブができると表示されます。', '대전 기록은 클라우드에 저장됩니다. 첫 대전으로 클라우드 저장이 만들어지면 표시됩니다.'],
+    'hi.empty': ['這個模式還沒有紀錄。', 'No matches in this mode yet.', 'このモードの記録はまだありません。', '이 모드의 기록이 아직 없습니다.'],
+    'hi.keep': ['保留最近一年；只算雲端收到的場次。', 'The last year is kept; only matches the cloud received count.', '直近1年分を保存。クラウドが受け取った対戦のみ。', '최근 1년을 보관합니다. 클라우드가 받은 대전만 셉니다.'],
+    'hi.games': ['場數', 'Games', '試合数', '경기'],
+    'hi.wl': ['勝／敗／和', 'W / L / D', '勝／敗／分', '승／패／무'],
+    'hi.rate': ['勝率', 'Win rate', '勝率', '승률'],
+    'hi.kd': ['K／D（擊倒／被擊倒）', 'K / D (KOs / knocked out)', 'K／D（KO／被KO）', 'K／D（KO／피KO）'],
+    'hi.kda': ['KD 比', 'K/D ratio', 'KD比', 'KD 비율'],
+    'hi.apm': ['每分鐘攻擊', 'Attack per minute', '毎分攻撃', '분당 공격'],
+    'hi.pps': ['每秒方塊', 'Pieces per second', '毎秒ミノ', '초당 블록'],
+    'hi.best': ['最高分', 'Best score', '最高スコア', '최고 점수'],
+    'hi.sprint': ['40 行最佳', 'Best 40 lines', '40ライン最速', '40줄 최고'],
+    'hi.time': ['總時間', 'Time played', '合計時間', '총 시간'],
+    'hi.win': ['勝', 'Win', '勝ち', '승'],
+    'hi.loss': ['敗', 'Loss', '負け', '패'],
+    'hi.draw': ['和', 'Draw', '引き分け', '무'],
+    'hi.done': ['完成', 'Finished', '完走', '완주'],
+    'hi.quit': ['未完成', 'Not finished', '未完走', '미완주'],
+    'hi.vsAi': ['對電腦・{0}', 'vs computer · {0}', 'CPU・{0}', '컴퓨터・{0}'],
+    'hi.vs': ['對手：{0}', 'Against: {0}', '相手：{0}', '상대: {0}'],
+    'hi.place': ['第 {0} 名／{1} 人', 'Place {0} of {1}', '{1}人中 {0}位', '{1}명 중 {0}위'],
+    'hi.team': ['組隊', 'Teams', 'チーム', '팀'],
+    'hi.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '랜덤 매치'],
+    'hi.pvpOk': ['真人排位・伺服器已核定', 'Ranked vs people · settled by the server', '対人ランク・サーバー確定', '대인 랭크 · 서버 확정'],
+    'hi.pvpBad': ['真人排位・雙方紀錄不一致，不計分', 'Ranked vs people · reports disagreed, not counted', '対人ランク・記録不一致のため無効', '대인 랭크 · 기록 불일치로 무효'],
+    'hi.pvpWait': ['真人排位・等對手紀錄', 'Ranked vs people · waiting for the other report', '対人ランク・相手の記録待ち', '대인 랭크 · 상대 기록 대기'],
+    'hi.proven': ['有落子紀錄佐證', 'Backed by its piece record', '操作記録で確認済み', '조작 기록으로 확인됨'],
+    'hi.unproven': ['沒有落子紀錄（不進排行）', 'No piece record (not on leaderboards)', '操作記録なし（ランキング対象外）', '조작 기록 없음（랭킹 제외）'],
+    'hi.score': ['分數', 'Score', 'スコア', '점수'],
+    'hi.sent': ['攻擊', 'Attack', '攻撃', '공격'],
+    'hi.lines': ['消行', 'Lines', 'ライン', '줄'],
+    'hi.pieces': ['方塊', 'Pieces', 'ミノ', '블록'],
+    'hi.spins': ['T 轉', 'T-spins', 'Tスピン', 'T스핀'],
+    'hi.quads': ['四行消', 'Quads', '4ライン', '4줄'],
+    'hi.combo': ['最高連擊', 'Best combo', '最大コンボ', '최대 콤보'],
+    'hi.items': ['道具', 'Items', 'アイテム', '아이템'],
+    'hi.len': ['時長', 'Length', '時間', '시간'],
+    'hi.page': ['第 {0}／{1} 頁・共 {2} 場', 'Page {0} of {1} · {2} matches', '{0}／{1} ページ・全{2}試合', '{0}／{1} 페이지 · 총 {2}경기'],
+    'hi.prev': ['上一頁', 'Previous', '前へ', '이전'],
+    'hi.next': ['下一頁', 'Next', '次へ', '다음'],
+    'hi.first': ['第一頁', 'First', '最初', '처음'],
+    'hi.last': ['最後一頁', 'Last', '最後', '마지막'],
     'm.board': ['排行榜', 'Leaderboards', 'ランキング', '랭킹'],
     'lb.rp': ['段位', 'Rating', 'レート', '레이팅'],
     'lb.prp': ['真人排位', 'Ranked (people)', '対人ランク', '랭크 (사람)'],
@@ -957,6 +1011,89 @@
     if (d.lbv) { if ((d.lbv === 'lvs' || d.lbv === 'lve') && d.lbv !== lvb) { lvb = d.lbv; fetchBoard(); App.openSheet('board'); } return true; }
     if (d.lbg) { if (MG.indexOf(d.lbg) >= 0 && d.lbg !== mini.g) { mini.g = d.lbg; fetchBoard(); App.openSheet('board'); } return true; }
     if (d.lbl != null) { var k = +d.lbl; if (k >= 0 && k <= 2 && k !== mini.lv) { mini.lv = k; fetchBoard(); App.openSheet('board'); } return true; }
+    return false;
+  });
+
+  // ---------- 對戰紀錄: every match the server has from this save, by mode, twenty to a page ----------
+  var HI_MODES = ['', 'rank', 'net', 'ai', 'ghost', 'sprint'];
+  var HI_NAME = { rank: 'm.rank', net: 'm.online', ai: 'm.battle', ghost: 'm.ghost', sprint: 'm.sprint' };
+  var hi = { mode: '', page: 1, data: null, state: 'idle', ask: 0, open: -1 };
+  function fetchHistory() {
+    var ask = ++hi.ask;
+    hi.state = 'load';
+    Cloud.history(hi.mode, hi.page).then(function (d) {
+      if (ask !== hi.ask) return;
+      hi.data = d; hi.state = d ? 'ok' : 'fail';
+      if (d && d.page !== hi.page) hi.page = d.page;
+      if (App.sheet() === 'history') App.openSheet('history');
+    });
+  }
+  function when(ms) {
+    var d = new Date(ms), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+  function dur(ms) { var s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60; return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s; }
+  function ratio(a, b) { return b > 0 ? (a / b).toFixed(2) : a > 0 ? a.toFixed(2) : '0.00'; }
+  function perMin(n, ms) { return ms > 0 ? (n / (ms / 60000)).toFixed(1) : '—'; }
+  function perSec(n, ms) { return ms > 0 ? (n / (ms / 1000)).toFixed(2) : '—'; }
+  function verdict(m) {
+    if (m.mode === 'sprint') return m.result > 0 ? ['win', t('hi.done')] : ['loss', t('hi.quit')];
+    return m.result > 0 ? ['win', t('hi.win')] : m.result < 0 ? ['loss', t('hi.loss')] : ['draw', t('hi.draw')];
+  }
+  function matchRow(m, i) {
+    var v = verdict(m), open = hi.open === i, sprint = m.mode === 'sprint', tag = [];
+    if (m.mode === 'ai') tag.push(t('hi.vsAi', t('lv' + m.level)));
+    if (m.mode === 'net') {
+      if (m.place && m.seats > 2) tag.push(t('hi.place', m.place, m.seats));
+      if (m.team) tag.push(t('hi.team'));
+      if (m.quick) tag.push(t('hi.quick'));
+      if (m.foes.length) tag.push(t('hi.vs', m.foes.map(function (n) { return n || t('player'); }).join('、')));
+    }
+    if (m.pr) tag.push(t(m.pvp === true ? 'hi.pvpOk' : m.pvp === false ? 'hi.pvpBad' : 'hi.pvpWait'));
+    var head = '<button type="button" class="hi-row" data-hi-open="' + i + '" aria-expanded="' + open + '">' +
+      '<i class="hi-v ' + v[0] + '">' + esc(v[1]) + '</i>' +
+      '<span class="hi-main"><b>' + esc(t(HI_NAME[m.mode] || 'm.battle')) + '</b><small>' + esc(when(m.at)) + (tag.length ? ' · ' + esc(tag.join(' · ')) : '') + '</small></span>' +
+      '<span class="hi-k">' + (sprint ? esc(App.fmtTime(m.ms)) : '<b>' + m.ko + '</b>／' + m.koOpp) + '</span></button>';
+    if (!open) return '<li>' + head + '</li>';
+    var cells = sprint
+      ? [['hi.len', App.fmtTime(m.ms)], ['hi.lines', m.lines], ['hi.pieces', m.pieces], ['hi.pps', perSec(m.pieces, m.ms)], ['hi.spins', m.spins + m.minis], ['hi.quads', m.quads], ['hi.combo', m.combo], ['hi.score', L.num(m.score)]]
+      : [['hi.kd', m.ko + '／' + m.koOpp], ['hi.kda', ratio(m.ko, m.koOpp)], ['hi.score', L.num(m.score)], ['hi.sent', m.sent], ['hi.apm', perMin(m.sent, m.ms)], ['hi.lines', m.lines],
+         ['hi.pieces', m.pieces], ['hi.pps', perSec(m.pieces, m.ms)], ['hi.spins', m.spins + m.minis + m.xspins], ['hi.quads', m.quads], ['hi.combo', m.combo], ['hi.items', m.items], ['hi.len', dur(m.ms)]];
+    var body = '<dl class="hi-dl">' + cells.map(function (c) { return '<div><dt>' + t(c[0]) + '</dt><dd>' + esc(String(c[1])) + '</dd></div>'; }).join('') + '</dl>' +
+      '<p class="note">' + t(m.proven ? 'hi.proven' : 'hi.unproven') + '</p>';
+    return '<li class="open">' + head + body + '</li>';
+  }
+  App.dismiss.history = 1;
+  App.sheets.history = function () {
+    var h = '<h2>' + t('hi.title') + '</h2><div class="seg wrap" role="radiogroup" aria-label="' + esc(t('hi.title')) + '">';
+    HI_MODES.forEach(function (m) { h += '<button type="button" role="radio" aria-checked="' + (hi.mode === m) + '" data-hi-mode="' + m + '">' + esc(t(m ? HI_NAME[m] : 'hi.all')) + '</button>'; });
+    h += '</div>';
+    if (!Cloud.cred) return h + '<p class="note">' + t('hi.noCloud') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+    if (hi.state !== 'ok' && hi.state !== 'fail') return h + '<p class="note lb-wait">' + t('hi.loading') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+    if (hi.state === 'fail') return h + '<p class="warn">' + t('hi.fail') + '</p><div class="row">' + btn('historyRetry', 'lb.retry') + btn('close', 'close', true) + '</div>';
+    var d = hi.data, s = d.sum, sprintOnly = hi.mode === 'sprint';
+    var stats = sprintOnly
+      ? [['hi.games', s.games], ['hi.wl', s.win + '／' + (s.games - s.win)], ['hi.sprint', s.sprint ? App.fmtTime(s.sprint) : '—'], ['hi.lines', L.num(s.lines)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.time', dur(s.ms)]]
+      : [['hi.games', s.games], ['hi.wl', s.win + '／' + s.loss + '／' + s.draw], ['hi.rate', s.games ? Math.round(s.win / s.games * 100) + '%' : '—'], ['hi.kd', s.ko + '／' + s.koOpp],
+         ['hi.kda', ratio(s.ko, s.koOpp)], ['hi.apm', perMin(s.sent, s.ms)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.best', L.num(s.best)], ['hi.time', dur(s.ms)]];
+    h += '<dl class="hi-dl hi-sum">' + stats.map(function (c) { return '<div><dt>' + t(c[0]) + '</dt><dd>' + esc(String(c[1])) + '</dd></div>'; }).join('') + '</dl>';
+    if (!d.items.length) h += '<p class="lb-none">' + t('hi.empty') + '</p>';
+    else h += '<ol class="hi-list">' + d.items.map(matchRow).join('') + '</ol>';
+    if (d.pages > 1) {
+      var pb = function (to, key, off) { return '<button type="button" class="btn" data-hi-page="' + to + '"' + (off ? ' disabled' : '') + '>' + t(key) + '</button>'; };
+      h += '<p class="note hi-pg">' + esc(t('hi.page', d.page, d.pages, d.total)) + '</p><div class="row hi-pager">' +
+        pb(1, 'hi.first', d.page <= 1) + pb(d.page - 1, 'hi.prev', d.page <= 1) + pb(d.page + 1, 'hi.next', d.page >= d.pages) + pb(d.pages, 'hi.last', d.page >= d.pages) + '</div>';
+    } else if (d.total) h += '<p class="note hi-pg">' + esc(t('hi.page', 1, 1, d.total)) + '</p>';
+    return h + '<p class="note">' + t('hi.keep') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+  };
+  App.opened.history = function () { if (hi.state === 'idle') fetchHistory(); };
+  App.closed.history = function () { hi.state = 'idle'; hi.data = null; hi.ask++; hi.open = -1; };
+  App.acts.history = function () { hi.page = 1; hi.open = -1; hi.state = 'idle'; App.openSheet('history'); };
+  App.acts.historyRetry = function () { fetchHistory(); App.openSheet('history'); };
+  App.clicks.push(function (d) {
+    if (d.hiMode != null) { if (HI_MODES.indexOf(d.hiMode) >= 0 && d.hiMode !== hi.mode) { hi.mode = d.hiMode; hi.page = 1; hi.open = -1; fetchHistory(); App.openSheet('history'); } return true; }
+    if (d.hiPage != null) { var p = Math.floor(+d.hiPage); if (p >= 1 && p !== hi.page) { hi.page = p; hi.open = -1; fetchHistory(); App.openSheet('history'); App.el.sheetCard.scrollTop = 0; } return true; }
+    if (d.hiOpen != null) { var i = +d.hiOpen; hi.open = hi.open === i ? -1 : i; App.openSheet('history'); return true; }
     return false;
   });
 

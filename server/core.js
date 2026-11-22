@@ -256,6 +256,50 @@ async function restore(db, cred, now) {
   return good({ restored: true, st: rules.current(r[0].state, now), ver: r[0].ver, pub: r[0].pub, now });
 }
 
+// ---------- a player's own match history (對戰紀錄) ----------
+// Every match the server has seen from this save (kept a year, LIMIT.MATCHES_KEEP), newest first, twenty to a page,
+// for one mode or all of them, with totals for that same choice. Only the player's own reports; for online rooms the
+// names of the others who reported from the same room around the same time, and for ranked against people whether
+// the server settled it. Nothing about the others beyond their shown name.
+const HIST = { PER: 20, PAGES: 500, MODES: ['ai', 'rank', 'ghost', 'net', 'sprint'], NEAR: 15 * 60000 };
+async function history(db, cred, body, now) {
+  const row = await findPlayer(db, cred);
+  if (!row) return fail(401, 'auth');
+  if (row.pending) return pending(row.pending);
+  const mode = HIST.MODES.indexOf(body && body.mode) >= 0 ? body.mode : '';
+  let page = Math.min(HIST.PAGES, Math.max(1, Math.floor(+(body && body.page)) || 1));
+  const args = [row.id, now - LIMIT.MATCHES_KEEP], where = ['m.pid = $1', 'm.at >= $2'];
+  if (mode) { args.push(mode); where.push('m.mode = $3'); }
+  const w = where.join(' AND ');
+  const t = (await db.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE result > 0)::int AS win, count(*) FILTER (WHERE result < 0)::int AS loss,
+        count(*) FILTER (WHERE result = 0)::int AS draw,
+        COALESCE(sum((data->>'ko')::int), 0)::int AS ko, COALESCE(sum((data->>'koOpp')::int), 0)::int AS ko_opp,
+        COALESCE(sum((data->>'sent')::int), 0)::int AS sent, COALESCE(sum((data->>'lines')::int), 0)::int AS lines,
+        COALESCE(sum((data->>'pieces')::int), 0)::int AS pieces, COALESCE(sum((data->>'ms')::float8), 0)::float8 AS ms,
+        COALESCE(max((data->>'score')::int), 0)::int AS best, min((data->>'ms')::float8) FILTER (WHERE mode = 'sprint' AND result > 0) AS sprint
+      FROM zz.matches m WHERE ${w}`, args))[0] || {};
+  const total = Math.max(0, +t.n || 0), pages = Math.max(1, Math.ceil(total / HIST.PER));
+  page = Math.min(page, pages);
+  const list = await db.query(`SELECT m.id, m.at, m.mode, m.result, m.proven, m.room, m.seats, m.data,
+        (SELECT v.ok FROM zz.pvp v WHERE v.m1 = m.id OR v.m2 = m.id LIMIT 1) AS pvp,
+        CASE WHEN m.room <> '' THEN (SELECT COALESCE(json_agg(DISTINCT o.name), '[]'::json) FROM zz.matches om JOIN zz.players o ON o.id = om.pid
+          WHERE om.room = m.room AND om.mode = 'net' AND om.pid <> m.pid AND om.at BETWEEN m.at - ${HIST.NEAR} AND m.at + ${HIST.NEAR} AND o.gone IS NULL) END AS foes
+      FROM zz.matches m WHERE ${w} ORDER BY m.at DESC, m.id DESC LIMIT ${HIST.PER} OFFSET ${(page - 1) * HIST.PER}`, args);
+  const int = v => Number.isFinite(+v) ? Math.max(0, Math.round(+v)) : 0;
+  const items = list.map(r => {
+    const d = r.data || {};
+    return { id: String(r.id), at: +r.at, mode: r.mode, result: r.result, proven: !!r.proven, seats: r.seats,
+      pvp: r.pvp == null ? null : !!r.pvp, foes: Array.isArray(r.foes) ? r.foes.filter(n => typeof n === 'string').slice(0, 7) : [],
+      level: int(d.level), ms: int(d.ms), ko: int(d.ko), koOpp: int(d.koOpp), score: int(d.score), sent: int(d.sent), lines: int(d.lines),
+      pieces: int(d.pieces), spins: int(d.spins), minis: int(d.minis), xspins: int(d.xspins), tst: int(d.tst), quads: int(d.quads),
+      combo: int(d.maxCombo), items: int(d.items), place: int(d.place), team: !!d.team, quick: !!d.quick, pr: !!d.pr };
+  });
+  return good({ mode, page, per: HIST.PER, total, pages, items,
+    sum: { games: total, win: int(t.win), loss: int(t.loss), draw: int(t.draw), ko: int(t.ko), koOpp: int(t.ko_opp), sent: int(t.sent),
+      lines: int(t.lines), pieces: int(t.pieces), ms: int(t.ms), best: int(t.best), sprint: t.sprint == null ? null : int(t.sprint) },
+    keep: LIMIT.MATCHES_KEEP, now });
+}
+
 // ---------- leaderboards ----------
 const PUB = /^[a-z0-9]{8}$/;
 async function board(db, b, scope, me, now) {
@@ -535,4 +579,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

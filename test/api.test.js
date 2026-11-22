@@ -172,6 +172,41 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(r.json.res[0].why === 'range', 'nor one that cleared too few lines');
   r = await sync(A, [op('fin', taped({ mode: 'sprint', result: 1, ms: 71500, stats: { score: 9000, lines: 40, pieces: 101 } }))]);
   ok(r.json.res[0].ok && r.json.st.tot.sprint === 71500, 'a real sprint counts', r.json.st.tot);
+
+  // ---------- 對戰紀錄 (match history) ----------
+  eq((await rpc({ a: 'history' })).status, 401, 'history needs the save\'s key');
+  r = await rpc({ a: 'history' }, A);
+  let mine = await pg.query('SELECT count(*)::int AS n FROM zz.matches WHERE pid = $1', [A.id]);
+  ok(r.json.ok && r.json.total === mine[0].n && r.json.items.length === mine[0].n && r.json.page === 1 && r.json.pages === 1 && r.json.per === 20, 'history lists every match of this save', r.json);
+  ok(r.json.items[0].mode === 'sprint' && r.json.items[0].ms === 71500 && r.json.items.every((m, i, a) => !i || a[i - 1].at >= m.at), 'newest first, with the length of each', r.json.items.map(m => [m.mode, m.at]));
+  let rk = r.json.items.find(m => m.mode === 'rank');
+  ok(rk && rk.ko === 3 && rk.koOpp === 1 && rk.result === 1 && rk.proven === true && rk.quads === 1 && rk.combo === 2 && rk.spins === 3 && rk.sent === 30 && rk.pieces === 120 && typeof rk.at === 'number', 'each match carries K/D and the detail', rk);
+  ok(r.json.sum.games === mine[0].n && r.json.sum.ko >= 3 && r.json.sum.koOpp >= 1 && r.json.sum.sprint === 71500 && r.json.sum.best === 365000, 'totals for the same choice', r.json.sum);
+  ok(!/"(pid|key|hash|pub|state|srv)"/.test(r.text), 'nothing about keys or the raw record', r.text.slice(0, 300));
+  r = await rpc({ a: 'history', mode: 'ai' }, A);
+  ok(r.json.mode === 'ai' && r.json.items.length === 3 && r.json.items.every(m => m.mode === 'ai') && r.json.sum.games === 3, 'one mode at a time', r.json.items.map(m => m.mode));
+  r = await rpc({ a: 'history', mode: 'nope' }, A);
+  eq(r.json.mode, '', 'an unknown mode means all');
+  r = await rpc({ a: 'history' }, Bx);
+  ok(r.json.items.every(m => m.mode !== 'sprint' || false) && r.json.total === 2, 'another save sees only its own', r.json.total);
+  // twenty to a page, the last page clamps
+  await pg.query("INSERT INTO zz.matches (pid, at, mode, result, proven, data) SELECT $1, $2::float8 - g * 1000, 'ghost', CASE WHEN g % 3 = 0 THEN -1 ELSE 1 END, true, jsonb_build_object('ko', 1, 'koOpp', g % 2, 'ms', 60000, 'score', g) FROM generate_series(1, 45) g", [Bx.id, Date.now()]);
+  r = await rpc({ a: 'history', mode: 'ghost', page: 1 }, Bx);
+  ok(r.json.total === 45 && r.json.pages === 3 && r.json.items.length === 20 && r.json.items[0].score === 1 && r.json.items[19].score === 20, 'page 1 has the newest twenty', r.json.items.map(m => m.score));
+  r = await rpc({ a: 'history', mode: 'ghost', page: 3 }, Bx);
+  ok(r.json.page === 3 && r.json.items.length === 5 && r.json.items[4].score === 45, 'the last page has the rest', r.json.items.map(m => m.score));
+  r = await rpc({ a: 'history', mode: 'ghost', page: 99 }, Bx);
+  ok(r.json.page === 3 && r.json.items.length === 5, 'a page past the end shows the last one', r.json.page);
+  r = await rpc({ a: 'history', mode: 'ghost', page: -4 }, Bx);
+  eq(r.json.page, 1, 'a page before the start shows the first');
+  ok((await rpc({ a: 'history', mode: 'ghost' }, Bx)).json.sum.win === 30 && (await rpc({ a: 'history', mode: 'ghost' }, Bx)).json.sum.loss === 15, 'wins and losses add up');
+  // an online room: who else reported from it, and the place
+  const Hn = await newPlayer({ name: '阿華' }, '203.0.113.88');
+  r = await sync(Hn, [op('fin', [match({ mode: 'net', room: 'AB23C', seats: 4, result: 1, place: 1 })])]);
+  r = await rpc({ a: 'history', mode: 'net' }, Hn);
+  ok(r.json.items[0].foes.length === 1 && r.json.items[0].place === 1 && r.json.items[0].seats === 4, 'an online match names the others from the room and the place', r.json.items[0]);
+  r = await rpc({ a: 'history', mode: 'net' }, Bx);
+  ok(r.json.items[0].foes.indexOf('阿華') >= 0, 'and the other side sees this one', r.json.items[0].foes);
   r = await call('board', { url: '/api/board?b=sprint&s=all&me=' + A.pub });
   ok(r.json.top[0].v === 71500 && r.json.me.rank === 1 && r.json.me.v === 71500, 'sprint board shows the time', r.json);
   // the coin ledger: written by the server, adds up to the balance, never twice for one change

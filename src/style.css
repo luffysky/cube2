@@ -1009,3 +1009,26 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .ds-how summary { cursor: pointer; font-weight: 700; }
 .ds-how ul { margin: 6px 0 0; padding-left: 1.2em; line-height: 1.55; }
 .ds-how li + li { margin-top: 4px; }
+
+/* 對戰紀錄: totals, then one row per match that opens to its numbers */
+.hi-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; margin: 8px 0 10px; }
+.hi-dl div { padding: 7px 10px; background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; min-width: 0; }
+.hi-dl dt { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hi-dl dd { margin: 2px 0 0; font: italic 700 18px/1.1 var(--num); font-variant-numeric: tabular-nums; }
+.hi-sum div { background: var(--floor); }
+.hi-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.hi-list li { background: var(--panel); border: 1px solid var(--edge); border-radius: 11px; }
+.hi-list li.open { border-color: var(--edge-deep); padding-bottom: 6px; }
+.hi-list li .hi-dl, .hi-list li .note { margin-left: 8px; margin-right: 8px; }
+.hi-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 7px 12px 7px 7px; background: none; border: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; border-radius: 11px; }
+.hi-row:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.hi-v { display: grid; place-items: center; height: 30px; border-radius: 7px; font-style: normal; font-weight: 800; font-size: 13px; background: var(--floor); color: var(--muted); }
+.hi-v.win { background: var(--gold); color: #1B2530; }
+.hi-v.loss { background: var(--alarm); color: #fff; }
+.hi-main { min-width: 0; }
+.hi-main b { display: block; font-size: 15px; }
+.hi-main small { display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hi-k { font: italic 700 18px/1 var(--num); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+.hi-k b { color: var(--ink); }
+.hi-pager { flex-wrap: wrap; }
+.hi-pg { text-align: center; }

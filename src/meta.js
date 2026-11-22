@@ -1048,6 +1048,7 @@
       mode: mode, result: m.result > 0 ? 1 : m.result < 0 && !sprint ? -1 : 0, level: int(m.level, 0, 6),
       team: mode === 'net' && m.team === true, quick: mode === 'net' && m.quick === true, pr: mode === 'net' && m.pr === true,
       // which online room it was played in and how many seats it had, so the reports of one match can be put together
+      place: mode === 'net' ? int(m.place, 0, 8) : 0,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       ms: ms, time: sprint ? ms : 0,
