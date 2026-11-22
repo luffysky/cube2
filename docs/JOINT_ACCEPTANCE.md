@@ -119,20 +119,21 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 
 | # | 結果 | 時間（UTC） | 證據 | 原因／下一步 |
 |---|---|---|---|---|
-| A1 | PENDING | 2026-11-23 01:20 | identity-staging 已上線，admin JWKS 可取得；cube2 staging 管理信任已指向它並重新部署。**尚未有任何一次帶 cube1 簽發 JWT 的 staging HTTP 呼叫** | 等 cube1 用 `ADMIN_JWKS_URL=https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`、`ADMIN_KID=srstagea_EWW-tM7u8uSnvCwV`、`ADMIN_ISS=https://identity-staging.snowrealm.pet`、`EXPECT_BUILD=`（staging 當時版本）執行 `tools/joint-admin-check.js`，交回 JSON 報告 |
-| A2 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
-| A3 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
-| A4 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
-| A5 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
-| A6 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
-| A7 | BLOCKED | 2026-11-22 | — | 同上，另需 cube1 在 staging JWKS 並列兩把金鑰 |
-| A8 | BLOCKED | 2026-11-22 | — | 同 A7 |
-| A9 | BLOCKED | 2026-11-22 | — | 同上，另需 cube1 讓 staging JWKS 暫時無法存取 |
-| A10 | PENDING | 2026-11-23 | — | 同 A1 |
-| A11 | PENDING | 2026-11-23 | — | 同 A1 |
-| A12 | PENDING | 2026-11-23 | — | 同 A1 |
-| A13 | PENDING | 2026-11-23 | — | 同 A1（POST 要由 cube1 送；cube2 這邊的工具只能發 GET） |
-| A14 | BLOCKED | 2026-11-22 | — | A1–A13 跑完後，Owner 在 Neon staging 分支查 `zz.admin_log` |
+| A0 | PASS | 2026-11-22 17:44 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；Actions 連結待 cube1 補）；預檢：`dbSource: staging`、`db`、`admin` 為 true、build `1d1e1ca`、JWKS 只有公鑰 | — |
+| A1 | PASS | 2026-11-22 17:44:10–13 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；Actions 連結待 cube1 補）。稽核表佐證：id 1–9 同一個 jti `3e05f934…` 依序讀 overview、players、draws、matches、metrics、metrics/daily、players/{合成玩家}，全部 200 | — |
+| A2 | PASS | 2026-11-22 17:44 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；Actions 連結待 cube1 補）。401 依設計不寫入稽核表（只記伺服器日誌的原因類別） | — |
+| A3 | PASS | 2026-11-22 17:44 | 同 A2 | — |
+| A4 | PASS | 2026-11-22 17:44:15 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；Actions 連結待 cube1 補）。稽核表 id 10、11：`svc:snowrealm-games-admin`、overview、403 | — |
+| A5 | PASS | 2026-11-22 17:44:15 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；Actions 連結待 cube1 補）。稽核表 id 12：sub `svc:someone-else`、overview、403（被拒的 sub 照實記下） | — |
+| A6 | PASS | 2026-11-22 17:44 | 同 A2 | — |
+| A7 | PASS | 2026-11-22 18:04:53 → 18:10:21 | cube2 staging 部署 `5d840d1`；用 cube2 自備的**測試金鑰** k1、k2（只有公鑰進 JWKS；私鑰只在執行環境暫存，不進 repo），暫時把 staging 的 `BRICKDUEL_ADMIN_JWKS_URL` 指向 `accept-jwks` 分支的 `admin-jwks.json`（raw.githubusercontent.com，CDN 快取 300 秒）。這份 JWKS 一直保留 cube1 的 `srstagea_EWW-tM7u8uSnvCwV`，所以 A7、A8 期間 cube1 的呼叫照常可用。請求從瀏覽器打 `https://brickduel-staging.snowrealm.pet/internal/admin/v1/overview`。第 1 階段 JWKS＝{cube1, k1}：18:04:45 k1 200、k2 401。18:04:53 發布第 2 階段＝{cube1, k1, k2}（commit `e070176`）；18:09:22 k2 仍 401（GitHub CDN 還在給舊檔，快取到約 18:09:45），18:10:21 起 k2 連續 200，k1 也照舊 200。扣掉測試用 CDN 的快取，cube2 自己在 1 分鐘內接受新 kid | — |
+| A8 | PASS | 2026-11-22 18:10:34 → 18:20:32 | 同 A7 的部署與 JWKS。18:10:34 發布第 3 階段＝{cube1, k2}（移除 k1，commit `09f533f`）。k1 每 20 秒打一次：18:10:44–18:20:11 都是 200（快取內），18:20:32 起 401，之後 18:21:44–18:25:34 連續 401；k2 全程 200。上次完整抓取在 18:10:21 左右，所以 k1 在約 10 分鐘快取到期時被拒 | — |
+| A9 | PASS | 2026-11-22 18:21:34 → 18:35:00 | 同 A7 的部署。18:21:34 刪除 JWKS 檔案（commit `718f3a4`，raw 回 404）。k2 每 20 秒打一次：快取有效時 200，18:35:00 起連續 503 `{"error":"unavailable"}`（18:35:00、18:35:20、18:35:41、18:36:03），沒有一次放行。期間未知 kid（k1）重新抓取失敗時也是 503，抓不到就拒絕。18:36:27 已把 `BRICKDUEL_ADMIN_JWKS_URL` 改回 cube1 的 JWKS 並重新部署。只影響 staging 管理 API 約 1 分半，正式站沒有動 | — |
+| A10 | PASS | 2026-11-22 17:44 | 同 A2 | — |
+| A11 | PASS | 2026-11-22 17:44:10–13 | 稽核表 id 1–9 共用同一個 jti，全部 200（唯讀可重複使用） | — |
+| A12 | PASS | 2026-11-22 17:44:17–32 | 稽核表：同一分鐘內第 1–60 次有效呼叫 200（id 1–9、13–63），第 61 次（id 64）429 | — |
+| A13 | PASS | 2026-11-22 17:44 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；Actions 連結待 cube1 補）。405 不帶 sub，依設計不寫入稽核表 | — |
+| A14 | PASS | 2026-11-22 17:56（台北 11-23 01:56） | Neon 主控台 SQL Editor，專案 `neon-crimson-envelope`、**`staging` 分支**（`br-raspy-silence-azzokuib`）、資料庫 `neondb`，只執行 SELECT。見下方「A14 稽核查核」 | — |
 | B1 | BLOCKED | 2026-11-23 00:05 | staging Preview 已設 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_STAGING_REDIRECT`、`IDENTITY_LINK_ENABLED`；`link` 仍是 false | identity-staging 已上線、玩家 JWKS 可取得（kid `srstagep_nmkeJAZFwC5B6-ZJ`）；仍缺 `IDENTITY_AUTHORIZE_URL`、`IDENTITY_STAGING_CLIENT_SECRET`、兩個測試帳號，所以 `link` 還是 false |
 | B2 | BLOCKED | 2026-11-22 | 同上 | 同上，另需第二台裝置 |
 | B3 | BLOCKED | 2026-11-22 | 同上 | 同上，另需兩個測試帳號 |
@@ -146,6 +147,28 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | B11 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
 | B12 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
 | B13 | BLOCKED | 2026-11-22 | 正式站排行榜與健康檢查正常，但這是正式站的旁證，不算 staging 的結果 | 同 B1 |
+
+### A14 稽核查核（2026-11-22 17:56 UTC，staging 分支，唯讀）
+
+`SELECT at, sub, jti, path, status FROM zz.admin_log ORDER BY id DESC LIMIT 50;`（另外把 `at` 轉成 UTC 時間，並加查欄位結構與統計）
+
+- 共 64 筆，時間 17:44:10–17:44:32 UTC，就是 cube1 那次執行。
+- sub：除了 A5 刻意送的 `svc:someone-else`（403，照實記下被拒的身分），其他全部是 `svc:snowrealm-games-admin`。
+- jti：64 筆有 56 個不同值。A1／A11 的 9 筆共用一個（`3e05f934…`），其餘每次都是新的。最長 36 字，都是 UUID。
+- path：只有路徑（最長 44 字，例如 `players/af315eac-…`），沒有查詢字串。
+- status：200 ×60、403 ×3（A4 兩筆、A5 一筆）、429 ×1（A12 第 61 次）。
+- 欄位只有 `id bigint`、`at double precision`、`sub text`、`jti text`、`path text`、`status smallint`，沒有 token、header、IP 的欄位。
+- 用正規式掃 sub、jti、path，找 `eyJ`、`bearer`、`private`、`-----BEGIN`、`secret`、`authorization`、JWT 形狀：**0 筆**。
+- 程式：`server/admin.js` 的 `audit()` 只寫 `at, sub, jti, path, status`（sub ≤100 字、jti ≤200、path ≤120）；`server/app.js` 只在簽章通過、有 sub 時才寫，所以 401（A2、A3、A6、A10）、503 和 405（A13）不會進資料表，這是規格寫好的（`docs/BRICKDUEL_ADMIN_API_ADAPTER_SPEC.md`：驗不過的 401 不寫入資料庫，只記原因類別）。伺服器日誌只印 `admin 401 <原因類別>`，不印 token。
+- 沒有發現完整 JWT、私鑰、Client Secret 或 Authorization header。
+
+### A7–A9 的做法與還原
+
+- cube1 的 Identity 簽發服務沒有動。cube2 用自己的兩把測試金鑰，暫時指定 staging 要信任的 JWKS，測的是 cube2 驗簽端在換鑰、移除舊鑰、JWKS 故障時的行為。
+- 這份暫時 JWKS 一直保留 cube1 的金鑰，cube1 的呼叫只在 A9 故障的那段時間受影響。
+- 測試 token 只有在這次驗收、只對 staging 有效；k1、k2 都已經不在任何被信任的 JWKS 裡。
+- 還原：18:36:27 UTC 把 `BRICKDUEL_ADMIN_JWKS_URL` 改回 `https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`，並重新部署 staging（版本見 DEVLOG）。`accept-jwks` 分支只剩 README 和 vercel.json，要刪等 Owner 同意。
+- 如果 cube1 也想用自己的新 kid 重跑 A7（例如真的換鑰時），流程一樣，只是 JWKS 改由 cube1 發布。
 
 **cube2 這邊已經實際確認的（不屬於 27 項）**：
 

@@ -1004,3 +1004,18 @@
 - 這次只 push main，**沒有**更新 staging，讓 staging 維持 `1d1e1ca`，和 workflow 預設的 `EXPECT_BUILD` 對得上。
 - A 組結果不變：還沒有任何實際的 staging 呼叫。
 - 檔案：`docs/handoff/cube1-joint-admin-check.yml`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`5d840d1`](https://github.com/luffysky/cube2/commit/5d840d1)（只 push 到 main 時被中斷，本輪一併推上，staging 也更新到它）。
+
+## 2026-11-23 02:40（Asia/Taipei）｜Admin API 聯合驗收 A7–A9、A14 完成，A 組 15 項全 PASS
+
+- 專案：cube2｜執行者：Claude
+- 關聯指令：完成 A14 稽核查核，配合 Work 完成 A7–A9 實際 staging HTTP 驗收；不改 cube1 Identity 簽發服務；不動正式站。
+- **A14**：在 Neon 主控台的 SQL Editor，只對 `staging` 分支下 SELECT（沒經手資料庫密碼）。64 筆，都是 cube1 那次執行留下的；只有 `at/sub/jti/path/status` 五個欄位；掃描 JWT、私鑰、secret、Authorization 字樣 0 筆。401／405 依規格不寫入資料庫。詳見 `docs/JOINT_ACCEPTANCE.md`。
+- **A7–A9**：cube2 用自己兩把測試金鑰，暫時把 staging 的 `BRICKDUEL_ADMIN_JWKS_URL` 指向 `accept-jwks` 分支的 JWKS（一直保留 cube1 的金鑰），分四個階段改 JWKS 內容，從瀏覽器打 staging：
+  - A7：新 kid 在 JWKS 生效後 200（扣掉 GitHub CDN 的 5 分鐘快取，cube2 自己 1 分鐘內接受）。
+  - A8：移除舊 kid 後，約 10 分鐘快取到期，18:20:32 UTC 起 401。
+  - A9：JWKS 檔案刪除後，快取到期，18:35:00 UTC 起連續 503，沒有放行。
+- 還原：18:36 UTC 把 `BRICKDUEL_ADMIN_JWKS_URL` 改回 cube1 的 `/.well-known/admin-jwks.json`，並重新部署 staging。
+- 已經通過的 A0–A6、A10–A13 改記為 PASS（cube1 Work 17:44 UTC 那次執行，加上稽核表佐證）；GitHub Actions 連結待 cube1 補。
+- 正式站的管理信任、帳號綁定、玩家資料都沒動。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：只有 SELECT。｜刪除：無（`accept-jwks` 分支裡的 JWKS 檔案是測試用暫存，刪掉它就是 A9 的故障注入；分支本身留著，要刪等 Owner 同意）。

@@ -1,6 +1,6 @@
 # 轉磚 待辦清單
 
-每做完一項就打勾，並寫上 commit。最後更新：2026-11-21 08:50（Asia/Taipei）
+每做完一項就打勾，並寫上 commit。最後更新：2026-11-23 02:40（Asia/Taipei）
 
 ## Claude 這一輪在做
 
@@ -61,8 +61,8 @@
 - [x] Owner：Cloudflare 加 CNAME（staging 網域 TLS 已生效）
 - [x] Owner：Neon `staging` 分支（只有結構）＋ Vercel Preview 設 `STAGING_DATABASE_URL`、`IDENTITY_STAGING`
 - [x] Owner：Vercel 部署保護的 bypass 密碼，已交給 cube1
-- [ ] Owner：拿到 cube1 的 staging Identity 值後，設在 Preview（staging 分支）
-- [ ] cube1 提供受控 staging signer → 跑有效、錯 audience／issuer／scope／sub、換鑰、缺 key 的實測
+- [ ] Owner：拿到 cube1 的 staging Identity 值後，設在 Preview（staging 分支）（管理信任已設；還缺 `IDENTITY_AUTHORIZE_URL`、`IDENTITY_STAGING_CLIENT_SECRET`）
+- [x] cube1 提供受控 staging signer → 跑有效、錯 audience／issuer／scope／sub、換鑰、缺 key 的實測（A0–A14 全 PASS，2026-11-23）
 - [ ] 機器簽發端與 `admin-jwks.json` 上線 → Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS`
 - [ ] Identity `/oauth/authorize`、`/oauth/token` 上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開 `IDENTITY_LINK_ENABLED`
 
@@ -87,3 +87,8 @@
 - [x] 音樂播放器、會員本機上傳（`c8e5644`）
 - [x] 開房間可選模式：普通對戰／挑戰大自然／關卡地形（`c8e5644`）
 - [x] 沙塵暴、極光、日蝕、冰雹、火山、雷擊（`85166a9`）
+
+## 新需求（2026-11-23）
+
+- [ ] 各模式歷史對戰紀錄：K／D、攻擊、行數、T 轉等細項，日期時間，全部紀錄，一頁 20 筆分頁
+- [ ] 新對線模式與 RPG 化：提案給 Owner
