@@ -106,6 +106,7 @@ cube1 提供：
 - 能自動產生的情境都會自動跑：A1、A2、A3、A4、A5、A6、A10、A11、A12、A13。A7、A8、A9、A14 會列出要手動做的步驟。
 - 輸出 JSON 報告，裡面沒有 token、bypass 密碼或玩家資料。
 - 2026-11-22 已在本機 dev-server 演練：用測試金鑰跑一次，A1–A13 能自動化的全部照預期回應。這只是演練，**不是** staging 實測。
+- 加 `SEED=1` 會先在 staging 建一個合成測試玩家（名字 `staging-test-xxxxxx`），再開一次免費寶箱，讓 A1 的 `players/{id}`、`draws` 有東西可讀。正式站一律拒絕這個選項，玩家的金鑰也不會印出來。
 
 ## 實測報告
 
@@ -148,3 +149,5 @@ cube1 提供：
 | staging 網域 TLS、部署保護、bypass | 通 | cube1 用 bypass 打 staging `/api/health` 得到 200（cube1 回報） |
 | staging 用的是獨立資料庫 | 通 | staging `/api/health?deep=1`：`db: true`、`ready: true`；staging 排行榜是空的，正式站有玩家；`7c2562f` 部署後 staging `/api/health` 顯示 `dbSource: "staging"`，正式站顯示 `"main"` |
 | 管理 API 在 staging 沒設定前回 503 | 通 | staging `/internal/admin/v1/overview` → 503 `{"error":"disabled"}` |
+| 2026-11-22 22:13 第一階段複查（staging 部署 `dpl_DuPzTTWfaBUD6uL7RkPiv4CwMJiW`，`7c2562f`；main `f2af893` 只改文件） | 通 | `/api/health`：`db: true`、`dbSource: "staging"`、`build: "7c2562f"`、`admin: false`、`link: false`。`GET /api/auth/start` → 405（`Allow: POST`）。`/api/auth/callback` → 303 導回首頁（`auth=off`）。admin → 503 `disabled` |
+| cube1 進度（Issue #18，2026-11-22） | — | PR #17 到 `898a8b0`，沒有部署網址、也沒合併；staging issuer、JWKS、Identity 端點都還沒有 |

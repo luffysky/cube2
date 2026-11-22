@@ -909,3 +909,15 @@
   - 正式站 `/api/health`：`dbSource: "main"`、`build: "7c2562f"`、`admin: false`、`link: false`、`mail: true`（Owner 已設好寄信的三個變數）。
   - staging `/api/health?deep=1`：`dbSource: "staging"`、`db: true`、`ready: true`、`admin: false`、`build: "7c2562f"`。
   - staging `/internal/admin/v1/overview`：503 `{"error":"disabled"}`，`Cache-Control: no-store`。
+- 補記：上一條的 commit 為 [`f2af893`](https://github.com/luffysky/cube2/commit/f2af893)，CI run 45023845849 成功。
+
+## 2026-11-22 22:20（Asia/Taipei）｜Staging 聯合驗收：第一階段複查；A 組工具能自己建測試玩家
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的「立即接續 staging 聯合驗收」，對照 cube1 Issue #18
+- **第一階段複查**：staging 部署 `dpl_DuPzTTWfaBUD6uL7RkPiv4CwMJiW` 跑的是 `7c2562f`（main `f2af893` 之後只改了文件）。
+  - `/api/health`：`db: true`、`dbSource: "staging"`、`admin: false`、`link: false`
+  - `GET /api/auth/start` → 405；`/api/auth/callback` → 303 導回首頁並帶 `auth=off`；管理 API → 503 `disabled`
+- **cube1 現況**（Issue #18 的留言）：PR #17 到 `898a8b0`，**沒有部署網址、也沒合併**。staging admin 的 issuer 和 JWKS、Identity 的端點、測試帳號都還沒有。所以 Preview 的管理信任這次不設，27 項維持 BLOCKED。
+- **`tools/joint-admin-check.js` 加 `SEED=1`**：在 staging 建一個合成測試玩家，再開一次免費寶箱，讓 A1 的 `players/{id}` 和 `draws` 有資料可讀。只允許 staging 或本機，玩家金鑰不印出。在本機演練過，A1 七支全部 200。
+- 檔案：`tools/joint-admin-check.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。

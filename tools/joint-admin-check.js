@@ -14,6 +14,9 @@
      ADMIN_SUB          default svc:snowrealm-games-admin
    or one ready-made valid token (only the cases that need no other token run; the rest say BLOCKED)
      ADMIN_TOKEN
+   and, optional,
+     SEED=1             first make one synthetic test player on staging (POST /api/rpc hello, then one free box draw),
+                        so A1 players/{id} and draws have something to read. Refused for any host but staging.
 
      node tools/joint-admin-check.js > a-results.json
 
@@ -64,7 +67,26 @@ function note(id, what, path, ok, r, extra) {
     result: ok === null ? 'BLOCKED' : ok ? 'PASS' : 'FAIL', response: r ? r.shape : null }, extra || {}));
 }
 
+async function seed() {
+  if (!/^https:\/\/brickduel-staging\.snowrealm\.pet$/.test(BASE) && !/^http:\/\/127\.0\.0\.1:\d+$/.test(BASE)) throw new Error('SEED only on staging');
+  const headers = { 'content-type': 'application/json' };
+  if (BYPASS) headers['x-vercel-protection-bypass'] = BYPASS;
+  const post = async (body, cred) => {
+    const h = Object.assign({}, headers, cred ? { authorization: 'Bearer ' + cred.id + '.' + cred.key } : {});
+    const r = await fetch(BASE + '/api/rpc', { method: 'POST', headers: h, body: JSON.stringify(body), redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    return { status: r.status, json: await r.json().catch(() => null) };
+  };
+  const made = await post({ a: 'hello', st: { name: 'staging-test-' + crypto.randomBytes(3).toString('hex') } });
+  if (made.status !== 200 || !made.json || !made.json.ok) return { seeded: false, status: made.status };
+  const cred = { id: made.json.id, key: made.json.key };
+  const op = { i: 'seed' + crypto.randomBytes(6).toString('hex'), k: 'draw', a: [1] };
+  const drew = await post({ a: 'sync', ops: [op] }, cred);
+  // the synthetic player's own key is not kept or printed: nothing more is done with it
+  return { seeded: true, player: 'created (id not printed)', draw: drew.status };
+}
+
 (async () => {
+  const seeded = process.env.SEED === '1' ? await seed() : null;
   const health = await hit('/api/health');
   let build = null;
   try { const h = JSON.parse(health.text); build = { build: h.build || null, dbSource: h.dbSource || null, admin: h.admin }; } catch (e) { /* recorded below */ }
@@ -115,5 +137,5 @@ function note(id, what, path, ok, r, extra) {
   results.push({ caseId: 'A8', result: 'MANUAL', what: 'remove the old key from the JWKS, sign with the old kid, expect 401 after at most 10 minutes (cache)' });
   results.push({ caseId: 'A9', result: 'MANUAL', what: 'make the staging admin JWKS unreachable (or 500), expect 503 {"error":"unavailable"}' });
   results.push({ caseId: 'A14', result: 'MANUAL', what: 'Owner, in the Neon console on the staging branch: SELECT at, sub, jti, path, status FROM zz.admin_log ORDER BY id DESC LIMIT 50; expect the calls above, no token text' });
-  process.stdout.write(JSON.stringify({ target: BASE, cube2: build, ranAt: new Date().toISOString(), signer: key ? 'staging signer' : T ? 'single token' : 'none', results }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ target: BASE, cube2: build, seed: seeded, ranAt: new Date().toISOString(), signer: key ? 'staging signer' : T ? 'single token' : 'none', results }, null, 2) + '\n');
 })().catch(e => { console.error('stopped: ' + (e && e.message ? e.message.replace(/Bearer \S+/g, 'Bearer [hidden]') : e)); process.exit(1); });
