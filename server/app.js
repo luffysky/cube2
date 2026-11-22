@@ -97,14 +97,14 @@ const routes = {
   },
   async authCallback(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    let outcome;
+    let outcome, note = '';
     if (!bff.enabled()) outcome = 'off';
     else {
-      try { outcome = (await db.run(d => bff.finish(d, url.searchParams, header(req, 'cookie'), clock(), undefined, String(header(req, 'host') || '').toLowerCase()))).outcome; }
+      try { const f = await db.run(d => bff.finish(d, url.searchParams, header(req, 'cookie'), clock(), undefined, String(header(req, 'host') || '').toLowerCase())); outcome = f.outcome; note = f.note || ''; }
       catch (e) { log('auth', e); outcome = 'unavailable'; }
     }
     if (bff.OUTCOMES.indexOf(outcome) < 0) outcome = 'unavailable';
-    if (['linked', 'recovered'].indexOf(outcome) < 0) console.warn('[zz] auth ' + outcome);
+    if (['linked', 'recovered'].indexOf(outcome) < 0) console.warn('[zz] auth ' + outcome + (/^[a-z0-9 ]{1,40}$/.test(note) ? ' (' + note + ')' : ''));
     res.statusCode = 303;
     res.setHeader('Location', '/?auth=' + outcome);
     res.setHeader('Cache-Control', 'no-store');

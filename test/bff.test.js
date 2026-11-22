@@ -223,7 +223,11 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
     eq(where(x.cb), '/?auth=' + want, 'token status ' + mode);
   }
   statusMode = 'ok';
+  const warnWas = console.warn, warned = []; console.warn = (...m) => warned.push(m.join(' '));
   tokenMode = '503'; x = await round('recover', null, U1); eq(where(x.cb), '/?auth=unavailable', 'token endpoint 503 (not live yet)');
+  console.warn = warnWas;
+  ok(warned.some(w => w === '[zz] auth unavailable (token 503)'), 'the server log says where it stopped (the upstream status)', warned);
+  ok(!warned.some(w => /secret|Bearer|eyJ|[A-Za-z0-9_-]{40,}/.test(w)), 'and nothing secret', warned);
   tokenMode = 'down'; x = await round('recover', null, U1); eq(where(x.cb), '/?auth=unavailable', 'token endpoint timeout');
   tokenMode = 'ok';
   jwksDown = true; idn.clearCache();

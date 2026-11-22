@@ -1045,3 +1045,12 @@
 - Owner 告知：cube1 已把 Actions #45051087698 補到 Issue #18，A0–A14 共 15 項 PASS，證據來源註明清楚（A0–A6、A10–A13 由 cube1 Actions 驗證；A7–A9、A14 由 Claude 實測）。
 - `docs/TODO.md`：新增「接下來要做」三大項的細項；管理 API 改為「staging 已通過、正式站待開」；帳號綁定拆成 staging（B1–B13）與正式兩步；補上 `accept-jwks` 分支待刪。
 - 檔案：`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`5df1799`](https://github.com/luffysky/cube2/commit/5df1799)。
+
+## 2026-11-23 03:45（Asia/Taipei）｜帳號綁定 B 組：staging 設定核對、拒絕路徑實測、回呼記錄卡在哪一步
+
+- 專案：cube2｜執行者：Claude
+- 關聯指令：立即準備 B1–B13；核對 Preview／staging 的 Identity 設定、找出所有會讓 `link:false` 的缺漏；不依賴登入服務的路徑先實測；正式站 `IDENTITY_LINK_ENABLED`、`admin` 保持關閉。
+- 程式：callback 沒成功時，伺服器日誌多記「停在哪一步」（例如 `token 503`、`status 401`、`verify kid`、`nonce`），只有上游的 HTTP 狀態碼或檢查名稱，不含 token 或 secret（新測試 2 項）。
+- 詳細核對結果與實測紀錄寫在 `docs/JOINT_ACCEPTANCE.md` 的「B 組準備」。
+- 檔案：`server/bff.js`、`server/app.js`、`test/bff.test.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：staging 建了一個合成測試玩家 `staging-test-b0`；正式站沒動。｜刪除：無。

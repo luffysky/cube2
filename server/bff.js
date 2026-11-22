@@ -166,9 +166,10 @@ async function finish(db, q, cookie, now, env, host) {
     const seen = await db.query('SELECT 1 FROM zz.authsess WHERE id = $1', [sha(sid)]);
     return { outcome: seen[0] ? 'replay' : 'session' };
   }
-  const done = async (outcome, res) => {
+  // note: where it stopped, for the server log only (an upstream HTTP status or a check's name; never a token or secret)
+  const done = async (outcome, res, note) => {
     await db.query('UPDATE zz.authsess SET outcome = $2, res = $3, res_exp = $4 WHERE id = $1', [sha(sid), outcome, res ? seal(sid, res) : null, now + RESULT_LIFE]);
-    return { outcome, sid };
+    return { outcome, sid, note: note || '' };
   };
   if (row.exp <= now) return done('expired');
   const box = row.box0 ? open(sid, row.box0) : null;
@@ -183,19 +184,19 @@ async function finish(db, q, cookie, now, env, host) {
   let t;
   try {
     t = await post(s.token, { 'x-snowrealm-client-secret': s.secret }, { clientId: s.clientId, redirectUri: s.redirect, code, codeVerifier: box.verifier, state: box.state, nonce: box.nonce }, TOKEN_MS);
-  } catch (e) { return done('unavailable'); }
-  if (t.status >= 500) return done('unavailable');
+  } catch (e) { return done('unavailable', null, 'token fetch ' + (e && e.name === 'TimeoutError' ? 'timeout' : 'failed')); }
+  if (t.status >= 500) return done('unavailable', null, 'token ' + t.status);
   const token = t.body && t.body.access_token;
-  if (t.status !== 200 || typeof token !== 'string' || token.length > 4096 || (t.body.token_type && String(t.body.token_type).toLowerCase() !== 'bearer')) return done('token');
+  if (t.status !== 200 || typeof token !== 'string' || token.length > 4096 || (t.body.token_type && String(t.body.token_type).toLowerCase() !== 'bearer')) return done('token', null, 'token ' + t.status);
   const v = await identity.verify(token, { now, need: identity.LINK_SCOPE, env: s.env });
-  if (!v.ok) return done(v.why === 'jwks' ? 'unavailable' : 'token');
+  if (!v.ok) return done(v.why === 'jwks' ? 'unavailable' : 'token', null, 'verify ' + v.why);
   const c = claimsOf(token);
   // the nonce must be in the token and be ours: missing or different is a refusal
-  if (!c || typeof c.nonce !== 'string' || !c.nonce || !same(c.nonce, box.nonce)) return done('token');
+  if (!c || typeof c.nonce !== 'string' || !c.nonce || !same(c.nonce, box.nonce)) return done('token', null, 'nonce');
   // revoked since it was signed? Only an explicit active: true lets it through.
   let st;
-  try { st = await post(s.status, { Authorization: 'Bearer ' + token, 'x-snowrealm-client-secret': s.secret }, {}, STATUS_MS); } catch (e) { return done('unavailable'); }
-  if (st.status !== 200 || !st.body || st.body.active !== true) return done(st.status === 200 || st.status === 401 || st.status === 403 ? 'revoked' : 'unavailable');
+  try { st = await post(s.status, { Authorization: 'Bearer ' + token, 'x-snowrealm-client-secret': s.secret }, {}, STATUS_MS); } catch (e) { return done('unavailable', null, 'status fetch failed'); }
+  if (st.status !== 200 || !st.body || st.body.active !== true) return done(st.status === 200 || st.status === 401 || st.status === 403 ? 'revoked' : 'unavailable', null, 'status ' + st.status);
   let out;
   if (row.intent === 'link') out = await core.idLink(db, { id: row.pid, hash: row.cred }, v, now);
   else out = await core.idRecover(db, v, now, row.intent === 'restore');
