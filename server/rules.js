@@ -198,7 +198,7 @@ function finish(a, srv, mark) {
   const st = m.stats;
   return { ok: true, rec: { mode: m.mode, result: m.result, proven: !!v, room: m.room, seats: m.seats,
     data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins,
-    minis: st.minis, xspins: st.xspins, tst: st.tst, quads: st.quads, maxCombo: st.maxCombo, place: m.place, tw: m.tower, ry: m.royale, rl: m.relay, as: m.assists, kr: m.koRoom, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
+    minis: st.minis, xspins: st.xspins, tst: st.tst, quads: st.quads, maxCombo: st.maxCombo, place: m.place, tw: m.tower, ry: m.royale, rl: m.relay, tr: m.terr, as: m.assists, kr: m.koRoom, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
 }
 // The record as it stands right now (a new day or season may have begun since it was stored).
 function current(state, now) { return clone(open(state, now)); }

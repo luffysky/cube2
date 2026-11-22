@@ -292,7 +292,7 @@ async function history(db, cred, body, now) {
       pvp: r.pvp == null ? null : !!r.pvp, foes: Array.isArray(r.foes) ? r.foes.filter(n => typeof n === 'string').slice(0, 7) : [],
       level: int(d.level), ms: int(d.ms), ko: int(d.ko), koOpp: int(d.koOpp), as: d.as == null ? null : int(d.as), kr: int(d.kr), score: int(d.score), sent: int(d.sent), lines: int(d.lines),
       pieces: int(d.pieces), spins: int(d.spins), minis: int(d.minis), xspins: int(d.xspins), tst: int(d.tst), quads: int(d.quads),
-      combo: int(d.maxCombo), items: int(d.items), place: int(d.place), tw: !!d.tw, ry: !!d.ry, rl: !!d.rl, team: !!d.team, quick: !!d.quick, pr: !!d.pr };
+      combo: int(d.maxCombo), items: int(d.items), place: int(d.place), tw: !!d.tw, ry: !!d.ry, rl: !!d.rl, tr: !!d.tr, team: !!d.team, quick: !!d.quick, pr: !!d.pr };
   });
   return good({ mode, page, per: HIST.PER, total, pages, items,
     sum: { games: total, win: int(t.win), loss: int(t.loss), draw: int(t.draw), ko: int(t.ko), koOpp: int(t.ko_opp), as: int(t.assists), sent: int(t.sent),

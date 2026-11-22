@@ -79,7 +79,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await until(() => A.evaluate(() => ZZ.Net.state === 'waiting' && !!ZZ.Net.code), 6000), 'A opens a room');
     const code = await A.evaluate(() => ZZ.Net.code);
     await B.evaluate(c => ZZ.Net.join(c, '小瓦'), code);
-    ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && document.querySelectorAll('[data-nmode]').length === 7 && document.querySelector('[data-nmode="royale"]').disabled && document.querySelector('[data-nmode="relay"]').disabled), 10000), 'the host sees the seven room modes (大逃殺 and 接力 greyed out with two in the room)');
+    ok(await until(() => A.evaluate(() => ZZ.Net.count() === 2 && document.querySelectorAll('[data-nmode]').length === 8 && document.querySelector('[data-nmode="royale"]').disabled && document.querySelector('[data-nmode="relay"]').disabled), 10000), 'the host sees the eight room modes (大逃殺 and 接力 greyed out with two in the room)');
     ok(await A.evaluate(() => (document.getElementById('sheetCard').textContent.match(/💻 電腦/g) || []).length >= 1), 'the room shows what each player plays on');
     await A.click('[data-nmode="lv"]');
     ok(await until(() => B.evaluate(() => ZZ.Net.cfg.mode === 'lv' && /關卡地形/.test(document.getElementById('sheet').textContent)), 5000), 'the guest is told the room plays on a level wall');

@@ -1091,6 +1091,12 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 #strip .ghostSend { display: block; margin: 6px auto 0; min-height: 40px; }
 /* 2v2 接力: whose turn it is, under the name tags */
 #strip .relay { margin: 6px 0 0; text-align: center; font-weight: 800; font-size: 14px; }
+/* 搶地盤: the shared field under the clock */
+.terr { margin-top: 4px; text-align: center; }
+.terr .tgrid { display: grid; grid-template-columns: repeat(var(--c), 1fr); gap: 2px; width: 120px; margin: 0 auto; }
+.terr .tgrid i { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--floor-chip); }
+.terr .tgrid i.mine { outline: 2px solid var(--ink); outline-offset: -1px; }
+.terr small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
 
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
@@ -4974,6 +4980,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   Meta.ROYALE = { every: 30000, maxFloor: 12, ghostEvery: 8000 };
   // 2v2 接力 (relay): teammates share one wall and take turns, 8 pieces each; the one playing hands the wall over
   Meta.RELAY = { pieces: 8 };
+  // 搶地盤 (territory): a shared field of 10 × 6 cells. Every line you clear and every line of cement you send paints
+  // that many cells your colour: empty ones first, then the leader's. At time-up the most cells wins.
+  Meta.TERR = { cols: 10, rows: 6 };
   Meta.KO_WINDOW = 15000;
   Meta.koCredit = function (hits, now) {
     var recent = [], i, by = -1, as = [];
@@ -4996,6 +5005,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       tower: (mode === 'net' || mode === 'ai') && m.tower === true,
       royale: mode === 'net' && m.royale === true,
       relay: mode === 'net' && m.relay === true,
+      terr: (mode === 'net' || mode === 'ai') && m.terr === true,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it
@@ -7437,6 +7447,12 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       }
       if (S.royale) { S.rec = null; S.tape = null; toast(t('ry.on'), 3600); }
       if (S.relay) { S.rec = null; S.tape = null; toast(t(S.relay.active ? 'rl.first' : 'rl.wait', S.multi.foes[S.relay.team[0]] ? S.multi.foes[S.relay.team[0]].name : t('you')), 3600); }
+      // 搶地盤: one shared field; the host of the room (or this page, against the computer) decides who owns what
+      if (o.terr && (mode === 'net' || mode === 'ai') && !S.race && !o.tower) {
+        S.terr = { own: [], me: mode === 'net' && ZZ.Net ? ZZ.Net.seat : 0 };
+        for (var ti = 0; ti < Meta.TERR.cols * Meta.TERR.rows; ti++) S.terr.own.push(-1);
+        toast(t('tr.on'), 3200);
+      }
       // 守塔戰: towers instead of a knockout count (Meta.TOWER); the match ends when a tower falls
       if (o.tower && (mode === 'net' || mode === 'ai') && !o.multi && !S.race) {
         S.tower = true;
@@ -7547,7 +7563,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var f = M.foes[s], p = Net.peers[s], e = p && p.end;
       list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone, outAt: f.outAt || 0 });
     });
-    var better = S.royale
+    var cellsOf = function (p) { return S.terr && App.terrCount ? App.terrCount().by[p.seat] || 0 : 0; };
+    var better = S.terr
+      ? function (a, b) { return (a.gone - b.gone) || (cellsOf(b) - cellsOf(a)) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); }
+      : S.royale
       ? function (a, b) { return (a.gone - b.gone) || ((a.downs > 0) - (b.downs > 0)) || ((b.outAt || 0) - (a.outAt || 0)) || (b.sent - a.sent) || (b.score - a.score); }
       : function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); };
     list.sort(better);
@@ -7560,7 +7579,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       });
       out.teams = tm;
       var us = tm[M.myTeam], them = tm[1 - M.myTeam];
-      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : us.score !== them.score ? (us.score > them.score ? 1 : -1) : 0;
+      if (S.terr && App.terrCount) { var tcb = App.terrCount().by, cellsT = function (k) { return list.filter(function (p) { return p.team === k; }).reduce(function (a, p) { return a + (tcb[p.seat] || 0); }, 0); }; us.cells = cellsT(M.myTeam); them.cells = cellsT(1 - M.myTeam); }
+      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.cells != null && us.cells !== them.cells ? (us.cells > them.cells ? 1 : -1) : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : us.score !== them.score ? (us.score > them.score ? 1 : -1) : 0;
     } else {
       var me = list.filter(function (p) { return p.me; })[0], tops = list.filter(function (p) { return p.place === 1; }).length;
       out.r = why === 'left' ? 1 : me.place === 1 ? (tops > 1 ? 0 : 1) : -1;
@@ -7598,7 +7618,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         el.hudL.innerHTML = you + stat('koMe', t('ko')) + stat('sentMe', t('sent'));
         el.hudR.innerHTML = stat('sentOpp', t('sent')) + stat('koOpp', t('ko')) + name;
       }
-      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
+      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>' + (S.terr ? '<div id="terr" class="terr" aria-live="off"></div>' : '');
       if (S.race) { el.hudL.innerHTML = you + stat('sentMe', t('net.raceLines', S.race)); el.hudR.innerHTML = stat('sentOpp', t('net.raceLines', S.race)) + name; }
       if (S.tower) {
         var bar = function (id) { return '<div class="stat tower"><b id="' + id + '">' + Meta.TOWER.hp + '</b><span>' + t('tw.hp') + '</span><i class="twbar"><i id="' + id + 'Bar"></i></i></div>'; };
@@ -8056,11 +8076,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
+      if (S.terr && App.terrCount) {
+        var tc = App.terrCount(); S.terrEnd = tc;
+        if (!S.multi) r = why === 'left' ? 1 : why === 'quit' ? -1 : tc.me !== tc.best ? (tc.me > tc.best ? 1 : -1) : r;
+      }
       if (S.tower) { var tw = towers(); S.towerEnd = tw; r = why === 'left' ? 1 : why === 'quit' ? -1 : tw.me !== tw.opp ? (tw.me > tw.opp ? 1 : -1) : r; }
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, terr: !!S.terr, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -8108,7 +8132,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
 
   // ---------- sheets ----------
-  var pick = { level: 1, minutes: 2, items: true, tower: false };
+  var pick = { level: 1, minutes: 2, items: true, tower: false, terr: false };
   function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
   // the big centred win / lose line at the top of a battle result
   function verdict() {
@@ -8158,7 +8182,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       h += '</div>' + (aiStep() ? '<p class="note">' + t('aiNow', t('s.ai' + aiKey(aiStep()))) + '</p>' : '') + '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
       for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
       h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' +
-        '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' + bringHtml() +
+        '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' +
+        '<label class="toggle" for="bTerr">' + t('tr.toggle') + '<input type="checkbox" id="bTerr"></label><p class="note">' + t('tr.rule') + '</p>' + bringHtml() +
         '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
     } else if (name === 'pause') {
       h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
@@ -8381,7 +8406,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     el.sheet.hidden = false;
     el.sheetCard.scrollTop = keep;
     if (name === 'settings') { syncSettings(); if (App.settingsOpened) App.settingsOpened(); }
-    if (name === 'battle') { $('bItems').checked = pick.items; $('bTower').checked = !!pick.tower; }
+    if (name === 'battle') { $('bItems').checked = pick.items; $('bTower').checked = !!pick.tower; $('bTerr').checked = !!pick.terr; }
     if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
     if (b && !env.touch && !keep) { try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); } el.sheetCard.scrollTop = 0; }   // (a long sheet opens at its top, not at its button)
@@ -8416,7 +8441,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     else if (a === 'resume') { sheetBack = ''; closeSheet(true); resume(); }
     else if (a === 'fight') {
       save.level = pick.level; save.minutes = pick.minutes; save.items = pick.items ? 1 : 0; saveStore();
-      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, tower: pick.tower ? 1 : 0, bring: Meta.takeBring() });
+      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, tower: pick.tower ? 1 : 0, terr: pick.terr ? 1 : 0, bring: Meta.takeBring() });
     }
     else if (a === 'again') {
       sheetBack = '';
@@ -8464,7 +8489,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
-      if (id === 'bTower') { pick.tower = e.target.checked; return; }
+      if (id === 'bTower') { pick.tower = e.target.checked; if (pick.tower) { pick.terr = false; $('bTerr').checked = false; } return; }
+      if (id === 'bTerr') { pick.terr = e.target.checked; if (pick.terr) { pick.tower = false; $('bTower').checked = false; } return; }
       if (id === 'htOff') { set.howto = !e.target.checked; saveStore(); return; }
       if (id === 'sLang') { if (e.type !== 'change') return; setLang(e.target.value); openSheet('settings'); return; }
       if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
@@ -8679,6 +8705,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
       if (S.race) { txt('sentMe', String(Math.min(S.race, st.lines))); txt('sentOpp', String(Math.min(S.race, S.opp.stats.lines))); }
       else { txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent)); }
+      if (S.terr && App.terrDraw) App.terrDraw();
       if (S.tower) {
         var tw = towers(), bm = $('towMeBar'), bo = $('towOppBar');
         txt('towMe', String(tw.me)); txt('towOpp', String(tw.opp));
@@ -9568,7 +9595,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 
   // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
   // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
-  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay'];
+  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay', 'terr'];
   Net.ROOM_MODES = ROOM_MODES;
   function readCfg(c) {
     var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
@@ -9579,7 +9606,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx, lv, race, tower, royale, relay) {
+  function startMatch(seed, minutes, items, multi, wx, lv, race, tower, royale, relay, terr) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
@@ -9590,6 +9617,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race && !tower) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
     if (tower && !multi && !race) { o.tower = 1; }
+    if (terr && !race && !tower) { o.terr = 1; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: royale ? null : multi.teams || null }; if (royale) o.royale = 1; if (relay && o.multi.teams) o.relay = 1; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -9608,9 +9636,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var mode = Net.modeOf();
     var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
     var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
-    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0, royale = mode === 'royale' && multi ? 1 : 0, relay = mode === 'relay' && multi && multi.teams ? 1 : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower, royale: royale, relay: relay });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower, royale, relay);
+    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0, royale = mode === 'royale' && multi ? 1 : 0, relay = mode === 'relay' && multi && multi.teams ? 1 : 0, terr = mode === 'terr' ? 1 : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower, royale: royale, relay: relay, terr: terr });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower, royale, relay, terr);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -9632,6 +9660,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   Net.item = function (id) { send({ t: 'i', id: id }); };
   // 2v2 接力: our turn is over; the wall (as a snapshot) goes to the next teammate. Everyone hears whose turn it is.
   Net.handoff = function (to, snap) { send({ t: 'h', to: to, s: snap }); };
+  // 搶地盤: claims go to the host, who keeps the one field and sends it to everyone after each change
+  Net.terrClaim = function (n) { send({ t: 'c', n: n }, 0); };
+  Net.terrMap = function (own) { send({ t: 'T', o: own }); };
+  Net.isHost = function () { return !!Net.host; };
   function readSnap(s) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.grid) || s.grid.length !== ROWS) return null;
     var grid = [], r, x;
@@ -9766,7 +9798,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0, m.royale === 1 ? 1 : 0, m.relay === 1 ? 1 : 0); break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0, m.royale === 1 ? 1 : 0, m.relay === 1 ? 1 : 0, m.terr === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a':
@@ -9777,6 +9809,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
           // in a room of three or more, who sent what and when: if this wall goes down, that decides the knockout
           if (S.multi && hit > 0) { S.hits = S.hits || []; S.hits.push({ s: from, t: Date.now(), n: hit }); if (S.hits.length > 40) S.hits.shift(); }
         }
+        break;
+      case 'c': if (live && Net.host && S.terr && App.terrClaim) App.terrClaim(from, int(m.n, 1, 12)); break;
+      case 'T':
+        if (S && S.terr && from === 0 && Array.isArray(m.o) && m.o.length === S.terr.own.length && App.terrSet)
+          App.terrSet(m.o.map(function (v) { return v === Math.floor(v) && v >= -1 && v < Net.SEATS ? v : -1; }));
         break;
       case 'h':
         if (S && S.relay && S.multi && S.multi.teams && S.multi.teams[from] === S.multi.myTeam) {
@@ -10036,6 +10073,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'net.m.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'net.m.royale': ['大逃殺', 'Battle royale', 'バトルロイヤル', '배틀 로얄'],
     'net.m.relay': ['接力', 'Relay', 'リレー', '릴레이'],
+    'net.m.terr': ['搶地盤', 'Territory', '陣取り', '땅따먹기'],
+    'net.m.terrP': ['中間有一塊 10 × 6 的共用地盤。你每消 1 行、每送 1 行攻擊，就把 1 格染成你的顏色：先染空格，空格沒了就搶領先者的。時間到比誰的格子多。2 到 8 人都能玩，組隊時算全隊的格子。', 'A shared field of 10 × 6 in the middle. Every line you clear and every line you send paints one cell your colour: empty cells first, then the leader\'s. At time-up the most cells wins. 2 to 8 players; with teams, the team\'s cells count.', '中央に10×6の共有エリア。1ライン消すごと、1ライン攻撃を送るごとに1マスを自分の色に。空きマスから、なくなったらトップから奪う。時間切れでマスが多い方の勝ち。2〜8人、チーム戦はチーム合計。', '가운데 10 × 6 공용 땅. 1줄 지울 때마다, 공격 1줄 보낼 때마다 1칸을 내 색으로 칠해요. 빈칸부터, 다 차면 1등의 칸을 빼앗아요. 시간이 끝나면 칸이 많은 쪽 승리. 2~8명, 팀전은 팀 합계.'],
+    'tr.on': ['搶地盤：消行、送攻擊都能把中間的格子染成你的顏色', 'Territory: clearing and sending lines paints the middle field your colour', '陣取り：ライン消しと攻撃で中央のマスを自分の色に', '땅따먹기: 줄을 지우고 공격을 보내면 가운데 칸이 내 색으로'],
+    'tr.toggle': ['搶地盤', 'Territory', '陣取り', '땅따먹기'],
+    'tr.rule': ['打開後：每消 1 行、每送 1 行攻擊，就把中間 10 × 6 共用地盤的 1 格染成你的顏色，時間到比格子多。（跟守塔戰二選一）', 'On: every line cleared or sent paints one cell of a shared 10 × 6 field your colour; at time-up the most cells wins. (Either this or the tower battle.)', 'オン：1ライン消し・攻撃ごとに共有10×6エリアの1マスを自分の色に。時間切れでマスが多い方の勝ち（タワーバトルと二者択一）。', '켜면: 1줄 지우거나 보낼 때마다 공용 10 × 6 땅의 1칸을 내 색으로. 시간이 끝나면 칸이 많은 쪽 승리(타워 배틀과 둘 중 하나).'],
+    'tr.count': ['你 {0} 格', 'You: {0}', 'あなた {0}マス', '나 {0}칸'],
+    'tr.end': ['地盤：你 {0} 格　最多的對手 {1} 格', 'Territory: you {0} · best rival {1}', '陣取り：あなた {0}マス　最多の相手 {1}マス', '땅: 나 {0}칸 · 최다 상대 {1}칸'],
     'net.m.relayP': ['兩隊對戰，同隊共用一面牆，輪流放方塊：每人 8 塊就交給下一位隊友，連暫存和下一個都一起交接。等待時看隊友放。4、6、8 人房才能選，會自動分兩隊。', 'Two teams; each team shares one wall and takes turns: 8 pieces each, then the wall (hold and next pieces too) goes to the next teammate. While waiting you watch them play. Rooms of 4, 6 or 8; teams are made for you.', '2チーム対戦。チームで1つの壁を共有し、1人8個ずつ交代（ホールドとネクストも引き継ぎ）。待っている間は味方のプレイを見ます。4・6・8人部屋のみ、自動でチーム分け。', '두 팀 대전. 팀이 벽 하나를 함께 쓰고 8개씩 번갈아 놓아요(홀드와 다음 블록도 함께 넘겨요). 기다리는 동안 팀원을 봐요. 4·6·8인 방 전용, 팀은 자동으로 나눠요.'],
     'net.m.onlyTeam': ['接力要 4、6 或 8 個人（兩隊人數一樣），這房間會用普通對戰。', 'The relay needs 4, 6 or 8 players (two even teams); this room plays an ordinary battle.', 'リレーは4・6・8人（同数の2チーム）。この部屋は通常バトルになります。', '릴레이는 4·6·8명(같은 인원 두 팀)이 필요해서 이 방은 일반 대전으로 해요.'],
     'rl.first': ['接力：你先放，8 塊後交給隊友', 'Relay: you start; after 8 pieces the wall goes to your teammate', 'リレー：あなたから。8個で味方に交代', '릴레이: 먼저 시작해요. 8개 후 팀원에게'],
@@ -10288,7 +10332,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) || (k === 'relay' && !Net.teamOk(n)) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay', 'terr'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) || (k === 'relay' && !Net.teamOk(n)) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
     h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : cur === 'royale' && n < 3 ? 'net.m.only3' : cur === 'relay' && !Net.teamOk(n) ? 'net.m.onlyTeam' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
@@ -10404,7 +10448,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   };
   App.endExtra = function () {
     var S = App.S();
-    var twNote = S && S.tower && S.towerEnd ? '<p class="note"><b>' + esc(t('tw.end', S.towerEnd.me, S.oppName, S.towerEnd.opp)) + '</b></p>' : '';
+    var trNote = S && S.terr && S.terrEnd ? '<p class="note"><b>' + esc(t('tr.end', S.terrEnd.me, S.terrEnd.best)) + '</b></p>' : '';
+    var twNote = trNote + (S && S.tower && S.towerEnd ? '<p class="note"><b>' + esc(t('tw.end', S.towerEnd.me, S.oppName, S.towerEnd.opp)) + '</b></p>' : '');
     if (S && S.o && S.o.quickCpu) return twNote + '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return twNote;
     var rc = S.o.pr ? '<p class="note"><b>' + t('pr.wait') + '</b></p>' : '';
@@ -10432,6 +10477,69 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, mode: Net.modeOf() }); return true; }
     if (d.nmode != null) { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, mode: d.nmode }); return true; }
     return false;
+  });
+
+
+  // ---------- 搶地盤: the shared field ----------
+  // own[i] is the seat that owns cell i, or -1. Against the computer this page keeps it (you are seat 0, the computer
+  // seat 1); online the host keeps it and sends it to everyone after each change, so every screen shows one field.
+  var TERR_COLORS = ['#F5B82E', '#5DB7F5', '#F0704F', '#37C29A', '#B49CFF', '#FF9DB5', '#8C939B', '#F1EADB'];
+  function terrSeats() {
+    var S = App.S();
+    if (!S || !S.terr) return [];
+    if (S.mode === 'ai') return [0, 1];
+    if (S.multi) return [S.multi.me].concat(S.multi.order);
+    return [Net.seat, Net.seat === 0 ? 1 : 0];
+  }
+  App.terrCount = function () {
+    var S = App.S(), by = {}, me = 0, best = 0;
+    if (!S || !S.terr) return { me: 0, best: 0, by: by };
+    S.terr.own.forEach(function (o) { if (o >= 0) by[o] = (by[o] || 0) + 1; });
+    me = by[S.terr.me] || 0;
+    terrSeats().forEach(function (st) { if (st !== S.terr.me && (!S.multi || !S.multi.teams || S.multi.teams[st] !== S.multi.myTeam)) best = Math.max(best, by[st] || 0); });
+    return { me: me, best: best, by: by };
+  };
+  App.terrClaim = function (seat, n) {
+    var S = App.S();
+    if (!S || !S.terr || S.state !== 'play') return;
+    var own = S.terr.own, k, i;
+    for (k = 0; k < n; k++) {
+      var free = [];
+      for (i = 0; i < own.length; i++) if (own[i] === -1) free.push(i);
+      if (!free.length) {
+        // the leader (not the claimer, not a teammate) gives one up
+        var c = App.terrCount().by, lead = -1, most = 0;
+        Object.keys(c).forEach(function (st) { st = +st; var mate = S.multi && S.multi.teams && S.multi.teams[st] === S.multi.teams[seat]; if (st !== seat && !mate && c[st] > most) { most = c[st]; lead = st; } });
+        if (lead < 0) break;
+        for (i = 0; i < own.length; i++) if (own[i] === lead) free.push(i);
+      }
+      own[free[Math.floor(Math.random() * free.length)]] = seat;
+    }
+    if (S.mode === 'net' && Net.isHost && Net.isHost()) Net.terrMap(own);
+  };
+  App.terrSet = function (own) { var S = App.S(); if (S && S.terr && S.state !== 'over') S.terr.own = own; };
+  var terrKey = '';
+  App.terrDraw = function () {
+    var S = App.S(), el = document.getElementById('terr');
+    if (!S || !S.terr || !el) return;
+    var key = S.terr.own.join(',') + '|' + L.lang;
+    if (key === terrKey && el.firstChild) return;
+    terrKey = key;
+    var h = '<div class="tgrid" style="--c:' + Meta.TERR.cols + '">';
+    S.terr.own.forEach(function (o) { h += '<i' + (o >= 0 ? ' style="background:' + TERR_COLORS[o % TERR_COLORS.length] + '"' : '') + (o === S.terr.me ? ' class="mine"' : '') + '></i>'; });
+    el.innerHTML = h + '</div><small>' + esc(t('tr.count', App.terrCount().me)) + '</small>';
+  };
+  // a lock that cleared lines: one cell per line cleared and per line of cement sent
+  App.hooks.push(function (g, e, mine) {
+    var S = App.S();
+    if (!S || !S.terr || S.state !== 'play' || e.type !== 'lock') return;
+    var n = Math.min(12, (e.lines || 0) + (e.attack || 0));
+    if (!n) return;
+    if (mine && g === S.me) {
+      if (S.mode !== 'net') App.terrClaim(S.terr.me, n);
+      else if (Net.isHost && Net.isHost()) App.terrClaim(Net.seat, n);
+      else Net.terrClaim(n);
+    } else if (!S.remote && g === S.opp) App.terrClaim(1, n);
   });
 
   App.boot.push(function () {
@@ -12072,6 +12180,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'hi.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'hi.royale': ['大逃殺', 'Battle royale', 'バトルロイヤル', '배틀 로얄'],
     'hi.relay': ['接力', 'Relay', 'リレー', '릴레이'],
+    'hi.terr': ['搶地盤', 'Territory', '陣取り', '땅따먹기'],
     'hi.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '랜덤 매치'],
     'hi.pvpOk': ['真人排位・伺服器已核定', 'Ranked vs people · settled by the server', '対人ランク・サーバー確定', '대인 랭크 · 서버 확정'],
     'hi.pvpBad': ['真人排位・雙方紀錄不一致，不計分', 'Ranked vs people · reports disagreed, not counted', '対人ランク・記録不一致のため無効', '대인 랭크 · 기록 불일치로 무효'],
@@ -12471,6 +12580,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (m.tw) tag.push(t('hi.tower'));
     if (m.ry) tag.push(t('hi.royale'));
     if (m.rl) tag.push(t('hi.relay'));
+    if (m.tr) tag.push(t('hi.terr'));
     if (m.mode === 'ai') tag.push(t('hi.vsAi', t('lv' + m.level)));
     if (m.mode === 'net') {
       if (m.place && m.seats > 2) tag.push(t('hi.place', m.place, m.seats));

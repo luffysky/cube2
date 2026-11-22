@@ -1162,3 +1162,19 @@
 - 被擊倒中不交接，等復活、放下下一塊之後才交出去。接力沒有重播。對戰紀錄的標籤顯示「接力」。
 - 測試：新的四人房瀏覽器測試 `test/relay.js` 16 項：3 人時選不了、4 人時可選，分成 2 隊各 2 人，一人放、一人等，等的人按鍵沒反應；放滿 8 塊後隊友接手，接到的牆上正好 8 塊、還能放 8 塊；交出去的人看到是誰在放；攻擊只落在正在放的人身上。房間模式變成 7 種，`test/wxnet.js` 跟著改，24 項全過；`test/multi.js` 38 項、`test/royale.js` 16 項都還是全過。
 - 檔案：`src/ui.js`、`src/net.js`、`src/modes.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/relay.js`、`test/meta.test.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
+- 補記：上一條的 commit 為 [`e410fab`](https://github.com/luffysky/cube2/commit/e410fab)。
+
+## 2026-11-23 08:15（Asia/Taipei）｜新模式：搶地盤；修一個偶發失敗的測試
+
+- 專案：cube2｜執行者：Claude
+- 規則（`Meta.TERR`）：計時器下方有一塊 10 × 6 的共用地盤。
+  - 每消 1 行、每送 1 行攻擊，就把 1 格染成自己的顏色：先染空格，空格沒了就搶領先者的（不搶自己的，也不搶隊友的）。
+  - 時間到比格數；同格數再用原本的規則。組隊時算全隊的格子，多人房的名次也先比格數。
+- 誰說了算：對電腦時由這一頁算（你是 0 號，電腦是 1 號）。連線時由房主保管這塊地盤：其他人消行時送新訊息 `c`（要染幾格）給房主，房主每次改完就用 `T` 把整塊地盤發給所有人，所以每個畫面都一樣。
+- 哪裡玩：對戰設定多一個「搶地盤」開關，和守塔戰二選一；朋友房間多一個模式「搶地盤」，2 到 8 人都能選。對戰紀錄的標籤顯示「搶地盤」。
+- 修測試：`test/bff.test.js` 檢查 session 表裡「沒有 token」時，原本只找 `eyJ` 三個字，加密後的亂碼偶爾也會剛好出現這三個字，造成偶發失敗。改成找 JWT 的形狀 `eyJ….eyJ`。
+- 測試：新的瀏覽器測試 `test/terr.js` 15 項。
+  - 對電腦：兩個開關只能開一個；地盤有 60 格；4 行消加送 4 行染 8 格；電腦染它自己的顏色；地盤滿了就搶領先者的；時間到格子多的贏；結算畫面顯示格數。
+  - 兩人房：選模式、對方看到；兩邊各自消行之後，兩個畫面的地盤一模一樣；格子多的人在兩邊都是贏家。
+  - 房間模式變成 8 種，`test/wxnet.js` 跟著改；多人、大逃殺、接力、守塔戰的測試全都重跑過，全部通過。
+- 檔案：`src/modes.js`、`src/ui.js`、`src/net.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/terr.js`、`test/meta.test.js`、`test/wxnet.js`、`test/bff.test.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。

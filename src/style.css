@@ -1041,3 +1041,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 #strip .ghostSend { display: block; margin: 6px auto 0; min-height: 40px; }
 /* 2v2 接力: whose turn it is, under the name tags */
 #strip .relay { margin: 6px 0 0; text-align: center; font-weight: 800; font-size: 14px; }
+/* 搶地盤: the shared field under the clock */
+.terr { margin-top: 4px; text-align: center; }
+.terr .tgrid { display: grid; grid-template-columns: repeat(var(--c), 1fr); gap: 2px; width: 120px; margin: 0 auto; }
+.terr .tgrid i { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--floor-chip); }
+.terr .tgrid i.mine { outline: 2px solid var(--ink); outline-offset: -1px; }
+.terr small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }

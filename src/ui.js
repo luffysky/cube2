@@ -381,6 +381,12 @@
       }
       if (S.royale) { S.rec = null; S.tape = null; toast(t('ry.on'), 3600); }
       if (S.relay) { S.rec = null; S.tape = null; toast(t(S.relay.active ? 'rl.first' : 'rl.wait', S.multi.foes[S.relay.team[0]] ? S.multi.foes[S.relay.team[0]].name : t('you')), 3600); }
+      // 搶地盤: one shared field; the host of the room (or this page, against the computer) decides who owns what
+      if (o.terr && (mode === 'net' || mode === 'ai') && !S.race && !o.tower) {
+        S.terr = { own: [], me: mode === 'net' && ZZ.Net ? ZZ.Net.seat : 0 };
+        for (var ti = 0; ti < Meta.TERR.cols * Meta.TERR.rows; ti++) S.terr.own.push(-1);
+        toast(t('tr.on'), 3200);
+      }
       // 守塔戰: towers instead of a knockout count (Meta.TOWER); the match ends when a tower falls
       if (o.tower && (mode === 'net' || mode === 'ai') && !o.multi && !S.race) {
         S.tower = true;
@@ -491,7 +497,10 @@
       var f = M.foes[s], p = Net.peers[s], e = p && p.end;
       list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone, outAt: f.outAt || 0 });
     });
-    var better = S.royale
+    var cellsOf = function (p) { return S.terr && App.terrCount ? App.terrCount().by[p.seat] || 0 : 0; };
+    var better = S.terr
+      ? function (a, b) { return (a.gone - b.gone) || (cellsOf(b) - cellsOf(a)) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); }
+      : S.royale
       ? function (a, b) { return (a.gone - b.gone) || ((a.downs > 0) - (b.downs > 0)) || ((b.outAt || 0) - (a.outAt || 0)) || (b.sent - a.sent) || (b.score - a.score); }
       : function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); };
     list.sort(better);
@@ -504,7 +513,8 @@
       });
       out.teams = tm;
       var us = tm[M.myTeam], them = tm[1 - M.myTeam];
-      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : us.score !== them.score ? (us.score > them.score ? 1 : -1) : 0;
+      if (S.terr && App.terrCount) { var tcb = App.terrCount().by, cellsT = function (k) { return list.filter(function (p) { return p.team === k; }).reduce(function (a, p) { return a + (tcb[p.seat] || 0); }, 0); }; us.cells = cellsT(M.myTeam); them.cells = cellsT(1 - M.myTeam); }
+      out.r = why === 'left' || (them.out && !us.out) ? 1 : us.cells != null && us.cells !== them.cells ? (us.cells > them.cells ? 1 : -1) : us.downs !== them.downs ? (us.downs < them.downs ? 1 : -1) : us.sent !== them.sent ? (us.sent > them.sent ? 1 : -1) : us.score !== them.score ? (us.score > them.score ? 1 : -1) : 0;
     } else {
       var me = list.filter(function (p) { return p.me; })[0], tops = list.filter(function (p) { return p.place === 1; }).length;
       out.r = why === 'left' ? 1 : me.place === 1 ? (tops > 1 ? 0 : 1) : -1;
@@ -542,7 +552,7 @@
         el.hudL.innerHTML = you + stat('koMe', t('ko')) + stat('sentMe', t('sent'));
         el.hudR.innerHTML = stat('sentOpp', t('sent')) + stat('koOpp', t('ko')) + name;
       }
-      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>';
+      el.hudC.innerHTML = '<div id="clock">' + fmtClock(S.left) + '</div><div id="ptsMe" class="pts"></div>' + (S.terr ? '<div id="terr" class="terr" aria-live="off"></div>' : '');
       if (S.race) { el.hudL.innerHTML = you + stat('sentMe', t('net.raceLines', S.race)); el.hudR.innerHTML = stat('sentOpp', t('net.raceLines', S.race)) + name; }
       if (S.tower) {
         var bar = function (id) { return '<div class="stat tower"><b id="' + id + '">' + Meta.TOWER.hp + '</b><span>' + t('tw.hp') + '</span><i class="twbar"><i id="' + id + 'Bar"></i></i></div>'; };
@@ -1000,11 +1010,15 @@
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
+      if (S.terr && App.terrCount) {
+        var tc = App.terrCount(); S.terrEnd = tc;
+        if (!S.multi) r = why === 'left' ? 1 : why === 'quit' ? -1 : tc.me !== tc.best ? (tc.me > tc.best ? 1 : -1) : r;
+      }
       if (S.tower) { var tw = towers(); S.towerEnd = tw; r = why === 'left' ? 1 : why === 'quit' ? -1 : tw.me !== tw.opp ? (tw.me > tw.opp ? 1 : -1) : r; }
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, terr: !!S.terr, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -1052,7 +1066,7 @@
   }
 
   // ---------- sheets ----------
-  var pick = { level: 1, minutes: 2, items: true, tower: false };
+  var pick = { level: 1, minutes: 2, items: true, tower: false, terr: false };
   function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
   // the big centred win / lose line at the top of a battle result
   function verdict() {
@@ -1102,7 +1116,8 @@
       h += '</div>' + (aiStep() ? '<p class="note">' + t('aiNow', t('s.ai' + aiKey(aiStep()))) + '</p>' : '') + '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
       for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
       h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' +
-        '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' + bringHtml() +
+        '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' +
+        '<label class="toggle" for="bTerr">' + t('tr.toggle') + '<input type="checkbox" id="bTerr"></label><p class="note">' + t('tr.rule') + '</p>' + bringHtml() +
         '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
     } else if (name === 'pause') {
       h = '<h2>' + t('pause') + '</h2><div class="row">' + btn('resume', 'resume', true) + '</div><div class="row">' +
@@ -1325,7 +1340,7 @@
     el.sheet.hidden = false;
     el.sheetCard.scrollTop = keep;
     if (name === 'settings') { syncSettings(); if (App.settingsOpened) App.settingsOpened(); }
-    if (name === 'battle') { $('bItems').checked = pick.items; $('bTower').checked = !!pick.tower; }
+    if (name === 'battle') { $('bItems').checked = pick.items; $('bTower').checked = !!pick.tower; $('bTerr').checked = !!pick.terr; }
     if (App.opened[name]) App.opened[name]();
     var b = el.sheetCard.querySelector('.btn.main');
     if (b && !env.touch && !keep) { try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); } el.sheetCard.scrollTop = 0; }   // (a long sheet opens at its top, not at its button)
@@ -1360,7 +1375,7 @@
     else if (a === 'resume') { sheetBack = ''; closeSheet(true); resume(); }
     else if (a === 'fight') {
       save.level = pick.level; save.minutes = pick.minutes; save.items = pick.items ? 1 : 0; saveStore();
-      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, tower: pick.tower ? 1 : 0, bring: Meta.takeBring() });
+      begin('battle', { mode: 'ai', level: pick.level, minutes: pick.minutes, items: pick.items, tower: pick.tower ? 1 : 0, terr: pick.terr ? 1 : 0, bring: Meta.takeBring() });
     }
     else if (a === 'again') {
       sheetBack = '';
@@ -1408,7 +1423,8 @@
     var onInput = function (e) {
       var id = e.target.id, i;
       if (id === 'bItems') { pick.items = e.target.checked; return; }
-      if (id === 'bTower') { pick.tower = e.target.checked; return; }
+      if (id === 'bTower') { pick.tower = e.target.checked; if (pick.tower) { pick.terr = false; $('bTerr').checked = false; } return; }
+      if (id === 'bTerr') { pick.terr = e.target.checked; if (pick.terr) { pick.tower = false; $('bTower').checked = false; } return; }
       if (id === 'htOff') { set.howto = !e.target.checked; saveStore(); return; }
       if (id === 'sLang') { if (e.type !== 'change') return; setLang(e.target.value); openSheet('settings'); return; }
       if (id === 'sAi') { set.ai = clamp(Math.round(+e.target.value || 0), -2, 2); saveStore(); return; }
@@ -1623,6 +1639,7 @@
       if (S.multi) txt('downT', String(S.multi.foes[S.multi.target].downs));
       if (S.race) { txt('sentMe', String(Math.min(S.race, st.lines))); txt('sentOpp', String(Math.min(S.race, S.opp.stats.lines))); }
       else { txt('sentMe', String(st.sent)); txt('sentOpp', String(S.opp.stats.sent)); }
+      if (S.terr && App.terrDraw) App.terrDraw();
       if (S.tower) {
         var tw = towers(), bm = $('towMeBar'), bo = $('towOppBar');
         txt('towMe', String(tw.me)); txt('towOpp', String(tw.opp));

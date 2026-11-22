@@ -557,7 +557,7 @@
 
   // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
   // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
-  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay'];
+  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay', 'terr'];
   Net.ROOM_MODES = ROOM_MODES;
   function readCfg(c) {
     var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
@@ -568,7 +568,7 @@
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx, lv, race, tower, royale, relay) {
+  function startMatch(seed, minutes, items, multi, wx, lv, race, tower, royale, relay, terr) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
@@ -579,6 +579,7 @@
     if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race && !tower) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
     if (tower && !multi && !race) { o.tower = 1; }
+    if (terr && !race && !tower) { o.terr = 1; }
     if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: royale ? null : multi.teams || null }; if (royale) o.royale = 1; if (relay && o.multi.teams) o.relay = 1; }
     Net.multi = !!multi;
     App.begin('battle', o);
@@ -597,9 +598,9 @@
     var mode = Net.modeOf();
     var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
     var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
-    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0, royale = mode === 'royale' && multi ? 1 : 0, relay = mode === 'relay' && multi && multi.teams ? 1 : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower, royale: royale, relay: relay });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower, royale, relay);
+    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0, royale = mode === 'royale' && multi ? 1 : 0, relay = mode === 'relay' && multi && multi.teams ? 1 : 0, terr = mode === 'terr' ? 1 : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower, royale: royale, relay: relay, terr: terr });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower, royale, relay, terr);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -621,6 +622,10 @@
   Net.item = function (id) { send({ t: 'i', id: id }); };
   // 2v2 接力: our turn is over; the wall (as a snapshot) goes to the next teammate. Everyone hears whose turn it is.
   Net.handoff = function (to, snap) { send({ t: 'h', to: to, s: snap }); };
+  // 搶地盤: claims go to the host, who keeps the one field and sends it to everyone after each change
+  Net.terrClaim = function (n) { send({ t: 'c', n: n }, 0); };
+  Net.terrMap = function (own) { send({ t: 'T', o: own }); };
+  Net.isHost = function () { return !!Net.host; };
   function readSnap(s) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.grid) || s.grid.length !== ROWS) return null;
     var grid = [], r, x;
@@ -755,7 +760,7 @@
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0, m.royale === 1 ? 1 : 0, m.relay === 1 ? 1 : 0); break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0, m.royale === 1 ? 1 : 0, m.relay === 1 ? 1 : 0, m.terr === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a':
@@ -766,6 +771,11 @@
           // in a room of three or more, who sent what and when: if this wall goes down, that decides the knockout
           if (S.multi && hit > 0) { S.hits = S.hits || []; S.hits.push({ s: from, t: Date.now(), n: hit }); if (S.hits.length > 40) S.hits.shift(); }
         }
+        break;
+      case 'c': if (live && Net.host && S.terr && App.terrClaim) App.terrClaim(from, int(m.n, 1, 12)); break;
+      case 'T':
+        if (S && S.terr && from === 0 && Array.isArray(m.o) && m.o.length === S.terr.own.length && App.terrSet)
+          App.terrSet(m.o.map(function (v) { return v === Math.floor(v) && v >= -1 && v < Net.SEATS ? v : -1; }));
         break;
       case 'h':
         if (S && S.relay && S.multi && S.multi.teams && S.multi.teams[from] === S.multi.myTeam) {

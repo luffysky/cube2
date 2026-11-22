@@ -1052,6 +1052,9 @@
   Meta.ROYALE = { every: 30000, maxFloor: 12, ghostEvery: 8000 };
   // 2v2 接力 (relay): teammates share one wall and take turns, 8 pieces each; the one playing hands the wall over
   Meta.RELAY = { pieces: 8 };
+  // 搶地盤 (territory): a shared field of 10 × 6 cells. Every line you clear and every line of cement you send paints
+  // that many cells your colour: empty ones first, then the leader's. At time-up the most cells wins.
+  Meta.TERR = { cols: 10, rows: 6 };
   Meta.KO_WINDOW = 15000;
   Meta.koCredit = function (hits, now) {
     var recent = [], i, by = -1, as = [];
@@ -1074,6 +1077,7 @@
       tower: (mode === 'net' || mode === 'ai') && m.tower === true,
       royale: mode === 'net' && m.royale === true,
       relay: mode === 'net' && m.relay === true,
+      terr: (mode === 'net' || mode === 'ai') && m.terr === true,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it

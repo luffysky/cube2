@@ -156,7 +156,7 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   eq(await coinsOf(P1.id), coins1, 'coins untouched by linking');
   eq((await pg.query('SELECT pid FROM zz.identity WHERE platform_id = $1', [U1]))[0].pid, P1.id, 'one platform player, one save');
   const all = JSON.stringify(await pg.query('SELECT * FROM zz.authsess'));
-  ok(!/eyJ/.test(all) && all.indexOf(P1b.key) < 0, 'no token or key left in the sessions');
+  ok(!/eyJ[A-Za-z0-9_-]*\.eyJ/.test(all) && all.indexOf(P1b.key) < 0, 'no token or key left in the sessions');      // (a JWT is eyJ….eyJ…; three letters alone turn up in random ciphertext now and then)
 
   // ---------- replays and wrong values ----------
   x = await round('link', P1b);

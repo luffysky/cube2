@@ -110,6 +110,13 @@
     'net.m.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'net.m.royale': ['大逃殺', 'Battle royale', 'バトルロイヤル', '배틀 로얄'],
     'net.m.relay': ['接力', 'Relay', 'リレー', '릴레이'],
+    'net.m.terr': ['搶地盤', 'Territory', '陣取り', '땅따먹기'],
+    'net.m.terrP': ['中間有一塊 10 × 6 的共用地盤。你每消 1 行、每送 1 行攻擊，就把 1 格染成你的顏色：先染空格，空格沒了就搶領先者的。時間到比誰的格子多。2 到 8 人都能玩，組隊時算全隊的格子。', 'A shared field of 10 × 6 in the middle. Every line you clear and every line you send paints one cell your colour: empty cells first, then the leader\'s. At time-up the most cells wins. 2 to 8 players; with teams, the team\'s cells count.', '中央に10×6の共有エリア。1ライン消すごと、1ライン攻撃を送るごとに1マスを自分の色に。空きマスから、なくなったらトップから奪う。時間切れでマスが多い方の勝ち。2〜8人、チーム戦はチーム合計。', '가운데 10 × 6 공용 땅. 1줄 지울 때마다, 공격 1줄 보낼 때마다 1칸을 내 색으로 칠해요. 빈칸부터, 다 차면 1등의 칸을 빼앗아요. 시간이 끝나면 칸이 많은 쪽 승리. 2~8명, 팀전은 팀 합계.'],
+    'tr.on': ['搶地盤：消行、送攻擊都能把中間的格子染成你的顏色', 'Territory: clearing and sending lines paints the middle field your colour', '陣取り：ライン消しと攻撃で中央のマスを自分の色に', '땅따먹기: 줄을 지우고 공격을 보내면 가운데 칸이 내 색으로'],
+    'tr.toggle': ['搶地盤', 'Territory', '陣取り', '땅따먹기'],
+    'tr.rule': ['打開後：每消 1 行、每送 1 行攻擊，就把中間 10 × 6 共用地盤的 1 格染成你的顏色，時間到比格子多。（跟守塔戰二選一）', 'On: every line cleared or sent paints one cell of a shared 10 × 6 field your colour; at time-up the most cells wins. (Either this or the tower battle.)', 'オン：1ライン消し・攻撃ごとに共有10×6エリアの1マスを自分の色に。時間切れでマスが多い方の勝ち（タワーバトルと二者択一）。', '켜면: 1줄 지우거나 보낼 때마다 공용 10 × 6 땅의 1칸을 내 색으로. 시간이 끝나면 칸이 많은 쪽 승리(타워 배틀과 둘 중 하나).'],
+    'tr.count': ['你 {0} 格', 'You: {0}', 'あなた {0}マス', '나 {0}칸'],
+    'tr.end': ['地盤：你 {0} 格　最多的對手 {1} 格', 'Territory: you {0} · best rival {1}', '陣取り：あなた {0}マス　最多の相手 {1}マス', '땅: 나 {0}칸 · 최다 상대 {1}칸'],
     'net.m.relayP': ['兩隊對戰，同隊共用一面牆，輪流放方塊：每人 8 塊就交給下一位隊友，連暫存和下一個都一起交接。等待時看隊友放。4、6、8 人房才能選，會自動分兩隊。', 'Two teams; each team shares one wall and takes turns: 8 pieces each, then the wall (hold and next pieces too) goes to the next teammate. While waiting you watch them play. Rooms of 4, 6 or 8; teams are made for you.', '2チーム対戦。チームで1つの壁を共有し、1人8個ずつ交代（ホールドとネクストも引き継ぎ）。待っている間は味方のプレイを見ます。4・6・8人部屋のみ、自動でチーム分け。', '두 팀 대전. 팀이 벽 하나를 함께 쓰고 8개씩 번갈아 놓아요(홀드와 다음 블록도 함께 넘겨요). 기다리는 동안 팀원을 봐요. 4·6·8인 방 전용, 팀은 자동으로 나눠요.'],
     'net.m.onlyTeam': ['接力要 4、6 或 8 個人（兩隊人數一樣），這房間會用普通對戰。', 'The relay needs 4, 6 or 8 players (two even teams); this room plays an ordinary battle.', 'リレーは4・6・8人（同数の2チーム）。この部屋は通常バトルになります。', '릴레이는 4·6·8명(같은 인원 두 팀)이 필요해서 이 방은 일반 대전으로 해요.'],
     'rl.first': ['接力：你先放，8 塊後交給隊友', 'Relay: you start; after 8 pieces the wall goes to your teammate', 'リレー：あなたから。8個で味方に交代', '릴레이: 먼저 시작해요. 8개 후 팀원에게'],
@@ -362,7 +369,7 @@
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) || (k === 'relay' && !Net.teamOk(n)) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay', 'terr'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) || (k === 'relay' && !Net.teamOk(n)) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
     h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : cur === 'royale' && n < 3 ? 'net.m.only3' : cur === 'relay' && !Net.teamOk(n) ? 'net.m.onlyTeam' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
@@ -478,7 +485,8 @@
   };
   App.endExtra = function () {
     var S = App.S();
-    var twNote = S && S.tower && S.towerEnd ? '<p class="note"><b>' + esc(t('tw.end', S.towerEnd.me, S.oppName, S.towerEnd.opp)) + '</b></p>' : '';
+    var trNote = S && S.terr && S.terrEnd ? '<p class="note"><b>' + esc(t('tr.end', S.terrEnd.me, S.terrEnd.best)) + '</b></p>' : '';
+    var twNote = trNote + (S && S.tower && S.towerEnd ? '<p class="note"><b>' + esc(t('tw.end', S.towerEnd.me, S.oppName, S.towerEnd.opp)) + '</b></p>' : '');
     if (S && S.o && S.o.quickCpu) return twNote + '<div class="row">' + btn('netQuickAgain', 'net.quick') + '</div>';
     if (!S || S.mode !== 'net' || S.why) return twNote;
     var rc = S.o.pr ? '<p class="note"><b>' + t('pr.wait') + '</b></p>' : '';
@@ -506,6 +514,69 @@
     if (d.nmin != null) { Net.setCfg({ minutes: +d.nmin, items: Net.cfg.items, team: Net.cfg.team, mode: Net.modeOf() }); return true; }
     if (d.nmode != null) { Net.setCfg({ minutes: Net.cfg.minutes, items: Net.cfg.items, team: Net.cfg.team, mode: d.nmode }); return true; }
     return false;
+  });
+
+
+  // ---------- 搶地盤: the shared field ----------
+  // own[i] is the seat that owns cell i, or -1. Against the computer this page keeps it (you are seat 0, the computer
+  // seat 1); online the host keeps it and sends it to everyone after each change, so every screen shows one field.
+  var TERR_COLORS = ['#F5B82E', '#5DB7F5', '#F0704F', '#37C29A', '#B49CFF', '#FF9DB5', '#8C939B', '#F1EADB'];
+  function terrSeats() {
+    var S = App.S();
+    if (!S || !S.terr) return [];
+    if (S.mode === 'ai') return [0, 1];
+    if (S.multi) return [S.multi.me].concat(S.multi.order);
+    return [Net.seat, Net.seat === 0 ? 1 : 0];
+  }
+  App.terrCount = function () {
+    var S = App.S(), by = {}, me = 0, best = 0;
+    if (!S || !S.terr) return { me: 0, best: 0, by: by };
+    S.terr.own.forEach(function (o) { if (o >= 0) by[o] = (by[o] || 0) + 1; });
+    me = by[S.terr.me] || 0;
+    terrSeats().forEach(function (st) { if (st !== S.terr.me && (!S.multi || !S.multi.teams || S.multi.teams[st] !== S.multi.myTeam)) best = Math.max(best, by[st] || 0); });
+    return { me: me, best: best, by: by };
+  };
+  App.terrClaim = function (seat, n) {
+    var S = App.S();
+    if (!S || !S.terr || S.state !== 'play') return;
+    var own = S.terr.own, k, i;
+    for (k = 0; k < n; k++) {
+      var free = [];
+      for (i = 0; i < own.length; i++) if (own[i] === -1) free.push(i);
+      if (!free.length) {
+        // the leader (not the claimer, not a teammate) gives one up
+        var c = App.terrCount().by, lead = -1, most = 0;
+        Object.keys(c).forEach(function (st) { st = +st; var mate = S.multi && S.multi.teams && S.multi.teams[st] === S.multi.teams[seat]; if (st !== seat && !mate && c[st] > most) { most = c[st]; lead = st; } });
+        if (lead < 0) break;
+        for (i = 0; i < own.length; i++) if (own[i] === lead) free.push(i);
+      }
+      own[free[Math.floor(Math.random() * free.length)]] = seat;
+    }
+    if (S.mode === 'net' && Net.isHost && Net.isHost()) Net.terrMap(own);
+  };
+  App.terrSet = function (own) { var S = App.S(); if (S && S.terr && S.state !== 'over') S.terr.own = own; };
+  var terrKey = '';
+  App.terrDraw = function () {
+    var S = App.S(), el = document.getElementById('terr');
+    if (!S || !S.terr || !el) return;
+    var key = S.terr.own.join(',') + '|' + L.lang;
+    if (key === terrKey && el.firstChild) return;
+    terrKey = key;
+    var h = '<div class="tgrid" style="--c:' + Meta.TERR.cols + '">';
+    S.terr.own.forEach(function (o) { h += '<i' + (o >= 0 ? ' style="background:' + TERR_COLORS[o % TERR_COLORS.length] + '"' : '') + (o === S.terr.me ? ' class="mine"' : '') + '></i>'; });
+    el.innerHTML = h + '</div><small>' + esc(t('tr.count', App.terrCount().me)) + '</small>';
+  };
+  // a lock that cleared lines: one cell per line cleared and per line of cement sent
+  App.hooks.push(function (g, e, mine) {
+    var S = App.S();
+    if (!S || !S.terr || S.state !== 'play' || e.type !== 'lock') return;
+    var n = Math.min(12, (e.lines || 0) + (e.attack || 0));
+    if (!n) return;
+    if (mine && g === S.me) {
+      if (S.mode !== 'net') App.terrClaim(S.terr.me, n);
+      else if (Net.isHost && Net.isHost()) App.terrClaim(Net.seat, n);
+      else Net.terrClaim(n);
+    } else if (!S.remote && g === S.opp) App.terrClaim(1, n);
   });
 
   App.boot.push(function () {

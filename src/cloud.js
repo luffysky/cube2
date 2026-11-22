@@ -652,6 +652,7 @@
     'hi.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'hi.royale': ['大逃殺', 'Battle royale', 'バトルロイヤル', '배틀 로얄'],
     'hi.relay': ['接力', 'Relay', 'リレー', '릴레이'],
+    'hi.terr': ['搶地盤', 'Territory', '陣取り', '땅따먹기'],
     'hi.quick': ['隨機配對', 'Quick match', 'ランダムマッチ', '랜덤 매치'],
     'hi.pvpOk': ['真人排位・伺服器已核定', 'Ranked vs people · settled by the server', '対人ランク・サーバー確定', '대인 랭크 · 서버 확정'],
     'hi.pvpBad': ['真人排位・雙方紀錄不一致，不計分', 'Ranked vs people · reports disagreed, not counted', '対人ランク・記録不一致のため無効', '대인 랭크 · 기록 불일치로 무효'],
@@ -1051,6 +1052,7 @@
     if (m.tw) tag.push(t('hi.tower'));
     if (m.ry) tag.push(t('hi.royale'));
     if (m.rl) tag.push(t('hi.relay'));
+    if (m.tr) tag.push(t('hi.terr'));
     if (m.mode === 'ai') tag.push(t('hi.vsAi', t('lv' + m.level)));
     if (m.mode === 'net') {
       if (m.place && m.seats > 2) tag.push(t('hi.place', m.place, m.seats));
