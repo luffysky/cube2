@@ -146,5 +146,5 @@ cube1 提供：
 | 項目 | 結果 | 證據 |
 |---|---|---|
 | staging 網域 TLS、部署保護、bypass | 通 | cube1 用 bypass 打 staging `/api/health` 得到 200（cube1 回報） |
-| staging 用的是獨立資料庫 | 通 | staging `/api/health?deep=1`：`db: true`、`ready: true`；staging 排行榜是空的，正式站有玩家；部署這次 commit 後再用 `dbSource` 確認（見 DEVLOG） |
+| staging 用的是獨立資料庫 | 通 | staging `/api/health?deep=1`：`db: true`、`ready: true`；staging 排行榜是空的，正式站有玩家；`7c2562f` 部署後 staging `/api/health` 顯示 `dbSource: "staging"`，正式站顯示 `"main"` |
 | 管理 API 在 staging 沒設定前回 503 | 通 | staging `/internal/admin/v1/overview` → 503 `{"error":"disabled"}` |

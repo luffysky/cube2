@@ -905,3 +905,7 @@
 - 檔案：`test/bff.test.js`、`server/db.js`、`server/app.js`、`test/staging.test.js`、`tools/joint-admin-check.js`（新）、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
 - 測試：`node test/run.js` 全過（bff 99、staging 10、admin 105、api 394）。
 - 部署：推到 main 和 `staging`，CI 和部署結果見下一條紀錄。
+- 補記：上一條的 commit 為 [`7c2562f`](https://github.com/luffysky/cube2/commit/7c2562f)。CI run 45022748438 **兩個 job 都成功**。
+  - 正式站 `/api/health`：`dbSource: "main"`、`build: "7c2562f"`、`admin: false`、`link: false`、`mail: true`（Owner 已設好寄信的三個變數）。
+  - staging `/api/health?deep=1`：`dbSource: "staging"`、`db: true`、`ready: true`、`admin: false`、`build: "7c2562f"`。
+  - staging `/internal/admin/v1/overview`：503 `{"error":"disabled"}`，`Cache-Control: no-store`。
