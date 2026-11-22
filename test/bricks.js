@@ -18,8 +18,8 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.goto(BASE + 'index.html?sw=off&lang=zh-Hant'); await sleep(500);
     ok(await page.evaluate(() => !!document.querySelector('.menu-foot a[href="games/"]')), "轉磚's menu links to the other games");
     await page.click('.menu-foot a[href="games/"]'); await sleep(500);
-    ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 10, 'the directory lists ten games', page.url());
-    ok((await page.$$('a.card')).length === 10 && (await page.$$('.card.soon')).length === 0, 'all ten playable');
+    ok(/\/games\/$/.test(page.url()) && (await page.$$('.card')).length === 11, 'the directory lists eleven games (ten, and 地城小隊 to play together)', page.url());
+    ok((await page.$$('a.card')).length === 11 && (await page.$$('.card.soon')).length === 0, 'all eleven playable');
     await page.screenshot({ path: path.join(OUT, 'games-dir.png'), fullPage: true });
     await page.click('a.card[href="snake/"]'); await sleep(500);
     ok(await page.evaluate(() => !document.getElementById('intro').hidden && document.getElementById('pause').disabled), '磚蛇 opens on its start card');

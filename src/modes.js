@@ -147,6 +147,9 @@
     'pr.wait': ['真人排位：等伺服器確認雙方紀錄後更新分數。', 'Ranked: the rating updates once the server has checked both records.', '対人ランク：サーバーが両者の記録を確認したらレートが更新されます。', '랭크: 서버가 양쪽 기록을 확인하면 레이팅이 바뀌어요.'],
     'net.quickH': ['隨機配對', 'Random match', 'ランダムマッチ', '랜덤 매칭'],
     'net.quickGo': ['開始配對', 'Find a player', 'マッチング開始', '매칭 시작'],
+    'net.otherH': ['其他多人遊戲', 'Other games to play together', 'ほかのみんなで遊ぶゲーム', '다른 함께하는 게임'],
+    'net.dungeon': ['地城小隊（新）', 'Dungeon Party (new)', 'ダンジョン小隊（新）', '던전 파티(신규)'],
+    'net.dungeonP': ['2 到 4 人組隊下地城，回合制打怪，跟方塊無關', 'Two to four players go down a dungeon together, fighting in rounds; no blocks involved', '2〜4人でダンジョンへ。ターン制バトル、ブロックは出てきません', '2~4명이 함께 던전으로. 턴제 전투, 블록은 없어요'],
     'net.raceOn': ['40 行競速：先消完 {0} 行的人贏', 'Race: first to {0} lines wins', 'レース：先に{0}ラインで勝ち', '레이스: 먼저 {0}줄이면 승리'],
     'net.raceNot': ['沒消完（{0} 行）', 'not done ({0} lines)', '未完了（{0}ライン）', '미완료 ({0}줄)'],
     'net.raceLines': ['/ {0} 行', '/ {0}', '/ {0}', '/ {0}줄'],
@@ -435,7 +438,10 @@
       if (hosted) { h += '<h3>' + t('mp.size') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('mp.size')) + '">'; [4, 6, 8].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (Net.size === k) + '" data-nsize="' + k + '">' + t('mp.sizeN', k) + '</button>'; }); h += '</div>'; }
       h += '<div class="row">' + btn('netOpen', 'net.open', !joinCode && !hosted) + '</div><h3>' + t('net.or') + '</h3>' +
         '<div class="joinrow"><input id="nCode" type="text" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="' + esc(t('net.codePh')) + '" value="' + esc(joinCode) + '">' +
-        btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+        btn('netJoin', 'net.join', !!joinCode) + '</div><p class="note">' + t(ZZ.Cloud && ZZ.Cloud.hosted() ? 'net.noteRelay' : 'net.note') + '</p>' +
+        // other games to play together (they need the game's own server for their rooms too)
+        (hosted ? '<h3>' + t('net.otherH') + '</h3><a class="btn othergame" href="games/dungeon/"><b>' + t('net.dungeon') + '</b><span>' + t('net.dungeonP') + '</span></a>' : '') +
+        '<div class="row">' + btn('close', 'close') + '</div>';
     }
     return h;
   };

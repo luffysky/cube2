@@ -1,0 +1,98 @@
+/* 地城小隊: the page's own look, on top of games.css. The fight happens in a dark cave; everything else is the
+   brick games' usual paper. */
+.dg { --cave: #221C2B; --cave-2: #2F2740; --cave-ink: #EEE8F7; --hp: #D9432F; --mp: #3E7BE0; --ok: #2E9E6B; --pick: #F5B82E; }
+.dg-room[hidden] { display: none; }
+.dg-room { margin-left: auto; font: 700 13px/1 var(--num); letter-spacing: .08em; color: var(--muted); }
+.dg-sec { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; padding: 4px 0 18px; box-sizing: border-box; }
+.dg-sec[hidden] { display: none; }
+.dg > .dg-err { width: 100%; max-width: 560px; box-sizing: border-box; }
+.dg-sec h2 { margin: 6px 0 0; font-size: 16px; }
+.dg-sub { margin: 0; font-weight: 800; color: var(--muted); }
+.dg-how { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.dg-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.dg-field input, .dg-join input { font: inherit; font-size: 16px; padding: 10px 12px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); color: var(--ink); }
+.dg-join { display: flex; gap: 8px; align-items: center; }
+.dg-join > span { font-size: 13px; color: var(--muted); }
+.dg-join input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .2em; font-family: var(--num); font-weight: 700; }
+.dg-err { margin: 0; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--hp) 14%, transparent); color: var(--hp); font-weight: 700; font-size: 14px; }
+.dg-err[hidden] { display: none; }
+.dg-wait { margin: 0; font-size: 14px; color: var(--muted); }
+
+/* class picker */
+.dg-cls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dg-cls button { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; text-align: left; padding: 10px; border: 1px solid var(--edge); border-radius: 12px; background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+.dg-cls button i { grid-row: 1 / 3; font-style: normal; font-size: 26px; }
+.dg-cls button b { font-size: 15px; }
+.dg-cls button span { grid-column: 1 / -1; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.dg-cls button[aria-checked="true"] { border-color: #8B6FD6; box-shadow: inset 0 0 0 2px #8B6FD6; }
+
+/* the lobby */
+.dg-code { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px; border-radius: 14px; background: var(--cave); color: var(--cave-ink); }
+.dg-code span { font-size: 12px; opacity: .75; }
+.dg-code b { font: 800 40px/1.1 var(--num); letter-spacing: .25em; padding-left: .25em; }
+
+/* heroes */
+.dg-party { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dg-party li, .dg-party li > button { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center; padding: 9px 10px; border: 1px solid var(--edge); border-radius: 12px; background: var(--panel); color: var(--ink); font: inherit; text-align: left; min-width: 0; }
+.dg-party li.pick { padding: 0; border: 0; background: none; }
+.dg-party li > button { width: 100%; cursor: pointer; border-color: var(--pick); box-shadow: inset 0 0 0 2px var(--pick); }
+.dg-party i { grid-row: 1 / 3; font-style: normal; font-size: 22px; }
+.dg-party b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-party b small { font-size: 11px; color: var(--muted); font-weight: 700; }
+.dg-party li > span:not(.dg-tags):not(.dg-stat), .dg-party button > span:not(.dg-tags):not(.dg-stat) { grid-column: 2; font-size: 12px; color: var(--muted); }
+.dg-party li.me { border-color: #8B6FD6; }
+.dg-party li.down { opacity: .55; }
+.dg-tags { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; }
+.dg-tags em { font-style: normal; font-size: 11px; font-weight: 800; padding: 0 6px; border-radius: 6px; background: var(--floor-chip, #C6CDD5); color: var(--muted); }
+.dg-tags em.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.dg-tags em.down, .dg-tags em.off { background: color-mix(in srgb, var(--hp) 16%, transparent); color: var(--hp); }
+.dg-tags em.tn { background: color-mix(in srgb, var(--pick) 25%, transparent); color: #7E5900; }
+.dg-stat { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
+.dg-stat small { flex: none; min-width: 5.5em; text-align: right; font: 700 11px/1 var(--num); color: var(--muted); font-variant-numeric: tabular-nums; }
+.dg-bar { flex: 1; display: block; height: 7px; border-radius: 4px; background: var(--floor-chip, #C6CDD5); overflow: hidden; }
+.dg-bar i { display: block; height: 100%; transition: width .3s; }
+.dg-bar.hp i { background: var(--hp); }
+.dg-bar.mp i { background: var(--mp); }
+
+/* the fight */
+.dg-head { display: flex; align-items: baseline; gap: 10px; }
+.dg-head b { font-size: 18px; }
+.dg-head span { font-size: 13px; color: var(--muted); }
+.dg-clock { margin-left: auto; font: 700 15px/1 var(--num) !important; font-variant-numeric: tabular-nums; }
+.dg-clock.low { color: var(--hp) !important; }
+.dg-cave { padding: 14px 10px; border-radius: 16px; background: radial-gradient(120% 90% at 50% 0%, var(--cave-2), var(--cave) 70%); color: var(--cave-ink); }
+.dg-foes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.dg-foes li, .dg-foes li > button { flex: 1 1 0; min-width: 96px; max-width: 170px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px 8px; border-radius: 12px; background: rgba(255, 255, 255, .06); color: inherit; font: inherit; border: 1px solid rgba(255, 255, 255, .1); }
+.dg-foes li.pick { padding: 0; border: 0; background: none; }
+.dg-foes li > button { width: 100%; max-width: none; cursor: pointer; border-color: var(--pick); box-shadow: 0 0 0 2px var(--pick); }
+.dg-foes i { font-style: normal; font-size: 38px; line-height: 1; }
+.dg-foes li.boss i { font-size: 58px; }
+.dg-foes li.boss { max-width: 260px; }
+.dg-foes li.rage i { filter: drop-shadow(0 0 8px #FF4D3A); }
+.dg-foes b { font-size: 13px; text-align: center; }
+.dg-foes .dg-bar { width: 100%; flex: none; background: rgba(255, 255, 255, .14); }
+.dg-foes small { font: 700 11px/1 var(--num); opacity: .8; font-variant-numeric: tabular-nums; }
+.dg-foes li.dead { opacity: .3; filter: grayscale(1); }
+.dg-acts { display: flex; flex-direction: column; gap: 8px; }
+.dg-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dg-btns .btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 58px; padding: 8px 6px; margin: 0; }
+.dg-btns .btn b { font-size: 16px; }
+.dg-btns .btn small { font-size: 11px; font-weight: 600; opacity: .8; line-height: 1.3; text-align: center; }
+.dg-btns .btn.sk { background: #6A4FC4; border-color: #6A4FC4; color: #fff; }
+.dg-btns .btn:disabled { opacity: .45; cursor: default; }
+.dg-logbox summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
+.dg-log { list-style: none; margin: 6px 0 0; padding: 8px 10px; max-height: 190px; overflow-y: auto; border-radius: 10px; background: var(--panel); border: 1px solid var(--edge); font-size: 13px; line-height: 1.6; }
+.dg-log .l-round { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.dg-log .l-floor, .dg-log .l-clear, .dg-log .l-win { font-weight: 800; }
+.dg-log .l-down, .dg-log .l-lose, .dg-log .l-rage { color: var(--hp); font-weight: 700; }
+.dg-log .l-heal, .dg-log .l-revive { color: var(--ok); }
+
+/* between floors */
+.dg-ups { display: grid; gap: 8px; }
+.dg-ups .btn { margin: 0; min-height: 52px; font-size: 16px; }
+
+@media (max-width: 380px) {
+  .dg-party, .dg-cls { grid-template-columns: 1fr; }
+  .dg-btns .btn small { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .dg-bar i { transition: none; } }

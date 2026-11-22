@@ -5,7 +5,7 @@
   'use strict';
   var here = location.pathname, inGame = /\/games\/[a-z]+\/?(index\.html)?$/.test(here), up = inGame ? '../../' : '../', g = inGame ? '../' : '';
   var T = function () { return window.SRW ? window.SRW.t.apply(null, arguments) : arguments[0]; };
-  var GAMES = [['snake', 'snake'], ['breakout', 'ball'], ['stack', 'layers'], ['push', 'box'], ['merge', 'merge'], ['sort', 'sort'], ['picross', 'pixel'], ['pipes', 'pipe'], ['sweep', 'mine']];
+  var GAMES = [['snake', 'snake'], ['breakout', 'ball'], ['stack', 'layers'], ['push', 'box'], ['merge', 'merge'], ['sort', 'sort'], ['picross', 'pixel'], ['pipes', 'pipe'], ['sweep', 'mine'], ['dungeon', 'quest']];
   var M = window.SnowRealmMini, I = window.SnowRealmIcons, rec = null;
   try { rec = JSON.parse(localStorage.getItem('zhuanzhuan.meta.v1') || 'null'); } catch (e) { /* none */ }
   var name = rec && rec.name || T('nav.player'), coins = M && M.balance() != null ? M.balance() : '—', waiting = M ? M.waiting() : 0;

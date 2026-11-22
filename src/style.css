@@ -1102,3 +1102,5 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .fresh { position: relative; }
 .fresh::after { content: attr(data-newt); position: absolute; top: -7px; right: 12px; padding: 1px 7px; border-radius: 8px; background: var(--alarm); color: #fff; font: 800 11px/1.5 var(--display); pointer-events: none; }
 .dr-list .fresh::after { top: 50%; right: 34px; transform: translateY(-50%); }
+.btn.othergame { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; text-decoration: none; }
+.btn.othergame span { font-size: 13px; font-weight: 600; opacity: .8; }

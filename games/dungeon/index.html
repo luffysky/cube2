@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-title="n.dungeon" data-desc="dg.desc">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>地城小隊 · SnowRealm 磚塊遊戲</title>
+<meta name="description" content="地城小隊：2 到 4 人連線組隊，回合制打怪下地城，打開瀏覽器就能玩。">
+<link rel="canonical" href="https://brickduel.snowrealm.pet/games/dungeon/">
+<link rel="alternate" hreflang="zh-Hant" href="https://brickduel.snowrealm.pet/games/dungeon/">
+<link rel="alternate" hreflang="zh-Hans" href="https://brickduel.snowrealm.pet/games/dungeon/?lang=zh-Hans">
+<link rel="alternate" hreflang="en" href="https://brickduel.snowrealm.pet/games/dungeon/?lang=en">
+<link rel="alternate" hreflang="ja" href="https://brickduel.snowrealm.pet/games/dungeon/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://brickduel.snowrealm.pet/games/dungeon/?lang=ko">
+<link rel="alternate" hreflang="x-default" href="https://brickduel.snowrealm.pet/games/dungeon/">
+<link rel="icon" href="../../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../games.css?v=9d91105f2f">
+<link rel="stylesheet" href="../drawer-items.css?v=f1c599a9fd">
+<link rel="stylesheet" href="../site-themes.css?v=98bc738adf">
+<link rel="stylesheet" href="dungeon.css?v=1bef516d88">
+<script src="../theme.js?v=034b918854"></script>
+</head>
+<body>
+<div id="gboot" role="status" aria-live="polite" style="--gb:#8B6FD6"><div class="gb-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p><span data-t="g.loading">載入中</span><b class="gb-d"><i>.</i><i>.</i><i>.</i></b></p></div>
+<main class="game dg">
+  <div class="bar">
+    <a href="../" data-ta="g.backA" data-t="g.back">← 遊戲</a>
+    <h1 data-t="n.dungeon">地城小隊</h1>
+    <span class="dg-room" id="roomTag" hidden></span>
+  </div>
+
+  <!-- before a room: name, class, open / join / alone -->
+  <section class="dg-sec" id="start">
+    <p class="dg-sub" data-t="dg.sub">合作地城 · 2 到 4 人 · 回合制</p>
+    <p class="dg-how" data-t="dg.how">每回合大家各自選要做什麼，全部選好（或時間到）就一起行動。</p>
+    <label class="dg-field"><span data-t="dg.name">你的名字</span><input id="name" maxlength="16" autocomplete="nickname"></label>
+    <h2 data-t="dg.cls">職業</h2>
+    <div class="dg-cls" id="clsStart" role="radiogroup" data-ta="dg.cls" aria-label="職業"></div>
+    <div class="row"><button class="btn" type="button" id="open" data-t="dg.open">開房間</button></div>
+    <div class="dg-join">
+      <span data-t="dg.or">或</span>
+      <input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" data-tp="dg.codeP" data-ta="dg.codeA" placeholder="5 碼代碼" aria-label="房間代碼">
+      <button class="btn plain" type="button" id="join" data-t="dg.join">加入</button>
+    </div>
+    <div class="row"><button class="btn plain" type="button" id="solo" data-t="dg.solo">一個人先玩</button></div>
+    <p class="dg-err" id="startErr" role="alert" hidden></p>
+  </section>
+
+  <!-- in a room, before the start -->
+  <section class="dg-sec" id="lobby" hidden>
+    <div class="dg-code"><span data-t="dg.codeA">房間代碼</span><b id="lobbyCode">-----</b></div>
+    <p class="dg-how" data-t="dg.share">把代碼或連結傳給朋友，最多 4 人。</p>
+    <div class="row"><button class="btn plain" type="button" id="copy" data-t="dg.copy">複製邀請連結</button></div>
+    <h2 id="partyTitle"></h2>
+    <ul class="dg-party" id="lobbyList"></ul>
+    <h2 data-t="dg.cls">職業</h2>
+    <div class="dg-cls" id="clsLobby" role="radiogroup" data-ta="dg.cls" aria-label="職業"></div>
+    <div class="row"><button class="btn" type="button" id="go" data-t="dg.start">開始冒險</button></div>
+    <p class="dg-wait" id="lobbyWait" data-t="dg.waitHost" hidden>等房主開始</p>
+    <div class="row"><button class="btn plain" type="button" id="leave" data-t="dg.leave">離開</button></div>
+  </section>
+
+  <!-- the fight -->
+  <section class="dg-sec" id="play" hidden>
+    <div class="dg-head"><b id="floorTag"></b><span id="roundTag"></span><span class="dg-clock" id="clock"></span></div>
+    <div class="dg-cave"><ol class="dg-foes" id="foes"></ol></div>
+    <ul class="dg-party fight" id="party"></ul>
+    <div class="dg-acts" id="acts"></div>
+    <details class="dg-logbox" open><summary data-t="dg.log">戰鬥紀錄</summary><ol class="dg-log" id="log" aria-live="polite"></ol></details>
+  </section>
+
+  <!-- between floors -->
+  <section class="dg-sec" id="loot" hidden>
+    <h2 id="lootTitle"></h2>
+    <div class="dg-ups" id="ups"></div>
+    <p class="dg-how" data-t="dg.next">下一層會回一些血和魔力，倒下的人也會站起來。</p>
+    <ul class="dg-party" id="lootList"></ul>
+  </section>
+
+  <!-- the end -->
+  <section class="dg-sec" id="end" hidden>
+    <h2 id="endTitle"></h2>
+    <p id="endNote"></p>
+    <ul class="dg-party" id="endList"></ul>
+    <div class="row"><button class="btn" type="button" id="again" data-t="dg.again">同一隊再挑戰</button></div>
+    <p class="dg-wait" id="againWait" data-t="dg.againWait" hidden>等房主決定要不要再挑戰</p>
+    <div class="row"><button class="btn plain" type="button" id="quit" data-t="dg.leave">離開</button></div>
+  </section>
+  <p class="dg-err" id="netErr" role="alert" hidden></p>
+</main>
+<script src="../words.js?v=c158e09f4d"></script>
+<script src="../i18n.js?v=91f00f02b0"></script>
+<script src="rules.js?v=c57edc7766"></script>
+<script src="dungeon.js?v=7e244ad59d"></script>
+<script src="../drawer-icons.js?v=5ecf0b9420"></script>
+<script src="../nav.js?v=58f8ba90e8"></script>
+</body>
+</html>
