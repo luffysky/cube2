@@ -423,7 +423,7 @@
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       // 磚之冒險 (adventure): class, the furthest stage cleared, and the level of each piece of gear (0: not found yet)
-      rpg: { cls: 'tank', best: 0, gear: { w: 0, a: 0, c: 0 }, wins: 0 },
+      rpg: { cls: 'tank', best: 0, gear: { tank: { w: 0, a: 0, c: 0 }, rogue: { w: 0, a: 0, c: 0 }, mage: { w: 0, a: 0, c: 0 } }, wins: 0 },
       note: null
     };
   }
@@ -458,6 +458,11 @@
   // Takes a saved record (from this device or from the server), fills in whatever it lacks and brings it up to today.
   Meta.use = function (obj) {
     var d = blank();
+    if (obj && obj.rpg && obj.rpg.gear && typeof obj.rpg.gear.w === 'number') {
+      var flat = obj.rpg.gear, nest = {};
+      ['tank', 'rogue', 'mage'].forEach(function (c) { nest[c] = { w: flat.w, a: flat.a, c: flat.c }; });
+      obj = Object.assign({}, obj, { rpg: Object.assign({}, obj.rpg, { gear: nest }) });
+    }
     if (obj && typeof obj === 'object') merge(d, obj);
     while (d.items.length < ITEM_PRICE.length) d.items.push(0);
     Meta.data = d;
@@ -566,44 +571,58 @@
   function jobEvent(kind, n) {
     Meta.data.daily.jobs.forEach(function (j) { var def = job(j.id); if (def && def.ev === kind && !j.paid && j.n < def.need) j.n = Math.min(def.need, def.max ? Math.max(j.n, n) : j.n + n); });
   }
-  // ---------- 磚之冒險 第一章：窯場 (adventure, chapter 1) ----------
+  // ---------- 磚之冒險 第一章：迷霧森林 (adventure, chapter 1) ----------
   // Ten stages, each a monster with hit points (cleared lines and sent cement hurt it) that sends cement on a clock.
-  // Stage 10 is the boss: at half its hit points it attacks faster and harder. Everything about rewards is worked out
-  // here, the same on the page and on the server; the server also checks the stage was open and that there was time
-  // to play it (server/rules.js).
+  // Stage 10 is the boss: at half its hit points it attacks faster and harder. Each class has its own three pieces of
+  // gear: a slot opens for every class at once on the first clear of stage 3, 6 or 9, and each class's pieces are made
+  // stronger on their own. Everything about rewards is worked out here, the same on the page and on the server; the
+  // server also checks the stage was open and that there was time to play it (server/rules.js).
   var RPG = {
     CLASSES: ['tank', 'rogue', 'mage'],
-    // id, emoji, hit points, ms between attacks, lines per attack; drop: the gear the first clear gives
+    SLOTS: ['w', 'a', 'c'],
+    // id, emoji, hit points, ms between attacks, lines per attack; drop: the slot the first clear opens
     STAGES: [
-      { id: 'mud', e: '🟤', hp: 24, every: 11000, lines: 1 },
-      { id: 'shard', e: '🐛', hp: 30, every: 10500, lines: 1 },
-      { id: 'smoke', e: '💨', hp: 36, every: 10000, lines: 1, drop: 'w' },
-      { id: 'bat', e: '🦇', hp: 42, every: 9500, lines: 2 },
-      { id: 'golem', e: '🗿', hp: 60, every: 9000, lines: 2 },
-      { id: 'fox', e: '🦊', hp: 54, every: 8500, lines: 2, drop: 'a' },
-      { id: 'snake', e: '🐍', hp: 60, every: 8000, lines: 2 },
-      { id: 'flame', e: '🔥', hp: 68, every: 7500, lines: 3 },
-      { id: 'shade', e: '👻', hp: 76, every: 7000, lines: 3, drop: 'c' },
-      { id: 'king', e: '👑', hp: 140, every: 8000, lines: 3, boss: true }
+      { id: 'slime', e: '🟢', hp: 16, every: 12000, lines: 1 },
+      { id: 'goblin', e: '👺', hp: 22, every: 11000, lines: 1 },
+      { id: 'shroom', e: '🍄', hp: 28, every: 10500, lines: 1, drop: 'w' },
+      { id: 'bat', e: '🦇', hp: 36, every: 10000, lines: 2 },
+      { id: 'wolf', e: '🐺', hp: 50, every: 9500, lines: 2 },
+      { id: 'treant', e: '🌳', hp: 48, every: 9000, lines: 2, drop: 'a' },
+      { id: 'snake', e: '🐍', hp: 56, every: 8500, lines: 2 },
+      { id: 'flower', e: '🥀', hp: 64, every: 8000, lines: 3 },
+      { id: 'ghost', e: '👻', hp: 72, every: 7500, lines: 3, drop: 'c' },
+      { id: 'dragon', e: '🐉', hp: 140, every: 8000, lines: 3, boss: true }
     ],
+    // each class's pieces, by slot (w weapon, a armour, c charm); their names and effects are in rpg.js
+    GEAR: { tank: { w: 'sword', a: 'shield', c: 'amulet' }, rogue: { w: 'daggers', a: 'leather', c: 'cloak' }, mage: { w: 'staff', a: 'robe', c: 'orb' } },
+    // lines taken off each monster attack, by armour level 0..5
+    ARMOR: { tank: [0, 1, 1, 1, 2, 2], rogue: [0, 0, 1, 1, 1, 2], mage: [0, 0, 0, 1, 1, 1] },
     GEAR_MAX: 5,
     BASE: [0, 1, 3, 5, 8],            // damage by lines cleared at once (then + the cement it sends)
+    NEED: { tank: 10, rogue: 8, mage: 6 },
     upCost: function (lv) { return 60 * lv; },
-    gauge: function (cls, charm) { return Math.max(4, (cls === 'mage' ? 6 : 10) - (charm || 0)); },
-    // damage of one lock: e = { lines, attack, tspin }
-    damage: function (e, cls, weapon, boosted) {
-      var lines = Math.max(0, Math.min(4, e.lines | 0));
+    blank: function () { var g = {}; RPG.CLASSES.forEach(function (c) { g[c] = { w: 0, a: 0, c: 0 }; }); return g; },
+    // lines of clearing that fill the skill; the mage's orb takes one off a level
+    gauge: function (cls, gear) { var n = RPG.NEED[cls] || 10; if (cls === 'mage') n -= (gear && gear.c) || 0; return Math.max(3, n); },
+    // damage of one lock: e = { lines, attack, tspin }; gear: this class's levels; boosted: the rogue's blade is out
+    damage: function (e, cls, gear, boosted) {
+      var lines = Math.max(0, Math.min(4, e.lines | 0)), w = (gear && gear.w) || 0, spin = e.tspin && e.tspin !== 'none', bonus;
       if (!lines) return 0;
       var d = RPG.BASE[lines] + Math.max(0, Math.min(30, e.attack | 0));
-      if (cls === 'rogue' && e.tspin && e.tspin !== 'none') d *= 2;
+      if (cls === 'rogue' && spin) d *= 2;
       if (boosted) d *= 2;
-      return Math.round(d * (1 + 0.1 * (weapon || 0)));
+      // the sword helps every clear; the daggers mostly T-spins; the staff mostly four-line clears
+      bonus = cls === 'tank' ? 0.1 * w : cls === 'rogue' ? (spin ? 0.25 : 0.05) * w : (lines === 4 ? 0.25 : 0.05) * w;
+      return Math.round(d * (1 + bonus));
     },
-    // lines a monster attack lands: armor takes 1 off from level 2 and 2 from level 5; the tank takes 1 more
-    incoming: function (lines, cls, armor) { return Math.max(0, lines - (armor >= 5 ? 2 : armor >= 2 ? 1 : 0) - (cls === 'tank' ? 1 : 0)); },
+    // lines a monster attack lands: the knight takes one fewer, and armour takes more off
+    incoming: function (lines, cls, armor) { var t = RPG.ARMOR[cls] || RPG.ARMOR.mage; return Math.max(0, lines - t[Math.max(0, Math.min(5, armor | 0))] - (cls === 'tank' ? 1 : 0)); },
+    shieldMs: function (gear) { return 8000 + 1500 * ((gear && gear.c) || 0); },     // the knight's 鐵壁, longer with the amulet
+    bladeDmg: function (gear) { return 12 + 4 * ((gear && gear.c) || 0); },          // the rogue's 暗殺, harder with the cloak
     reward: function (stage, first) { var st = RPG.STAGES[stage - 1]; return first ? (st && st.boss ? 200 : 30 + 10 * stage) : 5; }
   };
   Meta.RPG = RPG;
+  Meta.rpgGear = function (cls) { var g = Meta.data.rpg.gear; return g[cls || Meta.data.rpg.cls] || { w: 0, a: 0, c: 0 }; };
   Meta.rpgClass = function (cls) {
     if (RPG.CLASSES.indexOf(cls) < 0) return { ok: false, why: 'no' };
     Meta.data.rpg.cls = cls;
@@ -611,15 +630,15 @@
     emit('rpgCls', [cls]);
     return { ok: true };
   };
-  Meta.rpgUp = function (slot) {
-    var g = Meta.data.rpg.gear, d = Meta.data;
-    if (['w', 'a', 'c'].indexOf(slot) < 0 || !(g[slot] >= 1) || g[slot] >= RPG.GEAR_MAX) return { ok: false, why: 'no' };
+  Meta.rpgUp = function (cls, slot) {
+    var d = Meta.data, g = RPG.CLASSES.indexOf(cls) >= 0 ? d.rpg.gear[cls] : null;
+    if (!g || RPG.SLOTS.indexOf(slot) < 0 || !(g[slot] >= 1) || g[slot] >= RPG.GEAR_MAX) return { ok: false, why: 'no' };
     var cost = RPG.upCost(g[slot]);
     if (d.coins < cost) return { ok: false, why: 'coins' };
     d.coins -= cost;
     g[slot]++;
     Meta.save();
-    emit('rpgUp', [slot]);
+    emit('rpgUp', [cls, slot]);
     return { ok: true, lv: g[slot], cost: cost };
   };
   // a stage won in so many pieces, with this class (the class must be the one on record)
@@ -631,7 +650,7 @@
     if (first) {
       r.best = stage;
       var dp = RPG.STAGES[stage - 1].drop;
-      if (dp && !r.gear[dp]) { r.gear[dp] = 1; drop = dp; }
+      if (dp) { drop = dp; RPG.CLASSES.forEach(function (c) { if (!r.gear[c][dp]) r.gear[c][dp] = 1; }); }
     }
     r.wins++;
     d.coins += coins; d.tot.coins += coins;
@@ -903,7 +922,11 @@
     var rg = d.rpg, cl = function (v, hi) { v = Math.floor(+v) || 0; return v < 0 ? 0 : v > hi ? hi : v; };
     if (RPG.CLASSES.indexOf(rg.cls) < 0) rg.cls = 'tank';
     rg.best = cl(rg.best, RPG.STAGES.length); rg.wins = cl(rg.wins, 1e9);
-    ['w', 'a', 'c'].forEach(function (k) { rg.gear[k] = cl(rg.gear[k], RPG.GEAR_MAX); });
+    RPG.CLASSES.forEach(function (c) { RPG.SLOTS.forEach(function (k) {
+      // a slot is open for every class once the stage that drops it has been beaten (and only then)
+      var open = RPG.STAGES.some(function (st, i) { return st.drop === k && i < rg.best; });
+      rg.gear[c][k] = open ? Math.max(1, cl(rg.gear[c][k], RPG.GEAR_MAX)) : 0;
+    }); });
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
     d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
@@ -1282,7 +1305,7 @@
     wave: function () { return Meta.nextWave(); },
     lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
     rpg: function (a) { var r = Meta.rpgClear(a[0], a[1], str(a[2])); return r.ok ? { ok: true, out: r } : r; },
-    rpgUp: function (a) { var r = Meta.rpgUp(str(a[0])); return r.ok ? { ok: true, out: r } : r; },
+    rpgUp: function (a) { var r = Meta.rpgUp(str(a[0]), str(a[1])); return r.ok ? { ok: true, out: r } : r; },
     rpgCls: function (a) { return Meta.rpgClass(str(a[0])); },
     endless: function (a) { return Meta.endlessDone(a[0]); },
     custom: function () { return Meta.customPlayed(); },

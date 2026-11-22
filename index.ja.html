@@ -150,7 +150,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .mode.primary { background: var(--wall); border-color: var(--wall); border-bottom-color: var(--edge-deep); color: var(--wall-ink); }
 .mode.primary span, .mode.primary em { color: var(--wall-ink); opacity: 0.72; }
 .menu-foot { display: flex; flex-wrap: wrap; gap: 2px 22px; }
-.about { margin: -4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 46em; text-wrap: pretty; }
+.about-wrap { display: flex; flex-direction: column; gap: 4px; margin: -4px 0 0; }
+.about { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 46em; text-wrap: pretty; }
 .link { position: relative; background: none; border: 0; padding: 8px 0; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--edge-deep); }
 
 /* ---------- 對局畫面 ---------- */
@@ -618,7 +619,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   .group { grid-area: group; }
   .modes.two { grid-area: train; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .menu-foot { grid-area: foot; margin-top: 4px; }
-  .about { grid-area: about; }
+  .about-wrap { grid-area: about; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 24px; }
+  .about-wrap .cn-notice { flex-basis: 100%; }
   .logo { font-size: 80px; margin-bottom: 14px; }
   .lede { font-size: 17px; max-width: 22em; }
   #sheetCard { max-width: 600px; }
@@ -778,7 +780,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   .group { grid-area: group; margin: 0 0 -4px; font-size: 12px; }
   .modes.two { grid-area: train; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
   .menu-foot { grid-area: foot; }
-  .about { grid-area: about; }
+  .about-wrap { grid-area: about; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 24px; }
+  .about-wrap .cn-notice { flex-basis: 100%; }
   .mode { padding: 7px 12px 6px; border-radius: 11px; border-bottom-width: 3px; }
   .mode b { font-size: 16px; }
   .mode span { font-size: 11px; line-height: 1.3; }
@@ -1098,8 +1101,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .terr .tgrid i.mine { outline: 2px solid var(--ink); outline-offset: -1px; }
 .terr small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
 /* 磚之冒險: the menu card, the map, a fight */
-.mode.quest { background: linear-gradient(180deg, #5A3A22, #3E2716); border-color: #5A3A22; border-bottom-color: #24160C; color: #F7E7CF; }
-.mode.quest span, .mode.quest em { color: #F7E7CF; opacity: .78; }
+.mode.quest { background: linear-gradient(180deg, #2E5A3A, #1D3D27); border-color: #2E5A3A; border-bottom-color: #10241A; color: #E6F3E3; }
+.mode.quest span, .mode.quest em { color: #E6F3E3; opacity: .8; }
 .quest-nav { display: grid; }
 @media (min-width: 1024px) and (min-height: 560px) {
   .quest-nav { grid-area: quest; align-self: end; }
@@ -1119,14 +1122,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .rp-gear { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .rp-gear li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); }
 .rp-gear li span { grid-column: 1; font-size: 12px; color: var(--muted); }
+.rp-gear li.off { opacity: .6; }
 .rp-gear li > button, .rp-gear li > em { grid-column: 2; grid-row: 1 / 3; font-style: normal; font-size: 12px; color: var(--muted); }
 .rp-map { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .rp-map button { width: 100%; display: grid; grid-template-columns: 34px 1fr; gap: 0 8px; align-items: center; text-align: left; padding: 7px 9px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
 .rp-map button i { grid-row: 1 / 3; font-style: normal; font-size: 24px; text-align: center; }
 .rp-map button span { font-size: 12px; color: var(--muted); }
 .rp-map button.done { border-color: var(--gold-ink); }
-.rp-map button.boss { grid-column: auto; background: linear-gradient(180deg, #4A2618, #2E160D); color: #F7E7CF; border-color: #4A2618; }
-.rp-map button.boss span { color: #F0CFA8; }
+.rp-map button.boss { grid-column: auto; background: linear-gradient(180deg, #3A1F3F, #22122A); color: #F1E6F5; border-color: #3A1F3F; }
+.rp-map button.boss span { color: #D9C2E3; }
 .rp-map li:last-child { grid-column: 1 / -1; }
 .rp-map button:disabled { opacity: .45; cursor: default; }
 .rp-map small { font-size: 11px; padding: 0 5px; border-radius: 6px; background: var(--alarm); color: #fff; }
@@ -1144,6 +1148,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .rp-skill { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 @keyframes rp-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
 @media (prefers-reduced-motion: reduce) { .rp-bar i { transition: none; } .rp-foe.rage > i { animation: none; } }
+/* 「新」: a small tag on what was added lately, until it is opened once */
+.fresh { position: relative; }
+.fresh::after { content: attr(data-newt); position: absolute; top: -7px; right: 12px; padding: 1px 7px; border-radius: 8px; background: var(--alarm); color: #fff; font: 800 11px/1.5 var(--display); pointer-events: none; }
+.dr-list .fresh::after { top: 50%; right: 34px; transform: translateY(-50%); }
 
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
@@ -1260,7 +1268,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         <button class="mode" type="button" data-go="ghost"><b data-t="m.ghost">ゴースト対戦</b><span data-t="m.ghost.s">過去の自分の記録と対戦</span><em id="mGhost"></em></button>
       </nav>
       <nav class="quest-nav" data-ta="rp.title">
-        <button class="mode quest" type="button" data-go="rpg"><b data-t="rp.title">ブロック冒険</b><span data-t="rp.menuS">第1章：窯場。10体の魔物と窯の王</span><em id="mRpg"></em></button>
+        <button class="mode quest" type="button" data-go="rpg"><b data-t="rp.title">ブロック冒険</b><span data-t="rp.menuS">第1章：霧の森。10体の魔物と黒竜</span><em id="mRpg"></em></button>
       </nav>
       <h2 class="group" data-t="m.train">練習</h2>
       <nav class="modes two" data-ta="m.train">
@@ -1285,9 +1293,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         <button class="link" type="button" data-t="pwa.install" id="mInstall" hidden>アプリとして追加</button>
         <a class="link" href="games/" data-t="m.games">ほかのゲーム</a>
       </footer>
-      <p class="about" data-t="seo.about">Zhuan Zhuan バトルは無料のブラウザ対戦落ち物パズル。2分1本勝負で、ピースを回し入れてラインを消し、相手にセメントの壁を送ります。CPU戦、ランクマッチ、友だちとの部屋対戦をスマホ・タブレット・PCで。</p>
-      <p class="about cn-notice" id="cnNotice" hidden></p>
-      <p class="about legal"><a href="privacy.html" data-t="lg.privacy">プライバシー</a>　<a href="terms.html" data-t="lg.terms">利用規約</a></p>
+      <div class="about-wrap">
+        <p class="about" data-t="seo.about">Zhuan Zhuan バトルは無料のブラウザ対戦落ち物パズル。2分1本勝負で、ピースを回し入れてラインを消し、相手にセメントの壁を送ります。CPU戦、ランクマッチ、友だちとの部屋対戦をスマホ・タブレット・PCで。</p>
+        <p class="about cn-notice" id="cnNotice" hidden></p>
+        <p class="about legal"><a href="privacy.html" data-t="lg.privacy">プライバシー</a>　<a href="terms.html" data-t="lg.terms">利用規約</a></p>
+      </div>
     </div>
     <!-- the side menu: everything on the page in one place (the page itself keeps all of it too) -->
     <div class="scrim" id="drawerScrim" hidden></div>
@@ -2245,6 +2255,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'm.ghost.s': ['跟自己之前的紀錄打', 'Play against your own past games.', '過去の自分の記録と対戦', '지난 내 기록과 대결'],
     'm.train': ['練功', 'Training', '練習', '연습'],
     'm.dojo': ['旋轉道場', 'Spin dojo', 'スピン道場', '스핀 도장'],
+    'm.new': ['新', 'New', 'NEW', 'NEW'],
     'm.dojo.s': ['有提示有示範，一關一關練', 'Hints and demos, one drill at a time.', 'ヒントと手本つきで一問ずつ', '힌트와 시범으로 한 단계씩'],
     'm.open': ['開局定式', 'Openers', '開幕テンプレ', '오프너'],
     'm.open.s': ['照著放，把起手背起來', 'Follow the outline, learn the start.', 'ガイド通りに置いて覚える', '가이드대로 놓으며 익히기'],
@@ -2598,6 +2609,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'h.sc1': ['消行、各種轉、連擊、全清、擊倒對手都有分數；軟降每格 1 分，硬降每格 2 分。', 'Clears, spins, combos, perfect clears and KOs all score. Soft drop gives 1 per cell, hard drop 2.', 'ライン消去、スピン、コンボ、パーフェクト、KOで得点。ソフト1マス1点、ハード1マス2点。', '줄 지우기, 스핀, 콤보, 퍼펙트, KO로 점수를 얻습니다. 소프트 1칸 1점, 하드 1칸 2점.'],
     'h.sc2': ['每場結束會依分數、勝負和擊倒數發金幣。金幣可以在商店換外觀，或買道具帶進一般對戰。', 'After each match you earn coins for score, result and KOs. Spend them in the shop on looks, or on items to bring into casual matches.', '対戦後、スコア・勝敗・KO数に応じてコインがもらえます。ショップで見た目や、通常対戦に持ち込むアイテムと交換できます。', '대전이 끝나면 점수·승패·KO에 따라 코인을 받습니다. 상점에서 외형이나 일반 대전에 가져갈 아이템과 바꿀 수 있습니다.'],
     'h.sc3': ['排位賽和連線對戰不能帶買來的道具，大家條件一樣。', 'Bought items are not allowed in ranked or online matches, so everyone plays on equal terms.', 'ランクマッチとオンライン対戦では購入アイテムは使えません。条件は全員同じです。', '랭크전과 온라인 대전에는 구입한 아이템을 가져갈 수 없습니다. 모두 같은 조건입니다.'],
+    'h.modes': ['玩法一覽：在哪裡玩、跟誰玩', 'Ways to play: where, and against whom', '遊び方一覧：どこで、誰と', '플레이 방식: 어디서, 누구와'],
+    'h.m1': ['<b>守塔戰</b>：雙方各有一座塔，被送攻擊、被擊倒都會扣血，塔先倒的輸。跟電腦打：「對戰」裡打開開關；跟真人打：「連線對戰」開房間選模式，或隨機配對選守塔戰。', '<b>Tower battle</b>: each side has a tower; lines sent at you and knockouts wear it down, and the first to fall loses. Against the computer: the switch in Versus. Against people: pick it in an Online room, or in quick match.', '<b>タワーバトル</b>：お互いにタワーを持ち、攻撃を受けたりKOされると削られ、先に倒れた方の負け。CPU戦：「対戦」のスイッチ。対人：オンラインの部屋で選ぶか、クイックマッチで選ぶ。', '<b>타워 배틀</b>: 서로 타워를 가지고, 공격을 받거나 KO되면 깎이며 먼저 무너지면 패배. 컴퓨터전: 「대전」의 스위치. 사람과: 온라인 방에서 고르거나 빠른 매칭에서 선택.'],
+    'h.m2': ['<b>搶地盤</b>：消行、送攻擊都能把中間的共用地盤染成你的顏色，時間到格子多的贏。跟電腦打：「對戰」裡打開開關；跟真人打：開房間（2 到 8 人）或隨機配對。', '<b>Territory</b>: clearing and sending lines paints the shared field your colour; most cells when time runs out wins. Against the computer: the switch in Versus. Against people: an Online room (2 to 8) or quick match.', '<b>陣取り</b>：ライン消しと攻撃で共有の陣地を自分の色に。時間切れでマスが多い方の勝ち。CPU戦：「対戦」のスイッチ。対人：部屋（2〜8人）かクイックマッチ。', '<b>땅따먹기</b>: 줄을 지우고 공격을 보내면 공용 땅이 내 색으로 칠해지고, 시간이 끝났을 때 칸이 많은 쪽이 승리. 컴퓨터전: 「대전」의 스위치. 사람과: 방(2~8명) 또는 빠른 매칭.'],
+    'h.m3': ['<b>大逃殺</b>：被擊倒一次就出局，地板每 30 秒升一排，撐到最後的贏；出局後變幽靈還能送行。只能跟真人打：開房間，3 人以上。', '<b>Battle royale</b>: one knockout and you are out, the floor rises every 30 seconds, last one standing wins; the fallen become ghosts who can still send lines. People only: an Online room with 3 or more.', '<b>バトルロイヤル</b>：1回KOで脱落、30秒ごとに床が上がり、最後まで残った人の勝ち。脱落後は幽霊として攻撃を送れる。対人のみ：3人以上の部屋。', '<b>배틀 로얄</b>: 한 번 KO되면 탈락, 30초마다 바닥이 올라오고 마지막까지 남은 사람이 승리. 탈락 후엔 유령으로 줄을 보낼 수 있어요. 사람과만: 3명 이상의 방.'],
+    'h.m4': ['<b>2v2 接力</b>：同隊共用一面牆，每人放 8 塊就交給隊友。只能跟真人打：開房間，4、6 或 8 人。', '<b>Relay</b>: teammates share one wall, eight pieces each before handing it on. People only: an Online room with 4, 6 or 8.', '<b>2v2 リレー</b>：チームで1つの壁を共有し、8個置いたら交代。対人のみ：4・6・8人の部屋。', '<b>2v2 릴레이</b>: 팀이 벽 하나를 같이 쓰고, 8개씩 놓으면 교대. 사람과만: 4, 6, 8명 방.'],
+    'h.m5': ['<b>磚之冒險</b>：一個人打 10 隻怪物，選職業（騎士、刺客、法師，各有自己的裝備）、強化裝備、放技能（道具鍵）。主選單的綠色卡。', '<b>Brick Quest</b>: on your own against ten monsters, as a knight, rogue or mage, each with its own gear to upgrade, and a skill on the item key. The green card on the menu.', '<b>ブロック冒険</b>：一人で10体の魔物と戦う。騎士・暗殺者・魔法使いにそれぞれ専用装備、スキルはアイテムキー。メニューの緑のカード。', '<b>블록 모험</b>: 혼자서 몬스터 10마리와 싸워요. 기사·자객·마법사마다 전용 장비가 있고, 스킬은 아이템 키. 메뉴의 초록 카드.'],
+    'h.m6': ['<b>助攻</b>：多人房裡，有人被擊倒時，最後送他攻擊的人拿擊倒，15 秒內也送過的人拿助攻。對戰紀錄會列出 K／D／A。', '<b>Assists</b>: in rooms of three or more, the last to send lines at a player who is knocked out gets the KO, and anyone else who sent lines in the 15 seconds before gets an assist. Match history shows K/D/A.', '<b>アシスト</b>：3人以上の部屋で、KOされた人に最後に攻撃した人がKO、15秒以内に攻撃した他の人がアシスト。対戦履歴にK/D/A。', '<b>어시스트</b>: 3명 이상 방에서 KO된 사람에게 마지막으로 공격한 사람이 KO, 15초 안에 공격한 다른 사람은 어시스트. 대전 기록에 K/D/A.'],
     'h.items': ['道具', 'Items', 'アイテム', '아이템'],
     'h.itemsP': ['道具戰裡，每放幾塊，牆上就有一格變成白色的道具磚。把那一排消掉就能拿到，最多帶 3 個，先拿到的先用。', 'In an item match, every few pieces one cell turns into a white item tile. Clear its row to collect it. You carry up to 3 and use the oldest first.', 'アイテム戦では数ピースごとに1マスが白いアイテムタイルに。その列を消すと入手。最大3個まで持て、古い順に使います。', '아이템전에서는 블록 몇 개마다 한 칸이 흰 아이템 타일이 됩니다. 그 줄을 지우면 얻고, 최대 3개까지 들며 먼저 얻은 것부터 씁니다.'],
     'h.credits': ['素材出處', 'Credits', 'クレジット', '크레딧'],
@@ -4403,7 +4421,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       tot: { games: 0, wins: 0, best: 0, sprint: 0, tspins: 0, sent: 0, kos: 0, coins: 0, online: 0, quads: 0, duo: 0, qstreak: 0, qbest: 0 },
       first: { drills: [], openers: [] },
       // 磚之冒險 (adventure): class, the furthest stage cleared, and the level of each piece of gear (0: not found yet)
-      rpg: { cls: 'tank', best: 0, gear: { w: 0, a: 0, c: 0 }, wins: 0 },
+      rpg: { cls: 'tank', best: 0, gear: { tank: { w: 0, a: 0, c: 0 }, rogue: { w: 0, a: 0, c: 0 }, mage: { w: 0, a: 0, c: 0 } }, wins: 0 },
       note: null
     };
   }
@@ -4438,6 +4456,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // Takes a saved record (from this device or from the server), fills in whatever it lacks and brings it up to today.
   Meta.use = function (obj) {
     var d = blank();
+    if (obj && obj.rpg && obj.rpg.gear && typeof obj.rpg.gear.w === 'number') {
+      var flat = obj.rpg.gear, nest = {};
+      ['tank', 'rogue', 'mage'].forEach(function (c) { nest[c] = { w: flat.w, a: flat.a, c: flat.c }; });
+      obj = Object.assign({}, obj, { rpg: Object.assign({}, obj.rpg, { gear: nest }) });
+    }
     if (obj && typeof obj === 'object') merge(d, obj);
     while (d.items.length < ITEM_PRICE.length) d.items.push(0);
     Meta.data = d;
@@ -4546,44 +4569,58 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   function jobEvent(kind, n) {
     Meta.data.daily.jobs.forEach(function (j) { var def = job(j.id); if (def && def.ev === kind && !j.paid && j.n < def.need) j.n = Math.min(def.need, def.max ? Math.max(j.n, n) : j.n + n); });
   }
-  // ---------- 磚之冒險 第一章：窯場 (adventure, chapter 1) ----------
+  // ---------- 磚之冒險 第一章：迷霧森林 (adventure, chapter 1) ----------
   // Ten stages, each a monster with hit points (cleared lines and sent cement hurt it) that sends cement on a clock.
-  // Stage 10 is the boss: at half its hit points it attacks faster and harder. Everything about rewards is worked out
-  // here, the same on the page and on the server; the server also checks the stage was open and that there was time
-  // to play it (server/rules.js).
+  // Stage 10 is the boss: at half its hit points it attacks faster and harder. Each class has its own three pieces of
+  // gear: a slot opens for every class at once on the first clear of stage 3, 6 or 9, and each class's pieces are made
+  // stronger on their own. Everything about rewards is worked out here, the same on the page and on the server; the
+  // server also checks the stage was open and that there was time to play it (server/rules.js).
   var RPG = {
     CLASSES: ['tank', 'rogue', 'mage'],
-    // id, emoji, hit points, ms between attacks, lines per attack; drop: the gear the first clear gives
+    SLOTS: ['w', 'a', 'c'],
+    // id, emoji, hit points, ms between attacks, lines per attack; drop: the slot the first clear opens
     STAGES: [
-      { id: 'mud', e: '🟤', hp: 24, every: 11000, lines: 1 },
-      { id: 'shard', e: '🐛', hp: 30, every: 10500, lines: 1 },
-      { id: 'smoke', e: '💨', hp: 36, every: 10000, lines: 1, drop: 'w' },
-      { id: 'bat', e: '🦇', hp: 42, every: 9500, lines: 2 },
-      { id: 'golem', e: '🗿', hp: 60, every: 9000, lines: 2 },
-      { id: 'fox', e: '🦊', hp: 54, every: 8500, lines: 2, drop: 'a' },
-      { id: 'snake', e: '🐍', hp: 60, every: 8000, lines: 2 },
-      { id: 'flame', e: '🔥', hp: 68, every: 7500, lines: 3 },
-      { id: 'shade', e: '👻', hp: 76, every: 7000, lines: 3, drop: 'c' },
-      { id: 'king', e: '👑', hp: 140, every: 8000, lines: 3, boss: true }
+      { id: 'slime', e: '🟢', hp: 16, every: 12000, lines: 1 },
+      { id: 'goblin', e: '👺', hp: 22, every: 11000, lines: 1 },
+      { id: 'shroom', e: '🍄', hp: 28, every: 10500, lines: 1, drop: 'w' },
+      { id: 'bat', e: '🦇', hp: 36, every: 10000, lines: 2 },
+      { id: 'wolf', e: '🐺', hp: 50, every: 9500, lines: 2 },
+      { id: 'treant', e: '🌳', hp: 48, every: 9000, lines: 2, drop: 'a' },
+      { id: 'snake', e: '🐍', hp: 56, every: 8500, lines: 2 },
+      { id: 'flower', e: '🥀', hp: 64, every: 8000, lines: 3 },
+      { id: 'ghost', e: '👻', hp: 72, every: 7500, lines: 3, drop: 'c' },
+      { id: 'dragon', e: '🐉', hp: 140, every: 8000, lines: 3, boss: true }
     ],
+    // each class's pieces, by slot (w weapon, a armour, c charm); their names and effects are in rpg.js
+    GEAR: { tank: { w: 'sword', a: 'shield', c: 'amulet' }, rogue: { w: 'daggers', a: 'leather', c: 'cloak' }, mage: { w: 'staff', a: 'robe', c: 'orb' } },
+    // lines taken off each monster attack, by armour level 0..5
+    ARMOR: { tank: [0, 1, 1, 1, 2, 2], rogue: [0, 0, 1, 1, 1, 2], mage: [0, 0, 0, 1, 1, 1] },
     GEAR_MAX: 5,
     BASE: [0, 1, 3, 5, 8],            // damage by lines cleared at once (then + the cement it sends)
+    NEED: { tank: 10, rogue: 8, mage: 6 },
     upCost: function (lv) { return 60 * lv; },
-    gauge: function (cls, charm) { return Math.max(4, (cls === 'mage' ? 6 : 10) - (charm || 0)); },
-    // damage of one lock: e = { lines, attack, tspin }
-    damage: function (e, cls, weapon, boosted) {
-      var lines = Math.max(0, Math.min(4, e.lines | 0));
+    blank: function () { var g = {}; RPG.CLASSES.forEach(function (c) { g[c] = { w: 0, a: 0, c: 0 }; }); return g; },
+    // lines of clearing that fill the skill; the mage's orb takes one off a level
+    gauge: function (cls, gear) { var n = RPG.NEED[cls] || 10; if (cls === 'mage') n -= (gear && gear.c) || 0; return Math.max(3, n); },
+    // damage of one lock: e = { lines, attack, tspin }; gear: this class's levels; boosted: the rogue's blade is out
+    damage: function (e, cls, gear, boosted) {
+      var lines = Math.max(0, Math.min(4, e.lines | 0)), w = (gear && gear.w) || 0, spin = e.tspin && e.tspin !== 'none', bonus;
       if (!lines) return 0;
       var d = RPG.BASE[lines] + Math.max(0, Math.min(30, e.attack | 0));
-      if (cls === 'rogue' && e.tspin && e.tspin !== 'none') d *= 2;
+      if (cls === 'rogue' && spin) d *= 2;
       if (boosted) d *= 2;
-      return Math.round(d * (1 + 0.1 * (weapon || 0)));
+      // the sword helps every clear; the daggers mostly T-spins; the staff mostly four-line clears
+      bonus = cls === 'tank' ? 0.1 * w : cls === 'rogue' ? (spin ? 0.25 : 0.05) * w : (lines === 4 ? 0.25 : 0.05) * w;
+      return Math.round(d * (1 + bonus));
     },
-    // lines a monster attack lands: armor takes 1 off from level 2 and 2 from level 5; the tank takes 1 more
-    incoming: function (lines, cls, armor) { return Math.max(0, lines - (armor >= 5 ? 2 : armor >= 2 ? 1 : 0) - (cls === 'tank' ? 1 : 0)); },
+    // lines a monster attack lands: the knight takes one fewer, and armour takes more off
+    incoming: function (lines, cls, armor) { var t = RPG.ARMOR[cls] || RPG.ARMOR.mage; return Math.max(0, lines - t[Math.max(0, Math.min(5, armor | 0))] - (cls === 'tank' ? 1 : 0)); },
+    shieldMs: function (gear) { return 8000 + 1500 * ((gear && gear.c) || 0); },     // the knight's 鐵壁, longer with the amulet
+    bladeDmg: function (gear) { return 12 + 4 * ((gear && gear.c) || 0); },          // the rogue's 暗殺, harder with the cloak
     reward: function (stage, first) { var st = RPG.STAGES[stage - 1]; return first ? (st && st.boss ? 200 : 30 + 10 * stage) : 5; }
   };
   Meta.RPG = RPG;
+  Meta.rpgGear = function (cls) { var g = Meta.data.rpg.gear; return g[cls || Meta.data.rpg.cls] || { w: 0, a: 0, c: 0 }; };
   Meta.rpgClass = function (cls) {
     if (RPG.CLASSES.indexOf(cls) < 0) return { ok: false, why: 'no' };
     Meta.data.rpg.cls = cls;
@@ -4591,15 +4628,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     emit('rpgCls', [cls]);
     return { ok: true };
   };
-  Meta.rpgUp = function (slot) {
-    var g = Meta.data.rpg.gear, d = Meta.data;
-    if (['w', 'a', 'c'].indexOf(slot) < 0 || !(g[slot] >= 1) || g[slot] >= RPG.GEAR_MAX) return { ok: false, why: 'no' };
+  Meta.rpgUp = function (cls, slot) {
+    var d = Meta.data, g = RPG.CLASSES.indexOf(cls) >= 0 ? d.rpg.gear[cls] : null;
+    if (!g || RPG.SLOTS.indexOf(slot) < 0 || !(g[slot] >= 1) || g[slot] >= RPG.GEAR_MAX) return { ok: false, why: 'no' };
     var cost = RPG.upCost(g[slot]);
     if (d.coins < cost) return { ok: false, why: 'coins' };
     d.coins -= cost;
     g[slot]++;
     Meta.save();
-    emit('rpgUp', [slot]);
+    emit('rpgUp', [cls, slot]);
     return { ok: true, lv: g[slot], cost: cost };
   };
   // a stage won in so many pieces, with this class (the class must be the one on record)
@@ -4611,7 +4648,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (first) {
       r.best = stage;
       var dp = RPG.STAGES[stage - 1].drop;
-      if (dp && !r.gear[dp]) { r.gear[dp] = 1; drop = dp; }
+      if (dp) { drop = dp; RPG.CLASSES.forEach(function (c) { if (!r.gear[c][dp]) r.gear[c][dp] = 1; }); }
     }
     r.wins++;
     d.coins += coins; d.tot.coins += coins;
@@ -4883,7 +4920,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var rg = d.rpg, cl = function (v, hi) { v = Math.floor(+v) || 0; return v < 0 ? 0 : v > hi ? hi : v; };
     if (RPG.CLASSES.indexOf(rg.cls) < 0) rg.cls = 'tank';
     rg.best = cl(rg.best, RPG.STAGES.length); rg.wins = cl(rg.wins, 1e9);
-    ['w', 'a', 'c'].forEach(function (k) { rg.gear[k] = cl(rg.gear[k], RPG.GEAR_MAX); });
+    RPG.CLASSES.forEach(function (c) { RPG.SLOTS.forEach(function (k) {
+      // a slot is open for every class once the stage that drops it has been beaten (and only then)
+      var open = RPG.STAGES.some(function (st, i) { return st.drop === k && i < rg.best; });
+      rg.gear[c][k] = open ? Math.max(1, cl(rg.gear[c][k], RPG.GEAR_MAX)) : 0;
+    }); });
     d.bring = d.bring.filter(function (id) { return id >= 1 && id < ITEM_PRICE.length; }).slice(0, BRING_MAX);
     d.lv.stars = String(d.lv.stars || '').replace(/[^0-3]/g, '').slice(0, 1000);
     d.lv.endless = Math.max(0, Math.min(999, Math.floor(+d.lv.endless) || 0));
@@ -5262,7 +5303,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     wave: function () { return Meta.nextWave(); },
     lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
     rpg: function (a) { var r = Meta.rpgClear(a[0], a[1], str(a[2])); return r.ok ? { ok: true, out: r } : r; },
-    rpgUp: function (a) { var r = Meta.rpgUp(str(a[0])); return r.ok ? { ok: true, out: r } : r; },
+    rpgUp: function (a) { var r = Meta.rpgUp(str(a[0]), str(a[1])); return r.ok ? { ok: true, out: r } : r; },
     rpgCls: function (a) { return Meta.rpgClass(str(a[0])); },
     endless: function (a) { return Meta.endlessDone(a[0]); },
     custom: function () { return Meta.customPlayed(); },
@@ -7224,7 +7265,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', howto: true, lang: '', ai: 0
   };
   // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
-  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0 };
+  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0, fresh: 0 };
   var STORE = 'zhuanzhuan.v2';
   function keyCopy(src) { var o = {}; ACTIONS.forEach(function (a) { o[a] = (src && Array.isArray(src[a]) ? src[a] : KEYDEF[a]).filter(function (c) { return typeof c === 'string'; }).slice(0, KEY_MAX); }); return o; }
   function loadStore() {
@@ -8416,6 +8457,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         '<h3>' + t('h.atk') + '</h3>' + ul(['h.atk1', 'h.atk2', 'h.atk3', 'h.atk4', 'h.atk5', 'h.atk6']) +
         '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
         '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
+        '<h3>' + t('h.modes') + '</h3>' + ul(['h.m1', 'h.m2', 'h.m3', 'h.m4', 'h.m5', 'h.m6']) +
         '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
       for (i = 1; i <= 7; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
       h += '</dl><p class="note">' + t('h.itemsMore', ITEMS.length - 1) + '</p><dl class="keys">';
@@ -8534,6 +8576,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
 
   function openSheet(name) {
+    freshSeen(name);
     if ((name === 'settings' || name === 'help') && sheetName !== name && sheetName !== 'keys') sheetBack = sheetName === 'pause' ? 'pause' : '';
     var keep = sheetName === name ? el.sheetCard.scrollTop : 0;
     sheetName = name;
@@ -8657,8 +8700,26 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
   // One of the menu's entries, by name (also used by links that open the game straight into a mode).
   var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1, rpg: 1 };
+  // 「新」 tags on what was added lately (磚之冒險, the new battle switches and room modes, the match history), each gone
+  // once it has been opened, and all of them after FRESH_UNTIL. save.fresh keeps one bit per tag.
+  var FRESH = { rpg: 1, battle: 2, online: 4, history: 8 }, FRESH_UNTIL = Date.UTC(2026, 11, 14);
+  function freshSeen(id) {
+    if (!FRESH[id] || (save.fresh & FRESH[id])) return;
+    save.fresh |= FRESH[id]; saveStore(); freshTags();
+  }
+  function freshTags() {
+    var on = Date.now() < FRESH_UNTIL, nodes = document.querySelectorAll('[data-go], [data-sheet]'), i, n, id;
+    for (i = 0; i < nodes.length; i++) {
+      n = nodes[i]; id = n.getAttribute('data-go') || n.getAttribute('data-sheet');
+      if (!FRESH[id]) continue;
+      n.classList.toggle('fresh', on && !(save.fresh & FRESH[id]));
+      n.setAttribute('data-newt', t('m.new'));
+    }
+  }
+  App.freshTags = freshTags; App.freshUntil = FRESH_UNTIL;
   function goTo(go) {
     if (typeof go !== 'string' || !MODES.hasOwnProperty(go)) return false;
+    freshSeen(go);
     if (typeof App.go[go] === 'function') App.go[go]();
     else if (go === 'battle') openBattle();
     else if (go === 'dojo') { if (save.dojo > 0) openSheet('dojo'); else begin('dojo', { drill: 0 }); }
@@ -8673,6 +8734,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
     txt('mRpg', d.rpg && d.rpg.best ? d.rpg.best + '/' + Meta.RPG.STAGES.length : '');
+    freshTags();
     txt('mSprint', d.tot.sprint ? fmtTime(d.tot.sprint) : '');
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');
@@ -9675,7 +9737,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // let the page offer a computer opponent (onNoOne). Once two are in, the match starts on its own.
   // pool: '' for an ordinary battle, 'wx' for a weather battle (挑戰大自然); each pool is matched only with itself
   Net.quick = function (name, again, pool) {
-    pool = ['wx', 'lv', 'race', 'pr', 'tower'].indexOf(pool) >= 0 ? pool : '';
+    pool = ['wx', 'lv', 'race', 'pr', 'tower', 'terr'].indexOf(pool) >= 0 ? pool : '';
     reset(name, false);
     if (!again) quickTries = 0;
     Net.matched = true; Net.quickSince = Date.now(); Net.pool = pool;
@@ -10529,7 +10591,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       // random matching: pick what to play first; only players who picked the same are matched
       if (hosted) {
         h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-        ['battle', 'pr', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        ['battle', 'pr', 'wx', 'lv', 'race', 'tower', 'terr'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
         h += '</div>' + (quickMode === 'pr' ? '<p><b>' + esc(t('pr.now', App.rankName(Meta.rankOf(Meta.data.pvp.rp)), Meta.data.pvp.rp, Meta.data.pvp.games)) + '</b></p>' : '') + '<p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
         h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
       }
@@ -10542,7 +10604,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race', tower: 'tower' }, quickMode = 'battle';
+  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race', tower: 'tower', terr: 'terr' }, quickMode = 'battle';
   App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
   App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : S.o.tower ? 'tower' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   App.clicks.push(function (d) {
@@ -14067,9 +14129,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 })();
 </script>
 <script>
-/* 轉磚 磚之冒險 第一章：窯場 (adventure, chapter 1): one player against a monster. Lines you clear and cement you send
-   hurt it; it sends cement on a clock. Three classes, three pieces of gear found along the way and made stronger with
-   coins, a skill charged by cleared lines. Rules and rewards are in meta.js (Meta.RPG), the same on the server. Single
+/* 轉磚 磚之冒險 第一章：迷霧森林 (adventure, chapter 1): one player against a monster. Lines you clear and cement you send
+   hurt it; it sends cement on a clock. Three classes, each with its own three pieces of gear
+   (opened by stages 3, 6 and 9, made stronger with coins), and a skill charged by cleared lines. Rules and rewards are in meta.js (Meta.RPG), the same on the server. Single
    player only: nothing here touches ranked play or online rooms. */
 (function () {
   'use strict';
@@ -14077,24 +14139,35 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 
   L.add({
     'rp.title': ['磚之冒險', 'Brick Quest', 'ブロック冒険', '블록 모험'],
-    'rp.menuS': ['第一章：窯場。打倒 10 隻怪物，最後是窯爐之王', 'Chapter 1: the Kiln Yard. Ten monsters, then the Kiln King', '第1章：窯場。10体の魔物と窯の王', '1장: 가마터. 몬스터 10마리, 마지막은 가마의 왕'],
-    'rp.ch1': ['第一章：窯場', 'Chapter 1: the Kiln Yard', '第1章：窯場', '1장: 가마터'],
+    'rp.menuS': ['第一章：迷霧森林。打倒 10 隻怪物，最後是黑龍', 'Chapter 1: the Misty Forest. Ten monsters, then the Black Dragon', '第1章：霧の森。10体の魔物と黒竜', '1장: 안개 숲. 몬스터 10마리, 마지막은 흑룡'],
+    'rp.ch1': ['第一章：迷霧森林', 'Chapter 1: the Misty Forest', '第1章：霧の森', '1장: 안개 숲'],
     'rp.intro': ['消行和送出的攻擊都會打怪物的血；怪物也會定時送水泥給你。被擊倒就輸了。', 'Lines you clear and cement you send hurt the monster; it sends cement at you on a clock. Topping out loses.', 'ライン消しと攻撃で魔物にダメージ。魔物も定期的にセメントを送ってきます。トップアウトで負け。', '줄을 지우고 공격을 보내면 몬스터가 다쳐요. 몬스터도 주기적으로 시멘트를 보내요. 꼭대기에 닿으면 패배.'],
     'rp.cls': ['職業', 'Class', '職業', '직업'],
-    'rp.c.tank': ['守窯人', 'Kiln Guard', '窯番', '가마지기'],
-    'rp.c.tankP': ['怪物每次攻擊少 1 行。技能「窯牆」：8 秒內擋下所有攻擊。', 'Every monster attack lands one line fewer. Skill "Kiln Wall": block every attack for 8 seconds.', '魔物の攻撃が毎回1ライン減る。スキル「窯の壁」：8秒間すべての攻撃を防ぐ。', '몬스터 공격이 매번 1줄 줄어요. 스킬 「가마 벽」: 8초 동안 모든 공격 차단.'],
-    'rp.c.rogue': ['刺客', 'Rogue', '刺客', '자객'],
-    'rp.c.rogueP': ['T 轉造成的傷害加倍。技能「暗刃」：馬上造成 12 點傷害，下一次消行傷害也加倍。', 'T-spins do double damage. Skill "Hidden Blade": 12 damage at once, and your next clear does double.', 'Tスピンのダメージ2倍。スキル「暗刃」：即12ダメージ、次のライン消しも2倍。', 'T스핀 피해 2배. 스킬 「암인」: 즉시 12 피해, 다음 줄 지우기도 2배.'],
-    'rp.c.mage': ['法師', 'Mage', '術師', '마법사'],
-    'rp.c.mageP': ['技能充得比較快（6 行就滿）。技能「淨化」：清掉牆底 4 排。', 'The skill charges faster (6 lines). Skill "Cleanse": remove the bottom 4 rows of your wall.', 'スキルが早くたまる（6ライン）。スキル「浄化」：壁の下4段を消す。', '스킬이 빨리 차요(6줄). 스킬 「정화」: 벽 아래 4줄 제거.'],
-    'rp.gear': ['裝備', 'Gear', '装備', '장비'],
-    'rp.g.w': ['窯火錘', 'Kiln Hammer', '窯火の槌', '가마불 망치'],
-    'rp.g.wP': ['傷害 +{0}%', 'Damage +{0}%', 'ダメージ +{0}%', '피해 +{0}%'],
-    'rp.g.a': ['釉甲', 'Glaze Armor', '釉の鎧', '유약 갑옷'],
-    'rp.g.aP': ['怪物攻擊少 {0} 行（2 級起 1 行、5 級 2 行）', '{0} fewer lines per attack (1 from level 2, 2 at level 5)', '攻撃が{0}ライン減る（Lv2で1、Lv5で2）', '공격이 {0}줄 줄어요(2레벨부터 1, 5레벨 2)'],
-    'rp.g.c': ['窯變護符', 'Kiln Charm', '窯変の護符', '요변 부적'],
-    'rp.g.cP': ['技能少 {0} 行就充滿', 'Skill charges {0} lines sooner', 'スキルが{0}ライン早くたまる', '스킬이 {0}줄 빨리 차요'],
-    'rp.g.none': ['還沒找到（第 {0} 關掉落）', 'Not found yet (dropped by stage {0})', '未入手（ステージ{0}で入手）', '아직 없음({0}단계에서 획득)'],
+    'rp.c.tank': ['騎士', 'Knight', '騎士', '기사'],
+    'rp.c.tankP': ['怪物每次攻擊少 1 行。技能「鐵壁」：一段時間內擋下所有攻擊。消 10 行充滿。', 'Every monster attack lands one line fewer. Skill "Iron Wall": block every attack for a while. Fills after 10 lines.', '魔物の攻撃が毎回1ライン減る。スキル「鉄壁」：しばらく全攻撃を防ぐ。10ラインでたまる。', '몬스터 공격이 매번 1줄 줄어요. 스킬 「철벽」: 잠시 모든 공격 차단. 10줄이면 충전.'],
+    'rp.c.rogue': ['刺客', 'Rogue', '暗殺者', '자객'],
+    'rp.c.rogueP': ['T 轉造成的傷害加倍。技能「暗殺」：馬上造成傷害，下一次消行傷害也加倍。消 8 行充滿。', 'T-spins do double damage. Skill "Assassinate": damage at once, and your next clear does double. Fills after 8 lines.', 'Tスピンのダメージ2倍。スキル「暗殺」：即ダメージ、次のライン消しも2倍。8ラインでたまる。', 'T스핀 피해 2배. 스킬 「암살」: 즉시 피해, 다음 줄 지우기도 2배. 8줄이면 충전.'],
+    'rp.c.mage': ['法師', 'Mage', '魔法使い', '마법사'],
+    'rp.c.mageP': ['技能充得最快（6 行就滿）。技能「淨化」：清掉牆底 4 排。', 'The skill fills fastest (6 lines). Skill "Purify": remove the bottom 4 rows of your wall.', 'スキルが一番早くたまる（6ライン）。スキル「浄化」：壁の下4段を消す。', '스킬이 가장 빨리 차요(6줄). 스킬 「정화」: 벽 아래 4줄 제거.'],
+    'rp.gear': ['{0}的裝備', '{0} gear', '{0}の装備', '{0} 장비'],
+    'rp.gearP': ['每個職業有自己的裝備。第 3、6、9 關第一次打倒時，三個職業的那一格會一起解鎖；強化各自算。', 'Each class has its own gear. Beating stage 3, 6 or 9 for the first time opens that slot for all three classes; upgrades are per class.', '職業ごとに装備があります。ステージ3・6・9の初クリアで3職業の同じ枠が開き、強化は職業ごと。', '직업마다 장비가 따로 있어요. 3·6·9단계 첫 클리어 때 세 직업의 그 칸이 함께 열리고, 강화는 직업별로.'],
+    'rp.g.sword': ['騎士長劍', 'Knight\'s Sword', '騎士の剣', '기사의 장검'],
+    'rp.g.swordP': ['所有傷害 +{0}%', 'All damage +{0}%', '全ダメージ +{0}%', '모든 피해 +{0}%'],
+    'rp.g.shield': ['鐵盾', 'Iron Shield', '鉄の盾', '철 방패'],
+    'rp.g.amulet': ['守護項鍊', 'Guardian Amulet', '守護の首飾り', '수호 목걸이'],
+    'rp.g.amuletP': ['「鐵壁」撐 {0} 秒', '"Iron Wall" lasts {0}s', '「鉄壁」が{0}秒', '「철벽」 {0}초'],
+    'rp.g.daggers': ['雙匕首', 'Twin Daggers', '双短剣', '쌍단검'],
+    'rp.g.daggersP': ['T 轉傷害 +{0}%，其他 +{1}%', 'T-spin damage +{0}%, other clears +{1}%', 'Tスピン +{0}%、その他 +{1}%', 'T스핀 피해 +{0}%, 그 외 +{1}%'],
+    'rp.g.leather': ['皮甲', 'Leather Armour', '革鎧', '가죽 갑옷'],
+    'rp.g.cloak': ['影之斗篷', 'Shadow Cloak', '影の外套', '그림자 망토'],
+    'rp.g.cloakP': ['「暗殺」造成 {0} 點傷害', '"Assassinate" does {0} damage', '「暗殺」{0}ダメージ', '「암살」 {0} 피해'],
+    'rp.g.staff': ['法杖', 'Staff', '魔法の杖', '지팡이'],
+    'rp.g.staffP': ['四行消傷害 +{0}%，其他 +{1}%', 'Four-line clears +{0}%, other clears +{1}%', '4ライン消し +{0}%、その他 +{1}%', '4줄 지우기 +{0}%, 그 외 +{1}%'],
+    'rp.g.robe': ['法袍', 'Robe', 'ローブ', '로브'],
+    'rp.g.orb': ['魔力寶珠', 'Mana Orb', '魔力の宝珠', '마력 구슬'],
+    'rp.g.orbP': ['技能 {0} 行就充滿', 'Skill fills after {0} lines', 'スキルが{0}ラインでたまる', '스킬이 {0}줄이면 충전'],
+    'rp.g.armorP': ['怪物每次攻擊少 {0} 行', 'Monster attacks land {0} fewer lines', '魔物の攻撃が{0}ライン減る', '몬스터 공격이 {0}줄 줄어요'],
+    'rp.g.none': ['還沒解鎖（打倒第 {0} 關）', 'Locked (beat stage {0})', '未解放（ステージ{0}をクリア）', '잠김({0}단계 클리어)'],
     'rp.lv': ['{0} 級', 'Lv {0}', 'Lv{0}', '{0}레벨'],
     'rp.up': ['強化（{0} 金幣）', 'Upgrade ({0} coins)', '強化（{0}コイン）', '강화({0}코인)'],
     'rp.max': ['已滿級', 'Maxed', '最大', '최대'],
@@ -14105,45 +14178,53 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'rp.hp': ['血量 {0}', 'HP {0}', 'HP {0}', 'HP {0}'],
     'rp.boss': ['首領', 'Boss', 'ボス', '보스'],
     'rp.locked': ['先打倒前一關', 'Beat the one before first', '前のステージを先に', '이전 단계를 먼저'],
-    'rp.m.mud': ['泥巴怪', 'Mud Lump', '泥のかたまり', '진흙 덩어리'],
-    'rp.m.shard': ['碎瓦蟲', 'Shard Worm', 'かわら虫', '기와 벌레'],
-    'rp.m.smoke': ['窯煙精', 'Smoke Sprite', '窯煙の精', '가마 연기 정령'],
-    'rp.m.bat': ['釉彩蝙蝠', 'Glaze Bat', '釉彩こうもり', '유약 박쥐'],
-    'rp.m.golem': ['陶土巨人', 'Clay Golem', '陶土の巨人', '도토 거인'],
-    'rp.m.fox': ['灰燼狐', 'Ash Fox', '灰燼ぎつね', '잿불 여우'],
-    'rp.m.snake': ['裂紋蛇', 'Crackle Snake', '貫入へび', '빙렬 뱀'],
-    'rp.m.flame': ['火舌守衛', 'Flame Warden', '炎の番人', '불꽃 파수꾼'],
-    'rp.m.shade': ['窯變幽影', 'Kiln Shade', '窯変の影', '요변 그림자'],
-    'rp.m.king': ['窯爐之王', 'Kiln King', '窯の王', '가마의 왕'],
+    'rp.m.slime': ['史萊姆', 'Slime', 'スライム', '슬라임'],
+    'rp.m.goblin': ['哥布林', 'Goblin', 'ゴブリン', '고블린'],
+    'rp.m.shroom': ['毒菇怪', 'Toadstool', '毒キノコ', '독버섯'],
+    'rp.m.bat': ['吸血蝙蝠', 'Vampire Bat', '吸血コウモリ', '흡혈 박쥐'],
+    'rp.m.wolf': ['灰狼', 'Grey Wolf', '灰色オオカミ', '회색 늑대'],
+    'rp.m.treant': ['樹人', 'Treant', 'トレント', '트렌트'],
+    'rp.m.snake': ['毒蛇', 'Viper', '毒ヘビ', '독사'],
+    'rp.m.flower': ['食人花', 'Man-eating Flower', '人食い花', '식인화'],
+    'rp.m.ghost': ['森林幽靈', 'Forest Ghost', '森の亡霊', '숲의 유령'],
+    'rp.m.dragon': ['黑龍', 'Black Dragon', '黒竜', '흑룡'],
     'rp.next': ['{0} 秒後送 {1} 行', '{1} lines in {0}s', '{0}秒後に{1}ライン', '{0}초 후 {1}줄'],
-    'rp.skill': ['技能', 'Skill', 'スキル', '스킬'],
     'rp.skillGo': ['放技能（{0}）', 'Use skill ({0})', 'スキル（{0}）', '스킬 사용({0})'],
     'rp.skillWait': ['技能 {0}／{1} 行', 'Skill {0}/{1} lines', 'スキル {0}/{1}', '스킬 {0}/{1}줄'],
-    'rp.s.tank': ['窯牆！8 秒內擋下攻擊', 'Kiln Wall! Attacks blocked for 8s', '窯の壁！8秒間防御', '가마 벽! 8초간 방어'],
-    'rp.s.rogue': ['暗刃！', 'Hidden Blade!', '暗刃！', '암인!'],
-    'rp.s.mage': ['淨化！', 'Cleanse!', '浄化！', '정화!'],
-    'rp.rage': ['窯爐之王發怒了！攻擊變快變重', 'The Kiln King is enraged! Faster, heavier attacks', '窯の王が怒った！攻撃が速く重く', '가마의 왕이 분노! 공격이 빠르고 무거워져요'],
+    'rp.s.tank': ['鐵壁！{0} 秒內擋下攻擊', 'Iron Wall! Attacks blocked for {0}s', '鉄壁！{0}秒間防御', '철벽! {0}초간 방어'],
+    'rp.s.rogue': ['暗殺！', 'Assassinate!', '暗殺！', '암살!'],
+    'rp.s.mage': ['淨化！', 'Purify!', '浄化！', '정화!'],
+    'rp.rage': ['黑龍發怒了！攻擊變快變重', 'The Black Dragon is enraged! Faster, heavier attacks', '黒竜が怒った！攻撃が速く重く', '흑룡이 분노! 공격이 빠르고 무거워져요'],
     'rp.hit': ['-{0}', '-{0}', '-{0}', '-{0}'],
     'rp.win': ['打倒了！', 'Defeated!', '撃破！', '처치!'],
     'rp.winP': ['用了 {0} 塊，拿到 {1} 金幣', '{0} pieces · {1} coins', '{0}個使用・{1}コイン', '{0}개 사용 · {1}코인'],
-    'rp.drop': ['找到裝備：{0}！', 'Gear found: {0}!', '装備を入手：{0}！', '장비 획득: {0}!'],
-    'rp.clear': ['第一章完成！窯爐之王倒下了。', 'Chapter 1 complete! The Kiln King has fallen.', '第1章クリア！窯の王を倒しました。', '1장 클리어! 가마의 왕을 쓰러뜨렸어요.'],
+    'rp.drop': ['解鎖新裝備：{0}！三個職業都拿到了這一格。', 'New gear unlocked: {0}! All three classes get this slot.', '新装備を解放：{0}！3職業とも使えます。', '새 장비 해제: {0}! 세 직업 모두 이 칸을 얻었어요.'],
+    'rp.clear': ['第一章完成！黑龍倒下了。', 'Chapter 1 complete! The Black Dragon has fallen.', '第1章クリア！黒竜を倒しました。', '1장 클리어! 흑룡을 쓰러뜨렸어요.'],
     'rp.lose': ['被打倒了', 'Knocked out', 'やられた', '쓰러졌어요'],
     'rp.loseP': ['怪物還剩 {0} 血。換個職業、強化裝備再來。', 'The monster has {0} HP left. Try another class or upgrade your gear.', '魔物の残りHP {0}。職業や装備を見直してもう一度。', '몬스터 HP {0} 남음. 직업을 바꾸거나 장비를 강화해 다시.'],
     'rp.again': ['再打一次', 'Fight again', 'もう一度', '다시 싸우기'],
     'rp.nextSt': ['下一關', 'Next stage', '次へ', '다음 단계'],
     'rp.map': ['回冒險地圖', 'Back to the map', '冒険マップへ', '모험 지도로'],
-    'rp.fight': ['開打', 'Fight', '戦う', '싸우기'],
     'rp.repeat': ['打過的關再打只拿 {0} 金幣。', 'Stages already beaten pay {0} coins.', 'クリア済みは{0}コイン。', '클리어한 단계는 {0}코인.']
   });
 
-  var GEAR = { w: 3, a: 6, c: 9 };     // which stage drops each piece
-  function gearLine(slot) {
-    var lv = Meta.data.rpg.gear[slot], name = t('rp.g.' + slot);
-    if (!lv) return '<li><b>' + esc(name) + '</b><span>' + esc(t('rp.g.none', GEAR[slot])) + '</span></li>';
-    var eff = slot === 'w' ? t('rp.g.wP', lv * 10) : slot === 'a' ? t('rp.g.aP', lv >= 5 ? 2 : lv >= 2 ? 1 : 0) : t('rp.g.cP', lv);
+
+  var OPENS = { w: 3, a: 6, c: 9 };     // which stage opens each slot
+  function gearEffect(cls, slot, lv, g) {
+    var id = RPG.GEAR[cls][slot];
+    if (slot === 'a') return t('rp.g.armorP', RPG.ARMOR[cls][lv] + (cls === 'tank' ? 1 : 0));
+    if (id === 'sword') return t('rp.g.swordP', lv * 10);
+    if (id === 'daggers') return t('rp.g.daggersP', lv * 25, lv * 5);
+    if (id === 'staff') return t('rp.g.staffP', lv * 25, lv * 5);
+    if (id === 'amulet') return t('rp.g.amuletP', RPG.shieldMs({ c: lv }) / 1000);
+    if (id === 'cloak') return t('rp.g.cloakP', RPG.bladeDmg({ c: lv }));
+    return t('rp.g.orbP', RPG.gauge('mage', { c: lv }));
+  }
+  function gearLine(cls, slot) {
+    var lv = Meta.rpgGear(cls)[slot], name = t('rp.g.' + RPG.GEAR[cls][slot]);
+    if (!lv) return '<li class="off"><b>' + esc(name) + '</b><span>' + esc(t('rp.g.none', OPENS[slot])) + '</span></li>';
     var up = lv >= RPG.GEAR_MAX ? '<em>' + t('rp.max') + '</em>' : '<button type="button" class="btn sm" data-rpup="' + slot + '"' + (Meta.data.coins < RPG.upCost(lv) ? ' disabled' : '') + '>' + esc(t('rp.up', RPG.upCost(lv))) + '</button>';
-    return '<li><b>' + esc(name) + ' · ' + esc(t('rp.lv', lv)) + '</b><span>' + esc(eff) + '</span>' + up + '</li>';
+    return '<li><b>' + esc(name) + ' · ' + esc(t('rp.lv', lv)) + '</b><span>' + esc(gearEffect(cls, slot, lv)) + '</span>' + up + '</li>';
   }
 
   // ---------- the map ----------
@@ -14152,7 +14233,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var r = Meta.data.rpg, h = '<h2>' + t('rp.title') + '</h2><p class="lede">' + t('rp.ch1') + '</p><p class="note">' + t('rp.intro') + '</p>';
     h += '<h3>' + t('rp.cls') + '</h3><div class="rp-cls" role="radiogroup" aria-label="' + esc(t('rp.cls')) + '">';
     RPG.CLASSES.forEach(function (c) { h += '<button type="button" role="radio" aria-checked="' + (r.cls === c) + '" data-rpcls="' + c + '"><b>' + t('rp.c.' + c) + '</b><span>' + t('rp.c.' + c + 'P') + '</span></button>'; });
-    h += '</div><h3>' + t('rp.gear') + '</h3><ul class="rp-gear">' + gearLine('w') + gearLine('a') + gearLine('c') + '</ul>';
+    h += '</div><h3>' + esc(t('rp.gear', t('rp.c.' + r.cls))) + '</h3><p class="note">' + t('rp.gearP') + '</p><ul class="rp-gear">' + gearLine(r.cls, 'w') + gearLine(r.cls, 'a') + gearLine(r.cls, 'c') + '</ul>';
     h += '<h3>' + t('rp.stages') + '</h3><ol class="rp-map">';
     RPG.STAGES.forEach(function (st, i) {
       var n = i + 1, open = n <= r.best + 1, done = n <= r.best;
@@ -14164,8 +14245,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   App.clicks.push(function (d) {
     if (d.rpcls) { if (Meta.rpgClass(d.rpcls).ok) App.openSheet('rpg'); return true; }
     if (d.rpup) {
-      var r = Meta.rpgUp(d.rpup);
-      if (r.ok) { App.sfx.play('buy'); App.toast(t('rp.upDone', t('rp.g.' + d.rpup), r.lv)); } else if (r.why === 'coins') App.toast(t('rp.noCoins'));
+      var cls = Meta.data.rpg.cls, r = Meta.rpgUp(cls, d.rpup);
+      if (r.ok) { App.sfx.play('buy'); App.toast(t('rp.upDone', t('rp.g.' + RPG.GEAR[cls][d.rpup]), r.lv)); } else if (r.why === 'coins') App.toast(t('rp.noCoins'));
       App.openSheet('rpg'); return true;
     }
     if (d.rpgo != null) { var n = +d.rpgo; if (n >= 1 && n <= Meta.data.rpg.best + 1 && n <= RPG.STAGES.length) App.begin('rpg', { stage: n }); return true; }
@@ -14176,9 +14257,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   var K = App.kinds.rpg = {
     strip: true,
     begin: function (S, o) {
-      var st = RPG.STAGES[o.stage - 1], r = Meta.data.rpg;
-      S.rpg = { n: o.stage, st: st, hp: st.hp, max: st.hp, t: st.every, every: st.every, lines: st.lines, cls: r.cls, gear: { w: r.gear.w, a: r.gear.a, c: r.gear.c },
-        charge: 0, need: RPG.gauge(r.cls, r.gear.c), boosted: false, rage: false, pieces: 0, last: 0, lastT: 0 };
+      var st = RPG.STAGES[o.stage - 1], r = Meta.data.rpg, g = Meta.rpgGear(r.cls);
+      S.rpg = { n: o.stage, st: st, hp: st.hp, max: st.hp, t: st.every, every: st.every, lines: st.lines, cls: r.cls, gear: { w: g.w, a: g.a, c: g.c },
+        charge: 0, need: RPG.gauge(r.cls, g), boosted: false, rage: false, pieces: 0, last: 0, lastT: 0 };
       S.me = new ZZ.Game({ seed: S.seed, lockDelay: App.set.lock, sdf: App.sdfVal() });
       S.state = 'play';
     },
@@ -14208,7 +14289,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var lines = Math.max(0, Math.min(4, e.lines | 0));
       if (!lines) return;
       R.charge = Math.min(R.need, R.charge + lines);
-      var dmg = RPG.damage(e, R.cls, R.gear.w, R.boosted);
+      var dmg = RPG.damage(e, R.cls, R.gear, R.boosted);
       if (R.boosted) R.boosted = false;
       hurt(dmg);
     },
@@ -14221,8 +14302,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       if (!R || S.state !== 'play' || R.charge < R.need) return;
       R.charge = 0;
       App.sfx.play('itemUse');
-      if (R.cls === 'tank') { S.me.shield = 8000; App.toast(t('rp.s.tank'), 1600); }
-      else if (R.cls === 'rogue') { R.boosted = true; App.toast(t('rp.s.rogue'), 1200); hurt(12); }
+      if (R.cls === 'tank') { S.me.shield = RPG.shieldMs(R.gear); App.toast(t('rp.s.tank', S.me.shield / 1000), 1600); }
+      else if (R.cls === 'rogue') { R.boosted = true; App.toast(t('rp.s.rogue'), 1200); hurt(RPG.bladeDmg(R.gear)); }
       else { S.me.chisel(4); App.toast(t('rp.s.mage'), 1200); }
       draw();
     },
@@ -14269,7 +14350,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   App.sheets.rpgWin = function () {
     var S = App.S(), r = S.res || {}, R = S.rpg, last = R.n >= RPG.STAGES.length;
     var h = '<h2 class="verdict win">' + t('rp.win') + '</h2><p>' + esc(t('rp.winP', R.pieces, r.coins || 0)) + '</p>';
-    if (r.drop) h += '<p><b>' + esc(t('rp.drop', t('rp.g.' + r.drop))) + '</b></p>';
+    if (r.drop) h += '<p><b>' + esc(t('rp.drop', t('rp.g.' + RPG.GEAR[R.cls][r.drop]))) + '</b></p>';
     if (last && r.first) h += '<p><b>' + t('rp.clear') + '</b></p>';
     return h + '<div class="row">' + (last ? '' : btn('rpNext', 'rp.nextSt', true)) + btn('again', 'rp.again', last) + btn('rpMap', 'rp.map') + '</div>';
   };

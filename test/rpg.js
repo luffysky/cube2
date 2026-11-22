@@ -24,21 +24,24 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     const fight = () => A.evaluate(() => { const S = ZZ.App.S(); return S && S.kind === 'rpg' ? { n: S.rpg.n, hp: S.rpg.hp, max: S.rpg.max, state: S.state, charge: S.rpg.charge, need: S.rpg.need, rage: S.rpg.rage, every: S.rpg.every, pend: S.me.pendingTotal(), shield: S.me.shield, strip: document.getElementById('strip').textContent } : null; });
     // ---------- the menu and the map ----------
     ok(await A.evaluate(() => !!document.querySelector('.menu-in [data-go="rpg"]') && /磚之冒險/.test(document.querySelector('.menu-in [data-go="rpg"]').textContent)), 'the menu has 磚之冒險');
+    const freshOn = await A.evaluate(() => Date.now() < ZZ.App.freshUntil);      // the 新 tags come off by themselves after a while
+    if (freshOn) ok(await A.evaluate(() => ['rpg', 'battle', 'online'].every(g => document.querySelector('.menu-in [data-go="' + g + '"]').classList.contains('fresh')) && document.querySelector('.drawer [data-sheet="history"]').classList.contains('fresh') && !document.querySelector('.menu-in [data-go="rank"]').classList.contains('fresh')), 'what was added lately is tagged 新');
     await A.click('.menu-in [data-go="rpg"]');
-    ok(await until(() => A.evaluate(() => /第一章：窯場/.test(document.getElementById('sheetCard').textContent)), 3000), 'the map opens on chapter 1');
+    ok(await until(() => A.evaluate(() => /第一章：迷霧森林/.test(document.getElementById('sheetCard').textContent)), 3000), 'the map opens on chapter 1');
+    if (freshOn) ok(await A.evaluate(() => !document.querySelector('.menu-in [data-go="rpg"]').classList.contains('fresh') && !document.querySelector('.drawer [data-go="rpg"]').classList.contains('fresh') && document.querySelector('.menu-in [data-go="battle"]').classList.contains('fresh')), 'opening it once takes its tag away, everywhere; the others stay');
     ok(await A.evaluate(() => document.querySelectorAll('[data-rpgo]').length === 10 && !document.querySelector('[data-rpgo="1"]').disabled && document.querySelector('[data-rpgo="2"]').disabled), 'ten stages; only the first is open');
-    ok(await A.evaluate(() => /還沒找到/.test(document.querySelector('.rp-gear').textContent)), 'the gear slots start empty');
+    ok(await A.evaluate(() => /還沒解鎖/.test(document.querySelector('.rp-gear').textContent) && /騎士的裝備/.test(document.getElementById('sheetCard').textContent)), 'the gear slots of the class start locked');
     await A.screenshot({ path: path.join(OUT, 'rpg-map.png') });
     await A.click('[data-rpcls="mage"]');
-    ok(await until(() => A.evaluate(() => ZZ.Meta.data.rpg.cls === 'mage' && document.querySelector('[data-rpcls="mage"]').getAttribute('aria-checked') === 'true'), 3000), 'picking 法師 is kept');
+    ok(await until(() => A.evaluate(() => ZZ.Meta.data.rpg.cls === 'mage' && document.querySelector('[data-rpcls="mage"]').getAttribute('aria-checked') === 'true' && /法師的裝備/.test(document.getElementById('sheetCard').textContent) && /法杖/.test(document.querySelector('.rp-gear').textContent)), 3000), 'picking 法師 is kept, and the mage\'s own gear is shown');
     // ---------- a fight ----------
     await A.click('[data-rpgo="1"]');
     ok(await until(async () => { const f = await fight(); return f && f.state === 'play'; }, 8000), 'stage 1 starts');
     let f = await fight();
-    ok(f.hp === 24 && f.need === 6 && /泥巴怪/.test(f.strip) && /24／24/.test(f.strip), 'the monster and its hit points are on the strip; a mage needs 6 lines', f);
+    ok(f.hp === 16 && f.need === 6 && /史萊姆/.test(f.strip) && /16／16/.test(f.strip), 'the monster and its hit points are on the strip; a mage needs 6 lines', f);
     await A.evaluate(() => ZZ.App.kinds.rpg.lock({ lines: 4, attack: 4, tspin: 'none' })); await sleep(200);
     f = await fight();
-    ok(f.hp === 12 && f.charge === 4 && /-12/.test(f.strip), 'a four-line clear does 12 damage and charges the skill', f);
+    ok(f.hp === 4 && f.charge === 4 && /-12/.test(f.strip), 'a four-line clear does 12 damage and charges the skill', f);
     await A.evaluate(() => { ZZ.App.S().rpg.t = 50; }); await sleep(400);
     f = await fight();
     ok(f.pend === 1, 'the monster sends a line of cement on its clock', f);

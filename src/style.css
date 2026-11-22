@@ -100,7 +100,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .mode.primary { background: var(--wall); border-color: var(--wall); border-bottom-color: var(--edge-deep); color: var(--wall-ink); }
 .mode.primary span, .mode.primary em { color: var(--wall-ink); opacity: 0.72; }
 .menu-foot { display: flex; flex-wrap: wrap; gap: 2px 22px; }
-.about { margin: -4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 46em; text-wrap: pretty; }
+.about-wrap { display: flex; flex-direction: column; gap: 4px; margin: -4px 0 0; }
+.about { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); max-width: 46em; text-wrap: pretty; }
 .link { position: relative; background: none; border: 0; padding: 8px 0; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--edge-deep); }
 
 /* ---------- 對局畫面 ---------- */
@@ -568,7 +569,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   .group { grid-area: group; }
   .modes.two { grid-area: train; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .menu-foot { grid-area: foot; margin-top: 4px; }
-  .about { grid-area: about; }
+  .about-wrap { grid-area: about; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 24px; }
+  .about-wrap .cn-notice { flex-basis: 100%; }
   .logo { font-size: 80px; margin-bottom: 14px; }
   .lede { font-size: 17px; max-width: 22em; }
   #sheetCard { max-width: 600px; }
@@ -728,7 +730,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   .group { grid-area: group; margin: 0 0 -4px; font-size: 12px; }
   .modes.two { grid-area: train; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
   .menu-foot { grid-area: foot; }
-  .about { grid-area: about; }
+  .about-wrap { grid-area: about; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 24px; }
+  .about-wrap .cn-notice { flex-basis: 100%; }
   .mode { padding: 7px 12px 6px; border-radius: 11px; border-bottom-width: 3px; }
   .mode b { font-size: 16px; }
   .mode span { font-size: 11px; line-height: 1.3; }
@@ -1048,8 +1051,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .terr .tgrid i.mine { outline: 2px solid var(--ink); outline-offset: -1px; }
 .terr small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
 /* 磚之冒險: the menu card, the map, a fight */
-.mode.quest { background: linear-gradient(180deg, #5A3A22, #3E2716); border-color: #5A3A22; border-bottom-color: #24160C; color: #F7E7CF; }
-.mode.quest span, .mode.quest em { color: #F7E7CF; opacity: .78; }
+.mode.quest { background: linear-gradient(180deg, #2E5A3A, #1D3D27); border-color: #2E5A3A; border-bottom-color: #10241A; color: #E6F3E3; }
+.mode.quest span, .mode.quest em { color: #E6F3E3; opacity: .8; }
 .quest-nav { display: grid; }
 @media (min-width: 1024px) and (min-height: 560px) {
   .quest-nav { grid-area: quest; align-self: end; }
@@ -1069,14 +1072,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .rp-gear { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .rp-gear li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); }
 .rp-gear li span { grid-column: 1; font-size: 12px; color: var(--muted); }
+.rp-gear li.off { opacity: .6; }
 .rp-gear li > button, .rp-gear li > em { grid-column: 2; grid-row: 1 / 3; font-style: normal; font-size: 12px; color: var(--muted); }
 .rp-map { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .rp-map button { width: 100%; display: grid; grid-template-columns: 34px 1fr; gap: 0 8px; align-items: center; text-align: left; padding: 7px 9px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
 .rp-map button i { grid-row: 1 / 3; font-style: normal; font-size: 24px; text-align: center; }
 .rp-map button span { font-size: 12px; color: var(--muted); }
 .rp-map button.done { border-color: var(--gold-ink); }
-.rp-map button.boss { grid-column: auto; background: linear-gradient(180deg, #4A2618, #2E160D); color: #F7E7CF; border-color: #4A2618; }
-.rp-map button.boss span { color: #F0CFA8; }
+.rp-map button.boss { grid-column: auto; background: linear-gradient(180deg, #3A1F3F, #22122A); color: #F1E6F5; border-color: #3A1F3F; }
+.rp-map button.boss span { color: #D9C2E3; }
 .rp-map li:last-child { grid-column: 1 / -1; }
 .rp-map button:disabled { opacity: .45; cursor: default; }
 .rp-map small { font-size: 11px; padding: 0 5px; border-radius: 6px; background: var(--alarm); color: #fff; }
@@ -1094,3 +1098,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .rp-skill { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 @keyframes rp-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
 @media (prefers-reduced-motion: reduce) { .rp-bar i { transition: none; } .rp-foe.rage > i { animation: none; } }
+/* 「新」: a small tag on what was added lately, until it is opened once */
+.fresh { position: relative; }
+.fresh::after { content: attr(data-newt); position: absolute; top: -7px; right: 12px; padding: 1px 7px; border-radius: 8px; background: var(--alarm); color: #fff; font: 800 11px/1.5 var(--display); pointer-events: none; }
+.dr-list .fresh::after { top: 50%; right: 34px; transform: translateY(-50%); }

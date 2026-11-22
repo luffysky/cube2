@@ -68,6 +68,13 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await G.screenshot({ path: path.join(OUT, 'terr-net.png') });
     for (const P of [H, G]) await P.evaluate(() => { ZZ.App.S().left = 300; });
     ok(await until(async () => (await T(H)).r === -1 && (await T(G)).r === 1, 10000), 'the one with more cells wins on both screens', [await T(H), await T(G)]);
+    // ---------- quick match: two who picked 搶地盤 meet and play it ----------
+    for (const P of [H, G]) { await P.evaluate(() => { ZZ.Net.leave(); ZZ.App.toMenu(); }); }
+    await sleep(600);
+    const D = await open('阿土'), E = await open('阿泥');
+    for (const P of [D, E]) { await P.evaluate(() => ZZ.App.go.online()); await sleep(300); await P.click('[data-qmode="terr"]'); await sleep(150); }
+    await D.click('[data-do="netQuick"]'); await sleep(800); await E.click('[data-do="netQuick"]');
+    ok(await until(async () => { const a = await T(D), b = await T(E); return a && b && a.terr && b.terr && a.state === 'play' && b.state === 'play'; }, 15000), 'two who picked 搶地盤 in quick match are matched and play it');
     ok(problems.length === 0, 'no page errors', problems);
   } catch (e) { fail++; console.log('CRASH', e.message); }
   await browser.close();

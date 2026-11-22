@@ -326,12 +326,13 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   M.equipSet('market');
   ok(M.data.equip.ghost === 'gold', 'wearing a set keeps the landing shadow');
 }
-// 磚之冒險: stages in order, the class on record, gear from first clears, upgrades paid in coins
+// 磚之冒險: stages in order, the class on record, gear per class opened by first clears, upgrades paid in coins
 {
   const R = M.RPG;
-  M.data.rpg = { cls: 'tank', best: 0, gear: { w: 0, a: 0, c: 0 }, wins: 0 };
+  M.data.rpg = { cls: 'tank', best: 0, gear: R.blank(), wins: 0 };
   M.data.coins = 0;
-  ok(R.STAGES.length === 10 && R.STAGES[9].boss && R.STAGES.filter(s => s.drop).length === 3, 'ten stages, the last a boss, three drop gear');
+  ok(R.STAGES.length === 10 && R.STAGES[9].boss && R.STAGES.filter(s => s.drop).length === 3, 'ten stages, the last a boss, three open gear');
+  ok(R.CLASSES.every(c => R.SLOTS.every(k => R.GEAR[c][k])) && new Set(R.CLASSES.map(c => R.GEAR[c].w)).size === 3, 'each class has its own three pieces');
   ok(!M.rpgClear(2, 40, 'tank').ok, 'a stage cannot be skipped to');
   ok(!M.rpgClear(1, 40, 'mage').ok, 'the class must be the one on record');
   ok(!M.rpgClear(1, 2, 'tank').ok, 'nobody beats a monster in two pieces');
@@ -341,27 +342,35 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   ok(r.ok && !r.first && r.coins === 5, 'beating it again pays 5', r);
   M.rpgClear(2, 40, 'tank');
   r = M.rpgClear(3, 40, 'tank');
-  ok(r.drop === 'w' && M.data.rpg.gear.w === 1, 'stage 3 drops the hammer', r);
-  ok(!M.rpgUp('a').ok, 'gear not found cannot be upgraded');
+  ok(r.drop === 'w' && R.CLASSES.every(c => M.data.rpg.gear[c].w === 1 && M.data.rpg.gear[c].a === 0), 'stage 3 opens the weapon slot for every class', [r, M.data.rpg.gear]);
+  ok(!M.rpgUp('tank', 'a').ok && !M.rpgUp('paladin', 'w').ok, 'a slot not open, or a class that does not exist, cannot be upgraded');
   M.data.coins = 59;
-  ok(M.rpgUp('w').why === 'coins', 'an upgrade costs coins');
+  ok(M.rpgUp('tank', 'w').why === 'coins', 'an upgrade costs coins');
   M.data.coins = 1000;
-  ok(M.rpgUp('w').ok && M.data.rpg.gear.w === 2 && M.data.coins === 940, 'level 1 to 2 costs 60');
-  for (let i = 0; i < 6; i++) M.rpgUp('w');
-  ok(M.data.rpg.gear.w === R.GEAR_MAX && M.data.coins === 1000 - 60 - 120 - 180 - 240, 'up to level 5 and no further', M.data.coins);
+  ok(M.rpgUp('tank', 'w').ok && M.data.rpg.gear.tank.w === 2 && M.data.rpg.gear.mage.w === 1 && M.data.coins === 940, 'level 1 to 2 costs 60, for that class only');
+  for (let i = 0; i < 6; i++) M.rpgUp('tank', 'w');
+  ok(M.data.rpg.gear.tank.w === R.GEAR_MAX && M.data.coins === 1000 - 60 - 120 - 180 - 240, 'up to level 5 and no further', M.data.coins);
   ok(M.rpgClass('rogue').ok && !M.rpgClass('wizard').ok && M.data.rpg.cls === 'rogue', 'three classes to pick from');
-  // damage: lines + the attack they send; a rogue's T-spins double; the hammer adds 10% a level
-  ok(R.damage({ lines: 0, attack: 0 }, 'tank', 0) === 0 && R.damage({ lines: 1, attack: 0 }, 'tank', 0) === 1 && R.damage({ lines: 2, attack: 1 }, 'tank', 0) === 4 && R.damage({ lines: 4, attack: 4 }, 'tank', 0) === 12, 'damage by lines and attack');
-  ok(R.damage({ lines: 2, attack: 4, tspin: 'full' }, 'rogue', 0) === 14 && R.damage({ lines: 2, attack: 4, tspin: 'full' }, 'mage', 0) === 7, 'the rogue doubles T-spins');
-  ok(R.damage({ lines: 4, attack: 4 }, 'tank', 5) === 18 && R.damage({ lines: 4, attack: 4 }, 'tank', 0, true) === 24, 'hammer level 5 is +50%; the blade doubles');
-  ok(R.incoming(3, 'tank', 0) === 2 && R.incoming(3, 'mage', 2) === 2 && R.incoming(3, 'tank', 5) === 0 && R.incoming(1, 'rogue', 0) === 1, 'the tank and the armour take lines off');
-  ok(R.gauge('mage', 0) === 6 && R.gauge('tank', 0) === 10 && R.gauge('tank', 5) === 5 && R.gauge('mage', 5) === 4, 'the skill gauge: mages and the charm fill it sooner');
-  // the whole chapter's first-clear coins stay under what a few ranked evenings pay
+  // damage: lines + the attack they send; each class's weapon helps in its own way
+  const g0 = { w: 0, a: 0, c: 0 }, g5 = { w: 5, a: 5, c: 5 };
+  ok(R.damage({ lines: 0, attack: 0 }, 'tank', g0) === 0 && R.damage({ lines: 1, attack: 0 }, 'tank', g0) === 1 && R.damage({ lines: 2, attack: 1 }, 'tank', g0) === 4 && R.damage({ lines: 4, attack: 4 }, 'tank', g0) === 12, 'damage by lines and attack');
+  ok(R.damage({ lines: 2, attack: 4, tspin: 'full' }, 'rogue', g0) === 14 && R.damage({ lines: 2, attack: 4, tspin: 'full' }, 'mage', g0) === 7, 'the rogue doubles T-spins');
+  ok(R.damage({ lines: 4, attack: 4 }, 'tank', g5) === 18 && R.damage({ lines: 4, attack: 4 }, 'tank', g0, true) === 24, 'the sword is +50% at level 5; the blade doubles');
+  ok(R.damage({ lines: 2, attack: 4, tspin: 'full' }, 'rogue', g5) === 32 && R.damage({ lines: 4, attack: 4 }, 'rogue', g5) === 15, 'the daggers favour T-spins');
+  ok(R.damage({ lines: 4, attack: 4 }, 'mage', g5) === 27 && R.damage({ lines: 2, attack: 1 }, 'mage', g5) === 5, 'the staff favours four-line clears');
+  ok(R.incoming(3, 'tank', 0) === 2 && R.incoming(3, 'tank', 1) === 1 && R.incoming(3, 'tank', 5) === 0 && R.incoming(3, 'rogue', 2) === 2 && R.incoming(3, 'mage', 2) === 3 && R.incoming(3, 'mage', 5) === 2, 'the knight and each armour take lines off');
+  ok(R.gauge('mage', g0) === 6 && R.gauge('tank', g0) === 10 && R.gauge('rogue', g0) === 8 && R.gauge('tank', g5) === 10 && R.gauge('mage', g5) === 3, 'the skill gauge: mages fill fastest, the orb helps');
+  ok(R.shieldMs(g0) === 8000 && R.shieldMs(g5) === 15500 && R.bladeDmg(g0) === 12 && R.bladeDmg(g5) === 32, 'the amulet and the cloak make the skills stronger');
   let total = 0; for (let n = 1; n <= 10; n++) total += R.reward(n, true);
   ok(total === 920, 'the chapter pays 920 coins once', total);
-  // a broken record is put back in range
-  M.use(Object.assign({}, M.data, { rpg: { cls: 'god', best: 99, gear: { w: 9, a: -3, c: 2 }, wins: 1 } }));
-  eq([M.data.rpg.cls, M.data.rpg.best, M.data.rpg.gear], ['tank', 10, { w: 5, a: 0, c: 2 }], 'the adventure record is kept in range');
+  // a broken record is put back in range: slots stay shut until their stage is beaten
+  M.use(Object.assign({}, M.data, { rpg: { cls: 'god', best: 99, gear: { tank: { w: 9, a: -3, c: 2 }, rogue: {}, mage: { w: 0 } }, wins: 1 } }));
+  eq([M.data.rpg.cls, M.data.rpg.best, M.data.rpg.gear.tank, M.data.rpg.gear.rogue, M.data.rpg.gear.mage], ['tank', 10, { w: 5, a: 1, c: 2 }, { w: 1, a: 1, c: 1 }, { w: 1, a: 1, c: 1 }], 'the adventure record is kept in range');
+  M.use(Object.assign({}, M.data, { rpg: { cls: 'mage', best: 2, gear: { tank: { w: 3, a: 0, c: 0 }, rogue: { w: 0, a: 0, c: 0 }, mage: { w: 0, a: 0, c: 0 } }, wins: 1 } }));
+  eq(M.data.rpg.gear.tank, { w: 0, a: 0, c: 0 }, 'no gear before stage 3 is beaten');
+  // the first version kept one set for every class: each class starts from it
+  M.use(Object.assign({}, M.data, { rpg: { cls: 'rogue', best: 6, gear: { w: 3, a: 1, c: 0 }, wins: 4 } }));
+  eq([M.data.rpg.gear.tank, M.data.rpg.gear.rogue], [{ w: 3, a: 1, c: 0 }, { w: 3, a: 1, c: 0 }], 'an old save\'s gear carries over to every class');
 }
 console.log('meta tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -22,7 +22,7 @@
     vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', howto: true, lang: '', ai: 0
   };
   // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
-  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0 };
+  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0, fresh: 0 };
   var STORE = 'zhuanzhuan.v2';
   function keyCopy(src) { var o = {}; ACTIONS.forEach(function (a) { o[a] = (src && Array.isArray(src[a]) ? src[a] : KEYDEF[a]).filter(function (c) { return typeof c === 'string'; }).slice(0, KEY_MAX); }); return o; }
   function loadStore() {
@@ -1214,6 +1214,7 @@
         '<h3>' + t('h.atk') + '</h3>' + ul(['h.atk1', 'h.atk2', 'h.atk3', 'h.atk4', 'h.atk5', 'h.atk6']) +
         '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
         '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
+        '<h3>' + t('h.modes') + '</h3>' + ul(['h.m1', 'h.m2', 'h.m3', 'h.m4', 'h.m5', 'h.m6']) +
         '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
       for (i = 1; i <= 7; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
       h += '</dl><p class="note">' + t('h.itemsMore', ITEMS.length - 1) + '</p><dl class="keys">';
@@ -1332,6 +1333,7 @@
   }
 
   function openSheet(name) {
+    freshSeen(name);
     if ((name === 'settings' || name === 'help') && sheetName !== name && sheetName !== 'keys') sheetBack = sheetName === 'pause' ? 'pause' : '';
     var keep = sheetName === name ? el.sheetCard.scrollTop : 0;
     sheetName = name;
@@ -1455,8 +1457,26 @@
   }
   // One of the menu's entries, by name (also used by links that open the game straight into a mode).
   var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1, rpg: 1 };
+  // 「新」 tags on what was added lately (磚之冒險, the new battle switches and room modes, the match history), each gone
+  // once it has been opened, and all of them after FRESH_UNTIL. save.fresh keeps one bit per tag.
+  var FRESH = { rpg: 1, battle: 2, online: 4, history: 8 }, FRESH_UNTIL = Date.UTC(2026, 11, 14);
+  function freshSeen(id) {
+    if (!FRESH[id] || (save.fresh & FRESH[id])) return;
+    save.fresh |= FRESH[id]; saveStore(); freshTags();
+  }
+  function freshTags() {
+    var on = Date.now() < FRESH_UNTIL, nodes = document.querySelectorAll('[data-go], [data-sheet]'), i, n, id;
+    for (i = 0; i < nodes.length; i++) {
+      n = nodes[i]; id = n.getAttribute('data-go') || n.getAttribute('data-sheet');
+      if (!FRESH[id]) continue;
+      n.classList.toggle('fresh', on && !(save.fresh & FRESH[id]));
+      n.setAttribute('data-newt', t('m.new'));
+    }
+  }
+  App.freshTags = freshTags; App.freshUntil = FRESH_UNTIL;
   function goTo(go) {
     if (typeof go !== 'string' || !MODES.hasOwnProperty(go)) return false;
+    freshSeen(go);
     if (typeof App.go[go] === 'function') App.go[go]();
     else if (go === 'battle') openBattle();
     else if (go === 'dojo') { if (save.dojo > 0) openSheet('dojo'); else begin('dojo', { drill: 0 }); }
@@ -1471,6 +1491,7 @@
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
     txt('mRpg', d.rpg && d.rpg.best ? d.rpg.best + '/' + Meta.RPG.STAGES.length : '');
+    freshTags();
     txt('mSprint', d.tot.sprint ? fmtTime(d.tot.sprint) : '');
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');

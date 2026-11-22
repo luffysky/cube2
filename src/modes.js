@@ -427,7 +427,7 @@
       // random matching: pick what to play first; only players who picked the same are matched
       if (hosted) {
         h += '<h3>' + t('net.quickH') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-        ['battle', 'pr', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
+        ['battle', 'pr', 'wx', 'lv', 'race', 'tower', 'terr'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (quickMode === k) + '" data-qmode="' + k + '">' + t('net.m.' + k) + '</button>'; });
         h += '</div>' + (quickMode === 'pr' ? '<p><b>' + esc(t('pr.now', App.rankName(Meta.rankOf(Meta.data.pvp.rp)), Meta.data.pvp.rp, Meta.data.pvp.games)) + '</b></p>' : '') + '<p class="note">' + t('net.m.' + quickMode + 'P').replace(/(只限兩人房。|Two players only\.|二人部屋のみ。|2인 방 전용\.)/, '') + '</p>';
         h += '<div class="row">' + btn('netQuick', 'net.quickGo', !joinCode) + '</div><p class="note">' + t('net.quickP', Net.QUICK_WAIT / 1000) + '</p>';
       }
@@ -440,7 +440,7 @@
     return h;
   };
   App.opened.online = function () { var c = $('nItems'); if (c) c.checked = Net.cfg.items; c = $('nTeam'); if (c) c.checked = !!Net.cfg.team; };
-  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race', tower: 'tower' }, quickMode = 'battle';
+  var QUICK_POOL = { battle: '', pr: 'pr', wx: 'wx', lv: 'lv', race: 'race', tower: 'tower', terr: 'terr' }, quickMode = 'battle';
   App.acts.netQuick = function () { copied = false; Net.quick(myName(), false, QUICK_POOL[quickMode]); };
   App.acts.netQuickAgain = function () { var S = App.S(), pool = S && S.o ? (S.o.wx ? 'wx' : S.o.lv ? 'lv' : S.o.race ? 'race' : S.o.tower ? 'tower' : Net.pool || '') : ''; App.toMenu(); App.openSheet('online'); Net.quick(myName(), false, pool); };
   App.clicks.push(function (d) {
