@@ -992,3 +992,15 @@
 - A1–A6、A10–A13 改為 PENDING：條件都齊了，但**還沒有任何一次帶 cube1 簽發 JWT 的 staging HTTP 呼叫**，所以一項都不能算 PASS。A7–A9、A14 仍是 BLOCKED（需要 cube1 換鑰、讓 JWKS 暫時失效，以及查 `zz.admin_log`）。
 - 正式環境的管理信任、`IDENTITY_LINK_ENABLED`、玩家資料都沒動。
 - 檔案：`docs/DEVLOG.md`、`docs/JOINT_ACCEPTANCE.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`1d1e1ca`](https://github.com/luffysky/cube2/commit/1d1e1ca)。staging 部署後 `/api/health`：`build: "1d1e1ca"`、`admin: true`、`dbSource: "staging"`；正式站 `admin: false`、`link: false`、`dbSource: "main"`。
+
+## 2026-11-23 01:45（Asia/Taipei）｜給 cube1 的 A 組執行 workflow
+
+- 專案：cube2｜執行者：Claude
+- Owner 轉來 staging 管理私鑰在 cube1 那邊的 secret 名稱：`CUBE2_STAGING_ADMIN_SIGNER_PEM`。
+- 私鑰不搬到 cube2（cube2 的 GitHub、Vercel 都不放），改成寫一份 workflow 給 cube1 放進自己的 repo：`docs/handoff/cube1-joint-admin-check.yml`。
+  - 手動觸發，checkout 公開的 cube2，把私鑰寫到 runner 暫存檔（權限 600、結束就刪），跑 `tools/joint-admin-check.js`，JSON 報告存成 artifact。
+  - kid、issuer、sub、JWKS 網址都填好了；cube1 只要改 Environment 名稱和 bypass secret 名稱。
+- 這次只 push main，**沒有**更新 staging，讓 staging 維持 `1d1e1ca`，和 workflow 預設的 `EXPECT_BUILD` 對得上。
+- A 組結果不變：還沒有任何實際的 staging 呼叫。
+- 檔案：`docs/handoff/cube1-joint-admin-check.yml`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。

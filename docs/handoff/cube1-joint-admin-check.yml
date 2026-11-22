@@ -1,0 +1,67 @@
+# 給 cube1 的 workflow：放進 cube1 的 .github/workflows/，手動觸發，對 cube2 staging 跑 A 組聯合驗收。
+# 私鑰只留在 cube1 的 GitHub Environment，用完就刪掉暫存檔，不會出現在日誌或報告裡。
+# 需要依實際情況改的只有兩個地方：environment 名稱、bypass secret 的名稱（下面標了「改這裡」）。
+name: cube2 staging A-group check
+
+on:
+  workflow_dispatch:
+    inputs:
+      expect_build:
+        description: cube2 staging 的部署版本（7 碼 commit，看 /api/health 的 build）
+        required: true
+        default: 1d1e1ca
+      seed:
+        description: 先建一個合成測試玩家（1 = 是）
+        required: true
+        default: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: cube2-staging            # 改這裡：放著 CUBE2_STAGING_ADMIN_SIGNER_PEM 的那個 Environment 名稱
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: luffysky/cube2
+          ref: main
+          path: cube2
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run tools/joint-admin-check.js
+        working-directory: cube2
+        env:
+          SIGNER_PEM_TEXT: ${{ secrets.CUBE2_STAGING_ADMIN_SIGNER_PEM }}
+          VERCEL_BYPASS: ${{ secrets.CUBE2_STAGING_VERCEL_BYPASS }}   # 改這裡：cube2 bypass secret 在你們那邊的名稱
+          STAGING_URL: https://brickduel-staging.snowrealm.pet
+          ADMIN_KID: srstagea_EWW-tM7u8uSnvCwV
+          ADMIN_ISS: https://identity-staging.snowrealm.pet
+          ADMIN_SUB: svc:snowrealm-games-admin
+          ADMIN_JWKS_URL: https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json
+          EXPECT_BUILD: ${{ inputs.expect_build }}
+          SEED: ${{ inputs.seed }}
+        run: |
+          set -eu
+          umask 077
+          pem="$RUNNER_TEMP/admin-signer.pem"
+          trap 'rm -f "$pem"' EXIT
+          printf '%s\n' "$SIGNER_PEM_TEXT" > "$pem"
+          unset SIGNER_PEM_TEXT
+          ADMIN_SIGNER_PEM="$pem" node tools/joint-admin-check.js > "$RUNNER_TEMP/a-results.json"
+          cat "$RUNNER_TEMP/a-results.json"
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube2-staging-a-results
+          path: ${{ runner.temp }}/a-results.json
+          if-no-files-found: warn
+          retention-days: 30
