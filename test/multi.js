@@ -65,6 +65,9 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     // a knockout is counted from the player's own report
     await C.evaluate(() => { const g = ZZ.peek().S.me; g.topOut('lock'); });
     ok(await until(() => A.evaluate(s => ZZ.peek().S.multi.foes[s].downs === 1, cSeat), 6000), "C's knockout shows on A's screen", await A.evaluate(s => ZZ.peek().S.multi.foes[s].downs, cSeat));
+    // the knockout goes to whoever sent C the cement in the 15 seconds before (A), told by C itself
+    ok(await until(() => A.evaluate(() => ZZ.peek().S.kda.k === 1), 6000), 'A gets the K for knocking C out', await A.evaluate(() => ZZ.peek().S.kda));
+    ok(await B.evaluate(() => ZZ.peek().S.kda.k === 0 && ZZ.peek().S.kda.a === 0), 'B, who sent C nothing, gets neither', await B.evaluate(() => ZZ.peek().S.kda));
     await A.screenshot({ path: path.join(OUT, 'multi-play.png') });
     await B.screenshot({ path: path.join(OUT, 'multi-play-phone.png') });
     // B leaves mid-match: the other two play on

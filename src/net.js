@@ -613,6 +613,14 @@
     send({ t: 'a', n: n });
   };
   Net.item = function (id) { send({ t: 'i', id: id }); };
+  // our wall went down in a room of three or more: tell everyone whose cement did it (older pages ignore this)
+  Net.downed = function () {
+    var S = App.S();
+    if (!S || !S.multi || !ZZ.Meta || !ZZ.Meta.koCredit) return;
+    var c = ZZ.Meta.koCredit(S.hits || [], Date.now());
+    S.hits = [];
+    send({ t: 'k', by: c.by, as: c.as.slice(0, 7) });
+  };
   // weather thrown at the other player (a weather battle)
   Net.weather = function (kind) { send({ t: 'w', k: kind }); };
 
@@ -727,7 +735,22 @@
       case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
-      case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
+      case 'a':
+        if (live) {
+          var hit = int(m.n, 0, 40);
+          S.me.receive(hit);
+          // in a room of three or more, who sent what and when: if this wall goes down, that decides the knockout
+          if (S.multi && hit > 0) { S.hits = S.hits || []; S.hits.push({ s: from, t: Date.now(), n: hit }); if (S.hits.length > 40) S.hits.shift(); }
+        }
+        break;
+      // someone in the room went down and says who knocked them out (by) and who helped (as)
+      case 'k':
+        if (S && S.multi && S.remote && S.kda && (S.state === 'play' || S.state === 'over')) {
+          var by = m.by === Math.floor(m.by) && m.by >= 0 && m.by < Net.SEATS ? m.by : -1;
+          if (by === Net.seat) S.kda.k++;
+          else if (Array.isArray(m.as) && m.as.indexOf(Net.seat) >= 0) S.kda.a++;
+        }
+        break;
       case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
       case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.concat(ZZ.Weather.DISASTERS).indexOf(m.k) >= 0) App.wxHit(m.k); break;
       case 'end':

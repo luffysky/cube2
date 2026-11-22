@@ -175,7 +175,7 @@ function proven(m, tape, srv) {
   if (st.score > v.score + 44 * v.pieces + 1500 * m.ko) return null;
   if (sprint) return v.lines >= 40 && v.kos === 0 ? v : null;
   if (st.sent > v.attack || m.koOpp !== v.kos || m.ko > 1 + Math.floor(m.ms / 5000)) return null;
-  if (m.result > 0 && m.ko < m.koOpp) return null;                                         // fewer knockouts than the rival is not a win
+  if (m.result > 0 && m.ko < m.koOpp && m.seats <= 2) return null;                        // fewer knockouts than the rival is not a win (a room of more is won on places)
   return v;
 }
 function finish(a, srv, mark) {
@@ -198,7 +198,7 @@ function finish(a, srv, mark) {
   const st = m.stats;
   return { ok: true, rec: { mode: m.mode, result: m.result, proven: !!v, room: m.room, seats: m.seats,
     data: { level: m.level, ms: m.ms, ko: m.ko, koOpp: m.koOpp, score: st.score, sent: st.sent, lines: st.lines, pieces: st.pieces, spins: st.spins,
-    minis: st.minis, xspins: st.xspins, tst: st.tst, quads: st.quads, maxCombo: st.maxCombo, place: m.place, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
+    minis: st.minis, xspins: st.xspins, tst: st.tst, quads: st.quads, maxCombo: st.maxCombo, place: m.place, as: m.assists, kr: m.koRoom, items: m.itemsUsed, team: m.team, quick: m.quick, pr: m.pr } } };
 }
 // The record as it stands right now (a new day or season may have begun since it was stored).
 function current(state, now) { return clone(open(state, now)); }

@@ -1039,6 +1039,18 @@
   // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
   // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
   //   ms: how long it was played (for a sprint, the finishing time)
+  // Who gets the knockout when a player in a room of three or more goes down: whoever sent the last cement in the
+  // last 15 seconds (the K), and everyone else who sent some in that time (an A, assist). hits: [{ s: seat, t: ms, n }]
+  // as the one who went down received them. Nobody in that time: by -1 (they topped out on their own).
+  Meta.KO_WINDOW = 15000;
+  Meta.koCredit = function (hits, now) {
+    var recent = [], i, by = -1, as = [];
+    for (i = 0; i < (hits || []).length; i++) { var h = hits[i]; if (h && h.n > 0 && now - h.t >= 0 && now - h.t <= Meta.KO_WINDOW) recent.push(h); }
+    if (!recent.length) return { by: by, as: as };
+    by = recent[recent.length - 1].s;
+    for (i = 0; i < recent.length; i++) if (recent[i].s !== by && as.indexOf(recent[i].s) < 0) as.push(recent[i].s);
+    return { by: by, as: as };
+  };
   Meta.cleanMatch = function (m) {
     m = m && typeof m === 'object' ? m : {};
     var st = m.stats && typeof m.stats === 'object' ? m.stats : {}, mode = typeof m.mode === 'string' && MODES.hasOwnProperty(m.mode) ? m.mode : 'ai', sprint = mode === 'sprint';
@@ -1051,6 +1063,8 @@
       place: mode === 'net' ? int(m.place, 0, 8) : 0,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
+      // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it
+      assists: sprint ? 0 : int(m.assists, 0, 60), koRoom: mode === 'net' ? int(m.koRoom, 0, 99) : 0,
       ms: ms, time: sprint ? ms : 0,
       stats: {
         score: cap(st.score, 3000, 5000), sent: sprint ? 0 : cap(st.sent, 6, 20), spins: cap(st.spins, 1.5, 4), minis: cap(st.minis, 1.5, 4),

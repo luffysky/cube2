@@ -1102,3 +1102,18 @@
 - 新增 `test/linkcheck.js`：用 dev-server 加上這個模擬服務演練工具，19 項全過。包含錯密碼會判 FAIL 而且不印出密碼、拒絕正式站、預檢擋非 staging 資料庫。這是演練，不算 staging 驗收。
 - 新增 `docs/handoff/cube1-joint-link-check.yml`，並更新執行手冊。
 - 檔案：`tools/joint-link-check.js`、`test/fixtures/mock-identity-v4.js`、`test/linkcheck.js`、`test/browser-run.js`、`docs/handoff/cube1-joint-link-check.yml`、`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`8f05d8b`](https://github.com/luffysky/cube2/commit/8f05d8b)。
+
+## 2026-11-23 05:50（Asia/Taipei）｜助攻與個人擊倒（K／D／A）
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「先做我剛剛要你做的那些功能」（助攻、新對線模式、RPG），先做助攻。
+- **以前**：多人房的 K 是「所有對手被擊倒的總次數」，分不出是誰打的；沒有助攻。
+- **現在**：
+  - 每個人收到攻擊時記下「誰、幾行、什麼時候」（原本的攻擊訊息本來就帶發送者座位）。
+  - 自己被擊倒時，往前看 15 秒：最後一個送攻擊的人得 K，其他有送的人各得一次 A；都沒人送就沒有人得分。結果用新訊息 `k` 廣播給全房間，舊版頁面收到會直接忽略。
+  - 每個人只從這些廣播累計自己的 K 和 A。記錄進對戰紀錄時：`ko` 是自己打倒的、`as` 是助攻、`kr` 是房間裡對手被擊倒的總次數；名次和勝負的算法不變。
+  - 1 對 1、對電腦、真人排位：K 仍是對手倒下的次數，助攻是 0，真人排位雙方紀錄核對不受影響。落子證明裡「贏了但 K 比 D 少就不採信」這條，只套用在 1 對 1（多人房看名次）。
+  - 對戰紀錄改成顯示 K／D／A 和 KDA（＝（K＋A）÷ D，D 為 0 時算 1），並加說明。舊場次沒有助攻資料，顯示「—」。
+- 測試：meta 206 項（含判定 6 項）、API 412 項、三人房真瀏覽器 38 項（A 打的 C 被擊倒 → A 得 K、B 什麼都沒有）、對戰紀錄瀏覽器 18 項。
+- 檔案：`src/meta.js`、`src/net.js`、`src/ui.js`、`src/cloud.js`、`server/rules.js`、`server/core.js`、`test/meta.test.js`、`test/api.test.js`、`test/multi.js`、`test/history.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構（`zz.matches.data` 多兩個欄位）。｜刪除：無。

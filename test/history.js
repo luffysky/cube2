@@ -58,7 +58,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
   ok(/勝/.test(rows[0]) && /敗/.test(rows[1]), 'win and loss are marked', rows);
   ok(/1／3/.test(rows[1].replace(/\s/g, '')), 'K/D on the row', rows[1]);
   const sum = await page.$$eval('.hi-sum div', l => l.map(d => d.textContent));
-  ok(sum.some(s => /場數3/.test(s)) && sum.some(s => /勝／敗／和2／1／0/.test(s)) && sum.some(s => /K／D.*6／4/.test(s)) && sum.some(s => /KD 比1\.50/.test(s)), 'totals: games, W/L/D, K/D and ratio', sum);
+  ok(sum.some(s => /場數3/.test(s)) && sum.some(s => /勝／敗／和2／1／0/.test(s)) && sum.some(s => /K／D／A.*6／4／0/.test(s)) && sum.some(s => /KDA1\.50/.test(s)), 'totals: games, W/L/D, K/D and ratio', sum);
 
   // a row opens to its detail
   await page.tap('.hi-list > li:nth-child(3) .hi-row'); await sleep(150);

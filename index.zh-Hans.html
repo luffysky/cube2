@@ -4929,6 +4929,18 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // Reduces a finished match to the few numbers the rewards depend on, each kept inside what a match of that length
   // can produce. The page and the server both pass the match through here, so they pay out on the same figures.
   //   ms: how long it was played (for a sprint, the finishing time)
+  // Who gets the knockout when a player in a room of three or more goes down: whoever sent the last cement in the
+  // last 15 seconds (the K), and everyone else who sent some in that time (an A, assist). hits: [{ s: seat, t: ms, n }]
+  // as the one who went down received them. Nobody in that time: by -1 (they topped out on their own).
+  Meta.KO_WINDOW = 15000;
+  Meta.koCredit = function (hits, now) {
+    var recent = [], i, by = -1, as = [];
+    for (i = 0; i < (hits || []).length; i++) { var h = hits[i]; if (h && h.n > 0 && now - h.t >= 0 && now - h.t <= Meta.KO_WINDOW) recent.push(h); }
+    if (!recent.length) return { by: by, as: as };
+    by = recent[recent.length - 1].s;
+    for (i = 0; i < recent.length; i++) if (recent[i].s !== by && as.indexOf(recent[i].s) < 0) as.push(recent[i].s);
+    return { by: by, as: as };
+  };
   Meta.cleanMatch = function (m) {
     m = m && typeof m === 'object' ? m : {};
     var st = m.stats && typeof m.stats === 'object' ? m.stats : {}, mode = typeof m.mode === 'string' && MODES.hasOwnProperty(m.mode) ? m.mode : 'ai', sprint = mode === 'sprint';
@@ -4941,6 +4953,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       place: mode === 'net' ? int(m.place, 0, 8) : 0,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
+      // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it
+      assists: sprint ? 0 : int(m.assists, 0, 60), koRoom: mode === 'net' ? int(m.koRoom, 0, 99) : 0,
       ms: ms, time: sprint ? ms : 0,
       stats: {
         score: cap(st.score, 3000, 5000), sent: sprint ? 0 : cap(st.sent, 6, 20), spins: cap(st.spins, 1.5, 4), minis: cap(st.minis, 1.5, 4),
@@ -7313,6 +7327,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [], board: lvWall || undefined });
       S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
+      S.kda = { k: 0, a: 0 }; S.hits = [];     // a room of three or more: our own knockouts and assists (net.js)
       if (mode === 'net' && o.multi) {
         // three or four players: a mirror wall for each of the others; the one picked as the target is on show
         var M = o.multi, foes = {}, order = [], myTeam = M.teams ? M.teams[M.me] : -1;
@@ -7912,6 +7927,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (S.kind === 'battle' && S.multi && !mine) {
       v.knock(now); sfx.play('ko');      // the target went down: counted from its own report, not here
     } else if (S.kind === 'battle') {
+      if (mine && S.multi && ZZ.Net && ZZ.Net.downed) ZZ.Net.downed();
       var k = mine ? 'me' : 'opp', other = mine ? 'opp' : 'me';
       S.ko[other]++;
       S[other].stats.score += 1500;
@@ -7961,9 +7977,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
-      if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
+      var mineK = a, assists = 0, koRoom = 0;
+      if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -9454,6 +9471,14 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     send({ t: 'a', n: n });
   };
   Net.item = function (id) { send({ t: 'i', id: id }); };
+  // our wall went down in a room of three or more: tell everyone whose cement did it (older pages ignore this)
+  Net.downed = function () {
+    var S = App.S();
+    if (!S || !S.multi || !ZZ.Meta || !ZZ.Meta.koCredit) return;
+    var c = ZZ.Meta.koCredit(S.hits || [], Date.now());
+    S.hits = [];
+    send({ t: 'k', by: c.by, as: c.as.slice(0, 7) });
+  };
   // weather thrown at the other player (a weather battle)
   Net.weather = function (kind) { send({ t: 'w', k: kind }); };
 
@@ -9568,7 +9593,22 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
-      case 'a': if (live) S.me.receive(int(m.n, 0, 40)); break;
+      case 'a':
+        if (live) {
+          var hit = int(m.n, 0, 40);
+          S.me.receive(hit);
+          // in a room of three or more, who sent what and when: if this wall goes down, that decides the knockout
+          if (S.multi && hit > 0) { S.hits = S.hits || []; S.hits.push({ s: from, t: Date.now(), n: hit }); if (S.hits.length > 40) S.hits.shift(); }
+        }
+        break;
+      // someone in the room went down and says who knocked them out (by) and who helped (as)
+      case 'k':
+        if (S && S.multi && S.remote && S.kda && (S.state === 'play' || S.state === 'over')) {
+          var by = m.by === Math.floor(m.by) && m.by >= 0 && m.by < Net.SEATS ? m.by : -1;
+          if (by === Net.seat) S.kda.k++;
+          else if (Array.isArray(m.as) && m.as.indexOf(Net.seat) >= 0) S.kda.a++;
+        }
+        break;
       case 'i': if (live) App.foeItem(int(m.id, 1, ZZ.ITEMS.length - 1)); break;
       case 'w': if (live && S.sky && App.wxHit && ZZ.Weather && ZZ.Weather.KINDS.concat(ZZ.Weather.DISASTERS).indexOf(m.k) >= 0) App.wxHit(m.k); break;
       case 'end':
@@ -11801,8 +11841,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'hi.games': ['場數', 'Games', '試合数', '경기'],
     'hi.wl': ['勝／敗／和', 'W / L / D', '勝／敗／分', '승／패／무'],
     'hi.rate': ['勝率', 'Win rate', '勝率', '승률'],
-    'hi.kd': ['K／D（擊倒／被擊倒）', 'K / D (KOs / knocked out)', 'K／D（KO／被KO）', 'K／D（KO／피KO）'],
-    'hi.kda': ['KD 比', 'K/D ratio', 'KD比', 'KD 비율'],
+    'hi.kd': ['K／D／A（擊倒／被擊倒／助攻）', 'K / D / A (KOs / knocked out / assists)', 'K／D／A（KO／被KO／アシスト）', 'K／D／A（KO／피KO／어시스트）'],
+    'hi.kda': ['KDA', 'KDA', 'KDA', 'KDA'],
+    'hi.kdaP': ['KDA ＝（擊倒＋助攻）÷ 被擊倒（0 次算 1）。助攻：多人房裡，對手被擊倒前 15 秒內你送過攻擊給他，但最後一擊不是你。2026-11-23 以前的場次沒有助攻資料，顯示「—」。', 'KDA = (KOs + assists) ÷ times knocked out (0 counts as 1). Assist: in a room of three or more, you sent a foe cement in the 15 seconds before they went down, but someone else made the last hit. Matches before 2026-11-23 have no assist data and show a dash.', 'KDA ＝（KO＋アシスト）÷ 被KO（0回は1）。アシスト：3人以上の部屋で、相手が倒れる前15秒以内に攻撃を送ったが、とどめは別の人だった場合。2026-11-23 より前の試合は「—」。', 'KDA ＝（KO＋어시스트）÷ 피KO(0회는 1). 어시스트: 3명 이상 방에서 상대가 쓰러지기 전 15초 안에 공격을 보냈지만 마무리는 다른 사람인 경우. 2026-11-23 이전 경기는 「—」.'],
     'hi.apm': ['每分鐘攻擊', 'Attack per minute', '毎分攻撃', '분당 공격'],
     'hi.pps': ['每秒方塊', 'Pieces per second', '毎秒ミノ', '초당 블록'],
     'hi.best': ['最高分', 'Best score', '最高スコア', '최고 점수'],
@@ -12203,6 +12244,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
   function dur(ms) { var s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60; return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s; }
   function ratio(a, b) { return b > 0 ? (a / b).toFixed(2) : a > 0 ? a.toFixed(2) : '0.00'; }
+  function kda(k, d, a) { return ratio(k + (a || 0), Math.max(1, d)); }
+  function kdaText(k, d, a) { return k + '／' + d + '／' + (a == null ? '—' : a); }
   function perMin(n, ms) { return ms > 0 ? (n / (ms / 60000)).toFixed(1) : '—'; }
   function perSec(n, ms) { return ms > 0 ? (n / (ms / 1000)).toFixed(2) : '—'; }
   function verdict(m) {
@@ -12222,11 +12265,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var head = '<button type="button" class="hi-row" data-hi-open="' + i + '" aria-expanded="' + open + '">' +
       '<i class="hi-v ' + v[0] + '">' + esc(v[1]) + '</i>' +
       '<span class="hi-main"><b>' + esc(t(HI_NAME[m.mode] || 'm.battle')) + '</b><small>' + esc(when(m.at)) + (tag.length ? ' · ' + esc(tag.join(' · ')) : '') + '</small></span>' +
-      '<span class="hi-k">' + (sprint ? esc(App.fmtTime(m.ms)) : '<b>' + m.ko + '</b>／' + m.koOpp) + '</span></button>';
+      '<span class="hi-k">' + (sprint ? esc(App.fmtTime(m.ms)) : '<b>' + m.ko + '</b>／' + m.koOpp + '／' + (m.as == null ? '—' : m.as)) + '</span></button>';
     if (!open) return '<li>' + head + '</li>';
     var cells = sprint
       ? [['hi.len', App.fmtTime(m.ms)], ['hi.lines', m.lines], ['hi.pieces', m.pieces], ['hi.pps', perSec(m.pieces, m.ms)], ['hi.spins', m.spins + m.minis], ['hi.quads', m.quads], ['hi.combo', m.combo], ['hi.score', L.num(m.score)]]
-      : [['hi.kd', m.ko + '／' + m.koOpp], ['hi.kda', ratio(m.ko, m.koOpp)], ['hi.score', L.num(m.score)], ['hi.sent', m.sent], ['hi.apm', perMin(m.sent, m.ms)], ['hi.lines', m.lines],
+      : [['hi.kd', kdaText(m.ko, m.koOpp, m.as)], ['hi.kda', kda(m.ko, m.koOpp, m.as)], ['hi.score', L.num(m.score)], ['hi.sent', m.sent], ['hi.apm', perMin(m.sent, m.ms)], ['hi.lines', m.lines],
          ['hi.pieces', m.pieces], ['hi.pps', perSec(m.pieces, m.ms)], ['hi.spins', m.spins + m.minis + m.xspins], ['hi.quads', m.quads], ['hi.combo', m.combo], ['hi.items', m.items], ['hi.len', dur(m.ms)]];
     var body = '<dl class="hi-dl">' + cells.map(function (c) { return '<div><dt>' + t(c[0]) + '</dt><dd>' + esc(String(c[1])) + '</dd></div>'; }).join('') + '</dl>' +
       '<p class="note">' + t(m.proven ? 'hi.proven' : 'hi.unproven') + '</p>';
@@ -12243,8 +12286,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var d = hi.data, s = d.sum, sprintOnly = hi.mode === 'sprint';
     var stats = sprintOnly
       ? [['hi.games', s.games], ['hi.wl', s.win + '／' + (s.games - s.win)], ['hi.sprint', s.sprint ? App.fmtTime(s.sprint) : '—'], ['hi.lines', L.num(s.lines)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.time', dur(s.ms)]]
-      : [['hi.games', s.games], ['hi.wl', s.win + '／' + s.loss + '／' + s.draw], ['hi.rate', s.games ? Math.round(s.win / s.games * 100) + '%' : '—'], ['hi.kd', s.ko + '／' + s.koOpp],
-         ['hi.kda', ratio(s.ko, s.koOpp)], ['hi.apm', perMin(s.sent, s.ms)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.best', L.num(s.best)], ['hi.time', dur(s.ms)]];
+      : [['hi.games', s.games], ['hi.wl', s.win + '／' + s.loss + '／' + s.draw], ['hi.rate', s.games ? Math.round(s.win / s.games * 100) + '%' : '—'], ['hi.kd', kdaText(s.ko, s.koOpp, s.as)],
+         ['hi.kda', kda(s.ko, s.koOpp, s.as)], ['hi.apm', perMin(s.sent, s.ms)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.best', L.num(s.best)], ['hi.time', dur(s.ms)]];
     h += '<dl class="hi-dl hi-sum">' + stats.map(function (c) { return '<div><dt>' + t(c[0]) + '</dt><dd>' + esc(String(c[1])) + '</dd></div>'; }).join('') + '</dl>';
     if (!d.items.length) h += '<p class="lb-none">' + t('hi.empty') + '</p>';
     else h += '<ol class="hi-list">' + d.items.map(matchRow).join('') + '</ol>';
@@ -12253,7 +12296,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       h += '<p class="note hi-pg">' + esc(t('hi.page', d.page, d.pages, d.total)) + '</p><div class="row hi-pager">' +
         pb(1, 'hi.first', d.page <= 1) + pb(d.page - 1, 'hi.prev', d.page <= 1) + pb(d.page + 1, 'hi.next', d.page >= d.pages) + pb(d.pages, 'hi.last', d.page >= d.pages) + '</div>';
     } else if (d.total) h += '<p class="note hi-pg">' + esc(t('hi.page', 1, 1, d.total)) + '</p>';
-    return h + '<p class="note">' + t('hi.keep') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+    return h + (sprintOnly ? '' : '<p class="note">' + t('hi.kdaP') + '</p>') + '<p class="note">' + t('hi.keep') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
   };
   App.opened.history = function () { if (hi.state === 'idle') fetchHistory(); };
   App.closed.history = function () { hi.state = 'idle'; hi.data = null; hi.ask++; hi.open = -1; };

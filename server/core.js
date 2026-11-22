@@ -273,7 +273,7 @@ async function history(db, cred, body, now) {
   const w = where.join(' AND ');
   const t = (await db.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE result > 0)::int AS win, count(*) FILTER (WHERE result < 0)::int AS loss,
         count(*) FILTER (WHERE result = 0)::int AS draw,
-        COALESCE(sum((data->>'ko')::int), 0)::int AS ko, COALESCE(sum((data->>'koOpp')::int), 0)::int AS ko_opp,
+        COALESCE(sum((data->>'ko')::int), 0)::int AS ko, COALESCE(sum((data->>'koOpp')::int), 0)::int AS ko_opp, COALESCE(sum((data->>'as')::int), 0)::int AS assists,
         COALESCE(sum((data->>'sent')::int), 0)::int AS sent, COALESCE(sum((data->>'lines')::int), 0)::int AS lines,
         COALESCE(sum((data->>'pieces')::int), 0)::int AS pieces, COALESCE(sum((data->>'ms')::float8), 0)::float8 AS ms,
         COALESCE(max((data->>'score')::int), 0)::int AS best, min((data->>'ms')::float8) FILTER (WHERE mode = 'sprint' AND result > 0) AS sprint
@@ -290,12 +290,12 @@ async function history(db, cred, body, now) {
     const d = r.data || {};
     return { id: String(r.id), at: +r.at, mode: r.mode, result: r.result, proven: !!r.proven, seats: r.seats,
       pvp: r.pvp == null ? null : !!r.pvp, foes: Array.isArray(r.foes) ? r.foes.filter(n => typeof n === 'string').slice(0, 7) : [],
-      level: int(d.level), ms: int(d.ms), ko: int(d.ko), koOpp: int(d.koOpp), score: int(d.score), sent: int(d.sent), lines: int(d.lines),
+      level: int(d.level), ms: int(d.ms), ko: int(d.ko), koOpp: int(d.koOpp), as: d.as == null ? null : int(d.as), kr: int(d.kr), score: int(d.score), sent: int(d.sent), lines: int(d.lines),
       pieces: int(d.pieces), spins: int(d.spins), minis: int(d.minis), xspins: int(d.xspins), tst: int(d.tst), quads: int(d.quads),
       combo: int(d.maxCombo), items: int(d.items), place: int(d.place), team: !!d.team, quick: !!d.quick, pr: !!d.pr };
   });
   return good({ mode, page, per: HIST.PER, total, pages, items,
-    sum: { games: total, win: int(t.win), loss: int(t.loss), draw: int(t.draw), ko: int(t.ko), koOpp: int(t.ko_opp), sent: int(t.sent),
+    sum: { games: total, win: int(t.win), loss: int(t.loss), draw: int(t.draw), ko: int(t.ko), koOpp: int(t.ko_opp), as: int(t.assists), sent: int(t.sent),
       lines: int(t.lines), pieces: int(t.pieces), ms: int(t.ms), best: int(t.best), sprint: t.sprint == null ? null : int(t.sprint) },
     keep: LIMIT.MATCHES_KEEP, now });
 }

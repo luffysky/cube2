@@ -192,6 +192,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   // twenty to a page, the last page clamps
   await pg.query("INSERT INTO zz.matches (pid, at, mode, result, proven, data) SELECT $1, $2::float8 - g * 1000, 'ghost', CASE WHEN g % 3 = 0 THEN -1 ELSE 1 END, true, jsonb_build_object('ko', 1, 'koOpp', g % 2, 'ms', 60000, 'score', g) FROM generate_series(1, 45) g", [Bx.id, Date.now()]);
   r = await rpc({ a: 'history', mode: 'ghost', page: 1 }, Bx);
+  ok(r.json.items[0].as === null, 'a match logged without assists says so (null, shown as a dash)', r.json.items[0]);
   ok(r.json.total === 45 && r.json.pages === 3 && r.json.items.length === 20 && r.json.items[0].score === 1 && r.json.items[19].score === 20, 'page 1 has the newest twenty', r.json.items.map(m => m.score));
   r = await rpc({ a: 'history', mode: 'ghost', page: 3 }, Bx);
   ok(r.json.page === 3 && r.json.items.length === 5 && r.json.items[4].score === 45, 'the last page has the rest', r.json.items.map(m => m.score));
@@ -202,9 +203,10 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok((await rpc({ a: 'history', mode: 'ghost' }, Bx)).json.sum.win === 30 && (await rpc({ a: 'history', mode: 'ghost' }, Bx)).json.sum.loss === 15, 'wins and losses add up');
   // an online room: who else reported from it, and the place
   const Hn = await newPlayer({ name: '阿華' }, '203.0.113.88');
-  r = await sync(Hn, [op('fin', [match({ mode: 'net', room: 'AB23C', seats: 4, result: 1, place: 1 })])]);
+  r = await sync(Hn, [op('fin', [match({ mode: 'net', room: 'AB23C', seats: 4, result: 1, place: 1, ko: 1, assists: 2, koRoom: 5 })])]);
   r = await rpc({ a: 'history', mode: 'net' }, Hn);
   ok(r.json.items[0].foes.length === 1 && r.json.items[0].place === 1 && r.json.items[0].seats === 4, 'an online match names the others from the room and the place', r.json.items[0]);
+  ok(r.json.items[0].ko === 1 && r.json.items[0].as === 2 && r.json.items[0].kr === 5 && r.json.sum.as === 2, 'its own K, assists and the room total are kept', r.json.items[0]);
   r = await rpc({ a: 'history', mode: 'net' }, Bx);
   ok(r.json.items[0].foes.indexOf('阿華') >= 0, 'and the other side sees this one', r.json.items[0].foes);
   r = await call('board', { url: '/api/board?b=sprint&s=all&me=' + A.pub });

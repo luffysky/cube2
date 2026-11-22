@@ -326,6 +326,7 @@
       S.me = new ZZ.Game({ seed: seed, sdf: sdfVal(), lockDelay: set.lock, items: !!o.items, bring: o.bring || [], board: lvWall || undefined });
       S.total = o.minutes * 60000; S.left = S.total;
       S.ko = { me: 0, opp: 0 }; S.down = { me: 0, opp: 0 };
+      S.kda = { k: 0, a: 0 }; S.hits = [];     // a room of three or more: our own knockouts and assists (net.js)
       if (mode === 'net' && o.multi) {
         // three or four players: a mirror wall for each of the others; the one picked as the target is on show
         var M = o.multi, foes = {}, order = [], myTeam = M.teams ? M.teams[M.me] : -1;
@@ -925,6 +926,7 @@
     if (S.kind === 'battle' && S.multi && !mine) {
       v.knock(now); sfx.play('ko');      // the target went down: counted from its own report, not here
     } else if (S.kind === 'battle') {
+      if (mine && S.multi && ZZ.Net && ZZ.Net.downed) ZZ.Net.downed();
       var k = mine ? 'me' : 'opp', other = mine ? 'opp' : 'me';
       S.ko[other]++;
       S[other].stats.score += 1500;
@@ -974,9 +976,10 @@
       var a = S.ko.me, b = S.ko.opp, ms = S.me.stats, os = S.opp.stats, played = S.total - S.left;
       var mt = S.raceMs || 1e12, ft = S.foeRace || 1e12;
       var r = why === 'left' ? 1 : why === 'quit' ? -1 : S.race ? (mt !== ft ? (mt < ft ? 1 : -1) : ms.lines !== os.lines ? (ms.lines > os.lines ? 1 : -1) : 0) : a !== b ? (a > b ? 1 : -1) : ms.sent !== os.sent ? (ms.sent > os.sent ? 1 : -1) : ms.score !== os.score ? (ms.score > os.score ? 1 : -1) : 0;
-      if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); }
+      var mineK = a, assists = 0, koRoom = 0;
+      if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: a, koOpp: b, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {

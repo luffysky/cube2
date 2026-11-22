@@ -632,8 +632,9 @@
     'hi.games': ['場數', 'Games', '試合数', '경기'],
     'hi.wl': ['勝／敗／和', 'W / L / D', '勝／敗／分', '승／패／무'],
     'hi.rate': ['勝率', 'Win rate', '勝率', '승률'],
-    'hi.kd': ['K／D（擊倒／被擊倒）', 'K / D (KOs / knocked out)', 'K／D（KO／被KO）', 'K／D（KO／피KO）'],
-    'hi.kda': ['KD 比', 'K/D ratio', 'KD比', 'KD 비율'],
+    'hi.kd': ['K／D／A（擊倒／被擊倒／助攻）', 'K / D / A (KOs / knocked out / assists)', 'K／D／A（KO／被KO／アシスト）', 'K／D／A（KO／피KO／어시스트）'],
+    'hi.kda': ['KDA', 'KDA', 'KDA', 'KDA'],
+    'hi.kdaP': ['KDA ＝（擊倒＋助攻）÷ 被擊倒（0 次算 1）。助攻：多人房裡，對手被擊倒前 15 秒內你送過攻擊給他，但最後一擊不是你。2026-11-23 以前的場次沒有助攻資料，顯示「—」。', 'KDA = (KOs + assists) ÷ times knocked out (0 counts as 1). Assist: in a room of three or more, you sent a foe cement in the 15 seconds before they went down, but someone else made the last hit. Matches before 2026-11-23 have no assist data and show a dash.', 'KDA ＝（KO＋アシスト）÷ 被KO（0回は1）。アシスト：3人以上の部屋で、相手が倒れる前15秒以内に攻撃を送ったが、とどめは別の人だった場合。2026-11-23 より前の試合は「—」。', 'KDA ＝（KO＋어시스트）÷ 피KO(0회는 1). 어시스트: 3명 이상 방에서 상대가 쓰러지기 전 15초 안에 공격을 보냈지만 마무리는 다른 사람인 경우. 2026-11-23 이전 경기는 「—」.'],
     'hi.apm': ['每分鐘攻擊', 'Attack per minute', '毎分攻撃', '분당 공격'],
     'hi.pps': ['每秒方塊', 'Pieces per second', '毎秒ミノ', '초당 블록'],
     'hi.best': ['最高分', 'Best score', '最高スコア', '최고 점수'],
@@ -1034,6 +1035,8 @@
   }
   function dur(ms) { var s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60; return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s; }
   function ratio(a, b) { return b > 0 ? (a / b).toFixed(2) : a > 0 ? a.toFixed(2) : '0.00'; }
+  function kda(k, d, a) { return ratio(k + (a || 0), Math.max(1, d)); }
+  function kdaText(k, d, a) { return k + '／' + d + '／' + (a == null ? '—' : a); }
   function perMin(n, ms) { return ms > 0 ? (n / (ms / 60000)).toFixed(1) : '—'; }
   function perSec(n, ms) { return ms > 0 ? (n / (ms / 1000)).toFixed(2) : '—'; }
   function verdict(m) {
@@ -1053,11 +1056,11 @@
     var head = '<button type="button" class="hi-row" data-hi-open="' + i + '" aria-expanded="' + open + '">' +
       '<i class="hi-v ' + v[0] + '">' + esc(v[1]) + '</i>' +
       '<span class="hi-main"><b>' + esc(t(HI_NAME[m.mode] || 'm.battle')) + '</b><small>' + esc(when(m.at)) + (tag.length ? ' · ' + esc(tag.join(' · ')) : '') + '</small></span>' +
-      '<span class="hi-k">' + (sprint ? esc(App.fmtTime(m.ms)) : '<b>' + m.ko + '</b>／' + m.koOpp) + '</span></button>';
+      '<span class="hi-k">' + (sprint ? esc(App.fmtTime(m.ms)) : '<b>' + m.ko + '</b>／' + m.koOpp + '／' + (m.as == null ? '—' : m.as)) + '</span></button>';
     if (!open) return '<li>' + head + '</li>';
     var cells = sprint
       ? [['hi.len', App.fmtTime(m.ms)], ['hi.lines', m.lines], ['hi.pieces', m.pieces], ['hi.pps', perSec(m.pieces, m.ms)], ['hi.spins', m.spins + m.minis], ['hi.quads', m.quads], ['hi.combo', m.combo], ['hi.score', L.num(m.score)]]
-      : [['hi.kd', m.ko + '／' + m.koOpp], ['hi.kda', ratio(m.ko, m.koOpp)], ['hi.score', L.num(m.score)], ['hi.sent', m.sent], ['hi.apm', perMin(m.sent, m.ms)], ['hi.lines', m.lines],
+      : [['hi.kd', kdaText(m.ko, m.koOpp, m.as)], ['hi.kda', kda(m.ko, m.koOpp, m.as)], ['hi.score', L.num(m.score)], ['hi.sent', m.sent], ['hi.apm', perMin(m.sent, m.ms)], ['hi.lines', m.lines],
          ['hi.pieces', m.pieces], ['hi.pps', perSec(m.pieces, m.ms)], ['hi.spins', m.spins + m.minis + m.xspins], ['hi.quads', m.quads], ['hi.combo', m.combo], ['hi.items', m.items], ['hi.len', dur(m.ms)]];
     var body = '<dl class="hi-dl">' + cells.map(function (c) { return '<div><dt>' + t(c[0]) + '</dt><dd>' + esc(String(c[1])) + '</dd></div>'; }).join('') + '</dl>' +
       '<p class="note">' + t(m.proven ? 'hi.proven' : 'hi.unproven') + '</p>';
@@ -1074,8 +1077,8 @@
     var d = hi.data, s = d.sum, sprintOnly = hi.mode === 'sprint';
     var stats = sprintOnly
       ? [['hi.games', s.games], ['hi.wl', s.win + '／' + (s.games - s.win)], ['hi.sprint', s.sprint ? App.fmtTime(s.sprint) : '—'], ['hi.lines', L.num(s.lines)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.time', dur(s.ms)]]
-      : [['hi.games', s.games], ['hi.wl', s.win + '／' + s.loss + '／' + s.draw], ['hi.rate', s.games ? Math.round(s.win / s.games * 100) + '%' : '—'], ['hi.kd', s.ko + '／' + s.koOpp],
-         ['hi.kda', ratio(s.ko, s.koOpp)], ['hi.apm', perMin(s.sent, s.ms)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.best', L.num(s.best)], ['hi.time', dur(s.ms)]];
+      : [['hi.games', s.games], ['hi.wl', s.win + '／' + s.loss + '／' + s.draw], ['hi.rate', s.games ? Math.round(s.win / s.games * 100) + '%' : '—'], ['hi.kd', kdaText(s.ko, s.koOpp, s.as)],
+         ['hi.kda', kda(s.ko, s.koOpp, s.as)], ['hi.apm', perMin(s.sent, s.ms)], ['hi.pps', perSec(s.pieces, s.ms)], ['hi.best', L.num(s.best)], ['hi.time', dur(s.ms)]];
     h += '<dl class="hi-dl hi-sum">' + stats.map(function (c) { return '<div><dt>' + t(c[0]) + '</dt><dd>' + esc(String(c[1])) + '</dd></div>'; }).join('') + '</dl>';
     if (!d.items.length) h += '<p class="lb-none">' + t('hi.empty') + '</p>';
     else h += '<ol class="hi-list">' + d.items.map(matchRow).join('') + '</ol>';
@@ -1084,7 +1087,7 @@
       h += '<p class="note hi-pg">' + esc(t('hi.page', d.page, d.pages, d.total)) + '</p><div class="row hi-pager">' +
         pb(1, 'hi.first', d.page <= 1) + pb(d.page - 1, 'hi.prev', d.page <= 1) + pb(d.page + 1, 'hi.next', d.page >= d.pages) + pb(d.pages, 'hi.last', d.page >= d.pages) + '</div>';
     } else if (d.total) h += '<p class="note hi-pg">' + esc(t('hi.page', 1, 1, d.total)) + '</p>';
-    return h + '<p class="note">' + t('hi.keep') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+    return h + (sprintOnly ? '' : '<p class="note">' + t('hi.kdaP') + '</p>') + '<p class="note">' + t('hi.keep') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
   };
   App.opened.history = function () { if (hi.state === 'idle') fetchHistory(); };
   App.closed.history = function () { hi.state = 'idle'; hi.data = null; hi.ask++; hi.open = -1; };
