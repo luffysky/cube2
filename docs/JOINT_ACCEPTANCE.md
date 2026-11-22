@@ -134,18 +134,18 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | A12 | PASS | 2026-11-22 17:44:17–32 | 稽核表：同一分鐘內第 1–60 次有效呼叫 200（id 1–9、13–63），第 61 次（id 64）429 | — |
 | A13 | PASS | 2026-11-22 17:44 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；證據 [cube1 Actions #45051087698](https://github.com/luffysky/cube1/actions/runs/45051087698)、[Issue #18](https://github.com/luffysky/cube1/issues/18#issuecomment-7084081394)）。405 不帶 sub，依設計不寫入稽核表 | — |
 | A14 | PASS | 2026-11-22 17:56（台北 11-23 01:56） | Neon 主控台 SQL Editor，專案 `neon-crimson-envelope`、**`staging` 分支**（`br-raspy-silence-azzokuib`）、資料庫 `neondb`，只執行 SELECT。見下方「A14 稽核查核」 | — |
-| B1 | BLOCKED | 2026-11-22 19:58 | staging `d65c827`：`/api/health?deep=1` 為 `link: true`、`dbSource: "staging"`、`db: true`、`ready: true`。Owner 設的 secret 原本落在 Production，19:55 UTC 已把它的範圍改成 Preview／staging（沒讀值）；用假 code 換 token，cube1 回 **400**（`[zz] auth token (token 400)`），secret 一致、client 驗證通過。`/api/auth/start`（link，測試玩家自己的金鑰）200，入口 `https://identity-staging.snowrealm.pet/oauth/authorize` 顯示「登入 SnowRealm Games 測試站」，要 email＋密碼 | 停在 cube1 的登入頁：需要 staging 測試帳號登入。帳號密碼不能經過聊天，所以要 Owner／Work 在同一個瀏覽器分頁自己登入，或 cube1 提供可自動登入的測試工具 |
-| B2 | BLOCKED | 2026-11-22 19:40 | 同 B1 | 同 B1，另需第二個瀏覽器設定檔 |
-| B3 | BLOCKED | 2026-11-22 19:40 | 同 B1 | 同 B1（需兩個測試帳號） |
+| B1 | FAIL（cube1） | 2026-11-22 20:09–20:22 | staging `e1296ad`：`link: true`、`dbSource: staging`；secret 一致（假 code 換 token → cube1 回 400）。① `POST /api/auth/start`（link，合成玩家 `cvqwyq4a` 自己的金鑰）200 → ② `GET https://identity-staging.snowrealm.pet/oauth/authorize?…` 200，顯示 cube1 登入頁（表單 `POST /oauth/authorize`，查詢字串帶齊 8 個參數，欄位只有 email、password）→ ③ Owner 20:13:58 UTC 用 staging 測試帳號 1 登入送出 → cube1 回「授權請求無效」，沒有導回 callback，cube2 沒收到任何 code。**對照實驗**：用不存在的假帳號送出，結果一樣是「授權請求無效」（不是帳密錯誤）→ POST 在檢查帳密之前就拒絕了。拿掉 `sso`、`response_type` 兩個參數時，連 GET 都變成「授權請求無效」→ cube2 送的參數格式正是 GET 接受的那組 | **由 cube1 修**：`POST /oauth/authorize` 在驗證帳密之前就拒絕了自己頁面送出的表單。可能原因（cube1 v3 原始碼尚未推上 GitHub，cube2 看不到）：Origin 檢查只放行 `games.snowrealm.pet`（自己的 `identity-staging` 頁面被擋），或 POST 讀參數的地方跟 GET 不同（表單沒有 hidden 欄位，參數只在 action 的查詢字串），或缺 CSRF token。cube2 這邊不需要改 |
+| B2 | BLOCKED | 2026-11-22 20:22 | 同 B1 | 同 B1，另需第二個瀏覽器設定檔 |
+| B3 | BLOCKED | 2026-11-22 20:22 | 同 B1 | 同 B1（需兩個測試帳號） |
 | B4 | BLOCKED | 2026-11-22 19:40 | — | 同 B1，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
-| B5 | BLOCKED | 2026-11-22 19:40 | — | 同 B1 |
-| B6 | BLOCKED | 2026-11-22 19:34 | cube2 端預先實測：同一個 session 第二次回呼 → `/?auth=replay`（沒有 cube1 的真 code，不算完整流程） | 同 B1 |
-| B7 | BLOCKED | 2026-11-22 19:40 | — | 同 B1（本機測試已涵蓋 10 分鐘過期） |
-| B8 | BLOCKED | 2026-11-22 19:34 | cube2 端預先實測：state 不對 → `/?auth=state`（不算完整流程） | 同 B1 |
-| B9 | BLOCKED | 2026-11-22 19:40 | — | 同 B1，另需 cube1 撤銷 token |
-| B10 | BLOCKED | 2026-11-22 19:40 | cube2 端預先實測：cube1 token 端點還沒開的時候（19:34 UTC）回呼得到 `/?auth=unavailable`，沒有放行 | 同 B1，另需 cube1 讓 status 端點暫時失效 |
-| B11 | BLOCKED | 2026-11-22 19:34 | cube2 端預先實測：回呼帶 `error=access_denied` → `/?auth=denied`（不算完整流程，要 cube1 入口真的按取消） | 同 B1 |
-| B12 | BLOCKED | 2026-11-22 19:40 | — | 同 B1 |
+| B5 | BLOCKED | 2026-11-22 20:22 | — | 同 B1 |
+| B6 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：同一個 session 第二次回呼 → `/?auth=replay`（沒有 cube1 的真 code，不算完整流程） | 同 B1 |
+| B7 | BLOCKED | 2026-11-22 20:22 | — | 同 B1（本機測試已涵蓋 10 分鐘過期） |
+| B8 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：state 不對 → `/?auth=state`（不算完整流程） | 同 B1 |
+| B9 | BLOCKED | 2026-11-22 20:22 | — | 同 B1，另需 cube1 撤銷 token |
+| B10 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：cube1 token 端點還沒開的時候（19:34 UTC）回呼得到 `/?auth=unavailable`，沒有放行 | 同 B1，另需 cube1 讓 status 端點暫時失效 |
+| B11 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：回呼帶 `error=access_denied` → `/?auth=denied`（不算完整流程，要 cube1 入口真的按取消） | 同 B1 |
+| B12 | BLOCKED | 2026-11-22 20:22 | — | 同 B1 |
 | B13 | PASS | 2026-11-22 19:38 | staging `acc6f6a`、`link: true` 時，合成匿名玩家 `staging-test-b0`（不連結）照常：`hello` 建檔、`sync` 改名與回報一場 200、`/api/board` 200、`history` 1 場。正式站同時是 `link: false` | — |
 
 ### B 組準備（2026-11-23 03:45 台北）

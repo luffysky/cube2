@@ -1067,3 +1067,15 @@
 - B1：start（link）200 → cube1 入口頁要 staging 測試帳號登入，帳號密碼不能經過聊天，停在這裡。
 - 正式站：`link: false`、`admin: false`，沒有變。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`3eb9ea3`](https://github.com/luffysky/cube2/commit/3eb9ea3)；之後為了讀入 Owner 04:00 更新的變數，只在 staging 重新部署（`e1296ad`，空 commit）。
+
+## 2026-11-23 04:25（Asia/Taipei）｜B1 實測：卡在 cube1 `POST /oauth/authorize`
+
+- 專案：cube2｜執行者：Claude
+- staging `e1296ad`：`link: true`、`dbSource: staging`、secret 一致（`token 400`）。
+- B1：cube2 start 200 → cube1 登入頁 200 → Owner 用測試帳號 1 送出 → 「授權請求無效」，沒有回到 callback。
+- 對照：假帳號送出也是同一句（不是帳密錯誤）；GET 少了 `sso`、`response_type` 就無效，帶齊就顯示登入頁。結論：cube2 的參數被 cube1 GET 接受，失敗在 cube1 的 POST 處理，cube2 不用改。
+- cube1 Neon Function 日誌只有 invoke begin／end（20:13:58 那次就是 Owner 的送出），沒有原因；v3 原始碼還沒推到 GitHub，看不到它怎麼判斷。
+- B1 記 FAIL（cube1），B2–B12 因 B1 擋住仍是 BLOCKED，B13 維持 PASS。
+- 正式站：`link: false`、`admin: false`。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：staging 多了兩個合成測試玩家（`staging-test-b0`、`staging-b1-x`）。｜刪除：無。
