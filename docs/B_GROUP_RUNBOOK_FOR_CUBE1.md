@@ -10,6 +10,28 @@
 - 入口是 `https://identity-staging.snowrealm.pet/oauth/authorize`（v4）。cube2 自己確認過，用不存在的帳號登入會顯示「登入失敗」。
 - 正式站：`link: false`、`admin: false`，不要碰。
 
+## 最省事的跑法：自動化（2026-11-23 04:55 新增）
+
+Work 回報手動跑不了：bypass 只在 cube1 GitHub Actions 的 `staging` Environment，測試帳號的密碼又不在同一個執行環境。改成在那個 Environment 裡自動跑：
+
+1. 在 cube1 的 `staging` Environment 加 4 個 secret：`CUBE2_STAGING_ACCOUNT1_EMAIL`、`CUBE2_STAGING_ACCOUNT1_PASSWORD`、`CUBE2_STAGING_ACCOUNT2_EMAIL`、`CUBE2_STAGING_ACCOUNT2_PASSWORD`。
+2. 把 cube2 的 `docs/handoff/cube1-joint-link-check.yml` 放進 cube1 的 `.github/workflows/`，改兩個地方：Environment 名稱、bypass secret 名稱。
+3. 手動觸發。它會 checkout cube2，用 Playwright Chromium 執行 `tools/joint-link-check.js`。
+4. 交回 artifact `cube2-staging-b-results`（JSON）和 Actions run 的連結。
+
+工具會自動做：
+- 預檢：`link: true`、`dbSource: staging`、build 相符；不符就停下，什麼都不寫。
+- 依序跑 B1 → B2 → B6 → B3 → B8 → B11 →（B7，要另外開）→ B12。
+- 每一項用真的登入頁和同意頁，再用 cube2 API 核對：新金鑰、舊金鑰失效、同一份存檔、沒有多綁。
+- 每次都建新的合成存檔，所以可以重跑。帳號 2 從頭到尾都不會被綁到任何存檔。
+- 報告裡沒有密碼、token、code、cookie、裝置金鑰。
+
+B4、B5、B9、B10 需要 cube1 自己開測試開關，報告會列成 MANUAL。
+
+cube2 已經用一個模擬 cube1 v4 的本機服務演練過這支工具（`test/linkcheck.js`，19 項全過）。那只證明工具能走完流程、判斷正確，不算 staging 驗收。
+
+## 手動跑法（備用）
+
 ## 進入 staging
 
 - staging 有 Vercel 部署保護，請用你們 GitHub Environment 裡的 bypass。

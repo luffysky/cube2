@@ -1087,3 +1087,18 @@
 - 新增 `docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`：每一項的操作步驟、預期的 `auth=` 結果、cube2 會核對的伺服器證據，以及交回格式（不含密碼、token、code、cookie）。
 - 測試帳號：Work 在 identity-staging 的 Better Auth 建了兩個（03:34，`@example.test`），密碼不在 repo，也沒經過聊天。
 - 檔案：`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`883ffda`](https://github.com/luffysky/cube2/commit/883ffda)。
+
+## 2026-11-23 04:55（Asia/Taipei）｜B 組自動化工具：在 cube1 的 Actions 裡用真瀏覽器跑
+
+- 專案：cube2｜執行者：Claude
+- Work 回報 B1–B12 全部 BLOCKED：bypass 只在 cube1 GitHub Actions 的 `staging` Environment，測試帳號的密碼又不在同一個執行環境。
+- 新增 `tools/joint-link-check.js`：Playwright Chromium，每個「裝置」是一個獨立的瀏覽器設定檔。實際走 cube1 v4 的登入頁和同意頁，再用 cube2 API 核對結果。
+  - 先預檢：staging 資料庫、`link: true`、版本相符；拒絕正式站。
+  - 自動跑 B1、B2、B6、B3、B8、B11、B12，B7 要另外開；B4、B5、B9、B10 列為 MANUAL。
+  - 報告不含密碼、token、code、cookie、裝置金鑰。
+  - 技術細節：Playwright 不會攔截 redirect，所以先不讓同意頁的 POST 自動跟轉，拿到 callback 網址後再自己打開；callback 也不跟轉，直接從 Location 讀出結果字，這樣遊戲頁不會先把一次性的結果讀掉。
+- 新增 `test/fixtures/mock-identity-v4.js`：模擬 cube1 v4 的登入、同意（CSRF）、`/oauth/token`（六欄位與 client secret）、帶 nonce 的 Ed25519 token、`/v1/token/status`。
+- 新增 `test/linkcheck.js`：用 dev-server 加上這個模擬服務演練工具，19 項全過。包含錯密碼會判 FAIL 而且不印出密碼、拒絕正式站、預檢擋非 staging 資料庫。這是演練，不算 staging 驗收。
+- 新增 `docs/handoff/cube1-joint-link-check.yml`，並更新執行手冊。
+- 檔案：`tools/joint-link-check.js`、`test/fixtures/mock-identity-v4.js`、`test/linkcheck.js`、`test/browser-run.js`、`docs/handoff/cube1-joint-link-check.yml`、`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。

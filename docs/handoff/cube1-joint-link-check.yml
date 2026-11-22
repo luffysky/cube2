@@ -1,0 +1,68 @@
+# 給 cube1：放進 cube1 的 .github/workflows/，手動觸發，用真的瀏覽器對 cube2 staging 跑 B 組帳號綁定驗收。
+# bypass 和兩個測試帳號都從 cube1 的 GitHub Environment「staging」讀，不會出現在日誌或報告。
+# 要先在那個 Environment 加 4 個 secret（名稱可改，下面兩處一起改）：
+#   CUBE2_STAGING_ACCOUNT1_EMAIL、CUBE2_STAGING_ACCOUNT1_PASSWORD、CUBE2_STAGING_ACCOUNT2_EMAIL、CUBE2_STAGING_ACCOUNT2_PASSWORD
+# bypass 用你們已經有的那個 secret（下面「改這裡」）。
+name: cube2 staging B-group link check
+
+on:
+  workflow_dispatch:
+    inputs:
+      expect_build:
+        description: cube2 staging 的部署版本（7 碼，看 /api/health 的 build）
+        required: true
+        default: e1296ad
+      b7:
+        description: 也跑 B7（要等 10.5 分鐘；1 = 是）
+        required: true
+        default: '0'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: staging                     # 改這裡：放 bypass 和測試帳號的 Environment 名稱
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: luffysky/cube2
+          ref: main
+          path: cube2
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright Chromium
+        working-directory: cube2
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1
+          npx playwright install --with-deps chromium
+
+      - name: Run tools/joint-link-check.js
+        working-directory: cube2
+        env:
+          VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}   # 改這裡：cube2 bypass 在你們那邊的 secret 名稱
+          ACCOUNT1_EMAIL: ${{ secrets.CUBE2_STAGING_ACCOUNT1_EMAIL }}
+          ACCOUNT1_PASSWORD: ${{ secrets.CUBE2_STAGING_ACCOUNT1_PASSWORD }}
+          ACCOUNT2_EMAIL: ${{ secrets.CUBE2_STAGING_ACCOUNT2_EMAIL }}
+          ACCOUNT2_PASSWORD: ${{ secrets.CUBE2_STAGING_ACCOUNT2_PASSWORD }}
+          STAGING_URL: https://brickduel-staging.snowrealm.pet
+          EXPECT_BUILD: ${{ inputs.expect_build }}
+          B7: ${{ inputs.b7 }}
+        run: |
+          set -o pipefail
+          node tools/joint-link-check.js | tee "$RUNNER_TEMP/b-results.json"
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube2-staging-b-results
+          path: ${{ runner.temp }}/b-results.json
+          if-no-files-found: warn
+          retention-days: 30
