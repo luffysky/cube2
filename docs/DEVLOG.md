@@ -1054,3 +1054,16 @@
 - 程式：callback 沒成功時，伺服器日誌多記「停在哪一步」（例如 `token 503`、`status 401`、`verify kid`、`nonce`），只有上游的 HTTP 狀態碼或檢查名稱，不含 token 或 secret（新測試 2 項）。
 - 詳細核對結果與實測紀錄寫在 `docs/JOINT_ACCEPTANCE.md` 的「B 組準備」。
 - 檔案：`server/bff.js`、`server/app.js`、`test/bff.test.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：staging 建了一個合成測試玩家 `staging-test-b0`；正式站沒動。｜刪除：無。
+- 補記：上一條的 commit 為 [`d65c827`](https://github.com/luffysky/cube2/commit/d65c827)。
+
+## 2026-11-23 04:00（Asia/Taipei）｜B1 真實流程：設定生效，停在 cube1 登入頁
+
+- 專案：cube2｜執行者：Claude
+- Owner 說已設 `IDENTITY_AUTHORIZE_URL` 與 `IDENTITY_STAGING_CLIENT_SECRET`。核對發現兩個都建在 **Production**（19:51 UTC），staging 讀不到。
+  - secret：把 Owner 那筆的範圍改成 Preview／staging（沒有讀值）；我之前的佔位值改停到 `accept-jwks` 分支（那裡不部署，沒人讀），待 Owner 同意再刪。
+  - 入口網址：staging 那筆改成 `https://identity-staging.snowrealm.pet/oauth/authorize`（不是秘密）。
+  - Production 上還有一筆 Owner 建的 `IDENTITY_AUTHORIZE_URL`，正式站綁定是關的所以沒作用，待 Owner 同意再刪。另外 Production 也有 `BRICKDUEL_ADMIN_*`、`IDENTITY_STAGING`、`STAGING_DATABASE_URL` 的副本，程式在正式站一律不用（`admin: false`、`dbSource: main`），一樣待同意再刪。
+- 重新部署 staging `d65c827`：`link: true`、`dbSource: staging`、`ready: true`。假 code 換 token 得到 `token 400`（之前是 401），表示兩邊 secret 一致。
+- B1：start（link）200 → cube1 入口頁要 staging 測試帳號登入，帳號密碼不能經過聊天，停在這裡。
+- 正式站：`link: false`、`admin: false`，沒有變。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
