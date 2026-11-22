@@ -22,7 +22,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       await p.click('#mDrawer'); await sleep(350);
       let s = await st();
       ok(s.open && s.inert && await p.evaluate(() => document.activeElement.id === 'drClose'), w + ': it opens, the page behind cannot be tabbed into, focus is on close', s);
-      ok(await p.evaluate(() => /玩家/.test(document.getElementById('drName').textContent) && /訪客/.test(document.getElementById('drAcct').textContent) && document.querySelectorAll('.dr-body [data-go]').length === 10), w + ': the player, the account state and every mode');
+      ok(await p.evaluate(() => /玩家/.test(document.getElementById('drName').textContent) && /訪客/.test(document.getElementById('drAcct').textContent) && document.querySelectorAll('.dr-body [data-go]').length === 11), w + ': the player, the account state and every mode');
       if (w === 390) await p.screenshot({ path: path.join(OUT, 'drawer-phone.png') });
       await p.keyboard.press('Escape'); await sleep(300);
       ok(!(await st()).open && !(await st()).inert, w + ': Escape closes it');
@@ -36,7 +36,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
       await p.click('#mDrawer'); await sleep(300); await p.click('.dr-body [data-sheet="drLogout"]'); await sleep(300);
       ok(await p.evaluate(() => /綁好 SnowRealm 帳號以後才能登出/.test(document.getElementById('sheetCard').textContent)), w + ': sign-out says why it waits for a linked account');
       await p.evaluate(() => ZZ.App.closeSheet());
-      ok(await p.evaluate(() => !!document.querySelector('.menu-foot [data-sheet="shop"]') && document.querySelectorAll('.modes [data-go]').length === 10), w + ': the page keeps all its own buttons');
+      ok(await p.evaluate(() => !!document.querySelector('.menu-foot [data-sheet="shop"]') && document.querySelectorAll('.modes [data-go], .quest-nav [data-go]').length === 11), w + ': the page keeps all its own buttons');
       await ctx.close();
     }
     // the brick games

@@ -1104,7 +1104,7 @@
 - 檔案：`tools/joint-link-check.js`、`test/fixtures/mock-identity-v4.js`、`test/linkcheck.js`、`test/browser-run.js`、`docs/handoff/cube1-joint-link-check.yml`、`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
 - 補記：上一條的 commit 為 [`8f05d8b`](https://github.com/luffysky/cube2/commit/8f05d8b)。
 
-## 2026-11-23 05:50（Asia/Taipei）｜助攻與個人擊倒（K／D／A）
+## 2026-11-23 05:29（Asia/Taipei）｜助攻與個人擊倒（K／D／A）
 
 - 專案：cube2｜執行者：Claude
 - 關聯 Owner 指令：「先做我剛剛要你做的那些功能」（助攻、新對線模式、RPG），先做助攻。
@@ -1119,7 +1119,7 @@
 - 檔案：`src/meta.js`、`src/net.js`、`src/ui.js`、`src/cloud.js`、`server/rules.js`、`server/core.js`、`test/meta.test.js`、`test/api.test.js`、`test/multi.js`、`test/history.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構（`zz.matches.data` 多兩個欄位）。｜刪除：無。
 - 補記：上一條的 commit 為 [`eda7967`](https://github.com/luffysky/cube2/commit/eda7967)。
 
-## 2026-11-23 06:25（Asia/Taipei）｜新模式：守塔戰
+## 2026-11-23 05:33（Asia/Taipei）｜新模式：守塔戰
 
 - 專案：cube2｜執行者：Claude
 - 規則（`Meta.TOWER`）：雙方各有一座 100 點的塔。對手每送你 1 行攻擊扣 2 點，你被擊倒一次扣 20 點。塔先倒的人輸；時間到就比塔的高度，一樣高再用原本的規則（擊倒、攻擊、分數）。
@@ -1134,7 +1134,7 @@
 - 檔案：`src/meta.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/meta.test.js`、`test/tower.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
 - 補記：上一條的 commit 為 [`c663d01`](https://github.com/luffysky/cube2/commit/c663d01)。
 
-## 2026-11-23 07:00（Asia/Taipei）｜新模式：大逃殺
+## 2026-11-23 05:39（Asia/Taipei）｜新模式：大逃殺
 
 - 專案：cube2｜執行者：Claude
 - 規則（`Meta.ROYALE`）：朋友房間 3–8 人，沒有組隊。
@@ -1152,7 +1152,7 @@
 - 檔案：`src/engine.js`、`src/view.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/engine.test.js`、`test/meta.test.js`、`test/royale.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
 - 補記：上一條的 commit 為 [`452b9fa`](https://github.com/luffysky/cube2/commit/452b9fa)。
 
-## 2026-11-23 07:40（Asia/Taipei）｜新模式：2v2 接力
+## 2026-11-23 05:45（Asia/Taipei）｜新模式：2v2 接力
 
 - 專案：cube2｜執行者：Claude
 - 規則（`Meta.RELAY`）：4、6、8 人房，會自動分成兩隊。同一隊共用一面牆輪流放，每人放 8 塊，就把整面牆交給下一位隊友。
@@ -1164,7 +1164,7 @@
 - 檔案：`src/ui.js`、`src/net.js`、`src/modes.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/relay.js`、`test/meta.test.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
 - 補記：上一條的 commit 為 [`e410fab`](https://github.com/luffysky/cube2/commit/e410fab)。
 
-## 2026-11-23 08:15（Asia/Taipei）｜新模式：搶地盤；修一個偶發失敗的測試
+## 2026-11-23 05:51（Asia/Taipei）｜新模式：搶地盤；修一個偶發失敗的測試
 
 - 專案：cube2｜執行者：Claude
 - 規則（`Meta.TERR`）：計時器下方有一塊 10 × 6 的共用地盤。
@@ -1178,3 +1178,41 @@
   - 兩人房：選模式、對方看到；兩邊各自消行之後，兩個畫面的地盤一模一樣；格子多的人在兩邊都是贏家。
   - 房間模式變成 8 種，`test/wxnet.js` 跟著改；多人、大逃殺、接力、守塔戰的測試全都重跑過，全部通過。
 - 檔案：`src/modes.js`、`src/ui.js`、`src/net.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/terr.js`、`test/meta.test.js`、`test/wxnet.js`、`test/bff.test.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
+
+## 2026-11-23 06:10（Asia/Taipei）｜磚之冒險 第一章：窯場（單人 RPG）
+
+- 專案：cube2｜執行者：Claude
+- 主選單多一張「磚之冒險」卡，側邊選單也有入口。只能一個人玩，不影響排位，也不影響連線房間。
+- 打法：每關一隻怪物。消行和送出的攻擊都會扣怪物血量：消 1／2／3／4 行基本傷害 1／3／5／8，再加上這次送出的攻擊行數。怪物照自己的節奏送水泥過來，畫面上方的長條會顯示血量，還有「幾秒後送幾行」。被擊倒就輸了。
+- 職業三種，在冒險地圖上選：
+  - 守窯人：怪物每次攻擊少 1 行。技能「窯牆」：8 秒內擋下所有攻擊。
+  - 刺客：T 轉傷害加倍。技能「暗刃」：直接造成 12 點傷害，下一次消行傷害也加倍。
+  - 法師：技能比較快充滿，6 行就滿，其他職業要 10 行。技能「淨化」：清掉牆底 4 排。
+  - 技能靠消行充能，滿了按道具鍵（預設 F）或長條旁的按鈕施放。
+- 地圖：10 關，打倒一關才開下一關。第 10 關是首領「窯爐之王」，血量 140；血量剩一半時會發怒，攻擊變快，每次也多送 1 行。
+- 裝備三件，第一次打倒第 3、6、9 關時各掉一件：
+  - 窯火錘：每級傷害 +10%。
+  - 釉甲：2 級起怪物攻擊少 1 行，5 級少 2 行。
+  - 窯變護符：每級技能少 1 行就充滿，最少 4 行。
+  - 每件最高 5 級，強化花 60／120／180／240 金幣。
+- 原本待辦寫「把現有道具做成裝備欄位」，實際做成上面這三件專屬裝備，沒有拿現有道具來用。原因：現有道具是對戰用的消耗品，綁進冒險會影響道具經濟，也會讓排位的道具數量被冒險牽動。
+- 獎勵：
+  - 第一次打倒第 n 關：30 + 10n 金幣；首領 200。整章第一次打完總共 920 金幣，只能拿一次。
+  - 已打過的關再打：每次 5 金幣。
+  - 排位贏一場大約 60 到 100 金幣，所以冒險不會壓過排位。
+- 伺服器怎麼核對：所有規則寫在 `Meta.RPG`，瀏覽器和伺服器跑同一套，存檔只照伺服器算出來的結果。
+  - 不能跳關；回報的職業要和存檔裡的一樣；至少要用 3 塊。
+  - 每關最少 20 秒，每塊至少 1/3 秒，從「可玩時間額度」扣。回報得比能玩的速度快，就會回 `fast`。
+  - 金幣會記進金幣帳。
+  - 新建雲端存檔時，裝置上的冒險進度不會帶進來，避免改本機數字直接開到第 10 關或滿級裝備。
+- 選單位置：手機上在「練功」標題上方，獨立一張咖啡色卡；電腦和橫拿手機的左右兩欄版面，放在左欄 logo 下方的空位，不會把右欄撐高。
+- 順手修好一個舊問題：電腦螢幕比較矮時（例如 1280×720、1366×768），主選單是「上下置中」，內容一超出畫面，頂端的玩家列（名字、金幣、選單鍵）就被切到畫面外，而且捲不上去。之前「一頁放得下」的測試會過，正是因為被切掉的部分沒算進去。現在改成「放得下才置中，放不下就從頂端排」，矮螢幕上的上下留白也收一點，整個選單真的一頁放得下。
+- 介面細節：怪物圖示和血條放在牆上方，被打時會跳出傷害數字；首領發怒時圖示會抖動（有開「減少動態」就不抖）。
+- 補正：前面五條（助攻、守塔戰、大逃殺、接力、搶地盤）標題時間寫錯了，已改成實際 commit 時間 05:29、05:33、05:39、05:45、05:51。
+- 測試：
+  - `test/meta.test.js` 加 15 項，全部 227 項通過。內容：不能跳關、職業要一致、首通與重打的金幣、第 3 關掉落、強化的費用和上限、傷害公式、職業和裝備減傷、技能充能、整章 920 金幣、壞掉的存檔會被拉回正常範圍。
+  - `test/api.test.js` 加 8 項，全部 420 項通過。內容：裝置上的冒險進度不會被帶進雲端、伺服器擋跳關、擋職業不一致、第 3 關掉錘、沒拿到的裝備不能強化、回報太快會被擋、金幣有記進帳。
+  - 新的瀏覽器測試 `test/rpg.js` 20 項。內容：選單入口、地圖只開第 1 關、選法師、4 行造成 12 傷害並充能、怪物定時送 1 行、按 F 施放技能清掉 4 排、打倒後伺服器確認 40 金幣、首領半血發怒、被擊倒算輸而且進度不變、回地圖後第 2 關打開、選單顯示 1/10。
+  - 主選單和側邊選單多了一個入口，`test/drawer.js` 的模式數從 10 改成 11，28 項全過；`rwd` 258 項（19 種螢幕大小）、`flow` 60 項、`onehand`、`howto` 和全部單元測試也重跑過，都通過。
+- 檔案：`src/rpg.js`（新）、`src/meta.js`、`src/ui.js`、`src/index.template.html`、`src/style.css`（含選單置中的修正）、`games/drawer-icons.js`、`build.js`、`server/rules.js`、`test/rpg.js`（新）、`test/meta.test.js`、`test/api.test.js`、`test/i18n.test.js`、`test/drawer.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構，冒險進度放在原本的存檔欄位裡。｜刪除：無。
+- 補記：上一條的 commit 為 [`f3cfe10`](https://github.com/luffysky/cube2/commit/f3cfe10)。

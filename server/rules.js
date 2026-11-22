@@ -109,6 +109,12 @@ function applyOps(state, srv, ops, now) {
         if (r && r.ok) { srv.bud -= cost; mark('lvs', String(Meta.data.lv.stars || '').split('').reduce((n, c) => n + (+c || 0), 0)); }
       }
     }
+    else if (op.k === 'rpg') {
+      // an adventure stage: a monster takes time to beat, at least 20 s and a third of a second a piece
+      const cost = Math.max(20000, (Math.floor(+(op.a && op.a[1])) || 0) * 330);
+      if (srv.bud < cost) r = { ok: false, why: 'fast' };
+      else { r = Meta.run(op.k, op.a); if (r && r.ok) srv.bud -= cost; }
+    }
     else if (op.k === 'endless') {
       // the endless run: its best stage goes on the board only if there was time to play that far (15 s a stage)
       r = Meta.run(op.k, op.a);

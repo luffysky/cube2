@@ -133,7 +133,7 @@
     if (k === 'PAUSE') return pause();
     if (k === 'RESTART') return restart();
     if (k === 'UNDO') return undo();
-    if (k === 'ITEM') { useItem('me'); return; }
+    if (k === 'ITEM') { var KI = kindOf(); if (KI && KI.item) KI.item(); else useItem('me'); return; }
     if (!input.can()) return;
     var me = S.me;
     if (k === 'HD') { if (performance.now() >= (S.guard || 0)) me.hardDrop(); }
@@ -1454,7 +1454,7 @@
     });
   }
   // One of the menu's entries, by name (also used by links that open the game straight into a mode).
-  var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1 };
+  var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1, rpg: 1 };
   function goTo(go) {
     if (typeof go !== 'string' || !MODES.hasOwnProperty(go)) return false;
     if (typeof App.go[go] === 'function') App.go[go]();
@@ -1470,6 +1470,7 @@
     txt('mCoins', L.num(d.coins));
     txt('mRankPts', r.top ? String(r.rp) : r.into + ' / ' + r.need);
     txt('mDojo', save.dojo ? save.dojo + '/' + DRILLS.length : '');
+    txt('mRpg', d.rpg && d.rpg.best ? d.rpg.best + '/' + Meta.RPG.STAGES.length : '');
     txt('mSprint', d.tot.sprint ? fmtTime(d.tot.sprint) : '');
     var n = ZZ.Replay ? ZZ.Replay.list().length : 0, o = ZZ.OPENERS || [];
     txt('mGhost', n ? String(n) : '');
@@ -1892,6 +1893,8 @@
     // a name tag above the wall in a match of three or four: that player becomes the target
     el.strip.addEventListener('click', function (e) {
       if (e.target.closest && e.target.closest('[data-do="ghostSend"]')) { if (App.ghostSend()) { foeKey = ''; drawFoes(); } return; }
+      var act = e.target.closest && e.target.closest('[data-do]');
+      if (act && App.acts[act.getAttribute('data-do')]) { App.acts[act.getAttribute('data-do')](act); act.blur(); return; }
       var b = e.target.closest && e.target.closest('[data-foe]'); if (b && S && S.multi) { setTarget(+b.getAttribute('data-foe')); b.blur(); } });
     loadStore();
     rebuildKeys();

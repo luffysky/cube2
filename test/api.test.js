@@ -771,6 +771,28 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(lg[0].n >= 1, 'level coins are in the coin ledger');
   }
 
+  // ---------- 磚之冒險: stages in order, checked on the server, never faster than a monster can be beaten ----------
+  {
+    const Q = await newPlayer({ rpg: { cls: 'mage', best: 10, gear: { w: 5, a: 5, c: 5 }, wins: 99 } }, '203.0.113.69');
+    ok(Q.st.rpg.best === 0 && Q.st.rpg.gear.w === 0, 'adventure progress on the device is not brought into a new cloud save', Q.st.rpg);
+    const c0 = Q.st.coins;
+    r = await sync(Q, [op('rpg', [2, 40, 'tank'])]);
+    ok(r.json.res[0].ok === false, 'a stage cannot be skipped to', r.json.res);
+    r = await sync(Q, [op('rpg', [1, 40, 'mage'])]);
+    ok(r.json.res[0].ok === false, 'the class must be the one on record', r.json.res);
+    r = await sync(Q, [op('rpgCls', ['rogue']), op('rpg', [1, 40, 'rogue'])]);
+    ok(r.json.res.every(x => x.ok) && r.json.st.rpg.best === 1 && r.json.st.rpg.cls === 'rogue' && r.json.st.coins === c0 + 40, 'a class is picked and stage 1 is beaten: 40 coins', [r.json.res, r.json.st.rpg, r.json.st.coins - c0]);
+    r = await sync(Q, [op('rpg', [2, 40, 'rogue']), op('rpg', [3, 40, 'rogue'])]);
+    ok(r.json.st.rpg.gear.w === 1, 'stage 3 drops the hammer on the server too', r.json.st.rpg);
+    r = await sync(Q, [op('rpgUp', ['w']), op('rpgUp', ['a'])]);
+    ok(r.json.res[0].ok && !r.json.res[1].ok && r.json.st.rpg.gear.w === 2, 'gear found can be upgraded; gear not found cannot', r.json.res);
+    let fast = false;
+    for (let k = 0; k < 3 && !fast; k++) { const many = []; for (let i = 0; i < 30; i++) many.push(op('rpg', [1, 3, 'rogue'])); r = await sync(Q, many); fast = r.json.res.some(x => x.why === 'fast'); }
+    ok(fast, 'stages cannot be reported faster than they could be played', r.json.res.filter(x => !x.ok).length);
+    const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'rpg'", [Q.id]);
+    ok(lg[0].n >= 1, 'adventure coins are in the coin ledger');
+  }
+
   // ---------- weather runs: paid by time, never faster than they could be played, on their own board ----------
   {
     const X = await newPlayer(null, '203.0.113.65');

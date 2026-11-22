@@ -556,8 +556,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
 @media (min-width: 1024px) and (min-height: 560px) {
   .menu-in {
     max-width: 1040px; min-height: 100%; padding: 26px 32px 30px;
-    display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 48px; row-gap: 16px; align-content: center;
-    grid-template-areas: "top top" "hero modes" "hero group" "hero train" "foot foot" "about about";
+    display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 48px; row-gap: 16px; align-content: start; align-content: safe center;
+    grid-template-areas: "top top" "hero modes" "hero group" "hero train" "quest train" "foot foot" "about about";
   }
   .topbar { grid-area: top; }
   .hero { grid-area: hero; align-self: center; grid-template-columns: 1fr; justify-items: start; gap: 24px; }
@@ -714,7 +714,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #menu::-webkit-scrollbar, #she
   .menu-in {
     max-width: 920px; padding: 8px 18px 12px;
     display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); column-gap: 22px; row-gap: 7px; align-content: start;
-    grid-template-areas: "top top" "hero modes" "hero group" "hero train" "foot foot" "about about";
+    grid-template-areas: "top top" "hero modes" "hero group" "hero train" "quest train" "foot foot" "about about";
   }
   .topbar { grid-area: top; }
   .hero { grid-area: hero; align-self: center; grid-template-columns: 1fr; justify-items: start; gap: 10px; }
@@ -1047,3 +1047,50 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .terr .tgrid i { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--floor-chip); }
 .terr .tgrid i.mine { outline: 2px solid var(--ink); outline-offset: -1px; }
 .terr small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--muted); }
+/* 磚之冒險: the menu card, the map, a fight */
+.mode.quest { background: linear-gradient(180deg, #5A3A22, #3E2716); border-color: #5A3A22; border-bottom-color: #24160C; color: #F7E7CF; }
+.mode.quest span, .mode.quest em { color: #F7E7CF; opacity: .78; }
+.quest-nav { display: grid; }
+@media (min-width: 1024px) and (min-height: 560px) {
+  .quest-nav { grid-area: quest; align-self: end; }
+  .quest-nav .mode { padding: 8px 16px 7px; }
+  .quest-nav .mode b { font-size: 18px; }
+}
+/* 矮的桌機螢幕（720–800 高）：上下留白收一點，整個選單一頁放得下，頂端的玩家列也不會被切掉 */
+@media (min-width: 1024px) and (min-height: 560px) and (max-height: 800px) {
+  .menu-in { padding-top: 16px; padding-bottom: 18px; row-gap: 14px; }
+}
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) { .quest-nav { grid-area: quest; align-self: end; } }
+.rp-cls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.rp-cls button { text-align: left; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+.rp-cls button b { display: block; font-family: var(--display); }
+.rp-cls button span { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.rp-cls button[aria-checked="true"] { border-color: var(--gold-ink); box-shadow: inset 0 0 0 1px var(--gold-ink); }
+.rp-gear { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.rp-gear li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); }
+.rp-gear li span { grid-column: 1; font-size: 12px; color: var(--muted); }
+.rp-gear li > button, .rp-gear li > em { grid-column: 2; grid-row: 1 / 3; font-style: normal; font-size: 12px; color: var(--muted); }
+.rp-map { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.rp-map button { width: 100%; display: grid; grid-template-columns: 34px 1fr; gap: 0 8px; align-items: center; text-align: left; padding: 7px 9px; border: 1px solid var(--edge); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+.rp-map button i { grid-row: 1 / 3; font-style: normal; font-size: 24px; text-align: center; }
+.rp-map button span { font-size: 12px; color: var(--muted); }
+.rp-map button.done { border-color: var(--gold-ink); }
+.rp-map button.boss { grid-column: auto; background: linear-gradient(180deg, #4A2618, #2E160D); color: #F7E7CF; border-color: #4A2618; }
+.rp-map button.boss span { color: #F0CFA8; }
+.rp-map li:last-child { grid-column: 1 / -1; }
+.rp-map button:disabled { opacity: .45; cursor: default; }
+.rp-map small { font-size: 11px; padding: 0 5px; border-radius: 6px; background: var(--alarm); color: #fff; }
+.rp-foe { display: flex; gap: 10px; align-items: center; text-align: left; }
+.rp-foe > i { font-style: normal; font-size: 30px; line-height: 1; }
+.rp-foe > div { flex: 1; min-width: 0; }
+.rp-foe b { font-family: var(--display); }
+.rp-foe small { display: block; font-size: 12px; color: var(--muted); }
+.rp-foe.rage > i { animation: rp-shake .4s infinite; }
+.rp-hit { font-style: normal; color: var(--alarm); font-family: var(--num); font-weight: 700; margin-left: 4px; }
+.rp-bar { display: block; height: 7px; margin: 4px 0 2px; border-radius: 4px; background: var(--floor-chip); overflow: hidden; }
+.rp-bar i { display: block; height: 100%; background: var(--alarm); transition: width .2s; }
+.rp-bar.sk { flex: 1; margin: 0; }
+.rp-bar.sk i { background: var(--gold); }
+.rp-skill { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+@keyframes rp-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+@media (prefers-reduced-motion: reduce) { .rp-bar i { transition: none; } .rp-foe.rage > i { animation: none; } }

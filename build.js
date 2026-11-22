@@ -24,7 +24,7 @@ let html = src('index.template.html');
 const ZZ = require('./src/engine.js');
 require('./src/hans-map.js'); require('./src/i18n.js');
 const L = ZZ.L;
-for (const f of ['modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'minis.js', 'drawer.js', 'devstore.js', 'music.js']) {      // the dictionaries of the browser-only files, without running their screens
+for (const f of ['modes.js', 'shop.js', 'cloud.js', 'consent.js', 'bonus.js', 'levelmode.js', 'wxmode.js', 'rpg.js', 'minis.js', 'drawer.js', 'devstore.js', 'music.js']) {      // the dictionaries of the browser-only files, without running their screens
   const s = src(f), a = s.indexOf('L.add({'), b = s.indexOf('});', a);
   if (a >= 0) new Function('L', s.slice(a, b + 3))(L);
 }
@@ -107,7 +107,7 @@ for (const lang of PAGE_LANGS) {
 L.set('zh-Hant');
 // ---------- the page: scripts and stylesheet go in last, so nothing above can touch their text ----------
 const parts = { MINIREWARDS: '../games/rewards.js', ICONS: '../games/drawer-icons.js', CSS: 'style.css', ENGINE: 'engine.js', HANS: 'hans-map.js', I18N: 'i18n.js', BOT: 'bot.js', DRILLS: 'drills.js', OPENERS: 'openers.js', LEVELS: 'levels.js', WEATHER: 'weather.js', META: 'meta.js',
-  SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', PWA: 'pwa.js', SHOP: 'shop.js', CLOUD: 'cloud.js', CONSENT: 'consent.js', BONUS: 'bonus.js', LEVELMODE: 'levelmode.js', WXMODE: 'wxmode.js', MINIS: 'minis.js', DRAWER: 'drawer.js', DEVSTORE: 'devstore.js', MUSIC: 'music.js' };
+  SFX: 'sfxdata.js', VIEW: 'view.js', REPLAY: 'replay.js', UI: 'ui.js', NET: 'net.js', MODES: 'modes.js', PWA: 'pwa.js', SHOP: 'shop.js', CLOUD: 'cloud.js', CONSENT: 'consent.js', BONUS: 'bonus.js', LEVELMODE: 'levelmode.js', WXMODE: 'wxmode.js', RPG: 'rpg.js', MINIS: 'minis.js', DRAWER: 'drawer.js', DEVSTORE: 'devstore.js', MUSIC: 'music.js' };
 // the machine-filled words, and which of them a machine wrote (L.machine), go into the page after every dictionary
 const autoPart = 'ZZ.L.add(' + JSON.stringify(filled) + ');ZZ.L.machine=' + JSON.stringify(auto.machine) + ';';
 if (!html.includes('/*__AUTOI18N__*/')) throw new Error('missing marker /*__AUTOI18N__*/');
