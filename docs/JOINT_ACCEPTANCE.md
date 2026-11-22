@@ -95,7 +95,9 @@ cube1 提供：
 | `BRICKDUEL_ADMIN_JWKS_URL` | cube1 staging 的 `/.well-known/admin-jwks.json`（https，只放公開 JWK） | cube1 |
 | `BRICKDUEL_ADMIN_SUBJECTS` | `svc:snowrealm-games-admin` | 固定 |
 
-cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`。2026-11-22 22:55 查過：這個網域**沒有 DNS 紀錄**，Vercel 也查不到 A 或 CNAME，連線直接失敗，所以**還不存在**。等它實際用 HTTPS 回應、而且 JWKS 只有公鑰，cube2 才會把這四個值設到 Preview（只限 `staging` 分支）。這些值都不是秘密，Claude 用 Vercel 直接設，不需要 Owner 貼任何東西。
+cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`。2026-11-22 22:55 查過：這個網域**沒有 DNS 紀錄**，Vercel 也查不到 A 或 CNAME，連線直接失敗，所以**還不存在**。
+
+2026-11-22 22:46，Owner 已經在 Preview（只限 `staging` 分支）設了這四個變數。staging 部署 `fcd6d24` 的 `/api/health` 現在是 `admin: true`、`dbSource: "staging"`；正式站維持 `admin: false`、`dbSource: "main"`。因為 JWKS 網址還連不上，現在任何帶簽章的呼叫都會得到 503 `unavailable`（拿不到公鑰時一律拒絕）；identity-staging 上線後，不用重新部署，最多 10 分鐘就會抓到新金鑰。
 | `aud`／`scope`（token 內） | `snowrealm:brickduel:admin`／`brickduel:admin:read` | 固定 |
 
 - 設了 `BRICKDUEL_ADMIN_TEST_TRUST=1`，staging 就只會用 `STAGING_DATABASE_URL`（見 `server/db.js`）。
@@ -117,7 +119,7 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 
 | # | 結果 | 時間（UTC） | 證據 | 原因／下一步 |
 |---|---|---|---|---|
-| A1 | BLOCKED | 2026-11-22 | staging `/internal/admin/v1/overview` → 503 `disabled` | 等 cube1 的 staging admin signer、issuer、admin-jwks.json；拿到後 Owner 設進 Preview，cube1 執行 `tools/joint-admin-check.js` |
+| A1 | BLOCKED | 2026-11-22 23:00 | staging `fcd6d24`：管理信任已設好（`admin: true`），但 `https://identity-staging.snowrealm.pet` 沒有 DNS | 等 cube1 部署 identity-staging（admin-jwks.json 和 signer），再由 cube1 用 `EXPECT_BUILD=fcd6d24`（或當時最新的版本）和 `ADMIN_JWKS_URL` 執行 `tools/joint-admin-check.js` |
 | A2 | BLOCKED | 2026-11-22 | 同上 | 同上 |
 | A3 | BLOCKED | 2026-11-22 | 同上 | 同上 |
 | A4 | BLOCKED | 2026-11-22 | 同上 | 同上 |
