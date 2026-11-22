@@ -975,3 +975,20 @@
 - 還缺兩個要等 GPT：`IDENTITY_STAGING_CLIENT_SECRET`（Owner 自己貼進 Vercel）、`IDENTITY_AUTHORIZE_URL`（staging 登入入口）。少了這兩個，staging 的 BFF 會保持關閉（`/api/health` 的 `link` 是 false，`/api/auth/start` 回 503）。
 - 另外 `identity-staging.snowrealm.pet` 目前沒有 DNS，所以就算兩個都補上，驗 token 時也會因為拿不到 JWKS 而拒絕（`unavailable`），不會誤放行。
 - 檔案：`docs/DEVLOG.md`、`docs/JOINT_ACCEPTANCE.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`9d76ad2`](https://github.com/luffysky/cube2/commit/9d76ad2)。staging 部署 `dpl_9bCscCvAknLaL1p1yCS8U35pAAuQ`：`dbSource: "staging"`、`admin: true`、`link: false`。
+
+## 2026-11-23 01:25（Asia/Taipei）｜staging 管理信任接上 cube1 真實 admin JWKS
+
+- 專案：cube2｜執行者：Claude
+- 關聯指令：cube1 回報 Identity staging 已啟動，請核對 Preview（只限 staging 分支）的管理信任，用真實 Admin JWKS 驗管理 JWT；不建公鑰、不動正式環境。
+- 實際打了 cube1 的兩個端點（雲端瀏覽器）：
+  - `/.well-known/admin-jwks.json`：一把 Ed25519 公鑰，kid `srstagea_EWW-tM7u8uSnvCwV`，沒有私鑰欄位 `d`。
+  - `/.well-known/jwks.json`：玩家用的另一把，kid `srstagep_nmkeJAZFwC5B6-ZJ`。兩把分開，管理 API 不會接受玩家金鑰。
+- 發現 `BRICKDUEL_ADMIN_JWKS_URL` 在上次 staging 部署之後被改過，staging 跑的還是舊值。所以把三個管理變數重設為確認過的公開值，並重新部署（push staging）：
+  - `BRICKDUEL_ADMIN_JWKS_URL` = `https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`
+  - `BRICKDUEL_ADMIN_ISSUER` = `https://identity-staging.snowrealm.pet`
+  - `BRICKDUEL_ADMIN_SUBJECTS` = `svc:snowrealm-games-admin`
+  - `BRICKDUEL_ADMIN_TEST_TRUST` 沒動。cube2 沒有存任何公鑰（沒用 `BRICKDUEL_ADMIN_JWKS` 內嵌）。
+- A1–A6、A10–A13 改為 PENDING：條件都齊了，但**還沒有任何一次帶 cube1 簽發 JWT 的 staging HTTP 呼叫**，所以一項都不能算 PASS。A7–A9、A14 仍是 BLOCKED（需要 cube1 換鑰、讓 JWKS 暫時失效，以及查 `zz.admin_log`）。
+- 正式環境的管理信任、`IDENTITY_LINK_ENABLED`、玩家資料都沒動。
+- 檔案：`docs/DEVLOG.md`、`docs/JOINT_ACCEPTANCE.md`。｜資料庫：未異動。｜刪除：無。

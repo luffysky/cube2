@@ -119,21 +119,21 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 
 | # | 結果 | 時間（UTC） | 證據 | 原因／下一步 |
 |---|---|---|---|---|
-| A1 | BLOCKED | 2026-11-22 23:00 | staging `fcd6d24`：管理信任已設好（`admin: true`），但 `https://identity-staging.snowrealm.pet` 沒有 DNS | 等 cube1 部署 identity-staging（admin-jwks.json 和 signer），再由 cube1 用 `EXPECT_BUILD=fcd6d24`（或當時最新的版本）和 `ADMIN_JWKS_URL` 執行 `tools/joint-admin-check.js` |
-| A2 | BLOCKED | 2026-11-22 | 同上 | 同上 |
-| A3 | BLOCKED | 2026-11-22 | 同上 | 同上 |
-| A4 | BLOCKED | 2026-11-22 | 同上 | 同上 |
-| A5 | BLOCKED | 2026-11-22 | 同上 | 同上 |
-| A6 | BLOCKED | 2026-11-22 | 同上 | 同上 |
+| A1 | PENDING | 2026-11-23 01:20 | identity-staging 已上線，admin JWKS 可取得；cube2 staging 管理信任已指向它並重新部署。**尚未有任何一次帶 cube1 簽發 JWT 的 staging HTTP 呼叫** | 等 cube1 用 `ADMIN_JWKS_URL=https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`、`ADMIN_KID=srstagea_EWW-tM7u8uSnvCwV`、`ADMIN_ISS=https://identity-staging.snowrealm.pet`、`EXPECT_BUILD=`（staging 當時版本）執行 `tools/joint-admin-check.js`，交回 JSON 報告 |
+| A2 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
+| A3 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
+| A4 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
+| A5 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
+| A6 | PENDING | 2026-11-23 | 同 A1 | 同 A1 |
 | A7 | BLOCKED | 2026-11-22 | — | 同上，另需 cube1 在 staging JWKS 並列兩把金鑰 |
 | A8 | BLOCKED | 2026-11-22 | — | 同 A7 |
 | A9 | BLOCKED | 2026-11-22 | — | 同上，另需 cube1 讓 staging JWKS 暫時無法存取 |
-| A10 | BLOCKED | 2026-11-22 | — | 同 A1 |
-| A11 | BLOCKED | 2026-11-22 | — | 同 A1 |
-| A12 | BLOCKED | 2026-11-22 | — | 同 A1 |
-| A13 | BLOCKED | 2026-11-22 | — | 同 A1（POST 要由 cube1 送；cube2 這邊的工具只能發 GET） |
+| A10 | PENDING | 2026-11-23 | — | 同 A1 |
+| A11 | PENDING | 2026-11-23 | — | 同 A1 |
+| A12 | PENDING | 2026-11-23 | — | 同 A1 |
+| A13 | PENDING | 2026-11-23 | — | 同 A1（POST 要由 cube1 送；cube2 這邊的工具只能發 GET） |
 | A14 | BLOCKED | 2026-11-22 | — | A1–A13 跑完後，Owner 在 Neon staging 分支查 `zz.admin_log` |
-| B1 | BLOCKED | 2026-11-23 00:05 | staging Preview 已設 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_STAGING_REDIRECT`、`IDENTITY_LINK_ENABLED`；`link` 仍是 false | 等 cube1 的 staging Identity（issuer、JWKS、authorize、token、status、client secret），以及登記 callback |
+| B1 | BLOCKED | 2026-11-23 00:05 | staging Preview 已設 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_STAGING_REDIRECT`、`IDENTITY_LINK_ENABLED`；`link` 仍是 false | identity-staging 已上線、玩家 JWKS 可取得（kid `srstagep_nmkeJAZFwC5B6-ZJ`）；仍缺 `IDENTITY_AUTHORIZE_URL`、`IDENTITY_STAGING_CLIENT_SECRET`、兩個測試帳號，所以 `link` 還是 false |
 | B2 | BLOCKED | 2026-11-22 | 同上 | 同上，另需第二台裝置 |
 | B3 | BLOCKED | 2026-11-22 | 同上 | 同上，另需兩個測試帳號 |
 | B4 | BLOCKED | 2026-11-22 | 同上 | 同上，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
@@ -151,6 +151,7 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 
 | 項目 | 結果 | 證據 |
 |---|---|---|
+| 2026-11-23 01:20（台北）staging 管理信任對接真實 JWKS | 通（設定面，非 A 項） | 雲端瀏覽器直接取 `https://identity-staging.snowrealm.pet/.well-known/admin-jwks.json`：一把 Ed25519 公鑰，kid `srstagea_EWW-tM7u8uSnvCwV`，沒有 `d`；玩家 JWKS 是另一把（kid `srstagep_nmkeJAZFwC5B6-ZJ`），兩邊不混用。Preview／staging 的 `BRICKDUEL_ADMIN_JWKS_URL`、`BRICKDUEL_ADMIN_ISSUER`、`BRICKDUEL_ADMIN_SUBJECTS` 重設為上述網址、`https://identity-staging.snowrealm.pet`、`svc:snowrealm-games-admin`，並重新部署。cube2 沒有建立或保存任何公鑰，金鑰一律從 JWKS 端點取得 |
 | staging 網域 TLS、部署保護、bypass | 通 | cube1 用 bypass 打 staging `/api/health` 得到 200（cube1 回報） |
 | staging 用的是獨立資料庫 | 通 | staging `/api/health?deep=1`：`db: true`、`ready: true`；staging 排行榜是空的，正式站有玩家；`7c2562f` 部署後 staging `/api/health` 顯示 `dbSource: "staging"`，正式站顯示 `"main"` |
 | 管理 API 在 staging 沒設定前回 503 | 通 | staging `/internal/admin/v1/overview` → 503 `{"error":"disabled"}` |
