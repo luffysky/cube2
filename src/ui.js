@@ -340,6 +340,8 @@
         var first = order.filter(enemy)[0];
         S.multi.target = first; S.opp = foes[first].g; S.oppName = foes[first].name;
         S.me.onAttack = function (n) { ZZ.Net.attack(n); };
+        // 大逃殺: no teams, no replay; the floor clock starts with the match
+        if (o.royale && !M.teams) { S.royale = { floorT: Meta.ROYALE.every, out: false, outAt: 0, ghostT: 0, ghostSent: 0 }; }
       } else if (mode === 'net') {
         S.opp = new ZZ.Game({ seed: seed, manual: true, garbage: false, board: lvWall || undefined });   // a mirror of the other player's wall
         S.remote = true; S.bot = null;
@@ -372,6 +374,7 @@
         S.rec = null; S.tape = null;
         toast(t('net.raceOn', S.race), 3000);
       }
+      if (S.royale) { S.rec = null; S.tape = null; toast(t('ry.on'), 3600); }
       // 守塔戰: towers instead of a knockout count (Meta.TOWER); the match ends when a tower falls
       if (o.tower && (mode === 'net' || mode === 'ai') && !o.multi && !S.race) {
         S.tower = true;
@@ -456,18 +459,19 @@
   function drawFoes() {
     var M = S.multi;
     if (!M) return;
-    var key = M.target + '|' + L.lang + '|' + M.order.map(function (s) { var f = M.foes[s]; return s + ':' + f.downs + ':' + f.sent + ':' + (f.gone ? 1 : 0) + ':' + stackOf(f.g); }).join(',');
+    var key = M.target + '|' + L.lang + '|' + (S.royale ? (S.royale.out ? 'o' + Math.ceil(S.royale.ghostT / 1000) : 'i') : '') + '|' + M.order.map(function (s) { var f = M.foes[s]; return s + ':' + f.downs + ':' + f.sent + ':' + (f.gone ? 1 : 0) + ':' + stackOf(f.g); }).join(',');
     if (key === foeKey) return;
     foeKey = key;
     var h = '';
     M.order.forEach(function (s) {
       var f = M.foes[s], foe = enemy(s), on = M.target === s, hi = stackOf(f.g);
       h += '<button type="button" class="foe' + (on ? ' on' : '') + (f.gone ? ' gone' : '') + (foe ? '' : ' mate') + (M.teams ? ' t' + f.team : '') + '" data-foe="' + s + '"' +
-        (foe && !f.gone ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(f.name) + '</b><span>' + (f.gone ? t('mp.gone') : foe ? t('mp.downs', f.downs) : t('mp.mate')) +
+        (foe && !f.gone ? ' aria-pressed="' + on + '"' : ' disabled') + '><b>' + esc(f.name) + '</b><span>' + (f.gone ? t('mp.gone') : S.royale ? t(f.downs ? 'ry.outTag' : 'ry.inTag') : foe ? t('mp.downs', f.downs) : t('mp.mate')) +
         '</span><i style="--h:' + Math.round(hi / VIS * 100) + '%"></i></button>';
     });
     // up to seven rivals: two rows once there are more than four
-    el.strip.innerHTML = '<div class="foes' + (M.order.length > 4 ? ' many' : '') + '">' + h + '</div>';
+    var R = S.royale, ghost = R && R.out ? '<button type="button" class="btn ghostSend" data-do="ghostSend"' + (R.ghostT > 0 ? ' disabled' : '') + '>' + t(R.ghostT > 0 ? 'ry.ghostWait' : 'ry.ghost', Math.ceil(R.ghostT / 1000)) + '</button>' : '';
+    el.strip.innerHTML = '<div class="foes' + (M.order.length > 4 ? ' many' : '') + '">' + h + '</div>' + ghost;
   }
   function stackOf(g) {
     for (var r = 0; r < g.grid.length; r++) for (var x = 0; x < g.grid[r].length; x++) if (g.grid[r][x]) return g.grid.length - r;
@@ -475,12 +479,14 @@
   }
   // where everybody finished, best first: fewest knockouts, then most lines sent; players who left come last
   function standings(why) {
-    var M = S.multi, Net = ZZ.Net, list = [{ seat: M.me, name: t('you'), me: true, team: M.myTeam, downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score, gone: false }];
+    var M = S.multi, Net = ZZ.Net, list = [{ seat: M.me, name: t('you'), me: true, team: M.myTeam, downs: S.ko.opp, sent: S.me.stats.sent, score: S.me.stats.score, gone: false, outAt: S.royale ? S.royale.outAt : 0 }];
     M.order.forEach(function (s) {
       var f = M.foes[s], p = Net.peers[s], e = p && p.end;
-      list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone });
+      list.push({ seat: s, name: f.name, team: f.team, downs: e ? e.downs : f.downs, sent: e ? e.sent : f.sent, score: e ? e.score : f.g.stats.score, gone: f.gone, outAt: f.outAt || 0 });
     });
-    var better = function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); };
+    var better = S.royale
+      ? function (a, b) { return (a.gone - b.gone) || ((a.downs > 0) - (b.downs > 0)) || ((b.outAt || 0) - (a.outAt || 0)) || (b.sent - a.sent) || (b.score - a.score); }
+      : function (a, b) { return (a.gone - b.gone) || (a.downs - b.downs) || (b.sent - a.sent) || (b.score - a.score); };
     list.sort(better);
     list.forEach(function (p, i) { p.place = i && !better(list[i - 1], p) ? list[i - 1].place : i + 1; });
     var out = { list: list, teams: null, r: 0 };
@@ -937,6 +943,7 @@
       v.knock(now); sfx.play('ko');      // the target went down: counted from its own report, not here
     } else if (S.kind === 'battle') {
       if (mine && S.multi && ZZ.Net && ZZ.Net.downed) ZZ.Net.downed();
+      if (mine && S.royale && !S.royale.out) { S.royale.out = true; S.royale.outAt = Date.now(); toast(t('ry.out'), 4200); }
       var k = mine ? 'me' : 'opp', other = mine ? 'opp' : 'me';
       S.ko[other]++;
       S[other].stats.score += 1500;
@@ -990,7 +997,7 @@
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -1697,6 +1704,33 @@
       if (S.opp && !S.remote) S.opp.start();
     }
   }
+  // 大逃殺: the floor rises on everyone's own clock (the match starts together, so the walls rise together); a rival is
+  // out once their own report shows a knockout; with one left standing (or none) the match is over
+  function royaleTick(dt) {
+    var R = S.royale, M = S.multi;
+    if (!R.out) {
+      R.floorT -= dt;
+      if (R.floorT <= 0) {
+        R.floorT += Meta.ROYALE.every;
+        if (S.me.floorRows() < Meta.ROYALE.maxFloor) { S.me.raiseFloor(1); sfx.play('garbage'); toast(t('ry.floor', S.me.floorRows()), 1800); }
+      }
+    } else if (R.ghostT > 0) R.ghostT = Math.max(0, R.ghostT - dt);
+    var now = Date.now(), alive = R.out ? 0 : 1;
+    M.order.forEach(function (s) {
+      var f = M.foes[s];
+      if (f.downs > 0 && !f.outAt) { f.outAt = now; foeKey = ''; if (M.target === s) { var next = M.order.filter(function (x) { return !M.foes[x].gone && !M.foes[x].downs; })[0]; if (next != null) setTarget(next); } }
+      if (!f.gone && !f.downs) alive++;
+    });
+    if (alive <= 1 && S.state === 'play') endBattle('');
+  }
+  App.ghostSend = function () {
+    var R = S && S.royale;
+    if (!R || !R.out || R.ghostT > 0 || S.state !== 'play' || !ZZ.Net) return false;
+    R.ghostT = Meta.ROYALE.ghostEvery; R.ghostSent++;
+    ZZ.Net.attack(1);
+    sfx.play('ui');
+    return true;
+  };
   function playTick(dt) {
     var fz = S.freeze, K = kindOf();
     if (S.tape) S.tape.tick(dt);
@@ -1715,7 +1749,8 @@
           S.down[k] -= dt;
           if (S.down[k] <= 0) {
             S.down[k] = 0; V[k].koT = 0;
-            if (!(k === 'opp' && S.remote)) {
+            if (k === 'me' && S.royale && S.royale.out) { /* out of the royale: the wall stays down */ }
+            else if (!(k === 'opp' && S.remote)) {
               S[k].revive();
               if (k === 'opp' && S.bot && S.bot.onRevive) S.bot.onRevive();
             }
@@ -1728,6 +1763,8 @@
         if (S.sky.opp && fz.opp <= 0 && !S.opp.over) App.wxStep(S.sky.opp, S.opp, dt, false);
         if (fz.me <= 0 && !S.me.over) App.wxStep(S.sky.me, S.me, dt, true);
       }
+      if (S.royale) royaleTick(dt);
+      if (S.state !== 'play') return;
       if (S.remote) ZZ.Net.tick(dt);
       else if (fz.opp <= 0) {
         if (!S.opp.over) S.bot.update(dt);
@@ -1799,7 +1836,9 @@
       'toast', 'mtoast', 'rotate',
       'sheet', 'sheetCard', 'demoCv'].forEach(function (id) { el[id] = $(id); });
     // a name tag above the wall in a match of three or four: that player becomes the target
-    el.strip.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-foe]'); if (b && S && S.multi) { setTarget(+b.getAttribute('data-foe')); b.blur(); } });
+    el.strip.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('[data-do="ghostSend"]')) { if (App.ghostSend()) { foeKey = ''; drawFoes(); } return; }
+      var b = e.target.closest && e.target.closest('[data-foe]'); if (b && S && S.multi) { setTarget(+b.getAttribute('data-foe')); b.blur(); } });
     loadStore();
     rebuildKeys();
     Meta.load();

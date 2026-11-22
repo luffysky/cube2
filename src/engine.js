@@ -10,6 +10,7 @@
   // cells the weather mode puts on the wall (9 is settled snow): hail ice that cracks the first time its row is cleared
   // and goes the second time, and lava that cools into cement
   var ICE = 10, CRACK = 11, LAVA = 12;
+  var BEDROCK = 13;   // 大逃殺: a floor row that rises from below and is never cleared
   // Items. Names and descriptions live in the language file (keys i1..i7); the tile shows a wordless mark.
   var ITEMS = [null,
     { id: 1, color: '#D9432F' },   // knock down: removes your bottom 3 rows
@@ -487,7 +488,7 @@
     var rows = [];
     for (r = 0; r < ROWS; r++) {
       var row = this.grid[r], full = true;
-      for (x = 0; x < COLS; x++) if (!row[x]) { full = false; break; }
+      for (x = 0; x < COLS; x++) if (!row[x] || (row[x] & 15) === BEDROCK) { full = false; break; }
       if (full) rows.push(r);
     }
     var lines = rows.length, colors = [], got = [];
@@ -600,6 +601,28 @@
     }
   };
 
+  // 大逃殺: n solid floor rows come up from below, lifting everything; a wall pushed past the top is a knockout
+  Game.prototype.raiseFloor = function (n) {
+    if (this.over || n <= 0) return 0;
+    for (var i = 0; i < n; i++) {
+      var spill = false;
+      for (var x = 0; x < COLS; x++) if (this.grid[0][x]) spill = true;
+      this.grid.shift();
+      var row = emptyRow();
+      for (x = 0; x < COLS; x++) row[x] = BEDROCK;
+      this.grid.push(row);
+      if (spill) { this.topOut('floor'); return i + 1; }
+    }
+    this.refit();
+    if (this.cur && !this.fits(this.cur.type, this.cur.rot, this.cur.x, this.cur.y)) this.topOut('floor');
+    this.emit('floor', { n: n });
+    return n;
+  };
+  Game.prototype.floorRows = function () {
+    var n = 0;
+    for (var r = ROWS - 1; r >= 0 && (this.grid[r][0] & 15) === BEDROCK; r--) n++;
+    return n;
+  };
   Game.prototype.topOut = function (kind) {
     this.over = true;
     this.cur = null;

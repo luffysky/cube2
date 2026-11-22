@@ -301,5 +301,23 @@ eq(SHAPES.I[3].slice().sort(), [[1, 0], [1, 1], [1, 2], [1, 3]], 'I left state')
   ok(g.fits(g.cur.type, g.cur.rot, g.cur.x, g.cur.y), 'piece still fits after the chisel');
 }
 
+// --- 大逃殺: a floor row rises from below and is never cleared
+{
+  const g = mk(null, ['I', 'I', 'I']);
+  ok(g.raiseFloor(1) === 1 && g.floorRows() === 1, 'one floor row rises');
+  ok(Array.from(g.grid[ROWS - 1]).every(v => v === 13), 'the bottom row is all floor');
+  // lay an I flat on top of it: a full row of floor is not a cleared line
+  g.hardDrop();
+  ok(g.floorRows() === 1 && lastLock(g).lines === 0, 'the floor itself never counts as a full line');
+  g.raiseFloor(2);
+  ok(g.floorRows() === 3 && !g.over, 'more rows lift the wall up');
+  const h = mk(null, ['O']);
+  for (let r = 0; r < ROWS; r++) h.grid[r][0] = r >= 1 ? 1 : 0;
+  h.grid[0][0] = 1;
+  h.raiseFloor(1);
+  ok(h.over, 'a wall pushed past the top is a knockout');
+  ok(h.raiseFloor(1) === 0, 'and nothing rises on a wall that is down');
+}
+
 console.log('engine tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

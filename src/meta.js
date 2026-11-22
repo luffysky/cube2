@@ -1046,6 +1046,10 @@
   // every time your own wall goes down knocks off 20. A tower at 0 ends the match; at time-up the taller tower wins.
   Meta.TOWER = { hp: 100, perLine: 2, perDown: 20 };
   Meta.towerHp = function (foeSent, ownDowns) { return Math.max(0, Meta.TOWER.hp - Meta.TOWER.perLine * Math.max(0, foeSent | 0) - Meta.TOWER.perDown * Math.max(0, ownDowns | 0)); };
+  // 大逃殺 (battle royale), rooms of three or more: one knockout and you are out; every 30 seconds a solid floor row
+  // rises under every wall (at most 12); the last one standing wins. Someone who is out plays on as a ghost and may
+  // send one line at a time, once every 8 seconds, to whoever they pick.
+  Meta.ROYALE = { every: 30000, maxFloor: 12, ghostEvery: 8000 };
   Meta.KO_WINDOW = 15000;
   Meta.koCredit = function (hits, now) {
     var recent = [], i, by = -1, as = [];
@@ -1066,6 +1070,7 @@
       // which online room it was played in and how many seats it had, so the reports of one match can be put together
       place: mode === 'net' ? int(m.place, 0, 8) : 0,
       tower: (mode === 'net' || mode === 'ai') && m.tower === true,
+      royale: mode === 'net' && m.royale === true,
       room: mode === 'net' && typeof m.room === 'string' && /^[A-Z0-9]{5}$/.test(m.room) ? m.room : '', seats: mode === 'net' ? int(m.seats, 2, 8) : 1,
       ko: sprint ? 0 : int(m.ko, 0, 60), koOpp: sprint ? 0 : int(m.koOpp, 0, 60), itemsUsed: sprint ? 0 : int(m.itemsUsed, 0, 60),
       // assists, and (rooms of three or more) every knockout of a foe in the room whoever made it

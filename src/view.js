@@ -10,7 +10,7 @@
     dpr: Math.min(window.devicePixelRatio || 1, 3)
   };
   // Tile glazes by piece id: I ivory, O pink, T gold, S sky, Z jade, J coral, L lilac, 8 = cement.
-  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B', '#EEF5FB', '#BFE6F7', '#A5CFE3', '#FF6A2B'];   // 9 snow, 10 ice, 11 cracked ice, 12 lava (weather mode only)
+  var TILE = [null, '#F1EADB', '#FF9DB5', '#F5B82E', '#5DB7F5', '#37C29A', '#F0704F', '#B49CFF', '#8C939B', '#EEF5FB', '#BFE6F7', '#A5CFE3', '#FF6A2B', '#3D3548'];   // 13 bedrock (大逃殺)   // 9 snow, 10 ice, 11 cracked ice, 12 lava (weather mode only)
   var theme = {};
 
   function hex(c) {
@@ -468,6 +468,15 @@
     };
   });
 
+  // 大逃殺's rising floor: dark stone with hatching, so it reads as something that never clears
+  function bedrockTile(x, px, col) {
+    x.fillStyle = col; x.fillRect(0, 0, px, px);
+    x.strokeStyle = 'rgba(255,255,255,0.14)'; x.lineWidth = Math.max(1, px * 0.06);
+    x.beginPath();
+    for (var k = -px; k < px; k += px / 3) { x.moveTo(k, px); x.lineTo(k + px, 0); }
+    x.stroke();
+    x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = Math.max(1, px * 0.05); x.strokeRect(0.5, 0.5, px - 1, px - 1);
+  }
   function makeTile(px, id, style) {
     var c = document.createElement('canvas');
     c.width = c.height = px;
@@ -481,6 +490,7 @@
     if (id === 9) { snowTile(x, px); return c; }
     if (id === 10 || id === 11) { iceTile(x, px, id === 11); return c; }
     if (id === 12) { lavaTile(x, px); return c; }
+    if (id === 13) { bedrockTile(x, px, col); return c; }
     if (id === 8 && style !== 'neon' && style !== 'pixel') { cementTile(x, px, col); return c; }
     (TILE_DRAW[style] || TILE_DRAW.glaze)(x, px, col, id);
     return c;
@@ -851,7 +861,7 @@
     var key = style + '|' + px;
     if (!spriteCache[key]) {
       var t = [null];
-      for (var i = 1; i <= 12; i++) t.push(makeTile(px, i, style));
+      for (var i = 1; i <= 13; i++) t.push(makeTile(px, i, style));
       spriteCache[key] = t;
     }
     return spriteCache[key];

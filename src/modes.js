@@ -108,6 +108,16 @@
     'net.m.only2': ['挑戰大自然、競速和守塔戰只限兩人，這房間會用普通對戰。', 'Nature, the race and the tower battle are for two players; this room plays an ordinary battle.', '大自然、レース、タワーバトルは二人用。この部屋は通常バトルになります。', '대자연, 레이스, 타워 배틀은 2인 전용이라 이 방은 일반 대전으로 해요.'],
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
     'net.m.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
+    'net.m.royale': ['大逃殺', 'Battle royale', 'バトルロイヤル', '배틀 로얄'],
+    'net.m.royaleP': ['被擊倒一次就出局，最後留下的人贏。每 30 秒所有人底下升起一排消不掉的地板（最多 12 排）。出局後變幽靈，每 8 秒可以送 1 行攻擊給你選的人，幫忙打倒對手也算助攻。沒有組隊，三人以上才能選。', 'One knockout and you are out; the last one standing wins. Every 30 seconds a floor row that never clears rises under everyone (up to 12). Once out you are a ghost and may send one line every 8 seconds at whoever you pick; helping knock someone out counts as an assist. No teams; three players or more.', '一度KOされたら脱落、最後まで残った人の勝ち。30秒ごとに全員の下から消せない床が1段上がる（最大12段）。脱落後はゴーストとして8秒ごとに1ラインを好きな相手に送れ、撃破に貢献すればアシスト。チームなし、3人以上。', '한 번 KO되면 탈락, 마지막까지 남은 사람이 승리. 30초마다 모두의 아래에서 지울 수 없는 바닥이 한 줄 올라와요(최대 12줄). 탈락하면 유령이 되어 8초마다 1줄을 원하는 상대에게 보낼 수 있고, 처치에 도움이 되면 어시스트. 팀 없음, 3명 이상.'],
+    'net.m.only3': ['大逃殺要三個人以上，這房間會用普通對戰。', 'Battle royale needs three players or more; this room plays an ordinary battle.', 'バトルロイヤルは3人以上。この部屋は通常バトルになります。', '배틀 로얄은 3명 이상이라 이 방은 일반 대전으로 해요.'],
+    'ry.on': ['大逃殺：被擊倒一次就出局，地板每 30 秒升一排', 'Battle royale: one knockout and you are out; the floor rises every 30 seconds', 'バトルロイヤル：一度KOで脱落、30秒ごとに床が上昇', '배틀 로얄: 한 번 KO면 탈락, 30초마다 바닥 상승'],
+    'ry.out': ['你出局了，現在是幽靈：每 8 秒可以送 1 行給你選的人', 'You are out and now a ghost: send one line every 8 seconds at whoever you pick', '脱落しました。ゴーストとして8秒ごとに1ラインを送れます', '탈락했어요. 유령이 되어 8초마다 1줄을 보낼 수 있어요'],
+    'ry.floor': ['地板升起來了（{0} 排）', 'The floor rose ({0} rows)', '床が上がった（{0}段）', '바닥이 올라왔어요({0}줄)'],
+    'ry.outTag': ['出局', 'Out', '脱落', '탈락'],
+    'ry.inTag': ['還在', 'In', '生存', '생존'],
+    'ry.ghost': ['👻 送 1 行', '👻 Send 1 line', '👻 1ライン送る', '👻 1줄 보내기'],
+    'ry.ghostWait': ['👻 {0} 秒後可再送', '👻 again in {0}s', '👻 あと{0}秒', '👻 {0}초 후'],
     'net.m.towerP': ['雙方各有一座 100 點的塔。對手每送你 1 行攻擊扣 2 點，你被擊倒一次扣 20 點；塔先倒的人輸，時間到比誰的塔高。只限兩人房。', 'Each side has a tower of 100. Every line the other side sends you takes 2, every time you are knocked out takes 20; whoever\'s tower falls first loses, and at time-up the taller tower wins. Two players only.', 'お互いに100のタワー。相手から1ライン受けるごとに2、自分がKOされるごとに20減る。先にタワーが倒れた方の負け、時間切れなら高い方の勝ち。二人部屋のみ。', '서로 100점짜리 타워가 있어요. 상대가 보낸 공격 1줄마다 2, 내가 KO당할 때마다 20이 깎여요. 먼저 타워가 무너지면 패배, 시간이 끝나면 높은 쪽이 이겨요. 2인 방 전용.'],
     'tw.on': ['守塔戰：對手送的每行攻擊扣你的塔 {0} 點，被擊倒扣 {1} 點', 'Tower battle: each line sent at you takes {0}, each knockout takes {1}', 'タワーバトル：受けた攻撃1ラインで{0}、KOで{1}減少', '타워 배틀: 받은 공격 1줄마다 {0}, KO마다 {1} 감소'],
     'tw.hp': ['塔', 'Tower', 'タワー', '타워'],
@@ -338,13 +348,13 @@
   // what a player plays on, as a small tag beside the name
   function devTag(d) { return d ? ' <small class="devtag">' + esc(t('dev.' + d)) + '</small>' : ''; }
   App.devTag = devTag;
-  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race' || m === 'tower') && n > 2 ? 'battle' : m; }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race' || m === 'tower') && n > 2 ? 'battle' : m === 'royale' && n < 3 ? 'battle' : m; }
   function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv', 'race', 'tower'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + ((k === 'wx' || k === 'race' || k === 'tower') && n > 2 ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
-    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    ['battle', 'wx', 'lv', 'race', 'tower', 'royale'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : cur === 'royale' && n < 3 ? 'net.m.only3' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
   App.sheets.online = function () {

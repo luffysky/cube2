@@ -1132,3 +1132,21 @@
 - 真人排位不會變成守塔戰（只有普通 2 分鐘、沒道具的對戰才算真人排位）。
 - 測試：meta 208 項（塔的算法、哪些模式能開）；新的瀏覽器測試 `test/tower.js` 13 項（對電腦：開關、100／100、被送 10 行剩 80、擊倒電腦它剩 80、它的塔 0 就結束並獲勝、結算顯示塔；兩人房：選模式、對方看到、兩邊開始、送 50 行房主的塔倒，兩邊結果正確）。房間模式從 4 種變 5 種，`test/wxnet.js` 跟著改，24 項全過；`test/quick.js` 13 項全過。
 - 檔案：`src/meta.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/meta.test.js`、`test/tower.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
+- 補記：上一條的 commit 為 [`c663d01`](https://github.com/luffysky/cube2/commit/c663d01)。
+
+## 2026-11-23 07:00（Asia/Taipei）｜新模式：大逃殺
+
+- 專案：cube2｜執行者：Claude
+- 規則（`Meta.ROYALE`）：朋友房間 3–8 人，沒有組隊。
+  - 被擊倒一次就出局，不會復活。
+  - 每 30 秒，每個人底下升起一排消不掉的地板，最多 12 排；牆被推出頂端也算被擊倒。
+  - 剩一個人（或沒人）還在時比賽結束。名次：還在的人第一，接著是撐比較久的，中途離開的人最後。
+- 幽靈：出局後名牌下方出現「👻 送 1 行」，每 8 秒能送 1 行攻擊給自己選的人。被送的人如果在 15 秒內被擊倒，幽靈可以拿到助攻或擊倒（用前一項的判定）。
+- 引擎：新的格子種類 13「地板」（深色石頭加斜紋）。整排都是地板不算消行；`raiseFloor` 會把整面牆往上推，推過頂端就算被擊倒；`floorRows` 回傳目前幾排。連線鏡像也能正確顯示地板。
+- 房間：新增模式「大逃殺」，少於 3 人時按鈕變灰並說明原因。選了大逃殺就不分隊。大逃殺沒有重播。
+- 對戰紀錄的標籤顯示「大逃殺」。
+- 測試：
+  - 引擎 89 項，含地板 6 項：會升起、不算消行、推過頂端算擊倒。
+  - 新的三人房瀏覽器測試 `test/royale.js` 16 項：兩人時選不了、三人時可選；地板升起；C 出局後不會復活；其他人看到 C 標成「出局」；幽靈送的 1 行送到 C 選的人、按鈕進入 8 秒冷卻；B 出局時 A 在三個畫面上都是贏家；名次是 A、B、C。
+  - 房間模式變成 6 種，`test/wxnet.js` 跟著改，24 項全過；`test/multi.js` 38 項全過。
+- 檔案：`src/engine.js`、`src/view.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/engine.test.js`、`test/meta.test.js`、`test/royale.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
