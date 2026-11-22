@@ -1290,7 +1290,12 @@
       if (p && p.catch) p.catch(fail);
     } catch (e) { fail(); }
   };
+  // Called on every tap, click and key. Makes the audio context the first time, makes it again if the browser closed
+  // it, and starts it again whenever it is not running: 'suspended' (the tab was hidden, or no tap yet) and also
+  // Safari's 'interrupted' (a call, Siri, another app's audio, headphones coming out), which used to stay silent for
+  // good because only 'suspended' was looked at.
   Sound.prototype.wake = function () {
+    if (this.ac && this.ac.state === 'closed') { this.ac = null; this.buf = {}; this.decoding = false; this.msrc = null; this.mgain = null; this.mname = ''; this.mload = ''; this.mcache = {}; }
     if (!this.ac) {
       try {
         var AC = window.AudioContext || window.webkitAudioContext;
@@ -1304,14 +1309,12 @@
         var d = this.nb.getChannelData(0);
         for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
         this.vol();
+        var me = this, ac0 = this.ac;
+        // when the browser stops it by itself while the page is in view, try at once (it may need the next tap)
+        ac0.onstatechange = function () { if (me.ac === ac0 && ac0.state !== 'running' && ac0.state !== 'closed' && !document.hidden) me.resume(); };
       } catch (e) { this.ac = null; return; }
     }
-    if (this.ac.state === 'suspended' && !document.hidden) {
-      try {
-        var p = this.ac.resume();
-        if (p && p.catch) p.catch(function () { /* stays silent until the next tap */ });
-      } catch (e) { /* stays silent */ }
-    }
+    if (this.ac.state !== 'running' && !document.hidden) this.resume();
     if (!this.decoding && ZZ.SFX) {
       this.decoding = true;
       var self = this;
@@ -1321,6 +1324,13 @@
     }
     if (this.mwant && this.mname !== this.mwant) this.music(this.mwant);
   };
+  Sound.prototype.resume = function () {
+    try {
+      var p = this.ac.resume();
+      if (p && p.catch) p.catch(function () { /* stays silent until the next tap */ });
+    } catch (e) { /* stays silent */ }
+  };
+  Sound.prototype.running = function () { return !!(this.ac && this.ac.state === 'running'); };
   Sound.prototype.vol = function () {
     var c = this.cfg();
     if (this.out) this.out.gain.value = c.vol / 100 * 0.9;
@@ -1330,8 +1340,11 @@
   };
   Sound.prototype.setDuck = function (v) { this.duck = v; this.vol(); };
   Sound.prototype.hush = function (hidden) {
-    if (!this.ac) return;
-    try { if (hidden) this.ac.suspend(); else this.ac.resume(); } catch (e) { /* next tap wakes it */ }
+    if (!this.ac || this.ac.state === 'closed') return;
+    if (hidden) { try { this.ac.suspend(); } catch (e) { /* fine */ } return; }
+    this.resume();
+    // the music may have been dropped while away (a closed context, a track that ended): ask for it again
+    if (this.mwant && this.mname !== this.mwant) this.music(this.mwant);
   };
 
   Sound.prototype.tone = function (f, dur, type, vol, f2, at) {

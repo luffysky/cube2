@@ -1803,7 +1803,12 @@
     }
     if (window.MutationObserver) new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     window.addEventListener('resize', function () { if (screen === 'play') layout(); else heroLayout(); });
-    document.addEventListener('pointerdown', function () { sfx.wake(); }, { passive: true });
+    // Browsers only let sound start from a real user action. On touch screens that is the end of a tap (pointerup,
+    // touchend, click), not pointerdown, so waking on pointerdown alone could leave a phone silent until some button
+    // that wakes on click was pressed. Wake on all of them.
+    ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { sfx.wake(); }, { passive: true, capture: true }); });
+    window.addEventListener('pageshow', function () { if (!document.hidden) sfx.hush(false); });
+    window.addEventListener('focus', function () { if (!document.hidden) sfx.hush(false); });
     // Item marks and labels are drawn with the page fonts; redraw them once the web fonts have arrived.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () { env.font = ''; View.clearItemSprites(); V.me.itiles = null; if (S) layout(); }).catch(function () { /* fallback font stays */ });

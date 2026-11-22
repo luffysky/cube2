@@ -921,3 +921,23 @@
 - **cube1 現況**（Issue #18 的留言）：PR #17 到 `898a8b0`，**沒有部署網址、也沒合併**。staging admin 的 issuer 和 JWKS、Identity 的端點、測試帳號都還沒有。所以 Preview 的管理信任這次不設，27 項維持 BLOCKED。
 - **`tools/joint-admin-check.js` 加 `SEED=1`**：在 staging 建一個合成測試玩家，再開一次免費寶箱，讓 A1 的 `players/{id}` 和 `draws` 有資料可讀。只允許 staging 或本機，玩家金鑰不印出。在本機演練過，A1 七支全部 200。
 - 檔案：`tools/joint-admin-check.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`2d179b9`](https://github.com/luffysky/cube2/commit/2d179b9)。
+
+## 2026-11-22 22:45（Asia/Taipei）｜修音效、音樂有時沒聲音
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「幫我看一下轉磚 有時候音效音樂會有斷斷續續問題 有時有聲音有時沒有」
+- **找到的原因**：
+  1. **iPhone、iPad 上的 Safari**：遇到來電、Siri、其他 App 播放聲音、拔掉耳機時，音訊會進入 `interrupted` 狀態。程式原本只在 `suspended` 時重新啟動，所以一進 `interrupted` 就**一直沒聲音**，要重新整理頁面才會恢復。
+  2. **瀏覽器把音訊整個關掉**（`closed`，記憶體吃緊或在背景太久時會發生）：程式不會重新建一個，從此都沒聲音。
+  3. **手機上的觸控**：瀏覽器只接受「手指離開螢幕」那一下（pointerup、touchend、click）來開啟聲音，按下去那一下（pointerdown）不算。全頁原本只在 pointerdown 時喚醒，所以有時要按到特定按鈕才有聲音。
+  4. 切回頁面時，如果音樂在離開期間停掉了，不會自己重新播放。
+- **修正（`src/view.js`、`src/ui.js`）**：
+  - 只要不是「播放中」就重新啟動，不管是 `suspended` 還是 `interrupted`。
+  - 被瀏覽器關掉時，下一次點擊會重建音訊，並重新解碼音效。
+  - 音訊狀態一變就馬上試著恢復。
+  - 全頁的 pointerdown、pointerup、touchend、click、按鍵都會喚醒聲音；切回頁面（pageshow、focus、visibilitychange）時也會恢復，並把音樂接回來。
+- 另外要知道：iPhone 開了靜音鍵時，網頁音效本來就會被系統靜音，這是 iOS 的規則，不是故障。這次沒有改成無視靜音鍵。
+- 新增瀏覽器測試 `test/sound.js`（11 項）：第一次點擊就有聲音；被瀏覽器暫停後會自己恢復；觸控點擊會恢復；被關掉後點擊會重建、音效重新解碼；切走再切回有聲音；按鍵會恢復。
+- 檔案：`src/view.js`、`src/ui.js`、`test/sound.js`（新）、`test/browser-run.js`。｜資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過；瀏覽器 `sound` 11、`music` 10、`flow` 60、`pwa` 52、`onehand` 18。
