@@ -1036,3 +1036,12 @@
 - **還沒有的**：KDA 的 A（助攻）。現在連線時只知道「對手倒了幾次」，不知道是誰送的最後一擊，也不知道誰有幫忙；要加的話，連線訊息要帶上每次攻擊打向誰，屬於下一步。另外，多人房的 K 目前是「所有對手被擊倒的總次數」，不是只算自己打倒的。
 - 測試：`test/api.test.js` 加 15 項（權限、只看自己、模式篩選、20 筆分頁與頁碼夾限、勝敗加總、房間對手與名次），410 項全過；新的瀏覽器測試 `test/history.js` 18 項全過（真的打三場、列表、日期時間、展開細項、篩選、三頁分頁、個人資料入口）。
 - 檔案：`server/core.js`、`server/app.js`、`server/rules.js`、`src/meta.js`、`src/ui.js`、`src/cloud.js`、`src/shop.js`、`src/style.css`、`src/index.template.html`、`games/drawer-icons.js`、`test/api.test.js`、`test/meta.test.js`、`test/history.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構（只讀既有的 `zz.matches`）。｜刪除：無。
+- 補記：上一條的 commit 為 [`eb95050`](https://github.com/luffysky/cube2/commit/eb95050)，CI run 45057008865 兩個 job 都成功。
+
+## 2026-11-23 03:15（Asia/Taipei）｜待辦整理：助攻、四種對線模式、RPG 第一章
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：「這些都做」（助攻、新對線模式、RPG 冒險第一章），「現在先寫成一份待辦 commit 所有還沒做的項目」。
+- Owner 告知：cube1 已把 Actions #45051087698 補到 Issue #18，A0–A14 共 15 項 PASS，證據來源註明清楚（A0–A6、A10–A13 由 cube1 Actions 驗證；A7–A9、A14 由 Claude 實測）。
+- `docs/TODO.md`：新增「接下來要做」三大項的細項；管理 API 改為「staging 已通過、正式站待開」；帳號綁定拆成 staging（B1–B13）與正式兩步；補上 `accept-jwks` 分支待刪。
+- 檔案：`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。

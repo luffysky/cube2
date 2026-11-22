@@ -1,6 +1,6 @@
 # 轉磚 待辦清單
 
-每做完一項就打勾，並寫上 commit。最後更新：2026-11-23 02:40（Asia/Taipei）
+每做完一項就打勾，並寫上 commit。最後更新：2026-11-23 03:15（Asia/Taipei）
 
 ## Claude 這一輪在做
 
@@ -63,12 +63,15 @@
 - [x] Owner：Vercel 部署保護的 bypass 密碼，已交給 cube1
 - [ ] Owner：拿到 cube1 的 staging Identity 值後，設在 Preview（staging 分支）（管理信任已設；還缺 `IDENTITY_AUTHORIZE_URL`、`IDENTITY_STAGING_CLIENT_SECRET`）
 - [x] cube1 提供受控 staging signer → 跑有效、錯 audience／issuer／scope／sub、換鑰、缺 key 的實測（A0–A14 全 PASS，2026-11-23）
-- [ ] 機器簽發端與 `admin-jwks.json` 上線 → Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS`
-- [ ] Identity `/oauth/authorize`、`/oauth/token` 上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開 `IDENTITY_LINK_ENABLED`
+- [x] 機器簽發端與 `admin-jwks.json` 在 staging 上線，A0–A14 全 PASS（證據：cube1 Actions 45051087698、cube1 Issue #18）
+- [ ] 正式站開管理 API：cube1 正式 issuer `identity.snowrealm.pet` 的 admin JWKS 與 signer 上線 → Owner 核准後在 Vercel Production 設 `BRICKDUEL_ADMIN_SUBJECTS`（現在正式站 `admin: false`）
+- [ ] 帳號綁定 staging（B1–B13）：cube1 給 `IDENTITY_AUTHORIZE_URL`（我設）＋ Owner 貼 `IDENTITY_STAGING_CLIENT_SECRET` ＋ 兩個測試帳號 ＋ B4 harness → 跑 B1–B13
+- [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`
+- [ ] Owner 同意後刪 `accept-jwks` 分支（A7–A9 驗收用的暫時 JWKS，已不被信任）
 
 - [ ] SnowRealm Identity 上線並通過兩帳號驗收 → 才打開「註冊／登入」綁定
 - [ ] Suno 音樂庫 → Claude 挑歌換背景音樂
-- [ ] 後台管理 API（規格已寫，雙方確認阻塞項目後才實作）
+- [x] 後台管理 API 七支唯讀端點（已實作，staging 驗收通過；正式站開啟見上）
 
 ## 收錢前必做
 
@@ -91,4 +94,32 @@
 ## 新需求（2026-11-23）
 
 - [x] 各模式歷史對戰紀錄：K／D、攻擊、行數、T 轉等細項，日期時間，全部紀錄，一頁 20 筆分頁（助攻還沒有資料來源，見 DEVLOG）
-- [ ] 新對線模式與 RPG 化：提案給 Owner
+- [x] 新對線模式與 RPG 化：提案給 Owner（Owner 2026-11-23：全部都做）
+
+## 接下來要做（Owner 2026-11-23 指示：全部都做）
+
+### 1. 助攻與個人擊倒（改連線）
+- [ ] 連線訊息帶上每次攻擊的目標與行數（舊版頁面相容：沒帶目標的照舊算）
+- [ ] 被擊倒時判定最後一擊（K）與助攻（A：被擊倒前 N 秒內有送攻擊的其他人）
+- [ ] 多人房 K 改成只算自己打倒的，紀錄另存房間總擊倒
+- [ ] 真人排位核對規則跟著改（雙方各自回報的 K／D 要對得上）
+- [ ] 對戰紀錄顯示 K／D／A 與 KDA；舊場次助攻顯示「—」
+- [ ] 測試：單元（判定）、雙瀏覽器連線、真人排位核對
+
+### 2. 新對線模式（四種都做，一次一種）
+- [ ] 守塔戰：雙方各一座塔，消行攻擊塔，先打倒對方塔的人贏（先做，K／D 直接用得上）
+- [ ] 大逃殺：8 人房、場地逐步縮小、最後存活者贏；被擊倒成為幽靈，可繼續替隊友送攻擊（算助攻）
+- [ ] 2v2 接力：同隊共用一個場地、輪流放方塊
+- [ ] 搶地盤：中央共用區，消行把區塊染成自己的顏色，時間到比面積
+- [ ] 每種模式：開房間可選、隨機配對可選、對戰紀錄分類、說明畫面、四語系
+
+### 3. RPG 冒險第一章（單人，不影響排位與連線公平）
+- [ ] 職業三種：坦（少收垃圾行）、刺客（T 轉傷害加倍）、法師（道具冷卻短）
+- [ ] 地圖：一章 10 關，每關一隻怪（血量＝要消的行數，會反擊送垃圾行），第 10 關 Boss
+- [ ] 裝備：把現有道具做成裝備欄位，加強化
+- [ ] 進度存雲端（伺服器核對，不能改本機數字刷獎勵）
+- [ ] 獎勵與經濟平衡（不讓冒險獎勵壓過排位）
+
+### 其他還沒做的
+- [ ] 關卡模式收尾、第二款遊戲「磚蛇」完整版（11-19 日誌提過一直被往後推）
+- [ ] 推廣歌曲合作功能：等 Owner 回覆規格書最後一頁的決策項目才開始第一階段
