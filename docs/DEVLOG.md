@@ -880,3 +880,28 @@
 - 密碼沒有經過 Claude，也沒有寫進 repo。其他預覽一樣保留 Vercel Authentication；管理 API 照樣要驗 staging 的 admin token。
 - `docs/JOINT_ACCEPTANCE.md` 的實測表更新：cube2 端已就緒，A、B 兩組仍是 BLOCKED，等 cube1 的 staging signer 和 Identity。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 補記：上一條的 commit 為 [`b61d9a8`](https://github.com/luffysky/cube2/commit/b61d9a8)。它的 CI run 45020952901：Chrome 那個 job 成功，**`rules, server and sync` 失敗**（`test/bff.test.js` 出現 TypeError），原因和修正見下一條。
+
+## 2026-11-22 20:45（Asia/Taipei）｜修 BFF 測試的偶發失敗；staging 資料庫防呆；A 組驗收工具
+
+- 專案：cube2｜執行者：Claude
+- 關聯 Owner 指令：轉交的「繼續 cube2／BRICKDUEL Staging 聯合驗收準備」（先修 CI、確認 staging 管理 API 的啟用條件與資料庫隔離、27 項照實記錄）
+- **CI 失敗的原因**：
+  - `test/bff.test.js` 每個請求的來源 IP 是在 `203.0.113.1–250` 裡**隨機**挑的。
+  - 「限流」那段測試會用 `203.0.113.99` 連續開始 12 次，把這個位址 10 分鐘內的額度用完。
+  - 之後的測試（換 host、staging 那一輪）只要隨機剛好挑到 99，開始登入就會回 429。`round()` 拿不到回呼的回應，接著讀 `headers` 就當掉。
+  - 本機重現方式：用 `b61d9a8` 的測試檔，把 `Math.random` 固定成會產生 99 的值，就出現同一個 `TypeError: Cannot read properties of undefined (reading 'headers')`。
+- **修正**：
+  - 每個請求改用依序產生、不會重複的位址（`10.x.y.z`），限流測試另外用一個專用位址 `192.0.2.1`。這樣限流只會在想測它的地方被碰到。
+  - 開始登入如果失敗，`round()` 會記成一個失敗的測試項目，附上狀態碼，不再讓後面當掉。
+  - 沒有跳過任何測試、沒有吞掉錯誤，也沒有放寬伺服器的檢查。修正後本機連跑 10 次，99 項全過。
+- **staging 資料庫防呆（`server/db.js`）**：
+  - 如果 `STAGING_DATABASE_URL` 跟正式的資料庫網址相同，或是指向同一個 Neon endpoint（含經過 pooler 的寫法），staging 就當作沒有資料庫，不會連到正式庫。
+  - `/api/health` 新增三個欄位：`dbSource`（`main`／`staging`／`staging-missing`／`staging-same-as-main`）、`admin`（管理 API 有沒有啟用）、`build`（部署的 commit）。都不含網址或名稱。
+- **A 組驗收工具**：`tools/joint-admin-check.js`。由持有 staging signer 的 cube1 執行，私鑰不離開他們那邊。能自動跑的 A1–A6、A10–A13 都會跑，A7–A9、A14 列出要手動做的步驟，輸出 JSON 報告，不含任何 token 或密碼。在本機 dev-server 用測試金鑰演練過一次，結果都符合預期；這只是演練，不是 staging 實測。
+- **staging 管理 API 的啟用條件**寫進 `docs/JOINT_ACCEPTANCE.md`：Preview（`staging` 分支）要設 `BRICKDUEL_ADMIN_TEST_TRUST=1`、`BRICKDUEL_ADMIN_ISSUER`、`BRICKDUEL_ADMIN_JWKS_URL`（後兩個由 cube1 提供），以及 `BRICKDUEL_ADMIN_SUBJECTS=svc:snowrealm-games-admin`。這次沒有設：cube1 還沒有 staging signer，先設只會讓它去抓不存在的 JWKS。
+- **27 項聯合驗收**：全部照實記成 BLOCKED，每一項寫明在等 cube1 的什麼（cube1 main `9e9bb50` 的交辦文件也說 staging signer、Identity、測試帳號都還沒部署）。cube2 這邊能確認的另外列一張表。
+- 正式站的 `IDENTITY_LINK_ENABLED`、管理 API 白名單都沒動；沒有刪除；日誌不記任何秘密。
+- 檔案：`test/bff.test.js`、`server/db.js`、`server/app.js`、`test/staging.test.js`、`tools/joint-admin-check.js`（新）、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：未異動。｜刪除：無。
+- 測試：`node test/run.js` 全過（bff 99、staging 10、admin 105、api 394）。
+- 部署：推到 main 和 `staging`，CI 和部署結果見下一條紀錄。

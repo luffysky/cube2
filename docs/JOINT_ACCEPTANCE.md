@@ -86,11 +86,65 @@ cube1 提供：
 - 兩邊都通過以後，才由 Owner 決定要不要打開 production 的 `BRICKDUEL_ADMIN_SUBJECTS` 和 `IDENTITY_LINK_ENABLED`。
 - 驗收用的測試帳號和資料，事後要不要刪，由 Owner 另外決定。
 
+## Staging 管理 API 的啟用條件（cube2 Preview，只限 `staging` 分支）
+
+| 變數 | 值 | 誰提供 |
+|---|---|---|
+| `BRICKDUEL_ADMIN_TEST_TRUST` | `1`（只在 Preview 有效；production 一律無效） | Owner 設 |
+| `BRICKDUEL_ADMIN_ISSUER` | cube1 staging admin signer 的 issuer（不能是 `https://identity.snowrealm.pet`） | cube1 |
+| `BRICKDUEL_ADMIN_JWKS_URL` | cube1 staging 的 `/.well-known/admin-jwks.json`（https，只放公開 JWK） | cube1 |
+| `BRICKDUEL_ADMIN_SUBJECTS` | `svc:snowrealm-games-admin` | 固定 |
+| `aud`／`scope`（token 內） | `snowrealm:brickduel:admin`／`brickduel:admin:read` | 固定 |
+
+- 設了 `BRICKDUEL_ADMIN_TEST_TRUST=1`，staging 就只會用 `STAGING_DATABASE_URL`（見 `server/db.js`）。
+- 如果 `STAGING_DATABASE_URL` 不小心設成正式資料庫，或指向同一個 Neon endpoint，staging 會直接沒有資料庫，不會連過去。
+- `/api/health` 的 `dbSource` 會顯示 `staging`，沒接好時顯示 `staging-missing` 或 `staging-same-as-main`。另外 `admin` 顯示管理 API 有沒有啟用、`build` 顯示部署的 commit。
+- 目前這幾個值都還沒有，所以 staging 的 `/internal/admin/v1/*` 回 503 `disabled`，這是正確的。
+
+**A 組的執行工具**：`tools/joint-admin-check.js`。
+- 由持有 staging signer 的一方執行（cube1），私鑰不會離開他們那邊。
+- 能自動產生的情境都會自動跑：A1、A2、A3、A4、A5、A6、A10、A11、A12、A13。A7、A8、A9、A14 會列出要手動做的步驟。
+- 輸出 JSON 報告，裡面沒有 token、bypass 密碼或玩家資料。
+- 2026-11-22 已在本機 dev-server 演練：用測試金鑰跑一次，A1–A13 能自動化的全部照預期回應。這只是演練，**不是** staging 實測。
+
 ## 實測報告
 
-只記錄真的打過 staging 的結果。本機的模擬測試（CI）不寫在這裡。
+只記錄真的在 staging 雙端跑出來的結果。本機演練和 CI 都不算。cube2 SHA 指的是 staging 上部署的版本。
 
-| # | 結果 | 時間 | staging URL | cube2 SHA | HTTP／結果字 | 備註 |
-|---|---|---|---|---|---|---|
-| A1–A14 | BLOCKED | 2026-11-22 | https://brickduel-staging.snowrealm.pet | `f831e8b` | `/api/health` 200（`db: true`） | cube2 端已就緒：staging 有獨立 Neon 分支（只有結構）、Vercel 部署保護的 bypass 密碼已由 Owner 建立並交給 cube1。等 cube1 的 staging admin signer／JWKS |
-| B1–B13 | BLOCKED | 2026-11-22 | https://brickduel-staging.snowrealm.pet | `f831e8b` | `/api/health` 200（`link: false`） | DNS／TLS 已生效，staging 資料庫已接上。等 cube1 的 staging Identity、登記 callback 和 staging 的 client secret |
+| # | 結果 | 時間（UTC） | 證據 | 原因／下一步 |
+|---|---|---|---|---|
+| A1 | BLOCKED | 2026-11-22 | staging `/internal/admin/v1/overview` → 503 `disabled` | 等 cube1 的 staging admin signer、issuer、admin-jwks.json；拿到後 Owner 設進 Preview，cube1 執行 `tools/joint-admin-check.js` |
+| A2 | BLOCKED | 2026-11-22 | 同上 | 同上 |
+| A3 | BLOCKED | 2026-11-22 | 同上 | 同上 |
+| A4 | BLOCKED | 2026-11-22 | 同上 | 同上 |
+| A5 | BLOCKED | 2026-11-22 | 同上 | 同上 |
+| A6 | BLOCKED | 2026-11-22 | 同上 | 同上 |
+| A7 | BLOCKED | 2026-11-22 | — | 同上，另需 cube1 在 staging JWKS 並列兩把金鑰 |
+| A8 | BLOCKED | 2026-11-22 | — | 同 A7 |
+| A9 | BLOCKED | 2026-11-22 | — | 同上，另需 cube1 讓 staging JWKS 暫時無法存取 |
+| A10 | BLOCKED | 2026-11-22 | — | 同 A1 |
+| A11 | BLOCKED | 2026-11-22 | — | 同 A1 |
+| A12 | BLOCKED | 2026-11-22 | — | 同 A1 |
+| A13 | BLOCKED | 2026-11-22 | — | 同 A1（POST 要由 cube1 送；cube2 這邊的工具只能發 GET） |
+| A14 | BLOCKED | 2026-11-22 | — | A1–A13 跑完後，Owner 在 Neon staging 分支查 `zz.admin_log` |
+| B1 | BLOCKED | 2026-11-22 | staging `/api/health` → `link: false` | 等 cube1 的 staging Identity（issuer、JWKS、authorize、token、status、client secret），以及登記 callback |
+| B2 | BLOCKED | 2026-11-22 | 同上 | 同上，另需第二台裝置 |
+| B3 | BLOCKED | 2026-11-22 | 同上 | 同上，另需兩個測試帳號 |
+| B4 | BLOCKED | 2026-11-22 | 同上 | 同上，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
+| B5 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
+| B6 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
+| B7 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
+| B8 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
+| B9 | BLOCKED | 2026-11-22 | 同上 | 同 B1，另需 cube1 可以撤銷 token |
+| B10 | BLOCKED | 2026-11-22 | 同上 | 同 B1，另需 cube1 讓 status 端點暫時失效 |
+| B11 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
+| B12 | BLOCKED | 2026-11-22 | 同上 | 同 B1 |
+| B13 | BLOCKED | 2026-11-22 | 正式站排行榜與健康檢查正常，但這是正式站的旁證，不算 staging 的結果 | 同 B1 |
+
+**cube2 這邊已經實際確認的（不屬於 27 項）**：
+
+| 項目 | 結果 | 證據 |
+|---|---|---|
+| staging 網域 TLS、部署保護、bypass | 通 | cube1 用 bypass 打 staging `/api/health` 得到 200（cube1 回報） |
+| staging 用的是獨立資料庫 | 通 | staging `/api/health?deep=1`：`db: true`、`ready: true`；staging 排行榜是空的，正式站有玩家；部署這次 commit 後再用 `dbSource` 確認（見 DEVLOG） |
+| 管理 API 在 staging 沒設定前回 503 | 通 | staging `/internal/admin/v1/overview` → 503 `{"error":"disabled"}` |

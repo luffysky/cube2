@@ -18,10 +18,27 @@ function staging(env) {
   env = env || process.env;
   return env.VERCEL_ENV !== 'production' && (env.IDENTITY_STAGING === '1' || env.BRICKDUEL_ADMIN_TEST_TRUST === '1');
 }
+// Which database this is, for /api/health (no address, no name): 'main', 'staging', 'test' (swapped in by use()),
+// or, on staging, why there is none: 'staging-missing' (no STAGING_DATABASE_URL) or 'staging-same-as-main' (it
+// points at the same Neon endpoint as the main settings, so it is refused).
+let source = 'none';
+const hostOf = u => { try { return new URL(u).hostname.replace(/-pooler(?=\.)/, '').toLowerCase(); } catch (e) { return ''; } };
 function fromEnv() {
   const e = process.env;
-  const url = staging(e) ? (e.STAGING_DATABASE_URL || '') : (e.DATABASE_URL || e.DATABASE_POSTGRES_URL || e.POSTGRES_URL || e.DATABASE_URL_UNPOOLED || '');
-  if (!url) return null;
+  const mains = [e.DATABASE_URL, e.DATABASE_POSTGRES_URL, e.POSTGRES_URL, e.DATABASE_URL_UNPOOLED].filter(Boolean);
+  let url;
+  if (staging(e)) {
+    url = e.STAGING_DATABASE_URL || '';
+    if (!url) { source = 'staging-missing'; return null; }
+    // a staging setting that names the same endpoint as the main one is a mistake: no database rather than that one
+    const h = hostOf(url);
+    if (!h || mains.some(m => hostOf(m) === h) || mains.indexOf(url) >= 0) { source = 'staging-same-as-main'; return null; }
+    source = 'staging';
+  } else {
+    url = mains[0] || '';
+    if (!url) return null;
+    source = 'main';
+  }
   const { neon } = require('@neondatabase/serverless');
   const sql = neon(url);
   const opts = () => ({ fetchOptions: { signal: AbortSignal.timeout(TIMEOUT_MS) } });
@@ -36,7 +53,7 @@ function get() {
   if (!impl && !tried) { tried = true; impl = fromEnv(); }
   return impl;
 }
-function use(next) { impl = next; tried = true; }
+function use(next) { impl = next; tried = true; source = next ? 'test' : 'none'; }
 function configured() { return !!get(); }
 
 // ---------- tables ----------
@@ -307,4 +324,4 @@ async function run(fn) {
   }
 }
 
-module.exports = { get, use, configured, run, migrate, missing, SCHEMA, staging };
+module.exports = { get, use, configured, run, migrate, missing, SCHEMA, staging, source: () => { get(); return source; } };

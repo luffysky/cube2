@@ -69,12 +69,18 @@ const lastFetch = async (url, o) => {
 bff.setFetch(lastFetch);
 
 // ---------- requests ----------
+// every request comes from an address of its own (in order, never repeated), so the start limit, which counts per
+// address, is reached only where a test means to reach it. (They used to be random, and now and then one landed on the
+// address the limit test had used up, making a later start answer 429: CI run 45020952901.)
+let ipN = 0;
+const nextIp = () => { ipN++; return '10.' + ((ipN >> 16) & 255) + '.' + ((ipN >> 8) & 255) + '.' + (ipN & 255); };
+const LIMIT_IP = '192.0.2.1';      // used by the limit test only
 function call(name, o) {
   o = o || {};
   return new Promise(resolve => {
     const req = new Readable({ read() {} });
     req.method = o.method || 'POST'; req.url = o.url || '/api/' + name;
-    req.headers = Object.assign({ host: 'brickduel.snowrealm.pet', 'x-real-ip': '203.0.113.' + (o.ip || (1 + Math.floor(Math.random() * 250))) }, o.headers || {});
+    req.headers = Object.assign({ host: 'brickduel.snowrealm.pet', 'x-real-ip': o.ip || nextIp() }, o.headers || {});
     if (o.body !== undefined) { const t = JSON.stringify(o.body); req.headers['content-type'] = 'application/json'; req.headers['content-length'] = String(Buffer.byteLength(t)); req.push(t); }
     req.push(null);
     const res = { statusCode: 200, headers: {}, setHeader(k, v) { this.headers[k.toLowerCase()] = String(v); }, end(text) { let json = null; try { json = JSON.parse(text); } catch (e) { /* none */ } resolve({ status: this.statusCode, headers: this.headers, json, text }); } };
@@ -93,7 +99,8 @@ const where = r => r.headers.location;
 // a whole round: start, the portal, the callback; gives the cookie and the callback's answer
 async function round(intent, cred, sub, tweak) {
   const s = await startIt(intent, cred);
-  if (s.status !== 200) return { s };
+  // a start that did not work is a failure of its own, with its answer, not something to read past
+  if (s.status !== 200) { ok(false, 'start for a round (' + intent + ') answered ' + s.status, s.json); return { s, cb: { headers: { location: '(start failed: ' + s.status + ')' } } }; }
   const cookie = cookieFrom(s), p = portal(s.json.url, sub || U1);
   const q = tweak ? tweak(p) : 'code=' + p.code + '&state=' + p.state;
   return { s, cookie, p, cb: await back(q, cookie) };
@@ -256,7 +263,7 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
 
   // ---------- limits ----------
   let last = 0;
-  for (let i = 0; i < 12; i++) last = (await startIt('recover', null, { ip: 99 })).status;
+  for (let i = 0; i < 12; i++) last = (await startIt('recover', null, { ip: LIMIT_IP })).status;
   eq(last, 429, 'starting too often from one place: 429');
 
   // ---------- the host: start and callback only where the callback lives ----------

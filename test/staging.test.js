@@ -19,7 +19,17 @@ ok(db.staging() && !db.configured(), 'staging login without its own database: no
 db = fresh({ DATABASE_URL: PROD, VERCEL_ENV: 'preview', BRICKDUEL_ADMIN_TEST_TRUST: '1' });
 ok(db.staging() && !db.configured(), 'staging admin trust without its own database: no database at all');
 db = fresh({ DATABASE_URL: PROD, STAGING_DATABASE_URL: STG, VERCEL_ENV: 'preview', IDENTITY_STAGING: '1' });
-ok(db.staging() && db.configured(), 'with STAGING_DATABASE_URL it has a database (that one)');
+ok(db.staging() && db.configured() && db.source() === 'staging', 'with STAGING_DATABASE_URL it has a database (that one)');
+db = fresh({ DATABASE_URL: PROD, STAGING_DATABASE_URL: PROD, VERCEL_ENV: 'preview', IDENTITY_STAGING: '1' });
+ok(!db.configured() && db.source() === 'staging-same-as-main', 'STAGING_DATABASE_URL set to the production one by mistake: refused, no database');
+db = fresh({ DATABASE_URL: 'postgres://u:p@ep-cool-fog-123.ap-southeast-1.aws.neon.tech/neondb', STAGING_DATABASE_URL: 'postgres://u:p@ep-cool-fog-123-pooler.ap-southeast-1.aws.neon.tech/other', VERCEL_ENV: 'preview', IDENTITY_STAGING: '1' });
+ok(!db.configured() && db.source() === 'staging-same-as-main', 'the same Neon endpoint through the pooler counts as the same: refused');
+db = fresh({ DATABASE_URL: 'postgres://u:p@ep-cool-fog-123.ap-southeast-1.aws.neon.tech/neondb', STAGING_DATABASE_URL: 'postgres://u:p@ep-quiet-sun-456-pooler.ap-southeast-1.aws.neon.tech/neondb', VERCEL_ENV: 'preview', IDENTITY_STAGING: '1' });
+ok(db.configured() && db.source() === 'staging', 'another endpoint (another branch): fine');
+db = fresh({ DATABASE_URL: PROD, VERCEL_ENV: 'preview', IDENTITY_STAGING: '1' });
+ok(db.source() === 'staging-missing', 'staging without its own database says so');
+db = fresh({ DATABASE_URL: PROD });
+ok(db.source() === 'main', 'outside staging: main');
 for (const k of KEYS) delete process.env[k];
 console.log('staging tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

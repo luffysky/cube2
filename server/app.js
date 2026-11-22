@@ -76,7 +76,7 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), admin: admin.configured(), dbSource: db.source(), build: String(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null, region: process.env.VERCEL_REGION || '', now: clock() };
     if (url.searchParams.get('deep') && out.db) {
       // a look at the database itself: is it reachable, how long does one round trip take
       const t0 = Date.now();
