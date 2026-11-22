@@ -146,7 +146,7 @@ ok(M.cleanMatch({ mode: 'ai', result: 1, ms: 60000, tower: true }).tower === tru
   const cs = M.cleanMatch({ mode: 'sprint', result: 1, ms: 70000, assists: 3, koRoom: 4, stats: { lines: 40 } });
   ok(cs.assists === 0 && cs.koRoom === 0, 'a sprint has neither');
 }
-eq(c, { mode: 'rank', result: 1, level: 6, team: false, quick: false, pr: false, place: 0, tower: false, royale: false, room: '', seats: 1, ko: 60, koOpp: 0, itemsUsed: 60, assists: 0, koRoom: 0, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, tst: 0, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
+eq(c, { mode: 'rank', result: 1, level: 6, team: false, quick: false, pr: false, place: 0, tower: false, royale: false, relay: false, room: '', seats: 1, ko: 60, koOpp: 0, itemsUsed: 60, assists: 0, koRoom: 0, ms: 60000, time: 0, stats: { score: 185000, sent: 380, spins: 0, minis: 0, xspins: 2, tst: 0, quads: 63, maxCombo: 40, lines: 308, pieces: 370 } }, 'clean match clamps');
 eq(M.cleanMatch({ mode: 'hack', result: -1, stats: { score: 99999 } }).mode, 'ai', 'unknown mode becomes a plain match');
 eq(M.cleanMatch({ mode: 'ai', result: 1, stats: { score: 99999 } }).stats.score, 5000, 'no length given, so almost no score counts');
 eq(M.cleanMatch({ mode: 'sprint', result: -1, ms: 30000 }).result, 0, 'a sprint cannot be lost for points');

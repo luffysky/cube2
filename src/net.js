@@ -557,7 +557,7 @@
 
   // what a room plays: an ordinary battle, a weather battle (挑戰大自然, two players only) or a battle on a level's wall
   // (關卡地形). wx stays in the message so a page from before the mode picker still understands a weather room.
-  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower', 'royale'];
+  var ROOM_MODES = ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay'];
   Net.ROOM_MODES = ROOM_MODES;
   function readCfg(c) {
     var mode = ROOM_MODES.indexOf(c.mode) >= 0 ? c.mode : c.wx ? 'wx' : 'battle';
@@ -568,7 +568,7 @@
 
   // ---------- match ----------
   // multi: { roster: [seats], names: {seat: name}, teams: {seat: 0|1} | null } for a match of three or four
-  function startMatch(seed, minutes, items, multi, wx, lv, race, tower, royale) {
+  function startMatch(seed, minutes, items, multi, wx, lv, race, tower, royale, relay) {
     Net.state = 'playing';
     Net.wantAgain = Net.foeAgain = false; foeEnd = null; endWait = null; dirty = true; urgent = true; acc = 0;
     peerList().forEach(function (s) { var p = Net.peers[s]; p.again = false; p.end = null; p.heard = Date.now(); p.gone = false; });
@@ -579,7 +579,7 @@
     if (Net.matched && Net.pool === 'pr' && !multi && !wx && !lv && !race && !tower) { o.pr = true; o.items = false; }
     if (race && !multi) { o.race = 1; o.items = false; }
     if (tower && !multi && !race) { o.tower = 1; }
-    if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: royale ? null : multi.teams || null }; if (royale) o.royale = 1; }
+    if (multi) { o.items = false; o.multi = { me: Net.seat, roster: multi.roster, names: multi.names, teams: royale ? null : multi.teams || null }; if (royale) o.royale = 1; if (relay && o.multi.teams) o.relay = 1; }
     Net.multi = !!multi;
     App.begin('battle', o);
   }
@@ -591,15 +591,15 @@
     if (roster.length >= 3) {
       var names = {}, teams = null;
       roster.forEach(function (r) { names[r.seat] = r.name; });
-      if (Net.cfg.team && Net.teamOk(roster.length) && Net.modeOf() !== 'royale') { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
+      if ((Net.cfg.team || Net.modeOf() === 'relay') && Net.teamOk(roster.length) && Net.modeOf() !== 'royale') { teams = {}; roster.forEach(function (r, i) { teams[r.seat] = i % 2; }); }
       multi = { roster: roster.map(function (r) { return r.seat; }), names: names, teams: teams };
     }
     var mode = Net.modeOf();
     var wx = mode === 'wx' && !multi ? ((Math.random() * 4294967296) >>> 0 || 1) : 0;
     var lv = mode === 'lv' ? 1 + Math.floor(Math.random() * 1000) : 0;
-    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0, royale = mode === 'royale' && multi ? 1 : 0;
-    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower, royale: royale });
-    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower, royale);
+    var race = mode === 'race' && !multi ? 1 : 0, tower = mode === 'tower' && !multi ? 1 : 0, royale = mode === 'royale' && multi ? 1 : 0, relay = mode === 'relay' && multi && multi.teams ? 1 : 0;
+    send({ t: 'start', seed: seed, minutes: Net.cfg.minutes, items: multi ? false : Net.cfg.items, multi: multi, wx: wx, lv: lv, race: race, tower: tower, royale: royale, relay: relay });
+    startMatch(seed, Net.cfg.minutes, multi ? false : Net.cfg.items, multi, wx, lv, race, tower, royale, relay);
   };
   function everyoneAgain() { return peerList().every(function (s) { return Net.peers[s].again || Net.peers[s].gone; }) && peerList().some(function (s) { return !Net.peers[s].gone; }); }
   Net.again = function () {
@@ -610,10 +610,32 @@
   // in a match of three or four, cement goes to the player picked as the target
   Net.attack = function (n) {
     var S = App.S();
+    if (S && S.multi && S.relay && S.multi.teams) {
+      var tt = S.multi.teams[S.multi.target];
+      Object.keys(S.multi.foes).map(Number).forEach(function (s) { if (S.multi.teams[s] === tt && Net.peers[s] && !Net.peers[s].gone) send({ t: 'a', n: n }, s); });
+      return;
+    }
     if (S && S.multi) { var to = S.multi.target; if (to != null && Net.peers[to] && !Net.peers[to].gone) send({ t: 'a', n: n }, to); return; }
     send({ t: 'a', n: n });
   };
   Net.item = function (id) { send({ t: 'i', id: id }); };
+  // 2v2 接力: our turn is over; the wall (as a snapshot) goes to the next teammate. Everyone hears whose turn it is.
+  Net.handoff = function (to, snap) { send({ t: 'h', to: to, s: snap }); };
+  function readSnap(s) {
+    if (!s || typeof s !== 'object' || !Array.isArray(s.grid) || s.grid.length !== ROWS) return null;
+    var grid = [], r, x;
+    for (r = 0; r < ROWS; r++) {
+      if (!Array.isArray(s.grid[r]) || s.grid[r].length !== COLS) return null;
+      var row = [];
+      for (x = 0; x < COLS; x++) row.push(int(s.grid[r][x], 0, 255));
+      grid.push(row);
+    }
+    var types = function (a, max) { return Array.isArray(a) ? a.slice(0, max).filter(function (t) { return TYPES.indexOf(t) >= 0; }) : []; };
+    var st = {}, k;
+    if (s.stats && typeof s.stats === 'object') for (k in s.stats) if (/^[a-zA-Z]{1,16}$/.test(k)) st[k] = int(s.stats[k], 0, 99999999);
+    return { grid: grid, queue: types(s.queue, 14), bag: types(s.bag, 7), rng: int(s.rng, 0, 4294967295), holdType: TYPES.indexOf(s.holdType) >= 0 ? s.holdType : null,
+      combo: int(s.combo, -1, 99), b2b: int(s.b2b, -1, 99), stats: st, cur: TYPES.indexOf(s.cur) >= 0 ? s.cur : null, p: int(s.p, 0, 60) };
+  }
   // our wall went down in a room of three or more: tell everyone whose cement did it (older pages ignore this)
   Net.downed = function () {
     var S = App.S();
@@ -712,7 +734,7 @@
     if (who) who.heard = Date.now();
     // in a match of three or four, each wall arrives with its seat; only the one on show gets the effects
     if (S && S.multi && S.remote) {
-      if (m.t === 's') { var f = S.multi.foes[from]; if (f) { mirror(m, f.g); f.downs = int(m.d, 0, 99); f.sent = f.g.stats.sent; } return; }
+      if (m.t === 's') { var f = S.multi.foes[from]; if (f) { mirror(m, f.g); f.downs = int(m.d, 0, 99); f.sent = f.g.stats.sent; } if (S.relay && !S.relay.active && S.relay.team[S.relay.turn] === from) mirror(m, S.me); return; }
       if (m.t === 'e') { if (from === S.multi.target) foeEvent(m.e); return; }
       if (m.t === 'i') return;
     }
@@ -733,15 +755,23 @@
         break;
       case 'full': fail('full'); break;
       case 'cfg': if (!Net.host && from === 0) { Net.cfg = readCfg(m); changed(); } break;
-      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0, m.royale === 1 ? 1 : 0); break;
+      case 'start': if (!Net.host && link && from === 0) startMatch(+m.seed || 1, m.minutes, m.items, readMulti(m.multi), m.wx > 0 && m.wx <= 4294967295 ? Math.floor(m.wx) : 0, m.lv >= 1 && m.lv <= 1000 ? Math.floor(m.lv) : 0, m.race === 1 ? 1 : 0, m.tower === 1 ? 1 : 0, m.royale === 1 ? 1 : 0, m.relay === 1 ? 1 : 0); break;
       case 's': mirror(m); break;
       case 'e': foeEvent(m.e); break;
       case 'a':
+        if (live && S.relay && !S.relay.active) break;      // 接力: only the teammate playing the wall takes cement
         if (live) {
           var hit = int(m.n, 0, 40);
           S.me.receive(hit);
           // in a room of three or more, who sent what and when: if this wall goes down, that decides the knockout
           if (S.multi && hit > 0) { S.hits = S.hits || []; S.hits.push({ s: from, t: Date.now(), n: hit }); if (S.hits.length > 40) S.hits.shift(); }
+        }
+        break;
+      case 'h':
+        if (S && S.relay && S.multi && S.multi.teams && S.multi.teams[from] === S.multi.myTeam) {
+          var to2 = m.to === Math.floor(m.to) ? m.to : -1, snap = readSnap(m.s);
+          if (to2 === Net.seat && snap && snap.queue.length) App.relayTake(snap);
+          else App.relayTurn(to2);
         }
         break;
       // someone in the room went down and says who knocked them out (by) and who helped (as)

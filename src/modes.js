@@ -109,6 +109,15 @@
     'net.m.race': ['40 行競速', '40-line race', '40ラインレース', '40줄 레이스'],
     'net.m.tower': ['守塔戰', 'Tower battle', 'タワーバトル', '타워 배틀'],
     'net.m.royale': ['大逃殺', 'Battle royale', 'バトルロイヤル', '배틀 로얄'],
+    'net.m.relay': ['接力', 'Relay', 'リレー', '릴레이'],
+    'net.m.relayP': ['兩隊對戰，同隊共用一面牆，輪流放方塊：每人 8 塊就交給下一位隊友，連暫存和下一個都一起交接。等待時看隊友放。4、6、8 人房才能選，會自動分兩隊。', 'Two teams; each team shares one wall and takes turns: 8 pieces each, then the wall (hold and next pieces too) goes to the next teammate. While waiting you watch them play. Rooms of 4, 6 or 8; teams are made for you.', '2チーム対戦。チームで1つの壁を共有し、1人8個ずつ交代（ホールドとネクストも引き継ぎ）。待っている間は味方のプレイを見ます。4・6・8人部屋のみ、自動でチーム分け。', '두 팀 대전. 팀이 벽 하나를 함께 쓰고 8개씩 번갈아 놓아요(홀드와 다음 블록도 함께 넘겨요). 기다리는 동안 팀원을 봐요. 4·6·8인 방 전용, 팀은 자동으로 나눠요.'],
+    'net.m.onlyTeam': ['接力要 4、6 或 8 個人（兩隊人數一樣），這房間會用普通對戰。', 'The relay needs 4, 6 or 8 players (two even teams); this room plays an ordinary battle.', 'リレーは4・6・8人（同数の2チーム）。この部屋は通常バトルになります。', '릴레이는 4·6·8명(같은 인원 두 팀)이 필요해서 이 방은 일반 대전으로 해요.'],
+    'rl.first': ['接力：你先放，8 塊後交給隊友', 'Relay: you start; after 8 pieces the wall goes to your teammate', 'リレー：あなたから。8個で味方に交代', '릴레이: 먼저 시작해요. 8개 후 팀원에게'],
+    'rl.wait': ['接力：{0} 先放，輪到你時會通知', 'Relay: {0} starts; you will be told when it is your turn', 'リレー：{0} から。順番が来たらお知らせ', '릴레이: {0} 먼저. 차례가 되면 알려줘요'],
+    'rl.you': ['輪到你：還剩 {0} 塊', 'Your turn: {0} pieces left', 'あなたの番：あと{0}個', '내 차례: {0}개 남음'],
+    'rl.mate': ['{0} 正在放，等你接手', '{0} is playing; your turn comes next', '{0} がプレイ中。次はあなた', '{0} 플레이 중, 다음은 나'],
+    'rl.yours': ['輪到你了！放 {0} 塊', 'Your turn! {0} pieces', 'あなたの番！{0}個', '내 차례! {0}개'],
+    'rl.passed': ['交給 {0}', 'Over to {0}', '{0} に交代', '{0}에게 넘김'],
     'net.m.royaleP': ['被擊倒一次就出局，最後留下的人贏。每 30 秒所有人底下升起一排消不掉的地板（最多 12 排）。出局後變幽靈，每 8 秒可以送 1 行攻擊給你選的人，幫忙打倒對手也算助攻。沒有組隊，三人以上才能選。', 'One knockout and you are out; the last one standing wins. Every 30 seconds a floor row that never clears rises under everyone (up to 12). Once out you are a ghost and may send one line every 8 seconds at whoever you pick; helping knock someone out counts as an assist. No teams; three players or more.', '一度KOされたら脱落、最後まで残った人の勝ち。30秒ごとに全員の下から消せない床が1段上がる（最大12段）。脱落後はゴーストとして8秒ごとに1ラインを好きな相手に送れ、撃破に貢献すればアシスト。チームなし、3人以上。', '한 번 KO되면 탈락, 마지막까지 남은 사람이 승리. 30초마다 모두의 아래에서 지울 수 없는 바닥이 한 줄 올라와요(최대 12줄). 탈락하면 유령이 되어 8초마다 1줄을 원하는 상대에게 보낼 수 있고, 처치에 도움이 되면 어시스트. 팀 없음, 3명 이상.'],
     'net.m.only3': ['大逃殺要三個人以上，這房間會用普通對戰。', 'Battle royale needs three players or more; this room plays an ordinary battle.', 'バトルロイヤルは3人以上。この部屋は通常バトルになります。', '배틀 로얄은 3명 이상이라 이 방은 일반 대전으로 해요.'],
     'ry.on': ['大逃殺：被擊倒一次就出局，地板每 30 秒升一排', 'Battle royale: one knockout and you are out; the floor rises every 30 seconds', 'バトルロイヤル：一度KOで脱落、30秒ごとに床が上昇', '배틀 로얄: 한 번 KO면 탈락, 30초마다 바닥 상승'],
@@ -348,13 +357,13 @@
   // what a player plays on, as a small tag beside the name
   function devTag(d) { return d ? ' <small class="devtag">' + esc(t('dev.' + d)) + '</small>' : ''; }
   App.devTag = devTag;
-  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race' || m === 'tower') && n > 2 ? 'battle' : m === 'royale' && n < 3 ? 'battle' : m; }
+  function roomMode(n) { var m = Net.modeOf ? Net.modeOf() : Net.cfg.wx ? 'wx' : 'battle'; return (m === 'wx' || m === 'race' || m === 'tower') && n > 2 ? 'battle' : m === 'royale' && n < 3 ? 'battle' : m === 'relay' && !Net.teamOk(n) ? 'battle' : m; }
   function rulesText() { var n = Net.count(); return t('net.m.' + roomMode(n)) + '　' + t('net.rules', t('minutes', Net.cfg.minutes), t(Net.cfg.items && n === 2 ? 'net.itemsOn' : 'net.itemsOff')); }
   // the host picks what the room plays; the others see it in the rules line
   function modeSeg(n) {
     var cur = Net.modeOf ? Net.modeOf() : 'battle', h = '<h3>' + t('net.mode') + '</h3><div class="seg" role="radiogroup" aria-label="' + esc(t('net.mode')) + '">';
-    ['battle', 'wx', 'lv', 'race', 'tower', 'royale'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
-    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : cur === 'royale' && n < 3 ? 'net.m.only3' : 'net.m.' + roomMode(n) + 'P') + '</p>';
+    ['battle', 'wx', 'lv', 'race', 'tower', 'royale', 'relay'].forEach(function (k) { h += '<button type="button" role="radio" aria-checked="' + (cur === k) + '" data-nmode="' + k + '"' + (((k === 'wx' || k === 'race' || k === 'tower') && n > 2) || (k === 'royale' && n < 3) || (k === 'relay' && !Net.teamOk(n)) ? ' disabled' : '') + '>' + t('net.m.' + k) + '</button>'; });
+    h += '</div><p class="note" id="netModeP">' + t((cur === 'wx' || cur === 'race' || cur === 'tower') && n > 2 ? 'net.m.only2' : cur === 'royale' && n < 3 ? 'net.m.only3' : cur === 'relay' && !Net.teamOk(n) ? 'net.m.onlyTeam' : 'net.m.' + roomMode(n) + 'P') + '</p>';
     return h;
   }
   App.sheets.online = function () {

@@ -1150,3 +1150,15 @@
   - 新的三人房瀏覽器測試 `test/royale.js` 16 項：兩人時選不了、三人時可選；地板升起；C 出局後不會復活；其他人看到 C 標成「出局」；幽靈送的 1 行送到 C 選的人、按鈕進入 8 秒冷卻；B 出局時 A 在三個畫面上都是贏家；名次是 A、B、C。
   - 房間模式變成 6 種，`test/wxnet.js` 跟著改，24 項全過；`test/multi.js` 38 項全過。
 - 檔案：`src/engine.js`、`src/view.js`、`src/net.js`、`src/ui.js`、`src/modes.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/engine.test.js`、`test/meta.test.js`、`test/royale.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。
+- 補記：上一條的 commit 為 [`452b9fa`](https://github.com/luffysky/cube2/commit/452b9fa)。
+
+## 2026-11-23 07:40（Asia/Taipei）｜新模式：2v2 接力
+
+- 專案：cube2｜執行者：Claude
+- 規則（`Meta.RELAY`）：4、6、8 人房，會自動分成兩隊。同一隊共用一面牆輪流放，每人放 8 塊，就把整面牆交給下一位隊友。
+- 交接內容：牆、目前的方塊、下一個、暫存、連擊、B2B、統計和還沒落地的攻擊，透過新訊息 `h` 傳給隊友。收到的一方會逐欄檢查（牆的大小、格子值、方塊種類、數字範圍），沒問題才接手。
+- 等待的人不能操作，自己的牆會即時顯示正在放的隊友。名牌下方寫「輪到你：還剩 N 塊」或「某某正在放」。
+- 送攻擊時，會送給目標那一隊的每個人，但只有正在放的人會真的收下。所以擊倒和助攻判定照常，不會重複扣。
+- 被擊倒中不交接，等復活、放下下一塊之後才交出去。接力沒有重播。對戰紀錄的標籤顯示「接力」。
+- 測試：新的四人房瀏覽器測試 `test/relay.js` 16 項：3 人時選不了、4 人時可選，分成 2 隊各 2 人，一人放、一人等，等的人按鍵沒反應；放滿 8 塊後隊友接手，接到的牆上正好 8 塊、還能放 8 塊；交出去的人看到是誰在放；攻擊只落在正在放的人身上。房間模式變成 7 種，`test/wxnet.js` 跟著改，24 項全過；`test/multi.js` 38 項、`test/royale.js` 16 項都還是全過。
+- 檔案：`src/ui.js`、`src/net.js`、`src/modes.js`、`src/meta.js`、`src/cloud.js`、`src/style.css`、`server/rules.js`、`server/core.js`、`test/relay.js`、`test/meta.test.js`、`test/wxnet.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構。｜刪除：無。

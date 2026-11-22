@@ -98,7 +98,7 @@
   var input = {
     l: false, r: false, sd: false, dir: 0, das: 0, arr: 0,
     clear: function () { this.l = this.r = this.sd = false; this.dir = 0; this.das = this.arr = 0; if (S && S.me) S.me.soft = false; },
-    can: function () { return !!S && S.state === 'play' && !!S.me.cur && !S.me.over && !(S.freeze && S.freeze.me > 0); },
+    can: function () { return !!S && S.state === 'play' && !!S.me.cur && !S.me.over && !(S.freeze && S.freeze.me > 0) && !(S.relay && !S.relay.active); },
     side: function (d, down) {
       if (d < 0) this.l = down; else this.r = down;
       if (down) {
@@ -340,6 +340,11 @@
         var first = order.filter(enemy)[0];
         S.multi.target = first; S.opp = foes[first].g; S.oppName = foes[first].name;
         S.me.onAttack = function (n) { ZZ.Net.attack(n); };
+        // 2v2 接力: my team's seats in seat order; the first plays, the others wait their turn
+        if (o.relay && M.teams) {
+          var mates = M.roster.filter(function (st) { return M.teams[st] === myTeam; }).sort(function (a, b) { return a - b; });
+          S.relay = { team: mates, turn: 0, active: mates[0] === M.me, left: Meta.RELAY.pieces };
+        }
         // 大逃殺: no teams, no replay; the floor clock starts with the match
         if (o.royale && !M.teams) { S.royale = { floorT: Meta.ROYALE.every, out: false, outAt: 0, ghostT: 0, ghostSent: 0 }; }
       } else if (mode === 'net') {
@@ -375,6 +380,7 @@
         toast(t('net.raceOn', S.race), 3000);
       }
       if (S.royale) { S.rec = null; S.tape = null; toast(t('ry.on'), 3600); }
+      if (S.relay) { S.rec = null; S.tape = null; toast(t(S.relay.active ? 'rl.first' : 'rl.wait', S.multi.foes[S.relay.team[0]] ? S.multi.foes[S.relay.team[0]].name : t('you')), 3600); }
       // 守塔戰: towers instead of a knockout count (Meta.TOWER); the match ends when a tower falls
       if (o.tower && (mode === 'net' || mode === 'ai') && !o.multi && !S.race) {
         S.tower = true;
@@ -459,7 +465,7 @@
   function drawFoes() {
     var M = S.multi;
     if (!M) return;
-    var key = M.target + '|' + L.lang + '|' + (S.royale ? (S.royale.out ? 'o' + Math.ceil(S.royale.ghostT / 1000) : 'i') : '') + '|' + M.order.map(function (s) { var f = M.foes[s]; return s + ':' + f.downs + ':' + f.sent + ':' + (f.gone ? 1 : 0) + ':' + stackOf(f.g); }).join(',');
+    var key = M.target + '|' + L.lang + '|' + (S.royale ? (S.royale.out ? 'o' + Math.ceil(S.royale.ghostT / 1000) : 'i') : '') + (S.relay ? 'r' + S.relay.active + S.relay.left + S.relay.turn : '') + '|' + M.order.map(function (s) { var f = M.foes[s]; return s + ':' + f.downs + ':' + f.sent + ':' + (f.gone ? 1 : 0) + ':' + stackOf(f.g); }).join(',');
     if (key === foeKey) return;
     foeKey = key;
     var h = '';
@@ -470,8 +476,9 @@
         '</span><i style="--h:' + Math.round(hi / VIS * 100) + '%"></i></button>';
     });
     // up to seven rivals: two rows once there are more than four
+    var RL = S.relay, relayLine = RL ? '<p class="relay">' + esc(RL.active ? t('rl.you', RL.left) : t('rl.mate', (M.foes[RL.team[RL.turn]] || {}).name || '')) + '</p>' : '';
     var R = S.royale, ghost = R && R.out ? '<button type="button" class="btn ghostSend" data-do="ghostSend"' + (R.ghostT > 0 ? ' disabled' : '') + '>' + t(R.ghostT > 0 ? 'ry.ghostWait' : 'ry.ghost', Math.ceil(R.ghostT / 1000)) + '</button>' : '';
-    el.strip.innerHTML = '<div class="foes' + (M.order.length > 4 ? ' many' : '') + '">' + h + '</div>' + ghost;
+    el.strip.innerHTML = '<div class="foes' + (M.order.length > 4 ? ' many' : '') + '">' + h + '</div>' + ghost + relayLine;
   }
   function stackOf(g) {
     for (var r = 0; r < g.grid.length; r++) for (var x = 0; x < g.grid[r].length; x++) if (g.grid[r][x]) return g.grid.length - r;
@@ -997,7 +1004,7 @@
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -1723,6 +1730,36 @@
     });
     if (alive <= 1 && S.state === 'play') endBattle('');
   }
+  // 2v2 接力: after our 8th piece (and not while knocked out), the wall goes to the next teammate
+  function relayLock() {
+    var R = S.relay;
+    if (!R || !R.active || S.state !== 'play') return;
+    R.left--;
+    if (R.left > 0 || S.me.over || S.down.me > 0 || R.team.length < 2) return;
+    var next = R.team[(R.team.indexOf(S.multi.me) + 1) % R.team.length];
+    var snap = S.me.snapshot();
+    snap.grid = snap.grid.map(function (r) { return Array.prototype.slice.call(r); });     // rows are byte arrays; plain lists travel as JSON
+    snap.p = S.me.pendingTotal();
+    R.active = false; R.turn = R.team.indexOf(next); R.left = Meta.RELAY.pieces;
+    input.clear();
+    if (ZZ.Net && ZZ.Net.handoff) ZZ.Net.handoff(next, snap);
+    foeKey = '';
+    toast(t('rl.passed', S.multi.foes[next] ? S.multi.foes[next].name : ''), 1800);
+  }
+  App.hooks.push(function (g, e, mine) { if (mine && e.type === 'lock' && S && S.relay) relayLock(); });
+  // the wall arrives from a teammate: carry on from exactly where they left it
+  App.relayTake = function (snap) {
+    var R = S && S.relay;
+    if (!R || S.state !== 'play') return;
+    snap.grid = snap.grid.map(function (r) { return Uint8Array.from(r); });
+    S.me.restore(snap);
+    if (snap.p > 0) S.me.receive(snap.p);
+    R.active = true; R.turn = R.team.indexOf(S.multi.me); R.left = Meta.RELAY.pieces;
+    foeKey = '';
+    sfx.play('go');
+    toast(t('rl.yours', Meta.RELAY.pieces), 1800);
+  };
+  App.relayTurn = function (seat) { var R = S && S.relay; if (R && R.team.indexOf(seat) >= 0) { R.turn = R.team.indexOf(seat); foeKey = ''; } };
   App.ghostSend = function () {
     var R = S && S.royale;
     if (!R || !R.out || R.ghostT > 0 || S.state !== 'play' || !ZZ.Net) return false;
@@ -1775,7 +1812,7 @@
       S.time += dt;
       if (K && K.tick) K.tick(dt);
     }
-    if (fz.me > 0) return;
+    if (fz.me > 0 || (S.relay && !S.relay.active)) return;
     input.update(dt);
     S.me.update(dt);
   }
