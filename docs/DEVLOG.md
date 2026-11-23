@@ -1534,3 +1534,17 @@
 - 測試：`test/mail.test.js` 31 項（多 4 項），`test/api.test.js` 446 項（多 1 項）。
 - 檔案：`server/mail.js`、`server/app.js`、`test/mail.test.js`、`test/api.test.js`、`docs/DEVLOG.md`。｜資料庫：沒改。｜刪除：無。
 - 補記：上一條的 commit 為 [`f3d989e`](https://github.com/luffysky/cube2/commit/f3d989e)。
+
+## 2026-11-23 23:56（Asia/Taipei）｜管理 API 加「各遊戲數據」`/internal/admin/v1/metrics/games`
+
+- 專案：cube2｜執行者：Claude｜Owner 指示：「管理後台那邊要顯示各遊戲數據」
+- 新增唯讀端點 `GET /internal/admin/v1/metrics/games`，驗證方式和其他管理 API 一樣（機器 JWT、只讀、每次寫稽核）。每個遊戲一筆，只給伺服器真的有記錄的數字：
+  - 主遊戲各模式（對電腦、對戰、排位、線上、挑戰大自然、搶地盤……）：今天場數、7 天場數、7 天玩家數；比賽紀錄保存期間內的總場數與玩家數。
+  - 九款磚塊小遊戲：有成績的玩家數、7 天內刷新成績的玩家數；沒人玩過的遊戲顯示 0（真的量過），不會漏掉。
+  - 磚之冒險：開始過的玩家數、打通第一章的玩家數、總過關次數（從存檔讀）；7 天活躍沒有來源，給 null。
+  - 地城小隊：伺服器沒有紀錄（房主的頁面在跑），給 `source: null`，不放假的 0。
+  - 不含任何玩家 id、鑰匙或個資。
+- 卡點：cube1 正式站的管理金鑰（`https://identity.snowrealm.pet/.well-known/admin-jwks.json`）回 `admin_jwks_unavailable`，所以正式後台目前呼叫不到 cube2 的管理 API。另外 cube2 正式環境的管理設定還是 staging 的複本，等 cube1 發好正式金鑰再換。
+- 測試：`test/admin.test.js` 113 項（多 8 項）。
+- 檔案：`server/admin.js`、`test/admin.test.js`、`docs/DEVLOG.md`。｜資料庫：沒改。｜刪除：無。
+- 補記：上一條的 commit 為 [`58c7417`](https://github.com/luffysky/cube2/commit/58c7417)。

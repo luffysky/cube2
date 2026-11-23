@@ -198,6 +198,21 @@ const reset = () => { for (const k of ENV) delete process.env[k]; admin.clearCac
   ok(M.active.d1 === 3 && M.matches.today.ai === 1 && M.matches.today.rank === 1 && M.matches.today.net === 1 && Object.values(M.boxes.today).reduce((a, b) => a + b, 0) === 3, 'today', M);
   ok(typeof M.economy.coinsOutstanding === 'string' && typeof M.economy.itemsOutstanding === 'object', 'economy', M.economy);
 
+  // ---------- metrics/games ----------
+  await pg.query("INSERT INTO zz.scores (pid, board, season, val, at) VALUES ($1, 'm_snake_0', '', 120, $3), ($2, 'm_snake_1', '', 90, $4), ($1, 'm_push', '', 7, $3)", [P1.id, P2.id, now, now - 10 * 86400000]);
+  await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{rpg}', '{\"best\": 3, \"wins\": 5, \"cls\": \"tank\"}'::jsonb) WHERE id = $1", [P1.id]);
+  await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{rpg}', '{\"best\": \"x\", \"wins\": \"-1\"}'::jsonb) WHERE id = $1", [P2.id]);
+  r = await get('metrics/games', sign());
+  const G = {}; (r.json.games || []).forEach(x => { G[x.id] = x; });
+  ok(r.status === 200 && r.json.gameId === 'brickduel', 'metrics/games answers', r.json);
+  ok(G['mode:rank'] && G['mode:rank'].kind === 'mode' && G['mode:rank'].name === '排位' && G['mode:rank'].matchesToday === 1 && G['mode:rank'].players7d === 1, 'a match mode: today, seven days, players', G['mode:rank']);
+  ok(G['mode:ai'] && G['mode:ai'].name === '對電腦', 'the computer mode is named', G['mode:ai']);
+  ok(G.snake.playersWithScore === 2 && G.snake.playersImproved7d === 1 && G.snake.name === '磚蛇', 'a brick game: players with a score, improved this week', G.snake);
+  ok(G.push.playersWithScore === 1 && G.sweep && G.sweep.playersWithScore === 0, 'a level game counts too; a game nobody played is 0 (measured), not missing', [G.push, G.sweep]);
+  ok(G.rpg.playersStarted === 1 && G.rpg.clearsTotal === '5' && G.rpg.stages === 10 && G.rpg.active7d === null, '磚之冒險 from the saves; a malformed record counts as nothing', G.rpg);
+  ok(G.dungeon && G.dungeon.source === null && G.dungeon.players === undefined, '地城小隊 has no server record: source null, no zeros', G.dungeon);
+  ok(JSON.stringify(r.json).indexOf(P1.id) < 0 && JSON.stringify(r.json).indexOf(P1.key) < 0, 'no player ids or keys in the per-game view');
+
   // ---------- metrics/daily ----------
   r = await get('metrics/daily?from=2026-11-19&to=2026-11-21', sign());
   ok(r.status === 200 && r.json.items.length === 3 && r.json.items.map(x => x.date).join() === '2026-11-19,2026-11-20,2026-11-21', 'one line a day, both ends, in order', r.json);
