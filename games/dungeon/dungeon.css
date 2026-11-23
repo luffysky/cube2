@@ -96,3 +96,27 @@
   .dg-btns .btn small { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .dg-bar i { transition: none; } }
+
+/* friends: invite them from the lobby; an invitation on the first screen */
+.dg-fr { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dg-fr li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--edge); border-radius: 12px; background: var(--panel); }
+.dg-fr li.dg-wait { display: block; border: 0; background: none; padding: 0; }
+.dg-fr i { width: 8px; height: 8px; border-radius: 50%; background: var(--edge); }
+.dg-fr li.on i { background: var(--ok); }
+.dg-fr b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-fr span { font-size: 12px; color: var(--ok); }
+.dg-fr .btn { margin: 0; padding: 6px 12px; font-size: 14px; }
+.dg-inv { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border-radius: 14px; background: var(--cave); color: var(--cave-ink); }
+.dg-inv[hidden] { display: none; }
+.dg-inv p { flex: 1 1 100%; margin: 0; font-weight: 700; }
+.dg-inv .btn { margin: 0; text-decoration: none; }
+
+/* the dice beside the name */
+.dg-namerow { display: flex; gap: 8px; }
+.dg-namerow input { flex: 1; min-width: 0; }
+.dg-dice { flex: none; width: 46px; border-radius: 10px; border: 1px solid var(--edge); background: var(--panel); font-size: 22px; cursor: pointer; }
+.dg-dice i { font-style: normal; display: inline-block; }
+.dg-dice i.roll { animation: dg-roll .45s cubic-bezier(.3, .9, .4, 1.2); }
+@keyframes dg-roll { 0% { transform: rotate(0) scale(1); } 40% { transform: rotate(200deg) scale(1.2); } 100% { transform: rotate(360deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dg-dice i.roll { animation: none; } }
+.dg-field > label { font-size: 13px; font-weight: 700; color: var(--muted); }

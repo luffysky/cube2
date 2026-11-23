@@ -36,7 +36,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.screenshot({ path: path.join(OUT, 'naming.png') });
     let other = first;
     for (let i = 0; i < 6 && other === first; i++) { await page.click('[data-do="nmRoll"]'); other = await page.inputValue('#nmName'); }
-    ok(other !== first, '換一個 gives another one', [first, other]);
+    ok(other !== first && await page.evaluate(() => /🎲/.test(document.querySelector('[data-do="nmRoll"]').textContent)), 'the dice rolls another name', [first, other]);
     await page.fill('#nmName', '  '); await page.click('[data-do="nmOk"]'); await sleep(150);
     ok(await sheet(page) === 'naming' && /名字不能空白/.test(await page.textContent('#sheetCard')), 'an empty name is not taken');
     await page.fill('#nmName', '<>'); await page.click('[data-do="nmOk"]'); await sleep(150);
@@ -45,6 +45,9 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     ok(await page.evaluate(() => ZZ.Meta.data.name === '阿明' && !ZZ.peek().sheet && document.getElementById('mName').textContent === '阿明'), 'Enter takes the name; it is on the menu');
     await page.reload(); await sleep(1800);
     ok(!(await sheet(page)), 'the next visit does not ask again');
+    await page.evaluate(() => ZZ.App.openSheet('profile'));
+    await page.click('[data-do="pRoll"]'); await sleep(200);
+    ok(await page.evaluate(() => ZZ.Meta.data.name !== '阿明' && ZZ.Meta.data.name.length > 1 && document.getElementById('pName').value === ZZ.Meta.data.name), 'the profile has the same dice, and the name it rolls is kept');
     await ctx.close();
     // ---------- consent done before, no name yet: asked on arrival; Esc keeps the name that was showing ----------
     const c2 = await ctxWith(adult), p2 = await c2.newPage();

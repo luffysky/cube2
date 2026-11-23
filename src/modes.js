@@ -387,7 +387,7 @@
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
-        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('mp.more') + '</p><p class="note">' + t('net.keepOpen') + '</p>' : '') +
+        (navigator.share ? btn('netShare', 'net.share') : '') + (Net.relayed() && !(ZZ.Consent && ZZ.Consent.child()) ? btn('frOpen', 'fr.inviteBtn') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('mp.more') + '</p><p class="note">' + t('net.keepOpen') + '</p>' : '') +
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.matched) {
       h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b>' + devTag(Net.foeDev()) + '</p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
@@ -397,6 +397,7 @@
       h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.cap) + '</h3><ul class="roster">';
       ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + devTag(r.dev) + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
+      if (st === 'ready' && n < Net.cap && !(ZZ.Consent && ZZ.Consent.child())) h += '<div class="row">' + btn('frOpen', 'fr.inviteBtn') + '</div>';
       if (Net.direct && Net.direct()) h += '<p class="note" id="netLane">' + t('net.direct') + '</p>';
       else if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';

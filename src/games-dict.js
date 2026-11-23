@@ -392,6 +392,17 @@
     'dg.l.aoe': ['{0} 噴出黑焰，全隊共 {1} 點', '{0} breathes black fire: {1} to the party', '{0}の黒い炎、全体に合計{1}', '{0} 검은 불꽃, 파티에 합계 {1}'],
     'dg.l.clear': ['第 {0} 層過關！', 'Floor {0} cleared!', '{0}階クリア！', '{0}층 클리어!'],
     'dg.l.win': ['勝利！', 'Victory!', '勝利！', '승리!'],
-    'dg.l.lose': ['全員倒下……', 'The party has fallen…', '全滅……', '전멸……']
+    'dg.l.lose': ['全員倒下……', 'The party has fallen…', '全滅……', '전멸……'],
+    'dg.roll': ['擲骰子換一個隨機名字', 'Roll the dice for a random name', 'サイコロでランダムな名前', '주사위로 무작위 이름'],
+    'dg.fr.h': ['邀請好友', 'Invite friends', '友達を招待', '친구 초대'],
+    'dg.fr.none': ['在轉磚的「好友」加了好友，這裡就能直接邀請他們。', 'Add friends under “Friends” in 轉磚 and you can invite them from here.', '轉磚の「フレンド」で友達を追加すると、ここから招待できます。', '轉磚의 「친구」에서 친구를 추가하면 여기서 초대할 수 있어요.'],
+    'dg.fr.invite': ['邀請', 'Invite', '招待', '초대'],
+    'dg.fr.invited': ['已邀請', 'Invited', '招待済み', '초대함'],
+    'dg.fr.on': ['在線上', 'Online', 'オンライン', '온라인'],
+    'dg.fr.err': ['邀請沒送出，稍後再試', 'The invitation did not go; try again later', '招待を送れませんでした。あとでもう一度', '초대를 보내지 못했어요. 나중에 다시'],
+    'dg.fr.banDG': ['{0} 邀你一起玩地城小隊', '{0} invites you to Dungeon Party', '{0}からダンジョン小隊のお誘い', '{0}님이 던전 파티에 초대했어요'],
+    'dg.fr.banZZ': ['{0} 邀你一起玩轉磚', '{0} invites you to play 轉磚', '{0}から轉磚のお誘い', '{0}님이 轉磚에 초대했어요'],
+    'dg.fr.join': ['加入', 'Join', '参加', '참가'],
+    'dg.fr.ignore': ['忽略', 'Ignore', '無視', '무시']
   });
 })(typeof ZZ !== 'undefined' && ZZ.L ? ZZ.L : { add: function () {} });

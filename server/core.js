@@ -516,6 +516,93 @@ async function roomClose(db, body) {
   return good({});
 }
 
+// ---------- friends ----------
+// A player adds another by their public tag (the friend code: the same eight letters the leaderboards show). The other
+// side agrees by adding back; either side can end it. Friends see each other's name, level and whether the game is
+// open, and can invite each other into a room (轉磚 or 地城小隊). Nothing else about a friend is shown.
+// Under 13 the page offers none of this (there is no public name), the same as online play.
+const FR = { MAX: 100, ASKS_PER_HOUR: 30, INVITES_PER_HOUR: 60, INVITE_TTL: 10 * 60000, LIVE: 90000, AGAIN: 86400000, GAMES: ['zz', 'dg'] };
+const FR_CODE = /^[abcdefghjkmnpqrstuvwxyz23456789]{8}$/;
+function readFriend(v) {
+  if (typeof v !== 'string' || v.length > 24) return '';
+  const s = v.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return FR_CODE.test(s) ? s : '';
+}
+async function friendOf(db, me, pub) {
+  const rows = await db.query('SELECT id, name FROM zz.players WHERE pub = $1 AND gone IS NULL AND NOT ban', [pub]);
+  return rows[0] && rows[0].id !== me ? rows[0] : null;
+}
+async function friends(db, cred, now) {
+  const row = await findPlayer(db, cred);
+  if (!row) return fail(401, 'auth');
+  if (row.pending) return pending(row.pending);
+  const out = await db.batch([
+    ['UPDATE zz.players SET live = $2 WHERE id = $1', [row.id, now]],
+    [`SELECT p.pub, p.name, p.live, COALESCE(p.state->>'xp', '0') AS x, f.st, f.asker = $1 AS mine, f.at
+      FROM zz.friends f JOIN zz.players p ON p.id = CASE WHEN f.a = $1 THEN f.b ELSE f.a END
+      WHERE (f.a = $1 OR f.b = $1) AND f.st IN ('ask', 'ok') AND p.gone IS NULL AND NOT p.ban
+      ORDER BY f.at DESC LIMIT 200`, [row.id]],
+    [`SELECT p.pub, p.name, i.g, i.code, i.at FROM zz.invites i
+      JOIN zz.players p ON p.id = i.src
+      JOIN zz.friends f ON f.a = LEAST(i.src, i.dst) AND f.b = GREATEST(i.src, i.dst) AND f.st = 'ok'
+      WHERE i.dst = $1 AND i.at > $2 AND p.gone IS NULL AND NOT p.ban ORDER BY i.at DESC LIMIT 10`, [row.id, now - FR.INVITE_TTL]]
+  ]);
+  const list = out[1].map(r => ({ p: r.pub, n: r.name, lv: rules.Meta.levelOf(+r.x || 0).lv, st: r.st === 'ok' ? 'ok' : r.mine ? 'out' : 'in', on: r.st === 'ok' && r.live != null && r.live > now - FR.LIVE, seen: r.st === 'ok' && r.live != null ? r.live : null }));
+  return good({ me: row.pub, list, inv: out[2].map(r => ({ p: r.pub, n: r.name, g: r.g, code: r.code, at: r.at })), now });
+}
+async function friendAdd(db, cred, body, now) {
+  const row = await findPlayer(db, cred);
+  if (!row) return fail(401, 'auth');
+  if (row.pending) return pending(row.pending);
+  const pub = readFriend(body && body.p);
+  if (!pub) return fail(400, 'code');
+  if (pub === row.pub) return fail(400, 'self');
+  const them = await friendOf(db, row.id, pub);
+  if (!them) return fail(404, 'nobody');
+  if (await bump(db, 'fr', row.id, 3600000, now) > FR.ASKS_PER_HOUR) return fail(429, 'slow');
+  const n = await db.query("SELECT count(*)::int AS n FROM zz.friends WHERE (a = $1 OR b = $1) AND st IN ('ask', 'ok')", [row.id]);
+  if (n[0].n >= FR.MAX) return fail(409, 'many');
+  // asking someone who has asked me makes us friends; someone who turned me down cannot be asked again for a day
+  const got = await db.query(`
+    INSERT INTO zz.friends (a, b, st, asker, at) VALUES (LEAST($1::uuid, $2::uuid), GREATEST($1::uuid, $2::uuid), 'ask', $1, $3)
+    ON CONFLICT (a, b) DO UPDATE SET
+      st = CASE WHEN zz.friends.st = 'ok' OR (zz.friends.st = 'ask' AND zz.friends.asker <> $1) THEN 'ok' ELSE 'ask' END,
+      asker = CASE WHEN zz.friends.st = 'ok' OR (zz.friends.st = 'ask' AND zz.friends.asker <> $1) THEN zz.friends.asker ELSE $1 END,
+      at = $3
+    WHERE NOT (zz.friends.st = 'x' AND zz.friends.asker <> $1 AND zz.friends.at > $4)
+    RETURNING st`, [row.id, them.id, now, now - FR.AGAIN]);
+  if (!got[0]) return fail(409, 'wait');
+  return good({ st: got[0].st, n: them.name, p: pub, now });
+}
+// turn down a request, take back my own, or stop being friends: the row stays, marked ended (nothing is deleted here)
+async function friendDrop(db, cred, body, now) {
+  const row = await findPlayer(db, cred);
+  if (!row) return fail(401, 'auth');
+  if (row.pending) return pending(row.pending);
+  const pub = readFriend(body && body.p);
+  if (!pub) return fail(400, 'code');
+  const them = await db.query('SELECT id FROM zz.players WHERE pub = $1', [pub]);
+  if (!them[0]) return fail(404, 'nobody');
+  const got = await db.query(`UPDATE zz.friends SET st = 'x', asker = $1, at = $3
+    WHERE a = LEAST($1::uuid, $2::uuid) AND b = GREATEST($1::uuid, $2::uuid) AND st <> 'x' RETURNING 1`, [row.id, them[0].id, now]);
+  return got[0] ? good({ now }) : fail(404, 'none');
+}
+async function friendInvite(db, cred, body, now) {
+  const row = await findPlayer(db, cred);
+  if (!row) return fail(401, 'auth');
+  if (row.pending) return pending(row.pending);
+  const pub = readFriend(body && body.p), code = readRoom(body && body.code), g = FR.GAMES.indexOf(body && body.g) >= 0 ? body.g : '';
+  if (!pub || !code || !g) return fail(400, 'invite');
+  const them = await friendOf(db, row.id, pub);
+  if (!them) return fail(404, 'nobody');
+  const ok = await db.query("SELECT 1 FROM zz.friends WHERE a = LEAST($1::uuid, $2::uuid) AND b = GREATEST($1::uuid, $2::uuid) AND st = 'ok'", [row.id, them.id]);
+  if (!ok[0]) return fail(403, 'friend');
+  if (await bump(db, 'inv', row.id, 3600000, now) > FR.INVITES_PER_HOUR) return fail(429, 'slow');
+  await db.query(`INSERT INTO zz.invites (dst, src, g, code, at) VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (dst, src) DO UPDATE SET g = $3, code = $4, at = $5`, [them.id, row.id, g, code, now]);
+  return good({ now });
+}
+
 // ---------- SnowRealm Identity: link this save to a platform player, and get it back on another device ----------
 // claims: a token server/identity.js has already checked. Nothing here runs unless linking is switched on.
 async function useJti(db, claims) {
@@ -579,4 +666,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, history, HIST, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, FR, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

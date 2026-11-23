@@ -87,7 +87,7 @@
     'nm.title': ['幫自己取個名字', 'Pick a name', '名前を決めよう', '이름을 정해 주세요'],
     'nm.p': ['排行榜、連線對戰和地城小隊都會顯示這個名字，之後也可以在個人資料裡改。', 'It shows on the leaderboards, in online matches and in Dungeon Party. You can change it later in your profile.', 'ランキングやオンライン対戦、ダンジョン小隊で表示されます。あとでプロフィールから変えられます。', '랭킹, 온라인 대전, 던전 파티에 표시돼요. 나중에 프로필에서 바꿀 수 있어요.'],
     'nm.label': ['名字', 'Name', '名前', '이름'],
-    'nm.roll': ['換一個', 'Another one', '別の名前', '다른 이름'],
+    'nm.roll': ['擲骰子換一個隨機名字', 'Roll the dice for another name', 'サイコロで別の名前', '주사위로 다른 이름'],
     'nm.ok': ['就用這個', 'Use this name', 'この名前にする', '이 이름으로'],
     'nm.empty': ['名字不能空白', 'The name cannot be empty', '名前を入れてください', '이름을 입력해 주세요'],
     'nm.hi': ['你好，{0}！', 'Hello, {0}!', 'こんにちは、{0}！', '안녕하세요, {0}!'],
@@ -245,9 +245,9 @@
   }
   App.sheets.naming = function () {
     return '<h2>' + t('nm.title') + '</h2><p class="note">' + t('nm.p') + '</p>' +
-      '<form id="nmForm" class="field line"><label for="nmName">' + t('nm.label') + '</label><input type="text" id="nmName" maxlength="12" autocomplete="nickname" value="' + esc(candidate) + '"></form>' +
+      '<form id="nmForm" class="field line dicerow"><label for="nmName">' + t('nm.label') + '</label><span class="dicebox"><input type="text" id="nmName" maxlength="12" autocomplete="nickname" value="' + esc(candidate) + '">' + dice('nmRoll') + '</span></form>' +
       (nmWarn ? '<p class="warn" role="alert">' + t(nmWarn) + '</p>' : '') +
-      '<div class="row">' + btn('nmRoll', 'nm.roll') + btn('nmOk', 'nm.ok', true) + '</div>';
+      '<div class="row">' + btn('nmOk', 'nm.ok', true) + '</div>';
   };
   function nameOk() {
     var box = document.getElementById('nmName'), want = box ? String(box.value || '').trim() : candidate;
@@ -260,7 +260,11 @@
     if (App.updateMenu) App.updateMenu();
   }
   App.acts.nmOk = nameOk;
-  App.acts.nmRoll = function () { var box = document.getElementById('nmName'); candidate = rollName(); nmWarn = ''; if (box) { box.value = candidate; box.focus(); } else App.openSheet('naming'); };
+  // the dice: a random name, with a little roll (none when the player asks for less motion)
+  function dice(act) { return '<button class="dice" type="button" data-do="' + act + '" aria-label="' + esc(t('nm.roll')) + '" title="' + esc(t('nm.roll')) + '"><i aria-hidden="true">🎲</i></button>'; }
+  function spin(b) { var i = b && b.querySelector && b.querySelector('i'); if (!i) return; i.classList.remove('roll'); void i.offsetWidth; i.classList.add('roll'); }
+  App.dice = dice; App.rollName = rollName; App.diceSpin = spin;
+  App.acts.nmRoll = function (b) { var box = document.getElementById('nmName'); candidate = rollName(); nmWarn = ''; spin(b); App.sfx.play('rot'); if (box) box.value = candidate; else App.openSheet('naming'); };
   // closed some other way (Esc): the name that was showing is kept, so nobody ends up nameless by accident
   App.closed = App.closed || {};
   App.closed.naming = function () {

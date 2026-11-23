@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="../games.css?v=9d91105f2f">
 <link rel="stylesheet" href="../drawer-items.css?v=f1c599a9fd">
 <link rel="stylesheet" href="../site-themes.css?v=98bc738adf">
-<link rel="stylesheet" href="dungeon.css?v=1bef516d88">
+<link rel="stylesheet" href="dungeon.css?v=41cb18c3f0">
 <script src="../theme.js?v=034b918854"></script>
 </head>
 <body>
@@ -30,9 +30,10 @@
 
   <!-- before a room: name, class, open / join / alone -->
   <section class="dg-sec" id="start">
+    <div class="dg-inv" id="invCard" role="status" hidden></div>
     <p class="dg-sub" data-t="dg.sub">合作地城 · 2 到 4 人 · 回合制</p>
     <p class="dg-how" data-t="dg.how">每回合大家各自選要做什麼，全部選好（或時間到）就一起行動。</p>
-    <label class="dg-field"><span data-t="dg.name">你的名字</span><input id="name" maxlength="16" autocomplete="nickname"></label>
+    <div class="dg-field"><label for="name" data-t="dg.name">你的名字</label><span class="dg-namerow"><input id="name" maxlength="16" autocomplete="nickname"><button class="dg-dice" type="button" id="dice" data-ta="dg.roll" aria-label="擲骰子換一個隨機名字"><i aria-hidden="true">🎲</i></button></span></div>
     <h2 data-t="dg.cls">職業</h2>
     <div class="dg-cls" id="clsStart" role="radiogroup" data-ta="dg.cls" aria-label="職業"></div>
     <div class="row"><button class="btn" type="button" id="open" data-t="dg.open">開房間</button></div>
@@ -52,6 +53,7 @@
     <div class="row"><button class="btn plain" type="button" id="copy" data-t="dg.copy">複製邀請連結</button></div>
     <h2 id="partyTitle"></h2>
     <ul class="dg-party" id="lobbyList"></ul>
+    <div id="frBox" hidden><h2 data-t="dg.fr.h">邀請好友</h2><ul class="dg-fr" id="frList"></ul></div>
     <h2 data-t="dg.cls">職業</h2>
     <div class="dg-cls" id="clsLobby" role="radiogroup" data-ta="dg.cls" aria-label="職業"></div>
     <div class="row"><button class="btn" type="button" id="go" data-t="dg.start">開始冒險</button></div>
@@ -87,11 +89,11 @@
   </section>
   <p class="dg-err" id="netErr" role="alert" hidden></p>
 </main>
-<script src="../words.js?v=c158e09f4d"></script>
+<script src="../words.js?v=76a636e7c0"></script>
 <script src="../i18n.js?v=91f00f02b0"></script>
 <script src="rules.js?v=c57edc7766"></script>
-<script src="dungeon.js?v=7e244ad59d"></script>
-<script src="../drawer-icons.js?v=5ecf0b9420"></script>
+<script src="dungeon.js?v=9c346d5907"></script>
+<script src="../drawer-icons.js?v=04bc183400"></script>
 <script src="../nav.js?v=58f8ba90e8"></script>
 </body>
 </html>

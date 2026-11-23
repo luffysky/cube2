@@ -1214,7 +1214,7 @@
         '<h3>' + t('h.atk') + '</h3>' + ul(['h.atk1', 'h.atk2', 'h.atk3', 'h.atk4', 'h.atk5', 'h.atk6']) +
         '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
         '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
-        '<h3>' + t('h.modes') + '</h3>' + ul(['h.m1', 'h.m2', 'h.m3', 'h.m4', 'h.m5', 'h.m6']) +
+        '<h3>' + t('h.modes') + '</h3>' + ul(['h.m1', 'h.m2', 'h.m3', 'h.m4', 'h.m5', 'h.m6', 'h.m7']) +
         '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
       for (i = 1; i <= 7; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
       h += '</dl><p class="note">' + t('h.itemsMore', ITEMS.length - 1) + '</p><dl class="keys">';
@@ -1459,7 +1459,7 @@
   var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1, rpg: 1 };
   // 「新」 tags on what was added lately (磚之冒險, the new battle switches and room modes, the match history), each gone
   // once it has been opened, and all of them after FRESH_UNTIL. save.fresh keeps one bit per tag.
-  var FRESH = { rpg: 1, battle: 2, online: 4, history: 8 }, FRESH_UNTIL = Date.UTC(2026, 11, 14);
+  var FRESH = { rpg: 1, battle: 2, online: 4, history: 8, friends: 16 }, FRESH_UNTIL = Date.UTC(2026, 11, 14);
   function freshSeen(id) {
     if (!FRESH[id] || (save.fresh & FRESH[id])) return;
     save.fresh |= FRESH[id]; saveStore(); freshTags();

@@ -30,6 +30,18 @@
   function keep() { try { localStorage.setItem(STORE, JSON.stringify(me)); } catch (e) { /* not kept */ } }
   function cleanName(v) { return String(v || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16); }
   function myName() { return me.n || t('dg.you'); }
+  // the dice: a random name in the page's language
+  var PARTS = {
+    'zh-Hant': [['疾風', '閃電', '無敵', '傳說', '暴走', '冷靜', '神速', '夜行', '迷霧', '黃金'], ['勇者', '騎士', '弓手', '法師', '牧師', '劍客', '獵人', '冒險家']],
+    'zh-Hans': [['疾风', '闪电', '无敌', '传说', '暴走', '冷静', '神速', '夜行', '迷雾', '黄金'], ['勇者', '骑士', '弓手', '法师', '牧师', '剑客', '猎人', '冒险家']],
+    en: [['Swift', 'Lucky', 'Mighty', 'Brave', 'Sly', 'Bold', 'Grim'], ['Knight', 'Archer', 'Mage', 'Rogue', 'Hero', 'Ranger']],
+    ja: [['疾風の', '無敵の', '伝説の', '黄金の', '夜の'], ['勇者', '騎士', '弓使い', '魔法使い', '僧侶']],
+    ko: [['번개', '무적', '전설의', '황금', '용감한'], ['용사', '기사', '궁수', '마법사', '성직자']]
+  };
+  function rollName() {
+    var p = PARTS[W.lang] || PARTS['zh-Hant'], a = p[0][Math.floor(Math.random() * p[0].length)], b = p[1][Math.floor(Math.random() * p[1].length)];
+    return cleanName(a + b + (W.lang === 'en' && (a + b).length <= 10 ? Math.floor(10 + Math.random() * 90) : ''));
+  }
 
   // ---------- the room: numbered letters through /api/room ----------
   function seatKey() {
@@ -102,6 +114,51 @@
     try { call(body).catch(function () { /* gone anyway */ }); } catch (e) { /* gone anyway */ }
   };
 
+  // ---------- friends (made in 轉磚; the save's key is on this device): invite them, and hear their invitations ----------
+  function cred() { try { var v = JSON.parse(localStorage.getItem('zhuanzhuan.cloud.v1') || 'null'); return v && v.id && v.key ? v : null; } catch (e) { return null; } }
+  function kid() { try { return (JSON.parse(localStorage.getItem('zhuanzhuan.consent.v1') || 'null') || {}).age === 'u13'; } catch (e) { return false; } }
+  function rpc(body) {
+    var c = cred();
+    if (!c || kid()) return Promise.resolve(null);
+    return fetch('../../api/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.id + '.' + c.key }, body: JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j || {} }; }, function () { return null; }); }, function () { return null; });
+  }
+  var fr = { list: null, inv: [], at: 0, sent: {}, busy: false, ignored: [] };
+  function friendsNow(force) {
+    if (fr.busy || (!force && Date.now() - fr.at < 25000) || !cred() || kid()) return;
+    fr.busy = true;
+    rpc({ a: 'fr' }).then(function (r) {
+      fr.busy = false; fr.at = Date.now();
+      if (!r || r.status !== 200 || !r.body.ok) return;
+      fr.list = r.body.list.filter(function (f) { return f.st === 'ok'; }).sort(function (a, b) { return (b.on ? 1 : 0) - (a.on ? 1 : 0); });
+      fr.inv = r.body.inv || [];
+      drawFriends(); drawInvite();
+    });
+  }
+  function drawFriends() {
+    var box = $('frBox');
+    if (!box) return;
+    box.hidden = !room || kid() || !cred() || screen !== 'lobby';
+    if (box.hidden) return;
+    if (!fr.list || !fr.list.length) { $('frList').innerHTML = '<li class="dg-wait">' + esc(t('dg.fr.none')) + '</li>'; return; }
+    var inRoom = lobbyList().map(function (p) { return p.n; });
+    $('frList').innerHTML = fr.list.slice(0, 30).map(function (f) {
+      var sent = fr.sent[f.p] && fr.sent[f.p] === room.code;
+      return '<li class="' + (f.on ? 'on' : '') + '"><i aria-hidden="true"></i><b>' + esc(f.n || '?') + '</b><span>' + (f.on ? esc(t('dg.fr.on')) : '') + '</span>' +
+        (inRoom.indexOf(f.n) >= 0 ? '' : '<button class="btn plain" type="button" data-frinv="' + esc(f.p) + '"' + (sent ? ' disabled' : '') + '>' + esc(t(sent ? 'dg.fr.invited' : 'dg.fr.invite')) + '</button>') + '</li>';
+    }).join('');
+  }
+  function drawInvite() {
+    var card = $('invCard'), inv = fr.inv.filter(function (i) { return fr.ignored.indexOf(i.p + ':' + i.at) < 0; })[0];
+    if (!card) return;
+    card.hidden = !inv || screen !== 'start';
+    if (card.hidden) return;
+    card.setAttribute('data-k', inv.p + ':' + inv.at);
+    card.innerHTML = '<p>' + esc(t(inv.g === 'dg' ? 'dg.fr.banDG' : 'dg.fr.banZZ', inv.n || '?')) + '</p>' +
+      (inv.g === 'dg' ? '<button class="btn" type="button" data-invjoin="' + esc(inv.code) + '">' + esc(t('dg.fr.join')) + '</button>' : '<a class="btn" href="../../?room=' + encodeURIComponent(inv.code) + '">' + esc(t('dg.fr.join')) + '</a>') +
+      '<button class="btn plain" type="button" data-invno="1">' + esc(t('dg.fr.ignore')) + '</button>';
+  }
+
   // ---------- the game as this page sees it ----------
   var room = null, host = false, solo = false, screen = 'start';
   var lobby = {};            // host: seat → { s, n, c }; everyone: the list as last heard
@@ -139,6 +196,7 @@
     }).join('');
     clsButtons('clsLobby');
     $('go').hidden = !host; $('lobbyWait').hidden = host;
+    drawFriends();
   }
   function sendLobby() { if (host && room) room.send({ t: 'lb', g: 'dg', p: lobbyList() }); drawLobby(); }
   function readLobby(p) {
@@ -263,7 +321,7 @@
   // ---------- opening, joining, leaving ----------
   function newRoom(seat, code) {
     room = new Room();
-    room.onMsg = onMsg; room.onGone = roomGone;
+    room.onMsg = onMsg; room.onGone = roomGone; hostHeard = Date.now();
     return room;
   }
   function failKey(r) { return !r ? 'dg.err.net' : r.status === 404 ? 'dg.err.room' : r.status === 409 ? 'dg.err.full' : r.status === 429 ? 'dg.err.slow' : 'dg.err.net'; }
@@ -278,7 +336,7 @@
       host = true; solo = false; st = null; ended = false;
       lobby = {}; lobby[0] = { s: 0, n: me.n, c: me.c };
       r.start(res.body.code, 0);
-      show('lobby'); drawLobby();
+      show('lobby'); drawLobby(); friendsNow(true);
       try { history.replaceState(null, '', '?room=' + res.body.code); } catch (e) { /* fine */ }
     }, function () { $('open').disabled = false; room = null; err('startErr', 'dg.err.net'); });
   }
@@ -417,7 +475,7 @@
     else if (st.ph === 'loot') { if (screen !== 'loot') show('loot'); drawLoot(); }
     else { ended = true; if (screen !== 'end') show('end'); drawEnd(); }
   }
-  function drawStart() { $('name').value = me.n; clsButtons('clsStart'); }
+  function drawStart() { if (!me.n) { me.n = rollName(); keep(); } $('name').value = me.n; clsButtons('clsStart'); }
 
   // ---------- input ----------
   document.addEventListener('click', function (e) {
@@ -432,6 +490,17 @@
       } else clsButtons('clsStart');
       return;
     }
+    if (d.frinv && room) {
+      var who = d.frinv, code = room.code;
+      b.disabled = true;
+      rpc({ a: 'frInv', p: who, g: 'dg', code: code }).then(function (r) {
+        if (r && r.status === 200 && r.body.ok) fr.sent[who] = code; else { b.disabled = false; err('netErr', 'dg.fr.err'); setTimeout(function () { err('netErr', ''); }, 2500); }
+        drawFriends();
+      });
+      return;
+    }
+    if (d.invjoin) { var card = $('invCard'); fr.ignored.push(card.getAttribute('data-k')); $('code').value = d.invjoin; card.hidden = true; joinRoom(); return; }
+    if (d.invno) { fr.ignored.push($('invCard').getAttribute('data-k')); drawInvite(); return; }
     if (d.foe != null) { choose({ k: 'atk', t: +d.foe }); return; }
     if (d.ally != null) { choose({ k: 'skill', t: +d.ally }); return; }
     if (d.up) { takeUp(d.up); return; }
@@ -441,6 +510,10 @@
     if (d.do === 'cancel') { aim = ''; drawFight(); return; }
     if (d.do === 'change') { pick = null; if (h) h.a = null; drawFight(); return; }
     switch (b.id) {
+      case 'dice': {
+        var i = b.querySelector('i'); if (i) { i.classList.remove('roll'); void i.offsetWidth; i.classList.add('roll'); }
+        $('name').value = rollName(); readMe(); break;
+      }
       case 'open': openRoom(); break;
       case 'join': joinRoom(); break;
       case 'solo': playAlone(); break;
@@ -469,12 +542,19 @@
       drawClock();
       if (Date.now() - lastSent > 4000) { room.send({ t: 'hb' }, 0); lastSent = Date.now(); }
       if (Date.now() - hostHeard > LOST_MS) { leave(); err('startErr', 'dg.lost'); }
-    } else if (room && !st && Date.now() - hostHeard > LOST_MS) { leave(); err('startErr', 'dg.lost'); }
+    } else if (room && room.code && !host && !st && Date.now() - hostHeard > LOST_MS) { leave(); err('startErr', 'dg.lost'); }      // (a room still being opened or joined has no code yet)
     if (room) room.fast = !!st && !ended;
+    if (!document.hidden && (screen === 'start' || screen === 'lobby')) friendsNow(false);
   }, 400);
 
   drawStart();
-  try { var q = new URLSearchParams(location.search).get('room'); if (q) { $('code').value = q.toUpperCase().slice(0, 6); $('code').focus(); } } catch (e) { /* none */ }
+  try {
+    var qs = new URLSearchParams(location.search), q = qs.get('room');
+    if (q) { $('code').value = q.toUpperCase().slice(0, 6); $('code').focus(); }
+    // a friend's invitation from 轉磚 comes with join=1: straight into the room
+    if (q && qs.get('join') === '1') setTimeout(joinRoom, 300);
+  } catch (e) { /* none */ }
+  friendsNow(true);
   // for the browser tests
-  window.DGPage = { state: function () { return st; }, room: function () { return room; }, host: function () { return host; }, screen: function () { return screen; }, lobby: function () { return lobbyList(); }, deadline: function (ms) { deadline = Date.now() + ms; } };
+  window.DGPage = { friends: function () { friendsNow(true); }, state: function () { return st; }, room: function () { return room; }, host: function () { return host; }, screen: function () { return screen; }, lobby: function () { return lobbyList(); }, deadline: function (ms) { deadline = Date.now() + ms; } };
 })();

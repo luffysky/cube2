@@ -1154,6 +1154,37 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
 .dr-list .fresh::after { top: 50%; right: 34px; transform: translateY(-50%); }
 .btn.othergame { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; text-decoration: none; }
 .btn.othergame span { font-size: 13px; font-weight: 600; opacity: .8; }
+/* friends */
+.fr-me { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 12px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--edge); }
+.fr-me span { font-size: 13px; color: var(--muted); }
+.fr-me b { font: 800 24px/1.1 var(--num); letter-spacing: .14em; }
+.fr-me .btn { margin-left: auto; }
+.fr-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.fr-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--edge); }
+.fr-row > span:nth-child(2) { min-width: 0; display: flex; flex-direction: column; }
+.fr-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-row small { font-size: 12px; color: var(--muted); }
+.fr-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--edge-deep); }
+.fr-row.on .fr-dot { background: #2E9E6B; box-shadow: 0 0 0 3px color-mix(in srgb, #2E9E6B 25%, transparent); }
+.fr-btns { display: flex; gap: 6px; }
+.fr-btns .btn { margin: 0; }
+#sheetCard .note.ok { color: #2E9E6B; font-weight: 700; }
+.frcard { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 90; width: min(92vw, 420px); display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--wall); color: var(--wall-ink); box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+.frcard[hidden] { display: none; }
+.frcard p { margin: 0; flex: 1; font-weight: 700; font-size: 14px; }
+.frcard div { display: flex; gap: 6px; }
+.frcard .btn { margin: 0; }
+.frcard .btn.main { background: var(--gold); border-color: var(--gold); color: #3B2A00; }
+.frcard .btn:not(.main) { background: transparent; border-color: rgba(255, 255, 255, .35); color: var(--wall-ink); box-shadow: none; }
+/* the dice beside a name */
+.dicebox { justify-self: end; display: flex; align-items: center; gap: 6px; width: 100%; max-width: 16em; }
+.dicebox input[type="text"] { flex: 1; min-width: 0; max-width: none !important; width: auto !important; }
+.dice { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--edge); background: var(--panel); box-shadow: 0 2px 0 var(--edge); cursor: pointer; font-size: 22px; line-height: 1; }
+.dice:active { transform: translateY(2px); box-shadow: none; }
+.dice i { font-style: normal; display: block; }
+.dice i.roll { animation: dice-roll .45s cubic-bezier(.3, .9, .4, 1.2); }
+@keyframes dice-roll { 0% { transform: rotate(0) scale(1); } 40% { transform: rotate(200deg) scale(1.2); } 100% { transform: rotate(360deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dice i.roll { animation: none; } }
 
 /* Site themes (Meta.SITE): the colours of the whole site, around the game. They set only the page's own colours
    (floor, panels, edges, writing); the game's wall keeps whatever the game's own theme says. The same file goes
@@ -1282,6 +1313,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         <button class="mode" type="button" data-go="sprint"><b data-t="m.sprint">40-line sprint</b><span data-t="m.sprint.s">How fast can you clear 40 lines?</span><em id="mSprint"></em></button>
       </nav>
       <footer class="menu-foot">
+        <button class="link" type="button" data-sheet="friends"><span data-t="fr.title">Friends</span><i class="dot" id="frDot" hidden></i></button>
         <button class="link" type="button" data-sheet="shop" data-t="m.shop">Shop</button>
         <button class="link" type="button" data-sheet="boxes"><span data-t="bx.title">Treasure boxes</span><i class="dot" id="mBoxDot" hidden></i></button>
         <button class="link" type="button" data-sheet="bonus"><span data-t="bn.title">Freebies</span></button>
@@ -1323,6 +1355,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
           <button type="button" data-go="online"><i class="ic" data-ic="globe"></i><span data-t="m.online">Online</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-go="ghost"><i class="ic" data-ic="ghost"></i><span data-t="m.ghost">Ghost match</span><i class="ic go" data-ic="chev"></i></button>
           <button type="button" data-sheet="history"><i class="ic" data-ic="hist"></i><span data-t="hi.title">Match history</span><i class="ic go" data-ic="chev"></i></button>
+          <button type="button" data-sheet="friends"><i class="ic" data-ic="friends"></i><span data-t="fr.title">Friends</span><i class="dot" id="frDotD" hidden></i><i class="ic go" data-ic="chev"></i></button>
         </div></section>
         <section class="dr-grp" data-tone="train"><h3 data-t="m.train">Training</h3><div class="dr-list">
           <button type="button" data-go="rpg"><i class="ic" data-ic="quest"></i><span data-t="rp.title">Brick Quest</span><i class="ic go" data-ic="chev"></i></button>
@@ -2617,6 +2650,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'h.m3': ['<b>大逃殺</b>：被擊倒一次就出局，地板每 30 秒升一排，撐到最後的贏；出局後變幽靈還能送行。只能跟真人打：開房間，3 人以上。', '<b>Battle royale</b>: one knockout and you are out, the floor rises every 30 seconds, last one standing wins; the fallen become ghosts who can still send lines. People only: an Online room with 3 or more.', '<b>バトルロイヤル</b>：1回KOで脱落、30秒ごとに床が上がり、最後まで残った人の勝ち。脱落後は幽霊として攻撃を送れる。対人のみ：3人以上の部屋。', '<b>배틀 로얄</b>: 한 번 KO되면 탈락, 30초마다 바닥이 올라오고 마지막까지 남은 사람이 승리. 탈락 후엔 유령으로 줄을 보낼 수 있어요. 사람과만: 3명 이상의 방.'],
     'h.m4': ['<b>2v2 接力</b>：同隊共用一面牆，每人放 8 塊就交給隊友。只能跟真人打：開房間，4、6 或 8 人。', '<b>Relay</b>: teammates share one wall, eight pieces each before handing it on. People only: an Online room with 4, 6 or 8.', '<b>2v2 リレー</b>：チームで1つの壁を共有し、8個置いたら交代。対人のみ：4・6・8人の部屋。', '<b>2v2 릴레이</b>: 팀이 벽 하나를 같이 쓰고, 8개씩 놓으면 교대. 사람과만: 4, 6, 8명 방.'],
     'h.m5': ['<b>磚之冒險</b>：一個人打 10 隻怪物，選職業（騎士、刺客、法師，各有自己的裝備）、強化裝備、放技能（道具鍵）。主選單的綠色卡。', '<b>Brick Quest</b>: on your own against ten monsters, as a knight, rogue or mage, each with its own gear to upgrade, and a skill on the item key. The green card on the menu.', '<b>ブロック冒険</b>：一人で10体の魔物と戦う。騎士・暗殺者・魔法使いにそれぞれ専用装備、スキルはアイテムキー。メニューの緑のカード。', '<b>블록 모험</b>: 혼자서 몬스터 10마리와 싸워요. 기사·자객·마법사마다 전용 장비가 있고, 스킬은 아이템 키. 메뉴의 초록 카드.'],
+    'h.m7': ['<b>好友</b>：主選單下面的「好友」。用好友碼加好友，對方也加你就成為好友；開房間時可以直接邀請，好友的遊戲會跳出通知。轉磚和地城小隊都能邀。', '<b>Friends</b>: “Friends” under the main menu. Add someone by their friend code; when they add you back you are friends. In a room you can invite them, and their game shows the invitation. Works for 轉磚 and Dungeon Party.', '<b>フレンド</b>：メニュー下の「フレンド」。コードで申請し、相手も申請すればフレンドに。部屋から招待でき、相手のゲームに通知が出ます。轉磚とダンジョン小隊の両方で使えます。', '<b>친구</b>: 메인 메뉴 아래 「친구」. 친구 코드로 추가하고 상대도 추가하면 친구가 돼요. 방에서 초대하면 친구 게임에 알림이 떠요. 轉磚과 던전 파티 모두 가능.'],
     'h.m6': ['<b>助攻</b>：多人房裡，有人被擊倒時，最後送他攻擊的人拿擊倒，15 秒內也送過的人拿助攻。對戰紀錄會列出 K／D／A。', '<b>Assists</b>: in rooms of three or more, the last to send lines at a player who is knocked out gets the KO, and anyone else who sent lines in the 15 seconds before gets an assist. Match history shows K/D/A.', '<b>アシスト</b>：3人以上の部屋で、KOされた人に最後に攻撃した人がKO、15秒以内に攻撃した他の人がアシスト。対戦履歴にK/D/A。', '<b>어시스트</b>: 3명 이상 방에서 KO된 사람에게 마지막으로 공격한 사람이 KO, 15초 안에 공격한 다른 사람은 어시스트. 대전 기록에 K/D/A.'],
     'h.items': ['道具', 'Items', 'アイテム', '아이템'],
     'h.itemsP': ['道具戰裡，每放幾塊，牆上就有一格變成白色的道具磚。把那一排消掉就能拿到，最多帶 3 個，先拿到的先用。', 'In an item match, every few pieces one cell turns into a white item tile. Clear its row to collect it. You carry up to 3 and use the oldest first.', 'アイテム戦では数ピースごとに1マスが白いアイテムタイルに。その列を消すと入手。最大3個まで持て、古い順に使います。', '아이템전에서는 블록 몇 개마다 한 칸이 흰 아이템 타일이 됩니다. 그 줄을 지우면 얻고, 최대 3개까지 들며 먼저 얻은 것부터 씁니다.'],
@@ -3956,6 +3990,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5z"/>',
     ghost: '<path d="M5 20V11a7 7 0 0 1 14 0v9l-2.5-2-2.3 2-2.2-2-2.2 2-2.3-2z"/><circle cx="9.5" cy="11" r="1"/><circle cx="14.5" cy="11" r="1"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+    friends: '<circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9.5" r="2.8"/><path d="M2.5 20c.8-3.6 3.4-5.6 6.5-5.6s5.7 2 6.5 5.6"/><path d="M15.5 14.6c2.9-.2 5.2 1.6 6 4.9"/>',
     quest: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M12 8v6M9 11h6"/>',
     sun: '<circle cx="9" cy="9" r="3"/><path d="M9 2.5V4M3.5 9H2M4.4 4.4l1 1M13.6 4.4l-1 1"/><path d="M9 20h9a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 9 20z"/>',
     rotate: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/>',
@@ -8459,7 +8494,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         '<h3>' + t('h.atk') + '</h3>' + ul(['h.atk1', 'h.atk2', 'h.atk3', 'h.atk4', 'h.atk5', 'h.atk6']) +
         '<h3>' + t('h.bt') + '</h3>' + ul(['h.bt1', 'h.bt2', 'h.bt3', 'h.bt4']) +
         '<h3>' + t('h.sc') + '</h3>' + ul(['h.sc1', 'h.sc2', 'h.sc3']) +
-        '<h3>' + t('h.modes') + '</h3>' + ul(['h.m1', 'h.m2', 'h.m3', 'h.m4', 'h.m5', 'h.m6']) +
+        '<h3>' + t('h.modes') + '</h3>' + ul(['h.m1', 'h.m2', 'h.m3', 'h.m4', 'h.m5', 'h.m6', 'h.m7']) +
         '<h3>' + t('h.items') + '</h3><p>' + t('h.itemsP') + '</p><dl class="keys">';
       for (i = 1; i <= 7; i++) h += '<dt>' + itile(i) + '</dt><dd><b>' + t('i' + i) + '</b>　' + t('i' + i + 't') + '</dd>';
       h += '</dl><p class="note">' + t('h.itemsMore', ITEMS.length - 1) + '</p><dl class="keys">';
@@ -8704,7 +8739,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   var MODES = { rank: 1, battle: 1, online: 1, quick: 1, ghost: 1, dojo: 1, openers: 1, practice: 1, sprint: 1, levels: 1, weather: 1, rpg: 1 };
   // 「新」 tags on what was added lately (磚之冒險, the new battle switches and room modes, the match history), each gone
   // once it has been opened, and all of them after FRESH_UNTIL. save.fresh keeps one bit per tag.
-  var FRESH = { rpg: 1, battle: 2, online: 4, history: 8 }, FRESH_UNTIL = Date.UTC(2026, 11, 14);
+  var FRESH = { rpg: 1, battle: 2, online: 4, history: 8, friends: 16 }, FRESH_UNTIL = Date.UTC(2026, 11, 14);
   function freshSeen(id) {
     if (!FRESH[id] || (save.fresh & FRESH[id])) return;
     save.fresh |= FRESH[id]; saveStore(); freshTags();
@@ -10553,7 +10588,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     else if (st === 'waiting') {
       h += '<p>' + t('net.send') + '</p><div class="roomcode" aria-label="' + esc(Net.code) + '">' + esc(Net.code) + '</div><div class="row">' +
         '<button class="btn" type="button" data-do="netCopy">' + t(copied ? 'net.copied' : 'net.copy') + '</button>' +
-        (navigator.share ? btn('netShare', 'net.share') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('mp.more') + '</p><p class="note">' + t('net.keepOpen') + '</p>' : '') +
+        (navigator.share ? btn('netShare', 'net.share') : '') + (Net.relayed() && !(ZZ.Consent && ZZ.Consent.child()) ? btn('frOpen', 'fr.inviteBtn') : '') + '</div><p class="note">' + t('net.waitFriend') + '</p>' + (Net.relayed() ? '<p class="note">' + t('mp.more') + '</p><p class="note">' + t('net.keepOpen') + '</p>' : '') +
         '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
     } else if ((st === 'ready' || st === 'playing') && Net.matched) {
       h += '<p><b>' + esc(t('net.found', Net.foe || t('foe'))) + '</b>' + devTag(Net.foeDev()) + '</p>' + '<div class="row">' + btn('netQuit', 'net.leaveRoom') + '</div>';
@@ -10563,6 +10598,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       h += '<p>' + t('mp.code', Net.code) + '</p><h3>' + t('mp.inRoom', n, Net.cap) + '</h3><ul class="roster">';
       ro.forEach(function (r, i) { h += '<li' + (team ? ' class="t' + (i % 2) + '"' : '') + '><span>' + esc(r.name || t('player')) + (r.lv ? ' <small>' + t('xp.lv', r.lv) + (r.tt && L.has('tt.' + r.tt) ? ' · ' + esc(t('tt.' + r.tt)) : '') + '</small>' : '') + (r.me ? ' <small>' + t('you') + '</small>' : '') + (r.seat === 0 ? ' <small>' + t('mp.host') + '</small>' : '') + devTag(r.dev) + '</span>' + (team ? '<small>' + t(i % 2 ? 'mp.teamB' : 'mp.teamA') + '</small>' : '') + '</li>'; });
       h += '</ul>';
+      if (st === 'ready' && n < Net.cap && !(ZZ.Consent && ZZ.Consent.child())) h += '<div class="row">' + btn('frOpen', 'fr.inviteBtn') + '</div>';
       if (Net.direct && Net.direct()) h += '<p class="note" id="netLane">' + t('net.direct') + '</p>';
       else if (Net.fast && Net.fast()) h += '<p class="note" id="netLane">' + t('net.fast') + '</p>';
       if (/[?&]wsdebug=1/.test(window.location.search) && Net.wsInfo) h += '<p class="note" id="netDebug">' + esc(Net.wsInfo()) + '</p>';
@@ -11413,6 +11449,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     return h;
   }
   App.dismiss.shop = 1; App.dismiss.jobs = 1; App.dismiss.profile = 1;
+  // the dice by the name: a random one, kept at once
+  App.acts.pRoll = function (b) {
+    var box = document.getElementById('pName'), n = App.rollName ? App.rollName() : '';
+    if (!n || !box) return;
+    if (App.diceSpin) App.diceSpin(b);
+    App.sfx.play('rot');
+    box.value = n; Meta.setName(n);
+    if (App.updateMenu) App.updateMenu();
+  };
   App.sheets.shop = function () {
     var h = '<div class="shop-top"><h2>' + t('m.shop') + '</h2>' + coin(Meta.data.coins) + '</div><div class="tabs" role="tablist">', i;
     for (i = 0; i < TABS.length; i++) h += '<button type="button" role="tab" aria-selected="' + (tab === TABS[i]) + '" data-tab="' + TABS[i] + '">' + t('k.' + TABS[i]) + '</button>';
@@ -11700,7 +11745,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   App.sheets.profile = function () {
     var d = Meta.data, r = Meta.rankOf(d.rp), pct = r.top ? 100 : Math.round(r.into / r.need * 100), tt = d.tot;
     var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
-    var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
+    var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><span class="dicebox"><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '">' + (App.dice && !(ZZ.Consent && ZZ.Consent.child()) ? App.dice('pRoll') : '') + '</span></div>' +
       '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
     if (d.pvp && d.pvp.games) h += '<p class="note">' + esc(t('pr.now', App.rankName(Meta.rankOf(d.pvp.rp)), d.pvp.rp, d.pvp.games)) + '</p>';
     var lv = Meta.level(), lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100), now = Meta.titleNow();
@@ -12345,6 +12390,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       return r.status === 200 && r.body && r.body.ok ? r.body : null;
     }, function () { return null; });
   };
+  // any other signed request of the player's own (friends: src/friends.js); null when the server could not be reached
+  Cloud.rpc = function (body) {
+    if (!Cloud.cred) return Promise.resolve(null);
+    return call('POST', 'rpc', body, true).then(function (r) { return { status: r.status, body: r.body || {} }; }, function () { return null; });
+  };
   Cloud._forget = function () { boards = {}; };
 
   ZZ.Cloud = Cloud;
@@ -12977,7 +13027,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'nm.title': ['幫自己取個名字', 'Pick a name', '名前を決めよう', '이름을 정해 주세요'],
     'nm.p': ['排行榜、連線對戰和地城小隊都會顯示這個名字，之後也可以在個人資料裡改。', 'It shows on the leaderboards, in online matches and in Dungeon Party. You can change it later in your profile.', 'ランキングやオンライン対戦、ダンジョン小隊で表示されます。あとでプロフィールから変えられます。', '랭킹, 온라인 대전, 던전 파티에 표시돼요. 나중에 프로필에서 바꿀 수 있어요.'],
     'nm.label': ['名字', 'Name', '名前', '이름'],
-    'nm.roll': ['換一個', 'Another one', '別の名前', '다른 이름'],
+    'nm.roll': ['擲骰子換一個隨機名字', 'Roll the dice for another name', 'サイコロで別の名前', '주사위로 다른 이름'],
     'nm.ok': ['就用這個', 'Use this name', 'この名前にする', '이 이름으로'],
     'nm.empty': ['名字不能空白', 'The name cannot be empty', '名前を入れてください', '이름을 입력해 주세요'],
     'nm.hi': ['你好，{0}！', 'Hello, {0}!', 'こんにちは、{0}！', '안녕하세요, {0}!'],
@@ -13135,9 +13185,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
   App.sheets.naming = function () {
     return '<h2>' + t('nm.title') + '</h2><p class="note">' + t('nm.p') + '</p>' +
-      '<form id="nmForm" class="field line"><label for="nmName">' + t('nm.label') + '</label><input type="text" id="nmName" maxlength="12" autocomplete="nickname" value="' + esc(candidate) + '"></form>' +
+      '<form id="nmForm" class="field line dicerow"><label for="nmName">' + t('nm.label') + '</label><span class="dicebox"><input type="text" id="nmName" maxlength="12" autocomplete="nickname" value="' + esc(candidate) + '">' + dice('nmRoll') + '</span></form>' +
       (nmWarn ? '<p class="warn" role="alert">' + t(nmWarn) + '</p>' : '') +
-      '<div class="row">' + btn('nmRoll', 'nm.roll') + btn('nmOk', 'nm.ok', true) + '</div>';
+      '<div class="row">' + btn('nmOk', 'nm.ok', true) + '</div>';
   };
   function nameOk() {
     var box = document.getElementById('nmName'), want = box ? String(box.value || '').trim() : candidate;
@@ -13150,7 +13200,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (App.updateMenu) App.updateMenu();
   }
   App.acts.nmOk = nameOk;
-  App.acts.nmRoll = function () { var box = document.getElementById('nmName'); candidate = rollName(); nmWarn = ''; if (box) { box.value = candidate; box.focus(); } else App.openSheet('naming'); };
+  // the dice: a random name, with a little roll (none when the player asks for less motion)
+  function dice(act) { return '<button class="dice" type="button" data-do="' + act + '" aria-label="' + esc(t('nm.roll')) + '" title="' + esc(t('nm.roll')) + '"><i aria-hidden="true">🎲</i></button>'; }
+  function spin(b) { var i = b && b.querySelector && b.querySelector('i'); if (!i) return; i.classList.remove('roll'); void i.offsetWidth; i.classList.add('roll'); }
+  App.dice = dice; App.rollName = rollName; App.diceSpin = spin;
+  App.acts.nmRoll = function (b) { var box = document.getElementById('nmName'); candidate = rollName(); nmWarn = ''; spin(b); App.sfx.play('rot'); if (box) box.value = candidate; else App.openSheet('naming'); };
   // closed some other way (Esc): the name that was showing is kept, so nobody ends up nameless by accident
   App.closed = App.closed || {};
   App.closed.naming = function () {
@@ -14430,6 +14484,229 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   };
   App.acts.rpNext = function () { var S = App.S(); App.begin('rpg', { stage: S.rpg.n + 1 }); };
   App.acts.rpMap = function () { App.toMenu(); App.openSheet('rpg'); };
+})();
+</script>
+<script>
+/* 轉磚 friends: add a friend by their friend code (the public tag the leaderboards show), agree by adding back, see
+   who has the game open, and invite friends into a room (轉磚 here, or 地城小隊 on its own page). The server keeps the
+   friendships (server/core.js, friends*). The page looks in every 30 seconds while it is in front, which is also what
+   "online" means to friends; invitations from friends then show as a small card. Under 13 there is none of this,
+   the same as online play. */
+(function () {
+  'use strict';
+  var ZZ = window.ZZ, App = ZZ.App, L = ZZ.L, t = L.t, Meta = ZZ.Meta, esc = App.esc, btn = App.btn;
+  var POLL = 30000, SEEN = 'zhuanzhuan.invites.v1';
+
+  L.add({
+    'fr.title': ['好友', 'Friends', 'フレンド', '친구'],
+    'fr.kid': ['未滿 13 歲不能加好友（和連線對戰一樣，避免跟不認識的人接觸）。', 'Friends are not available under 13 (like online play, so you do not meet strangers).', '13歳未満はフレンド機能を使えません（オンライン対戦と同じく、知らない人と接しないため）。', '13세 미만은 친구 기능을 쓸 수 없어요(온라인 대전처럼 모르는 사람과 만나지 않도록).'],
+    'fr.off': ['好友功能要連上轉磚的伺服器才能用。', 'Friends need 轉磚\'s server, which cannot be reached here.', 'フレンド機能は轉磚のサーバーにつながっているときだけ使えます。', '친구 기능은 轉磚 서버에 연결되어 있어야 써요.'],
+    'fr.loading': ['載入中…', 'Loading…', '読み込み中…', '불러오는 중…'],
+    'fr.myCode': ['我的好友碼', 'My friend code', '自分のフレンドコード', '내 친구 코드'],
+    'fr.copyLink': ['複製加好友連結', 'Copy friend link', 'フレンドリンクをコピー', '친구 링크 복사'],
+    'fr.copied': ['已複製', 'Copied', 'コピーしました', '복사됨'],
+    'fr.add': ['加好友', 'Add friend', 'フレンド申請', '친구 추가'],
+    'fr.codePh': ['朋友的好友碼（8 碼）', 'A friend\'s code (8 letters)', '友達のコード（8文字）', '친구 코드(8자)'],
+    'fr.sent': ['已送出給 {0}，等對方同意', 'Sent to {0}; waiting for them to agree', '{0}に送りました。承認を待っています', '{0}에게 보냈어요. 수락을 기다리는 중'],
+    'fr.now': ['你和 {0} 成為好友了！', 'You and {0} are friends now!', '{0}とフレンドになりました！', '{0}와(과) 친구가 됐어요!'],
+    'fr.e.self': ['這是你自己的好友碼', 'That is your own code', '自分のコードです', '내 코드예요'],
+    'fr.e.nobody': ['找不到這個好友碼', 'Nobody has that code', 'そのコードの人は見つかりません', '그 코드의 사람이 없어요'],
+    'fr.e.code': ['好友碼是 8 個英文字母和數字', 'A friend code is 8 letters and digits', 'フレンドコードは英数字8文字です', '친구 코드는 영문과 숫자 8자예요'],
+    'fr.e.wait': ['對方不久前結束了好友關係，一天後才能再送', 'They ended it not long ago; you can ask again in a day', '最近相手が解除しました。1日たってから申請できます', '상대가 최근에 끊었어요. 하루 뒤에 다시 보낼 수 있어요'],
+    'fr.e.many': ['好友最多 100 位', 'Up to 100 friends', 'フレンドは100人まで', '친구는 100명까지'],
+    'fr.e.slow': ['送太多次了，等一下再試', 'Too many tries; wait a little', '試行が多すぎます。少し待って', '시도가 너무 많아요. 잠시 기다려 주세요'],
+    'fr.e.net': ['連不上伺服器，稍後再試', 'Cannot reach the server; try again later', 'サーバーにつながりません。あとでもう一度', '서버에 연결할 수 없어요. 나중에 다시'],
+    'fr.in': ['想加你為好友', 'wants to be your friend', 'からフレンド申請', '님이 친구 신청'],
+    'fr.inH': ['收到的申請', 'Requests', '届いた申請', '받은 신청'],
+    'fr.accept': ['同意', 'Accept', '承認', '수락'],
+    'fr.decline': ['拒絕', 'Decline', '断る', '거절'],
+    'fr.list': ['好友（{0}）', 'Friends ({0})', 'フレンド（{0}）', '친구({0})'],
+    'fr.none': ['還沒有好友。把你的好友碼傳給朋友，或輸入朋友的好友碼。', 'No friends yet. Send your code to a friend, or type in theirs.', 'まだフレンドがいません。自分のコードを送るか、友達のコードを入力しよう。', '아직 친구가 없어요. 내 코드를 보내거나 친구 코드를 입력하세요.'],
+    'fr.outH': ['等對方同意', 'Waiting for them', '承認待ち', '수락 대기'],
+    'fr.cancel': ['取消', 'Cancel', '取り消す', '취소'],
+    'fr.remove': ['移除', 'Remove', '解除', '삭제'],
+    'fr.removeSure': ['確定移除？', 'Remove for sure?', '本当に解除？', '정말 삭제?'],
+    'fr.online': ['在線上', 'Online', 'オンライン', '온라인'],
+    'fr.ago': ['{0} 分鐘前', '{0} min ago', '{0}分前', '{0}분 전'],
+    'fr.agoH': ['{0} 小時前', '{0} h ago', '{0}時間前', '{0}시간 전'],
+    'fr.agoD': ['{0} 天前', '{0} days ago', '{0}日前', '{0}일 전'],
+    'fr.invite': ['邀請', 'Invite', '招待', '초대'],
+    'fr.invited': ['已邀請 {0}', '{0} invited', '{0}を招待しました', '{0} 초대함'],
+    'fr.inRoom': ['你在房間 {0}，按「邀請」叫好友進來。', 'You are in room {0}: press Invite to bring a friend in.', '部屋 {0} にいます。「招待」で友達を呼べます。', '방 {0}에 있어요. 「초대」로 친구를 불러요.'],
+    'fr.inviteBtn': ['邀請好友', 'Invite friends', '友達を招待', '친구 초대'],
+    'fr.banZZ': ['{0} 邀你一起玩轉磚', '{0} invites you to play 轉磚', '{0}から轉磚のお誘い', '{0}님이 轉磚에 초대했어요'],
+    'fr.banDG': ['{0} 邀你一起玩地城小隊', '{0} invites you to Dungeon Party', '{0}からダンジョン小隊のお誘い', '{0}님이 던전 파티에 초대했어요'],
+    'fr.join': ['加入', 'Join', '参加', '참가'],
+    'fr.ignore': ['忽略', 'Ignore', '無視', '무시'],
+    'fr.help': ['好友碼就是排行榜上顯示的那組代碼。對方也加你，就成為好友；之後開房間可以直接邀請。', 'Your friend code is the tag shown on the leaderboards. When they add you back you are friends, and you can invite each other into rooms.', 'フレンドコードはランキングに出るコードです。相手も申請すればフレンドになり、部屋に招待できます。', '친구 코드는 랭킹에 표시되는 코드예요. 상대도 추가하면 친구가 되고, 방에 초대할 수 있어요.']
+  });
+
+  var data = null, busy = false, msg = '', msgBad = false, sure = '', backTo = '', timer = 0, lastAt = 0;
+  var hosted = function () { return ZZ.Cloud && ZZ.Cloud.hosted(); };
+  var kid = function () { return ZZ.Consent && ZZ.Consent.child && ZZ.Consent.child(); };
+  var codeOf = function (pub) { return String(pub || '').toUpperCase(); };
+  var myName = function () { return Meta.data.name || t('player'); };
+  function seen() { try { return JSON.parse(sessionStorage.getItem(SEEN) || '[]'); } catch (e) { return []; } }
+  function markSeen(k) { var s = seen(); s.push(k); try { sessionStorage.setItem(SEEN, JSON.stringify(s.slice(-50))); } catch (e) { /* once more */ } }
+  function room() { var N = ZZ.Net; return N && N.code && !N.matched && (N.state === 'waiting' || N.state === 'ready') ? N.code : ''; }
+
+  // ---------- talking to the server ----------
+  function refresh(draw) {
+    if (busy || kid() || !hosted() || !ZZ.Cloud.cred) return Promise.resolve(null);
+    busy = true;
+    return ZZ.Cloud.rpc({ a: 'fr' }).then(function (r) {
+      busy = false; lastAt = Date.now();
+      if (r && r.status === 200 && r.body.ok) { data = r.body; badge(); banner(); }
+      if (draw && App.sheet() === 'friends') App.openSheet('friends');
+      return data;
+    }, function () { busy = false; return null; });
+  }
+  function answer(r, ok) {
+    if (!r) { msg = t('fr.e.net'); msgBad = true; }
+    else if (r.status === 200 && r.body.ok) ok(r.body);
+    else { msg = L.has('fr.e.' + r.body.why) ? t('fr.e.' + r.body.why) : t('fr.e.net'); msgBad = true; }
+    refresh(true);
+  }
+  function add(code) {
+    msg = ''; msgBad = false;
+    var c = String(code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (c.length !== 8) { msg = t('fr.e.code'); msgBad = true; return App.openSheet('friends'); }
+    ZZ.Cloud.ensure().then(function (ok) {
+      if (!ok) { msg = t('fr.e.net'); msgBad = true; return App.openSheet('friends'); }
+      ZZ.Cloud.rpc({ a: 'frAdd', p: c }).then(function (r) { answer(r, function (b) { msg = t(b.st === 'ok' ? 'fr.now' : 'fr.sent', b.n || codeOf(b.p)); if (b.st === 'ok') App.sfx.play('chime'); }); });
+    });
+  }
+  function drop(pub) { msg = ''; ZZ.Cloud.rpc({ a: 'frDrop', p: pub }).then(function (r) { sure = ''; answer(r, function () {}); }); }
+  function invite(pub, name) {
+    var code = room();
+    if (!code) return;
+    ZZ.Cloud.rpc({ a: 'frInv', p: pub, g: 'zz', code: code }).then(function (r) {
+      if (r && r.status === 200 && r.body.ok) App.toast(t('fr.invited', name), 2000);
+      else App.toast(r && L.has('fr.e.' + r.body.why) ? t('fr.e.' + r.body.why) : t('fr.e.net'), 2600);
+    });
+  }
+
+  // ---------- the sheet ----------
+  function ago(ms) {
+    var m = Math.max(1, Math.round((Date.now() - ms) / 60000));
+    return m < 60 ? t('fr.ago', m) : m < 1440 ? t('fr.agoH', Math.round(m / 60)) : t('fr.agoD', Math.round(m / 1440));
+  }
+  function row(f, buttons, sub) {
+    return '<li class="fr-row' + (f.on ? ' on' : '') + '"><i class="fr-dot" aria-hidden="true"></i><span><b>' + esc(f.n || t('player')) + '</b><small>' + esc(sub) + '</small></span><span class="fr-btns">' + buttons + '</span></li>';
+  }
+  App.sheets.friends = function () {
+    var h = '<h2>' + t('fr.title') + '</h2>';
+    if (kid()) return h + '<p class="note">' + t('fr.kid') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+    if (!hosted()) return h + '<p class="note">' + t('fr.off') + '</p><div class="row">' + btn('close', 'close', true) + '</div>';
+    var me = data && data.me || (ZZ.Cloud && ZZ.Cloud.pub) || '';
+    h += '<div class="fr-me"><span>' + t('fr.myCode') + '</span><b id="frMine">' + esc(me ? codeOf(me) : '········') + '</b>' + (me ? '<button class="btn sm" type="button" data-do="frCopy">' + t('fr.copyLink') + '</button>' : '') + '</div>' +
+      '<p class="note">' + t('fr.help') + '</p>' +
+      '<form class="joinrow" id="frForm"><input id="frCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="' + esc(t('fr.codePh')) + '" value="' + esc(App.frWant || '') + '">' + btn('frAdd', 'fr.add', true) + '</form>';
+    if (msg) h += '<p class="' + (msgBad ? 'warn' : 'note ok') + '" role="status">' + esc(msg) + '</p>';
+    if (room()) h += '<p class="note"><b>' + esc(t('fr.inRoom', room())) + '</b></p>';
+    if (!data) return h + '<p class="note">' + t('fr.loading') + '</p><div class="row">' + btn('close', 'close') + '</div>';
+    var ins = data.list.filter(function (f) { return f.st === 'in'; }), oks = data.list.filter(function (f) { return f.st === 'ok'; }), outs = data.list.filter(function (f) { return f.st === 'out'; });
+    oks.sort(function (a, b) { return (b.on ? 1 : 0) - (a.on ? 1 : 0) || (b.seen || 0) - (a.seen || 0); });
+    if (ins.length) {
+      h += '<h3>' + t('fr.inH') + '</h3><ul class="fr-list">';
+      ins.forEach(function (f) { h += row(f, '<button class="btn sm main" type="button" data-fradd="' + f.p + '">' + t('fr.accept') + '</button><button class="btn sm" type="button" data-frdrop="' + f.p + '">' + t('fr.decline') + '</button>', t('fr.in') + ' · ' + t('xp.lv', f.lv)); });
+      h += '</ul>';
+    }
+    h += '<h3>' + t('fr.list', oks.length) + '</h3>';
+    if (!oks.length) h += '<p class="note">' + t('fr.none') + '</p>';
+    else {
+      h += '<ul class="fr-list">';
+      oks.forEach(function (f) {
+        var b = (room() ? '<button class="btn sm main" type="button" data-frinv="' + f.p + '">' + t('fr.invite') + '</button>' : '') +
+          '<button class="btn sm" type="button" data-frdrop="' + f.p + '">' + t(sure === f.p ? 'fr.removeSure' : 'fr.remove') + '</button>';
+        h += row(f, b, t('xp.lv', f.lv) + ' · ' + (f.on ? t('fr.online') : f.seen ? ago(f.seen) : ''));
+      });
+      h += '</ul>';
+    }
+    if (outs.length) {
+      h += '<h3>' + t('fr.outH') + '</h3><ul class="fr-list">';
+      outs.forEach(function (f) { h += row(f, '<button class="btn sm" type="button" data-frdrop="' + f.p + '">' + t('fr.cancel') + '</button>', codeOf(f.p)); });
+      h += '</ul>';
+    }
+    return h + '<div class="row">' + btn('close', 'close') + '</div>';
+  };
+  App.dismiss.friends = 1;
+  App.acts.frAdd = function () { var e = document.getElementById('frCode'); App.frWant = e ? e.value : ''; add(App.frWant); };
+  App.acts.frCopy = function (b) {
+    var link = window.location.href.split('#')[0].split('?')[0] + '?friend=' + codeOf(data && data.me || ZZ.Cloud.pub);
+    var done = function () { if (b) b.textContent = t('fr.copied'); };
+    try { navigator.clipboard.writeText(link).then(done, done); } catch (e) { done(); }
+  };
+  App.acts.frOpen = function () { backTo = App.sheet() || ''; App.openSheet('friends'); };
+  App.clicks.push(function (d) {
+    if (d.fradd) { add(d.fradd); return true; }
+    if (d.frdrop) {
+      var f = data && data.list.filter(function (x) { return x.p === d.frdrop; })[0];
+      if (f && f.st === 'ok' && sure !== f.p) { sure = f.p; App.openSheet('friends'); return true; }      // removing a friend asks once more
+      drop(d.frdrop); return true;
+    }
+    if (d.frinv) { var g = data && data.list.filter(function (x) { return x.p === d.frinv; })[0]; invite(d.frinv, g ? g.n : ''); return true; }
+    return false;
+  });
+  document.addEventListener('submit', function (e) { if (e.target && e.target.id === 'frForm') { e.preventDefault(); App.acts.frAdd(); } });
+  App.inputs.push(function (el) { if (el.id === 'frCode') { App.frWant = el.value; return true; } return false; });
+  var opened = App.openSheet;
+  App.closed.friends = function () { msg = ''; sure = ''; if (backTo === 'online' && room()) { backTo = ''; setTimeout(function () { opened('online'); }, 0); } backTo = ''; };
+
+  // ---------- the red dot, and the card for an invitation ----------
+  function badge() {
+    var n = data ? data.list.filter(function (f) { return f.st === 'in'; }).length : 0;
+    ['frDot', 'frDotD'].forEach(function (id) { var e = document.getElementById(id); if (e) e.hidden = !n; });
+  }
+  var card = null, showing = '';
+  function banner() {
+    if (!data || !data.inv) return;
+    var done = seen(), inv = data.inv.filter(function (i) { return done.indexOf(i.p + ':' + i.at) < 0; })[0];
+    var peek = ZZ.peek && ZZ.peek(), busyNow = peek && peek.S && peek.S.state === 'play';
+    if (!inv || busyNow || kid()) { if (card) card.hidden = true; showing = ''; return; }
+    if (!card) {
+      card = document.createElement('div'); card.className = 'frcard'; card.setAttribute('role', 'status'); card.hidden = true;
+      document.body.appendChild(card);
+      card.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button');
+        if (!b) return;
+        var i = JSON.parse(card.getAttribute('data-inv') || 'null');
+        if (!i) return;
+        markSeen(i.p + ':' + i.at); card.hidden = true; showing = '';
+        if (b.getAttribute('data-k') !== 'join') return banner();
+        if (i.g === 'dg') { window.location.href = 'games/dungeon/?room=' + encodeURIComponent(i.code) + '&join=1'; return; }
+        if (ZZ.Net && ZZ.Net.state !== 'idle' && ZZ.Net.state !== 'error') ZZ.Net.leave();
+        if (App.toMenu && peek && peek.screen !== 'menu') App.toMenu();
+        App.openSheet('online');
+        ZZ.Net.join(i.code, myName());
+      });
+    }
+    var key = inv.p + ':' + inv.at;
+    if (showing === key) return;
+    showing = key;
+    card.setAttribute('data-inv', JSON.stringify(inv));
+    card.innerHTML = '<p>' + esc(t(inv.g === 'dg' ? 'fr.banDG' : 'fr.banZZ', inv.n || t('player'))) + '</p><div><button class="btn sm main" type="button" data-k="join">' + t('fr.join') + '</button><button class="btn sm" type="button" data-k="no">' + t('fr.ignore') + '</button></div>';
+    card.hidden = false;
+    App.sfx.play('chime');
+  }
+  function tick() {
+    if (document.hidden || kid() || !hosted() || !ZZ.Cloud.cred) return;
+    if (Date.now() - lastAt >= POLL - 500) refresh(App.sheet() === 'friends');
+  }
+  App.boot.push(function () {
+    // ?friend=CODE: someone's friend link; the sheet opens with the code filled in
+    var m = /[?&]friend=([A-Za-z0-9-]{8,12})/.exec(window.location.search);
+    if (m && !kid()) { App.frWant = m[1].toUpperCase(); setTimeout(function () { if (!App.sheet()) App.openSheet('friends'); }, 700); }
+    if (ZZ.Cloud && ZZ.Cloud.whenKnown) ZZ.Cloud.whenKnown(function () { refresh(false); });
+    else setTimeout(function () { refresh(false); }, 1500);
+    timer = setInterval(tick, 5000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+  });
+  // opening the sheet asks the server straight away
+  App.opened = App.opened || {};
+  var prevOpen = App.opened.friends;
+  App.opened.friends = function () { if (prevOpen) prevOpen(); if (Date.now() - lastAt > 3000) refresh(true); };
+  App.friendsRefresh = refresh;
 })();
 </script>
 <script>

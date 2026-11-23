@@ -29,6 +29,9 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     // ---------- a room of three ----------
     const A = await open('阿勇'), B = await open('小弓'), C = await open('牧牧');
     ok(await A.evaluate(() => /地城小隊/.test(document.querySelector('h1').textContent) && document.querySelectorAll('#clsStart [data-cls]').length === 4), 'the page is there, with four classes');
+    const n0 = await A.inputValue('#name'); await A.click('#dice'); const n1 = await A.inputValue('#name');
+    ok(n1 && n1 !== n0, 'the dice rolls a random name', [n0, n1]);
+    await A.fill('#name', '阿勇');
     await A.click('#clsStart [data-cls="warrior"]');
     await A.click('#open');
     ok(await until(() => A.evaluate(() => DGPage.screen() === 'lobby' && /^[A-Z0-9]{5}$/.test(document.getElementById('lobbyCode').textContent)), 8000), 'a room is opened and its code shown');

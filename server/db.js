@@ -300,7 +300,30 @@ const SCHEMA = [
      pid uuid REFERENCES zz.players(id) ON DELETE CASCADE,
      at double precision NOT NULL,
      paid boolean NOT NULL
-   )`
+   )`,
+  // friends: one row per pair (a < b). st: 'ask' (asker is waiting for the other), 'ok', 'x' (ended or turned down;
+  // asker is then who ended it). Rows go with their players when a deleted save is finally removed.
+  `CREATE TABLE IF NOT EXISTS zz.friends (
+     a uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     b uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     st text NOT NULL,
+     asker uuid NOT NULL,
+     at double precision NOT NULL,
+     PRIMARY KEY (a, b),
+     CHECK (a < b)
+   )`,
+  'CREATE INDEX IF NOT EXISTS friends_b ON zz.friends (b)',
+  // "come and play": the latest invitation from one friend to another (a newer one takes its place)
+  `CREATE TABLE IF NOT EXISTS zz.invites (
+     dst uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     src uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     g text NOT NULL,
+     code text NOT NULL,
+     at double precision NOT NULL,
+     PRIMARY KEY (dst, src)
+   )`,
+  // when the player's page last looked in (for "online" in a friend's list)
+  'ALTER TABLE zz.players ADD COLUMN IF NOT EXISTS live double precision'
 ];
 let migrating = null;
 function migrate() {

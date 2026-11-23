@@ -219,6 +219,10 @@ const routes = {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.history(d, cred, body, now));
         break;
+      case 'fr': case 'frAdd': case 'frDrop': case 'frInv':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => body.a === 'fr' ? core.friends(d, cred, now) : body.a === 'frAdd' ? core.friendAdd(d, cred, body, now) : body.a === 'frDrop' ? core.friendDrop(d, cred, body, now) : core.friendInvite(d, cred, body, now));
+        break;
       case 'delete':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.wipe(d, cred, clock()));

@@ -58,7 +58,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 24, 'twenty-four tables in their own schema');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 26, 'twenty-six tables in their own schema (friends and invites the newest)');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -769,6 +769,61 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(fastSeen && r.json.st.lv.stars.length < 220, 'levels cannot be reported faster than they could be played', r.json.st.lv.stars.length);
     const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'lvl'", [V.id]);
     ok(lg[0].n >= 1, 'level coins are in the coin ledger');
+  }
+
+  // ---------- friends: asked by code, agreed by asking back, ended by either; invites only between friends ----------
+  {
+    const F1 = await newPlayer(null, '203.0.113.81'), F2 = await newPlayer(null, '203.0.113.82'), F3 = await newPlayer(null, '203.0.113.83');
+    const fr = (who, body) => rpc(Object.assign({ a: 'fr' }, body || {}), who);
+    r = await fr(F1);
+    ok(r.json.ok && r.json.me === F1.pub && r.json.list.length === 0 && r.json.inv.length === 0, 'nobody to start with; the friend code is the public tag', r.json);
+    r = await rpc({ a: 'frAdd', p: F1.pub.toUpperCase() }, F1);
+    ok(r.status === 400 && r.json.why === 'self', 'not yourself');
+    r = await rpc({ a: 'frAdd', p: 'zzzzzzzz' }, F1);
+    ok(r.status === 404 && r.json.why === 'nobody', 'a code nobody has');
+    r = await rpc({ a: 'frAdd', p: 'no' }, F1);
+    ok(r.status === 400 && r.json.why === 'code', 'something that is not a code');
+    r = await rpc({ a: 'frAdd', p: ' ' + F2.pub.toUpperCase().slice(0, 4) + '-' + F2.pub.toUpperCase().slice(4) + ' ' }, F1);
+    ok(r.json.ok && r.json.st === 'ask', 'a request is sent (capitals, a dash and spaces are fine)', r.json);
+    r = await fr(F2);
+    ok(r.json.list.length === 1 && r.json.list[0].p === F1.pub && r.json.list[0].st === 'in' && !r.json.list[0].on, 'the other side sees the request (and not whether the asker is online)', r.json.list);
+    r = await fr(F1);
+    ok(r.json.list[0].st === 'out', 'the asker sees it waiting');
+    r = await rpc({ a: 'frInv', p: F2.pub, g: 'zz', code: 'ABCDE' }, F1);
+    ok(r.status === 403, 'no invites before both agree');
+    r = await rpc({ a: 'frAdd', p: F1.pub }, F2);
+    ok(r.json.ok && r.json.st === 'ok', 'asking back: friends');
+    r = await fr(F1);
+    ok(r.json.list[0].st === 'ok' && r.json.list[0].on === true && typeof r.json.list[0].lv === 'number', 'friends see each other online, with a level', r.json.list);
+    now += 2 * MIN;
+    r = await fr(F2);
+    ok(r.json.list[0].on === false && r.json.list[0].seen > 0, 'two minutes without the game open: not online any more, last seen shown', r.json.list);
+    r = await rpc({ a: 'frInv', p: F2.pub, g: 'dg', code: 'abcde' }, F1);
+    ok(r.json.ok, 'a friend invites a friend into a room');
+    r = await fr(F2);
+    ok(r.json.inv.length === 1 && r.json.inv[0].p === F1.pub && r.json.inv[0].g === 'dg' && r.json.inv[0].code === 'ABCDE', 'the invitation arrives, with the game and the room', r.json.inv);
+    r = await rpc({ a: 'frInv', p: F2.pub, g: 'chess', code: 'ABCDE' }, F1);
+    ok(r.status === 400, 'only the two games');
+    r = await rpc({ a: 'frInv', p: F2.pub, g: 'zz', code: 'ABCDE' }, F3);
+    ok(r.status === 403 || r.status === 404, 'a stranger cannot invite', r.status);
+    now += 11 * MIN;
+    r = await fr(F2);
+    ok(r.json.inv.length === 0, 'an invitation runs out after ten minutes');
+    r = await rpc({ a: 'frDrop', p: F1.pub }, F2);
+    ok(r.json.ok, 'either side can end it');
+    r = await fr(F1);
+    ok(r.json.list.length === 0, 'and it is gone from both lists');
+    r = await rpc({ a: 'frAdd', p: F2.pub }, F1);
+    ok(r.status === 409 && r.json.why === 'wait', 'the one who was dropped cannot ask again straight away');
+    now += DAY + MIN;
+    r = await rpc({ a: 'frAdd', p: F2.pub }, F1);
+    ok(r.json.ok && r.json.st === 'ask', 'but can after a day');
+    r = await rpc({ a: 'frAdd', p: F1.pub }, F2);
+    ok(r.json.st === 'ok', 'and the two are friends again');
+    const rows = await pg.query('SELECT st FROM zz.friends');
+    ok(rows.length === 1, 'one row per pair, whatever happens', rows);
+    r = await rpc({ a: 'fr' }, null);
+    ok(r.status === 401, 'not without a save');
   }
 
   // ---------- 磚之冒險: stages in order, checked on the server, never faster than a monster can be beaten ----------

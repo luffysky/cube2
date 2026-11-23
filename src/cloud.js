@@ -608,6 +608,11 @@
       return r.status === 200 && r.body && r.body.ok ? r.body : null;
     }, function () { return null; });
   };
+  // any other signed request of the player's own (friends: src/friends.js); null when the server could not be reached
+  Cloud.rpc = function (body) {
+    if (!Cloud.cred) return Promise.resolve(null);
+    return call('POST', 'rpc', body, true).then(function (r) { return { status: r.status, body: r.body || {} }; }, function () { return null; });
+  };
   Cloud._forget = function () { boards = {}; };
 
   ZZ.Cloud = Cloud;

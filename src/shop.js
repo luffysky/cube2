@@ -591,6 +591,15 @@
     return h;
   }
   App.dismiss.shop = 1; App.dismiss.jobs = 1; App.dismiss.profile = 1;
+  // the dice by the name: a random one, kept at once
+  App.acts.pRoll = function (b) {
+    var box = document.getElementById('pName'), n = App.rollName ? App.rollName() : '';
+    if (!n || !box) return;
+    if (App.diceSpin) App.diceSpin(b);
+    App.sfx.play('rot');
+    box.value = n; Meta.setName(n);
+    if (App.updateMenu) App.updateMenu();
+  };
   App.sheets.shop = function () {
     var h = '<div class="shop-top"><h2>' + t('m.shop') + '</h2>' + coin(Meta.data.coins) + '</div><div class="tabs" role="tablist">', i;
     for (i = 0; i < TABS.length; i++) h += '<button type="button" role="tab" aria-selected="' + (tab === TABS[i]) + '" data-tab="' + TABS[i] + '">' + t('k.' + TABS[i]) + '</button>';
@@ -878,7 +887,7 @@
   App.sheets.profile = function () {
     var d = Meta.data, r = Meta.rankOf(d.rp), pct = r.top ? 100 : Math.round(r.into / r.need * 100), tt = d.tot;
     var rows = [['pf.games', tt.games], ['pf.wins', tt.wins], ['pf.best', L.num(tt.best)], ['pf.sprint', tt.sprint ? App.fmtTime(tt.sprint) : '—'], ['pf.tspins', tt.tspins], ['pf.sent', L.num(tt.sent)], ['pf.kos', tt.kos], ['pf.coins', L.num(tt.coins)]];
-    var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '"></div>' +
+    var h = '<h2>' + t('pf.title') + '</h2><div class="field line"><label for="pName">' + t('pf.name') + '</label><span class="dicebox"><input type="text" id="pName" maxlength="12" autocomplete="off" placeholder="' + esc(t('pf.namePh')) + '" value="' + esc(d.name) + '">' + (App.dice && !(ZZ.Consent && ZZ.Consent.child()) ? App.dice('pRoll') : '') + '</span></div>' +
       '<div class="rankbox"><b>' + esc(App.rankName(r)) + '</b><span>' + (r.top ? String(r.rp) : r.into + ' / ' + r.need) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
     if (d.pvp && d.pvp.games) h += '<p class="note">' + esc(t('pr.now', App.rankName(Meta.rankOf(d.pvp.rp)), d.pvp.rp, d.pvp.games)) + '</p>';
     var lv = Meta.level(), lp = lv.top ? 100 : Math.round(lv.into / lv.need * 100), now = Meta.titleNow();
