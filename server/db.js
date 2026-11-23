@@ -323,7 +323,24 @@ const SCHEMA = [
      PRIMARY KEY (dst, src)
    )`,
   // when the player's page last looked in (for "online" in a friend's list)
-  'ALTER TABLE zz.players ADD COLUMN IF NOT EXISTS live double precision'
+  'ALTER TABLE zz.players ADD COLUMN IF NOT EXISTS live double precision',
+  // linked saves and their copy at SnowRealm Games (server/savesync.js): one row per save, kept after the save is
+  // deleted until Games has heard of the purge. gen: which save of its account; sver: the last event version used.
+  `CREATE TABLE IF NOT EXISTS zz.syncs (
+     pid uuid PRIMARY KEY,
+     platform_id uuid NOT NULL,
+     gen integer NOT NULL,
+     sver bigint NOT NULL DEFAULT 0,
+     rev integer NOT NULL DEFAULT 1,
+     due double precision,
+     tries integer NOT NULL DEFAULT 0,
+     first double precision,
+     err text,
+     sent double precision,
+     ended boolean NOT NULL DEFAULT false
+   )`,
+  'CREATE INDEX IF NOT EXISTS syncs_due ON zz.syncs (due) WHERE due IS NOT NULL',
+  'CREATE INDEX IF NOT EXISTS syncs_platform ON zz.syncs (platform_id)'
 ];
 let migrating = null;
 function migrate() {

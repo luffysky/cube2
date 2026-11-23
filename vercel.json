@@ -113,6 +113,10 @@
   ],
   "rewrites": [
     {
+      "source": "/.well-known/sync-jwks.json",
+      "destination": "/api/sync-jwks"
+    },
+    {
       "source": "/internal/admin/v1/:path*",
       "destination": "/api/admin?__ap=:path*"
     },

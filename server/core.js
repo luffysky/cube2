@@ -94,6 +94,13 @@ async function hello(db, body, ip, now) {
   }
 }
 
+// what else runs once a save has changed (server/savesync.js puts linked saves in its queue); never stops the save
+const hooks = { saved: null };
+async function onSaved(db, pid, now) {
+  if (!hooks.saved) return;
+  try { await hooks.saved(db, pid, now); } catch (e) { console.warn('[zz] after-save ' + ((e && e.code) || (e && e.name) || 'error')); if (process.env.ZZ_DEBUG) console.warn(e); }
+}
+
 // ---------- load the record, apply what the page reports, save ----------
 const SAVE = `
   WITH u AS (
@@ -125,6 +132,7 @@ async function adReward(db, tag, tx, now) {
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
     if (saved[0] && saved[0].saved === 1) {
       await db.query('INSERT INTO zz.adtx (tx, pid, at, paid) VALUES ($1, $2, $3, $4) ON CONFLICT (tx) DO NOTHING', [tx, row.id, now, paid]);
+      await onSaved(db, row.id, now);
       return good({ paid, why: paid ? '' : (out.res[0] && out.res[0].why) || 'no' });
     }
   }
@@ -158,7 +166,7 @@ async function serverOp(db, pid, key, k, a, now) {
     if (!row) return false;
     const out = rules.applyOps(row.state, row.srv, [{ i: key.slice(0, 60), k, a, srv: true }], now), d = out.state;
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
-    if (saved[0] && saved[0].saved === 1) return true;
+    if (saved[0] && saved[0].saved === 1) { await onSaved(db, row.id, now); return true; }
   }
   return false;
 }
@@ -176,6 +184,7 @@ async function sync(db, cred, ops, now) {
         for (const m of put) if (m.pr === 'true' && m.room) await settlePvp(db, row.id, m.id, m.room, now);
       }
       if (out.draws.length) await db.query('INSERT INTO zz.draws (pid, at, kind, boxes) SELECT $1, (x->>\'at\')::float8, x->>\'kind\', x->\'boxes\' FROM jsonb_array_elements($2::jsonb) AS x', [row.id, JSON.stringify(out.draws)]);
+      await onSaved(db, row.id, now);
       return good({ st: d, ver: row.ver + 1, pub: row.pub, res: out.res, now });
     }
     // another device saved in between: read again and repeat on top of that
@@ -244,6 +253,7 @@ async function wipe(db, cred, now) {
     gone = r[0] ? r[0].gone : (await findPlayer(db, cred, true)).gone;
   }
   await db.query(PURGE[0], purge(now)[1]);
+  await onSaved(db, row.id, now);
   return good({ until: untilOf(gone), now });
 }
 // Takes the deletion back, from a device of that save, while the 30 days last.
@@ -253,6 +263,7 @@ async function restore(db, cred, now) {
   if (row.gone == null) return good({ restored: false, st: rules.current(row.state, now), ver: row.ver, pub: row.pub, now });
   const r = await db.query('UPDATE zz.players SET gone = NULL, restored = $2 WHERE id = $1 AND gone IS NOT NULL AND gone >= $3 RETURNING state, ver, pub', [row.id, now, now - LIMIT.GONE_KEEP]);
   if (!r[0]) return fail(410, 'purged');
+  await onSaved(db, row.id, now);
   return good({ restored: true, st: rules.current(r[0].state, now), ver: r[0].ver, pub: r[0].pub, now });
 }
 
@@ -655,6 +666,7 @@ async function idLink(db, cred, claims, now) {
     if (e && e.code === '23505') return fail(409, 'race');      // linked a moment ago from somewhere else
     throw e;
   }
+  await onSaved(db, p.id, now);            // the first full copy for Games: "the data it had before"
   return good({ linked: true, id: p.id, key: secret, now });
 }
 // sign out on this device: only a save linked to a SnowRealm Games account (signing in again brings it back); this
@@ -678,6 +690,7 @@ async function idRecover(db, claims, now, back) {
     if (!back) return pending(r[0].gone);
     const u = await db.query('UPDATE zz.players SET gone = NULL, restored = $2 WHERE id = $1 AND gone IS NOT NULL AND gone >= $3 RETURNING 1', [r[0].id, now, now - LIMIT.GONE_KEEP]);
     if (!u[0]) return fail(410, 'purged');
+    await onSaved(db, r[0].id, now);
   }
   const secret = newSecret(), pid = r[0].id;
   await db.batch([
@@ -687,4 +700,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, hooks, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

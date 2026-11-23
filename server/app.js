@@ -22,6 +22,14 @@ const admin = require('./admin.js');
 const bff = require('./bff.js');
 const retention = require('./retention.js');
 const mail = require('./mail.js');
+const savesync = require('./savesync.js');
+// every change to a linked save is queued for SnowRealm Games (does nothing while SAVE_SYNC_ENABLED is off)
+core.hooks.saved = (d, pid, now) => savesync.touch(d, pid, now);
+// sends what the request queued (its own save first, then a couple of others that are due); never fails the request
+async function syncOut(now, first, max) {
+  if (!savesync.enabled()) return;
+  try { await db.run(d => savesync.drain(d, now, max, first)); } catch (e) { log('savesync', e); }
+}
 
 const MAX_BODY = 24 * 1024, MAX_SYNC = 96 * 1024;      // a sync carries the tapes of finished matches, so it may be longer
 let clock = () => Date.now();
@@ -97,6 +105,11 @@ const routes = {
     const out = await db.run(d => bff.start(d, body, cred, ipTag(req), now, undefined, String(header(req, 'host') || '').toLowerCase()));
     send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
   },
+  // the public key SnowRealm Games checks this game's save-sync tokens with (empty while no key is set)
+  async syncJwks(req, res) {
+    if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
+    send(res, 200, savesync.jwks(), { 'Cache-Control': 'public, max-age=300' });
+  },
   async authCallback(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
     let outcome, note = '';
@@ -107,6 +120,7 @@ const routes = {
     }
     if (bff.OUTCOMES.indexOf(outcome) < 0) outcome = 'unavailable';
     if (['linked', 'recovered'].indexOf(outcome) < 0) console.warn('[zz] auth ' + outcome + (/^[a-z0-9 ]{1,40}$/.test(note) ? ' (' + note + ')' : ''));
+    else await syncOut(clock(), null, 2);     // a save just linked: its first full copy for SnowRealm Games
     res.statusCode = 303;
     res.setHeader('Location', '/?auth=' + outcome);
     res.setHeader('Cache-Control', 'no-store');
@@ -160,7 +174,10 @@ const routes = {
     // ended friendships past their one day (Owner decision C-040)
     let friends = null;
     try { friends = await db.run(d => core.friendsTidy(d, now)); } catch (e) { log('cron-friends', e); }
-    send(res, out.status, Object.assign({}, out.body, { watch, friends }));
+    // linked saves still waiting to reach SnowRealm Games (only while the sync is on)
+    let saveSync = null;
+    if (savesync.enabled()) { try { saveSync = await db.run(d => savesync.drain(d, now, 200)); } catch (e) { log('cron-savesync', e); } }
+    send(res, out.status, Object.assign({}, out.body, { watch, friends, saveSync }));
   },
   // the rewarded-ad network's callback (GET, signed). Not for pages: nothing is paid without a valid signature.
   async ad(req, res, url) {
@@ -211,6 +228,7 @@ const routes = {
         if (!ops) return send(res, 400, { ok: false, why: 'ops' });
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.sync(d, cred, ops, now));
+        if (out.status === 200 && ops.length) await syncOut(now, cred.id, 2);
         break;
       }
       case 'code':
@@ -231,10 +249,12 @@ const routes = {
       case 'delete':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.wipe(d, cred, clock()));
+        if (out.status === 200) await syncOut(clock(), cred.id, 0);
         break;
       case 'restore':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.restore(d, cred, clock()));
+        if (out.status === 200) await syncOut(clock(), cred.id, 0);
         break;
       // a member's own files in the cloud (R2; off until its keys are set, see server/files.js)
       case 'fileUp': case 'fileOk': case 'fileList': case 'fileHide': case 'fileBack': case 'fileKey': case 'fileVault': {

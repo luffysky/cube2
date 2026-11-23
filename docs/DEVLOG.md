@@ -1637,3 +1637,15 @@
 - 還沒做：存檔同步到 Games（C-042），下一步。
 - 檔案：`server/bff.js`、`server/core.js`、`server/app.js`、`src/cloud.js`、`src/drawer.js`、`test/bff.test.js`、`test/cloud.test.js`、`test/authui.js`、建置產物、`docs/DEVLOG.md`。｜資料庫：沒改結構。｜刪除：無（登出只停用該裝置自己的鑰匙）。
 - 補記：上一條的 commit 為 [`6258358`](https://github.com/luffysky/cube2/commit/6258358)。
+
+## 2026-11-24 01:46（Asia/Taipei）｜存檔同步到 SnowRealm Games：送出端完成（開關關著）
+
+- 專案：cube2｜執行者：Claude｜依據：C-042、Owner「可以 做吧」；cube1 接收端 PR #23、介面文件 cube1 `docs/BRICKDUEL_SAVE_SYNC.md`
+- 新檔 `server/savesync.js`：只送已綁定的存檔。事件分三種：`upsert`（整份存檔，正規化後的 30 個欄位）、`hide`（玩家刪除）、`purge`（30 天後真的刪掉）。每次送出都用一個新的、更大的版本號；同一帳號後綁的新存檔用下一個 `generation`，等前一份的 `purge` 被收到才送。用 cube2 自己的 Ed25519 金鑰簽 5 分鐘的服務 JWT（`iss` 依環境、`aud=snowrealm:games:save-sync`、`sub=svc:brickduel`、`scope=save:write`），公鑰放 `/.well-known/sync-jwks.json`（新函式 `api/sync-jwks.js`＋`vercel.json` 改寫）。不送裝置鑰匙、轉移碼、`srv`、網路位址、信箱、檔案內容。
+- 何時送：存檔有變動（同步、廣告獎勵、伺服器結算、刪除、救回、綁定）就記成待送，同一個請求最多等 3 秒送出；沒送成的由後續請求和每日排程重送，間隔逐次拉長。200 完成；409 和其他拒絕放著給人看並寫日誌；更新一天後放著，`purge` 一直送到收到為止。放著的資料都留在表裡，下次存檔變動會再送。
+- 資料庫：新表 `zz.syncs`（一份綁定存檔一列，存檔刪掉後仍保留到 `purge` 被收到）。開關關著時不會建表、不會寫入。
+- 開關（名稱）：`SAVE_SYNC_ENABLED`、`SAVE_SYNC_URL`、`SAVE_SYNC_PRIVATE_JWK`、`SAVE_SYNC_ISSUER`（staging 必填）。正式站四個都沒設，所以什麼都不送。
+- 測試：新 `test/savesync.test.js` 48 項（依 cube1 接收端的欄位規則檢查每筆事件）；`api` 表數改 27；全部單元測試、`linkcheck` 通過。
+- 還要做：staging 設金鑰與開關，跟 cube1 staging 端到端驗收；之後 Owner 核准才開正式站。
+- 檔案：`server/savesync.js`、`server/core.js`、`server/app.js`、`server/db.js`、`api/sync-jwks.js`、`vercel.json`、`test/savesync.test.js`、`test/api.test.js`、`test/run.js`、`docs/handoff/BRICKDUEL_SAVE_SYNC_TO_GAMES.md`、`docs/DEVLOG.md`。｜刪除：無。
+- 補記：上一條的 commit 為 [`0e89d25`](https://github.com/luffysky/cube2/commit/0e89d25)。

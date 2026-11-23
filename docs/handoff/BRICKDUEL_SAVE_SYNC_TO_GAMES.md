@@ -1,5 +1,13 @@
 # 轉磚存檔同步到 SnowRealm Games（草案 v0.1，2026-11-23）
 
+> **2026-11-24 更新**：cube1 已依這份草案實作接收端（cube1 PR #23，介面以 cube1 `docs/BRICKDUEL_SAVE_SYNC.md` 為準）。cube2 送出端已照那份實作，在 `server/savesync.js`，正式站開關關著。和下面草案不同的地方：
+> - 每筆事件多了 `generation` 和 `event`（`upsert`／`hide`／`purge`）；`hide`、`purge` 不帶 `publicTag`、`state`。
+> - `ver` 改成送件自己的版本號：每次送出都拿一個新的、更大的號碼，不再沿用存檔的 `ver`。
+> - `state` 是伺服器正規化後的 30 個欄位。
+> - 存檔 30 天後真的刪掉時送 `purge`，送到對方收到為止；同一個帳號之後再綁新存檔，用下一個 `generation`，而且要等前一份的 `purge` 被收到。
+> - `iss` 依環境：正式 `https://brickduel.snowrealm.pet`，staging `https://brickduel-staging.snowrealm.pet`；公鑰各自放在自己網域的 `/.well-known/sync-jwks.json`。
+> - 回應：200 完成；409 先放著給人看並寫日誌；429、5xx、連不上就隔一段時間重送（更新一天後放著，`purge` 不放棄）。
+
 給 cube1 Work。cube2（轉磚）這邊的提案。兩邊對好之後才實作，在那之前正式站不會送出任何資料。
 
 ## Owner 的決定（C-042，2026-11-23）
