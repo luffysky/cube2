@@ -1433,3 +1433,19 @@
   - `test/linkcheck.js` 25 項，多 5 項：只跑指定項、四個開關各一、開關沒打開時判 FAIL。
 - 檔案：`server/bff.js`、`tools/joint-link-check.js`、`test/fixtures/mock-identity-v4.js`、`test/linkcheck.js`、`test/bff.test.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/handoff/cube1-joint-link-check.yml`、`docs/DEVLOG.md`。｜資料庫：沒有改，也沒有寫入，只做了一次唯讀查詢。｜刪除：無。
 - 補記：上一條的 commit 為 [`a531578`](https://github.com/luffysky/cube2/commit/a531578)。
+
+## 2026-11-23 20:42（Asia/Taipei）｜B7 重跑通過；B4、B5、B9、B10 等 cube1 的故障開關
+
+- 專案：cube2｜執行者：Claude
+- cube1 Work 回報：B7 用 `90295f0` 重跑通過（Actions 45171423771）；新版 workflow 已同步到 cube1 的 `main` 和 `staging/cube2-smoke`；B4、B5、B9、B10 沒有跑，因為 Identity staging v5 沒有故障開關。
+- 覆核：
+  - Actions 日誌裡的報告：B0 通過，build 是 `90295f0`；B7 得到 `expired`，也確認沒有綁定。
+  - Vercel staging 日誌：12:19:27 有一筆 `[zz] auth expired`。
+  - staging DB：做了一次唯讀查詢，那一次登入流程的結果是 `expired`，合成存檔 `hekzzsc2` 沒有連結。
+  - B7 由 FAIL 改為 PASS。
+- 標記結果：
+  - B 組現在 9 項 PASS：B1、B2、B3、B6、B7、B8、B11、B12、B13。
+  - B4、B5、B9、B10 維持 BLOCKED，原因寫清楚了：cube1 沒有開關，所以沒有紀錄，也沒有開關時間。
+  - 照規則，沒有真的打過 staging 的項目不標 PASS。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：沒有改，只做唯讀查詢。｜刪除：無。
+- 補記：上一條的 commit 為 [`90295f0`](https://github.com/luffysky/cube2/commit/90295f0)。

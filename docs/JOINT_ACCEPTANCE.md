@@ -137,13 +137,13 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | B1 | PASS | 2026-11-23 11:39:04–11:39:11 | cube1 Actions [45167007292](https://github.com/luffysky/cube1/actions/runs/45167007292)（staging `e1296ad`，B0 前置通過：`link: true`、`dbSource: staging`）：`linked`；結果只能讀一次並換新裝置金鑰、新金鑰看到已連結、舊金鑰 401。staging DB：session 11:39:04 `link`→`linked`（11:39:08 用掉），合成存檔 `a8ccaanz` 有 identity 列 | — |
 | B2 | PASS | 2026-11-23 11:39:11–11:39:15 | 同 B1 的執行：裝置 Y `recover`→`recovered`，同一份存檔 `a8ccaanz`、拿到新金鑰。DB：session 11:39:11 `recover`→`recovered` | — |
 | B3 | PASS | 2026-11-23 11:39:19–11:39:26 | 同 B1 的執行：帳號 2 連已連給帳號 1 的存檔→`conflict`，存檔仍連帳號 1；帳號 2 `recover`→`none`（沒有存檔）。Vercel 日誌 11:39:22 `[zz] auth conflict`、11:39:26 `[zz] auth none`；DB：兩個 session 各為 `conflict`、`none` | — |
-| B4 | BLOCKED | 2026-11-23 11:50 | 工具標 MANUAL：cube1 的測試開關（簽一張沒有 nonce 的 token）沒有打開，沒有開關時間 | 需要 cube1 在 Identity staging 打開 B4 開關，再用 `SWITCH=B4` 跑一次（見下方「B 組第一次實跑」） |
-| B5 | BLOCKED | 2026-11-23 11:50 | 同 B4（nonce 不同的 token） | 同 B4，`SWITCH=B5` |
+| B4 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（沒有 nonce 的 token），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B4` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B4` |
+| B5 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（nonce 不同的 token），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B5` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B5` |
 | B6 | PASS | 2026-11-23 11:39:15–11:39:19 | 同 B1 的執行：第一次回呼 `recovered`，同一個 callback 網址再開一次→`replay`，第一次的結果仍可讀。Vercel 日誌 11:39:18 `[zz] auth replay` | — |
-| B7 | FAIL（cube2，已修） | 2026-11-23 11:39:35 → 11:50:10 | 同 B1 的執行：開始後等 10.5 分鐘才回來，預期 `expired`，實得 `session`；沒有發生綁定（DB：合成存檔 `mvhx8fx8` 沒有 identity 列；那個 session 沒被用掉）。Vercel 日誌 11:50:10 `[zz] auth session`。原因在 cube2：登入流程的 cookie 壽命和 session 一樣是 10 分鐘，瀏覽器 10 分鐘後就把 cookie 丟了，伺服器收不到、只能回 `session`，認不出「過期」 | 已改成 cookie 30 分鐘、session 仍 10 分鐘（`server/bff.js` `COOKIE_LIFE`）；部署到 staging 後要用 `CASES=B7` 重跑一次 |
+| B7 | PASS | 2026-11-23 12:08:50 → 12:19:29 | 重跑：cube1 Actions [45171423771](https://github.com/luffysky/cube1/actions/runs/45171423771)，staging `90295f0`（B0 前置通過），`cases=B7`、`b7=1`。開始後 10.5 分鐘才回來→`expired`，沒有綁定。Vercel 日誌 12:19:27 `[zz] auth expired`（`dpl_CCdVoz5CcSvNcr79EZPaGV6rmrTT`）；staging DB：session 12:08:50 `link`→`expired`（12:19:26 用掉），合成存檔 `hekzzsc2` 沒有 identity 列。第一次（Actions 45167007292，`e1296ad`）得到 `session`：cube2 的 cookie 只活 10 分鐘，已在 `90295f0` 改成 30 分鐘（session 仍 10 分鐘） | — |
 | B8 | PASS | 2026-11-23 11:39:27–11:39:30 | 同 B1 的執行：A 瀏覽器開始、B 瀏覽器完成→`session`（`session` 或 `state` 都算過），沒有綁定。Vercel 日誌 11:39:30 `[zz] auth session`；DB：該 session 未被用掉，存檔 `f8kf7fzw` 沒有 identity 列 | — |
-| B9 | BLOCKED | 2026-11-23 11:50 | 同 B4（交換後、查狀態前撤銷 token） | 同 B4，`SWITCH=B9` |
-| B10 | BLOCKED | 2026-11-23 11:50 | 同 B4（status 端點 503 或逾時） | 同 B4，`SWITCH=B10` |
+| B9 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（交換後撤銷 token），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B9` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B9` |
+| B10 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（status 端點 503 或逾時），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B10` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B10` |
 | B11 | PASS | 2026-11-23 11:39:31–11:39:34 | 同 B1 的執行：在 cube1 同意頁按拒絕→`denied`，沒有綁定。Vercel 日誌 11:39:34 `[zz] auth denied`；DB：session `link`→`denied`，存檔 `evxcnqm7` 沒有 identity 列 | — |
 | B12 | PASS | 2026-11-23 11:50:15–11:50:18 | 同 B1 的執行：帳號 1 的存檔先刪除（200），再用 `restore`→`recovered`，同一份存檔、可用且仍連結。DB：session 11:50:15 `restore`→`recovered`；`a8ccaanz` 狀態為使用中、有 restored 標記、仍有 identity 列 | — |
 | B13 | PASS | 2026-11-22 19:38 | staging `acc6f6a`、`link: true` 時，合成匿名玩家 `staging-test-b0`（不連結）照常：`hello` 建檔、`sync` 改名與回報一場 200、`/api/board` 200、`history` 1 場。正式站同時是 `link: false` | — |
@@ -168,6 +168,22 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
   - 本機用替身 Identity 演練過，四項都通過。替身「開關沒打開」時，工具會判 FAIL。
 - 只重跑部分項目：新增 `CASES`，例如 `CASES=B7`，就只跑 B7。B1、B2、B6、B3、B12 一定一起跑，因為後面幾項都要用 B1 的存檔。
 - workflow 範本 `docs/handoff/cube1-joint-link-check.yml` 多了 `cases` 和 `switch` 兩個輸入。
+
+### B7 重跑與目前狀態（2026-11-23 12:40 UTC）
+
+- B7 重跑：cube1 Actions 45171423771，staging `90295f0`，`cases=B7`、`b7=1`，12:19:29 得到 `expired`，沒有綁定。
+  - cube2 用 Vercel staging 日誌（12:19:27 `[zz] auth expired`）和 staging DB 唯讀查詢核對過：那一次登入流程的結果記為 `expired`，那份合成存檔沒有連結。B7 改為 **PASS**。
+- 新版 workflow 已同步到 cube1：`main` 是 `393f8c8`，`staging/cube2-smoke` 是 `6711db7`。
+- B 組目前的狀態：
+  - **PASS 9 項**：B1、B2、B3、B6、B7、B8、B11、B12、B13。
+  - **BLOCKED 4 項**：B4、B5、B9、B10。
+- 為什麼 BLOCKED：cube1 Identity staging v5 沒有這四個故障開關。驗收工具的 `switch` 只是選擇要跑哪一項，不會真的讓 cube1 出錯，所以不能拿它當作已經測過。
+- 要解除：cube1 在 Identity staging 加上這四個開關，只在 staging 有效、可以隨時關掉。
+  - B4：簽一張沒有 nonce 的 token。
+  - B5：nonce 不一樣。
+  - B9：讓 `/v1/token/status` 對這張 token 回 `active:false`。
+  - B10：讓 `/v1/token/status` 回 503 或逾時。
+- cube2 這邊對這四種情況的處理，已經用本機替身 Identity 測過（`test/bff.test.js` 和 `test/linkcheck.js`）。但沒有真正打過 staging，所以照規則不標 PASS。
 
 ### B 組準備（2026-11-23 03:45 台北）
 
