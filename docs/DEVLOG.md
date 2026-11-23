@@ -1549,10 +1549,19 @@
 - 檔案：`server/admin.js`、`test/admin.test.js`、`docs/DEVLOG.md`。｜資料庫：沒改。｜刪除：無。
 - 補記：上一條的 commit 為 [`58c7417`](https://github.com/luffysky/cube2/commit/58c7417)。
 
-## 2026-11-23 23:57（Asia/Taipei）｜存檔同步到 Games 的介面草案；記錄 C-042、C-043
+## 2026-11-23 23:53（Asia/Taipei）｜存檔同步到 Games 的介面草案；記錄 C-042、C-043
 
 - 專案：cube2｜執行者：Claude
 - Owner：「轉磚原來資料要同步到games」，選「整個存檔改由 games 保管」＋「綁定後持續單向」。
 - 寫了給 cube1 的介面草案 `docs/handoff/BRICKDUEL_SAVE_SYNC_TO_GAMES.md`：只送已綁定存檔、cube2 自己的服務 JWT（不共用秘密）、`ver` 只增、刪除送 `deleted: true`、送件佇列與重試、`SAVE_SYNC_ENABLED` 開關。cube2 這邊等介面對好才實作，正式站目前不送任何資料。
 - `docs/OWNER_DECISIONS.md` 新增 C-042（存檔同步）、C-043（各遊戲數據、限流計費、密碼 8 碼）。
 - 補記：上一條時間更正為 23:52；commit 為 [`4bd6281`](https://github.com/luffysky/cube2/commit/4bd6281)。
+
+## 2026-11-23 23:59（Asia/Taipei）｜正式串接驗收與流量防護報告
+
+- 專案：cube2｜執行者：Claude
+- 正式設定：補上 issuer、JWKS、audience，修正誤指 staging 的授權入口（`IDENTITY_AUTHORIZE_URL` → `https://games.snowrealm.pet/`），都已重新部署。
+- 雙帳號驗收：P1 卡在 cube1 同意頁（POST `/oauth/authorize` 400「授權請求無效」，3 次），cube2 沒收到回呼；P2、P3 BLOCKED。已交 Work。驗收存檔改存在瀏覽器 localStorage（`zzaccept.v1`），第一組因分頁關閉遺失。
+- 流量防護：Vercel WAF 4 條每 IP 限流已發布（Owner 同意計費）；寄信新增每 IP、每收件者、全站每日上限；深度健康檢查只認 `?deep=1`。`/api/room`、`/api/ws` 刻意不加邊緣限流（理由見 JOINT_ACCEPTANCE）。告警要 Priority 方案。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒改結構；正式庫有 6 份驗收存檔。｜刪除：無。
+- 補記：上一條時間更正為 23:53；commit 為 [`ea1b3fa`](https://github.com/luffysky/cube2/commit/ea1b3fa)。

@@ -113,6 +113,66 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 - **先做預檢（A0）**：每次執行都先查 `/api/health?deep=1`。必須是 `dbSource: "staging"`、`db: true`、`admin: true`；有給 `EXPECT_BUILD` 時，部署版本也要相符；有給 `ADMIN_JWKS_URL` 時，JWKS 必須是 https、只有公鑰、全部是 Ed25519，而且含 `ADMIN_KID`。任何一項不符就整個停下來，不建資料、不跑任何 A 項。本機演練過：沒設管理信任、或版本不符時，都會在寫入前停下。
 - 加 `SEED=1` 會先在 staging 建一個合成測試玩家（名字 `staging-test-xxxxxx`），再開一次免費寶箱，讓 A1 的 `players/{id}`、`draws` 有東西可讀。正式站一律拒絕這個選項，玩家的金鑰也不會印出來。
 
+## 正式站串接驗收（2026-11-23 15:06–15:58 UTC，台北 23:06–23:58）
+
+只記實際打到正式站的結果。報告不含密碼、Secret、token、授權碼或 cookie。正式部署：`4bd6281`（23:52 起），`link: false`、`admin: false`、`dbSource: main`。
+
+### 1. 正式設定核對
+
+| 項目 | 結果 | 實際狀況 |
+|---|---|---|
+| issuer `https://identity.snowrealm.pet` | FAIL → 已修 | 正式環境原本沒有 `IDENTITY_ISSUER`。15:06 依 Owner 給的值新增 |
+| JWKS `…/.well-known/jwks.json` | FAIL → 已修 | 原本沒有，15:06 新增。cube1 正式 JWKS 有 1 把公鑰 `srprod_identity_20261123_01`（OKP/Ed25519/EdDSA），沒有私鑰欄位 |
+| audience `snowrealm:brickduel:api` | FAIL → 已修 | 原本沒有，15:06 新增 |
+| callback `https://brickduel.snowrealm.pet/api/auth/callback` | PASS | 寫在程式裡（`server/bff.js` 的 `REDIRECT`），start 回的授權網址帶的就是它 |
+| 正式 client secret | PASS（只核對名稱） | `IDENTITY_BRICKDUEL_CLIENT_SECRET` 在 Production（Owner 設），沒有解密 |
+| 授權入口 | FAIL → 已修 | 正式環境的 `IDENTITY_AUTHORIZE_URL` 原本是 staging 的複本，start 會把正式玩家帶去 `identity-staging`。15:12 改為 `https://games.snowrealm.pet/` 並重新部署，之後 start 都導到正式入口 |
+| 最新部署有載入 | PASS | 用驗收存檔 A 查 `idStatus` 回 `enabled: true`（名單生效）；start 導到 `games.snowrealm.pet` |
+| cube1 端（未帶 secret） | 記錄 | 從瀏覽器打 `/oauth/token`、`/v1/token/status` 都回 403（cube1 回報從伺服器打是 401） |
+
+### 2. 受限的正式驗收入口
+
+- `IDENTITY_LINK_ENABLED` 沒開。新增 `IDENTITY_LINK_ACCEPT_PUBS`：只列 3 份驗收存檔 `accept2-A`／`accept2-B`／`accept2-Y`（各 200 金幣）。每次開始都要拿名單內存檔的裝置鑰匙，其他人一律 503 `off`。詳見 DEVLOG 23:07。
+- 實測：沒帶鑰匙 503 `off`；不存在的鑰匙 503 `off`；健康檢查 `link: false`；存檔 A 的 `idStatus` 回 `enabled: true, linked: false`。
+- 第一組驗收存檔 `accept-A/B/Y` 的鑰匙在分頁關掉時遺失，已從名單拿掉，留在正式庫等 Owner 決定。
+
+### 3. 雙帳號驗收
+
+| 項目 | 結果 | 實際回應 |
+|---|---|---|
+| P1 首次綁定（帳號 1 → 存檔 A） | BLOCKED | 3 次都卡在 cube1 同意頁：GET `/oauth/authorize` 200，按「同意」後 POST 400「授權請求無效」（15:51、15:55、15:58）。cube2 沒有收到任何回呼（Vercel 正式日誌沒有 `/api/auth/callback`），存檔 A 仍未連結、200 金幣 |
+| P2 換裝置找回（帳號 1，入場券 Y） | BLOCKED | 要先有 P1 |
+| P3 帳號衝突（帳號 2 綁 A；帳號 1 綁 B） | BLOCKED | 要先有 P1 |
+| 存檔與金幣核對 | 部分 | A、B、Y 各 200 金幣，都沒有連結；P1 通過後再核對 |
+
+- 前面的卡點與處理：
+  - 登入框限 10 碼 → cube1 v35 改為登入不限長度、註冊 8–128 碼。
+  - Owner 用的 `oauth-test-1-…@example.test` 是 staging 帳號，正式站沒有 → 改在正式站註冊 `+bd1` 帳號，登入成功。
+- 目前卡點交給 cube1 Work：同意頁送出只有 `csrf` 和 `decision`；把同一組授權參數加到送出網址後還是 400，所以要看 cube1 伺服器日誌。另外，帳密錯誤時畫面寫「連線失敗」，也請一起修。
+- `IDENTITY_LINK_ENABLED` 保持關閉，等驗收通過、Owner 核准公開。
+
+### 4. 流量防護
+
+- Vercel 平台的 DDoS 防護：一直開著（Vercel 代管）。過去一天 `get_active_attack_status` 沒有異常；防火牆總覽一天約 2.5k 次放行、223 次拒絕、247 次質詢，都是系統規則。
+- 告警：Firewall 的「Configure alerts」和異常告警要升級 Priority 才能用，目前沒有。Attack Mode 沒開（被攻擊時可以手動開）。
+- 自訂規則（Owner 23:44 同意限流計費：放行每百萬 0.5 美元、擋下免費、Pro 每月含 100 萬次）。15:48 發布，都是固定視窗 60 秒、以 IP 計、超過回 429：
+
+| 規則 | 路徑 | 每 IP 每分鐘 | 程式裡另外的限制（以存檔或工作階段計） |
+|---|---|---|---|
+| `auth flow per IP` | 開頭為 `/api/auth/` | 60 | 開始綁定每份存檔（找回則每個 IP）10 分鐘 10 次；callback 一個 cookie 只能用一次 |
+| `rpc per IP` | `/api/rpc` | 900 | 每份存檔每小時 1500 個操作、每次 40 個；新存檔每 IP 一天 40 份；轉移碼每 IP 10 分鐘 12 次；好友申請、邀請每份存檔每小時 30／60 次 |
+| `admin API per IP` | 開頭為 `/internal/admin/` | 120 | 每個簽章的呼叫者每分鐘 60 次；不認得的 kid 最多一分鐘重抓一次 JWKS |
+| `health and ads per IP` | `/api/health`、`/api/ad` | 120 | 廣告獎勵每份存檔每天有上限；深度健康檢查只有剛好 `?deep=1` 才查資料庫（15 秒快取） |
+
+- 寄驗證碼與寄回救援碼（cube2 的「重設密碼」是雲端檔案用救援碼重設，信只會寄到驗證過的信箱）：
+  - 原本只有每份存檔每小時 3 封、每天 6 封。
+  - 23:39 起新增：每 IP 每小時 10 封、同一收件信箱每天 3 封、全站每天 200 封（`MAIL_DAY_CAP`）。
+  - 驗證碼每組最多試 5 次、15 分鐘失效。
+- 登入：cube2 沒有自己的帳號密碼，登入是 cube1 Identity，限制在 cube1。cube2 端只有裝置鑰匙和轉移碼（上表）。
+- 刻意不加邊緣限流的：`/api/room`、`/api/ws`。對戰時一人每秒最多約 9 次，同一網路好幾個人一起玩容易誤擋；開房、加入、快速配對在程式裡已有每 IP 次數限制。
+- 共用網路：邊緣規則只以 IP 計，所以上限放寬（學校、網咖幾十人共用一個出口還有空間）；細的限制都在程式裡以存檔或工作階段計。
+- 驗證：規則發布後用一般請求各打一次：`/api/health` 200、`?deep=1` 200、`/api/rpc` 200、`/api/board` 200、首頁 200。沒有壓測。
+
 ## 實測報告
 
 只記錄真的在 staging 雙端跑出來的結果。本機演練和 CI 都不算。cube2 SHA 指的是 staging 上部署的版本。

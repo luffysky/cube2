@@ -74,6 +74,7 @@
 - [x] 刪掉 cube2 專案裡的 `accept-b` 舊部署（C-041，2026-11-23 21:35）
 - [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`（C-041：Owner 已授權 Claude 執行；2026-11-23 21:31 檢查 `identity.snowrealm.pet` 仍連不上）
   - cube1 回報（11-23 21:48）：正式授權入口還沒實作、也還沒部署，由 cube1 接手做完、綁正式網域、實測登入／授權／token 兌換。順序：cube1 正式端點驗證通過 → Owner 把正式 client secret 貼進 cube2 Vercel Production → Claude 設其他正式變數、兩帳號驗收 → 開 `IDENTITY_LINK_ENABLED`
+  - 11-23 23:58：正式設定已補齊、受限驗收入口上線；P1 卡在 cube1 同意頁 POST 400「授權請求無效」，已交 Work（詳 JOINT_ACCEPTANCE「正式站串接驗收」）
 - [ ] Owner 同意後刪 `accept-jwks` 分支（A7–A9 驗收用的暫時 JWKS，已不被信任）
 
 - [ ] SnowRealm Identity 上線並通過兩帳號驗收 → 才打開「註冊／登入」綁定
@@ -141,3 +142,11 @@
 ### 其他還沒做的
 - [ ] 關卡模式收尾、第二款遊戲「磚蛇」完整版（11-19 日誌提過一直被往後推）
 - [ ] 推廣歌曲合作功能：等 Owner 回覆規格書最後一頁的決策項目才開始第一階段
+
+## 正式站驗收後的收尾（等 Owner）
+
+- [ ] 驗收通過後拿掉 `IDENTITY_LINK_ACCEPT_PUBS`；Owner 核准才開 `IDENTITY_LINK_ENABLED`
+- [ ] 正式庫的驗收存檔：`accept-A/B/Y`（鑰匙已遺失）、`accept2-A/B/Y`
+- [ ] 正式環境裡從 staging 複製過來的設定（`IDENTITY_STAGING`、`STAGING_DATABASE_URL`、`BRICKDUEL_ADMIN_*`、`BRICKDUEL_ADMIN_TEST_TRUST`）
+- [ ] cube1：同意頁 400、帳密錯誤的提示文字、正式管理金鑰 `admin-jwks.json`、存檔同步介面草案回覆
+- [ ] 告警：Firewall 告警要 Priority 方案，Owner 決定要不要升級
