@@ -1449,3 +1449,29 @@
   - 照規則，沒有真的打過 staging 的項目不標 PASS。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：沒有改，只做唯讀查詢。｜刪除：無。
 - 補記：上一條的 commit 為 [`90295f0`](https://github.com/luffysky/cube2/commit/90295f0)。
+
+## 2026-11-23 21:21（Asia/Taipei）｜B4、B5、B9、B10 用隔離測試 Identity 實跑通過
+
+- 專案：cube2｜執行者：Claude｜Owner 指示：「好 做吧」（自建隔離 Identity、自己開關、自己跑）
+- 隔離測試 Identity：新 Vercel 專案 `cube2-test-identity`，網址 `https://cube2-test-identity.vercel.app`，程式 `tools/test-identity/`。
+  - 回應方式照 cube1 Identity staging v4。自己的 issuer、Ed25519 測試金鑰、測試 client secret、兩個合成帳號（按鈕選，沒有密碼）。
+  - 金鑰與 secret 在沙盒新產生，只放進 Vercel sensitive 環境變數；沒有進 repo、聊天或日誌。cube1 的東西都沒用到、沒改到。
+  - 開關 `TID_SWITCH`（B4／B5／B9／B10，其他值為關），切換＝改環境變數＋重新部署，以 `/health` 為準。
+  - 本機先演練：替身 HTTP 版搭配 dev server 和 `tools/joint-link-check.js`，四個開關都得到預期結果，關掉開關時工具判 FAIL。演練中發現 code 必須是 43 字元（cube2 會擋其他長度），改成用授權內容做 HMAC。
+- 隔離的 cube2 部署：分支 `accept-b`（先用不部署的佔位提交建分支，設好環境變數後換成 main 的 `1a12cb8`）。只有這個分支指向測試 Identity。
+  - `STAGING_DATABASE_URL` 的分支範圍 20:58:44 暫改為 `accept-b`，21:00:05 改回 `staging`；沒有讀或改它的值。
+  - `/api/health`：`dbSource: staging`、`link: true`、`admin: false`、build `1a12cb8`。
+- 實跑（在 Owner 的 Chrome，時間 UTC）：
+  - 對照組（開關關）13:09:38：`linked`。
+  - B4（開 13:11:14，生效 13:11:36）→ `token`，日誌 13:12:02 `[zz] auth token (nonce)`。
+  - B5（開 13:12:24，生效 13:12:46）→ `token`，日誌 13:13:11 `token (nonce)`。
+  - B9（開 13:13:27，生效 13:13:53）→ `revoked`，日誌 13:14:15 `revoked (status 200)`。
+  - B10（開 13:14:27，生效 13:14:53）→ `unavailable`，日誌 13:15:22 `unavailable (status 503)`。
+  - 關閉 13:15:36，13:16:05 `/health` 為 `none`。
+  - staging DB 唯讀查詢：四份存檔都沒有連結、session 結果與上面一致；兩個測試帳號只有對照組那 1 筆連結。
+- 標記：B4、B5、B9、B10 → PASS（隔離環境）。文件寫明對象是 cube2 自建的測試 Identity，不是 cube1 的 Identity staging。
+- 測試：新增 `test/tid.test.js` 28 項（流程、拒絕路徑、四個開關），加進 `test/run.js`。
+- 檔案：`tools/test-identity/`（3 個檔）、`test/tid.test.js`、`test/run.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。
+- 資料庫：沒有改結構；`accept-b` 在 staging DB 留下 5 份合成存檔（`acceptb-*`）、1 筆合成連結和 5 個登入 session，都是測試資料。正式站與正式資料庫沒有碰。
+- 刪除：無。待 Owner 同意：`accept-b` 分支、它的 8 個環境變數、`cube2-test-identity` 專案。
+- 補記：上一條的 commit 為 [`1a12cb8`](https://github.com/luffysky/cube2/commit/1a12cb8)。

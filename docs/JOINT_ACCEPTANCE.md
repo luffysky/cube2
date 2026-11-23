@@ -137,16 +137,39 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | B1 | PASS | 2026-11-23 11:39:04–11:39:11 | cube1 Actions [45167007292](https://github.com/luffysky/cube1/actions/runs/45167007292)（staging `e1296ad`，B0 前置通過：`link: true`、`dbSource: staging`）：`linked`；結果只能讀一次並換新裝置金鑰、新金鑰看到已連結、舊金鑰 401。staging DB：session 11:39:04 `link`→`linked`（11:39:08 用掉），合成存檔 `a8ccaanz` 有 identity 列 | — |
 | B2 | PASS | 2026-11-23 11:39:11–11:39:15 | 同 B1 的執行：裝置 Y `recover`→`recovered`，同一份存檔 `a8ccaanz`、拿到新金鑰。DB：session 11:39:11 `recover`→`recovered` | — |
 | B3 | PASS | 2026-11-23 11:39:19–11:39:26 | 同 B1 的執行：帳號 2 連已連給帳號 1 的存檔→`conflict`，存檔仍連帳號 1；帳號 2 `recover`→`none`（沒有存檔）。Vercel 日誌 11:39:22 `[zz] auth conflict`、11:39:26 `[zz] auth none`；DB：兩個 session 各為 `conflict`、`none` | — |
-| B4 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（沒有 nonce 的 token），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B4` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B4` |
-| B5 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（nonce 不同的 token），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B5` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B5` |
+| B4 | PASS（隔離環境） | 2026-11-23 13:11:14 → 13:12:24 | 隔離環境（見下方「B4、B5、B9、B10 隔離環境實跑」）：cube2 驗收部署 `accept-b`（`1a12cb8`，`dpl_EddMGiDnxyDLJ26DWKjy5raYvZ8j`，`dbSource: staging`）只信任 cube2 自建的**隔離測試 Identity** `https://cube2-test-identity.vercel.app`（自己的 issuer、Ed25519 測試金鑰、測試 client secret、合成帳號），**不是 cube1 Identity staging**。開關 `TID_SWITCH=B4`：13:11:14 設定、13:11:36 `/health` 顯示 `B4`；13:12:24 換成 B5。合成存檔 `59rvt6hk` 13:11:48 開始連結→同意→`token`。Vercel 日誌 13:12:02.827 `[zz] auth token (nonce)`；staging DB：該 session `link`→`token`，存檔沒有 identity 列；畫面顯示「沒有完成連結，存檔都沒有變動」 | cube1 真正的 Identity staging 沒有這個開關，無法在那邊重現；這項驗的是 cube2 的處理 |
+| B5 | PASS（隔離環境） | 2026-11-23 13:12:24 → 13:13:27 | 隔離環境（見下方「B4、B5、B9、B10 隔離環境實跑」）：cube2 驗收部署 `accept-b`（`1a12cb8`，`dpl_EddMGiDnxyDLJ26DWKjy5raYvZ8j`，`dbSource: staging`）只信任 cube2 自建的**隔離測試 Identity** `https://cube2-test-identity.vercel.app`（自己的 issuer、Ed25519 測試金鑰、測試 client secret、合成帳號），**不是 cube1 Identity staging**。開關 `TID_SWITCH=B5`：13:12:24 設定、13:12:46 `/health` 顯示 `B5`；13:13:27 換成 B9。合成存檔 `f54wjepv` 13:12:56 開始→`token`。Vercel 日誌 13:13:11.957 `[zz] auth token (nonce)`；DB：session `link`→`token`，沒有 identity 列 | 同 B4 |
 | B6 | PASS | 2026-11-23 11:39:15–11:39:19 | 同 B1 的執行：第一次回呼 `recovered`，同一個 callback 網址再開一次→`replay`，第一次的結果仍可讀。Vercel 日誌 11:39:18 `[zz] auth replay` | — |
 | B7 | PASS | 2026-11-23 12:08:50 → 12:19:29 | 重跑：cube1 Actions [45171423771](https://github.com/luffysky/cube1/actions/runs/45171423771)，staging `90295f0`（B0 前置通過），`cases=B7`、`b7=1`。開始後 10.5 分鐘才回來→`expired`，沒有綁定。Vercel 日誌 12:19:27 `[zz] auth expired`（`dpl_CCdVoz5CcSvNcr79EZPaGV6rmrTT`）；staging DB：session 12:08:50 `link`→`expired`（12:19:26 用掉），合成存檔 `hekzzsc2` 沒有 identity 列。第一次（Actions 45167007292，`e1296ad`）得到 `session`：cube2 的 cookie 只活 10 分鐘，已在 `90295f0` 改成 30 分鐘（session 仍 10 分鐘） | — |
 | B8 | PASS | 2026-11-23 11:39:27–11:39:30 | 同 B1 的執行：A 瀏覽器開始、B 瀏覽器完成→`session`（`session` 或 `state` 都算過），沒有綁定。Vercel 日誌 11:39:30 `[zz] auth session`；DB：該 session 未被用掉，存檔 `f8kf7fzw` 沒有 identity 列 | — |
-| B9 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（交換後撤銷 token），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B9` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B9` |
-| B10 | BLOCKED | 2026-11-23 12:40 | 未執行：cube1 Identity staging 目前部署的 v5 沒有故障開關（status 端點 503 或逾時），所以沒有 Actions 紀錄，也沒有開關時間（cube1 Work 2026-11-23 12:41 UTC 回報）。cube2 端已備好 `SWITCH=B10` 與新版 workflow（cube1 已同步：main `393f8c8`、`staging/cube2-smoke` `6711db7`） | 需要 cube1 在 Identity staging 部署這個開關（只限 staging、可隨時關），打開後跑 `switch=B10` |
+| B9 | PASS（隔離環境） | 2026-11-23 13:13:27 → 13:14:27 | 隔離環境（見下方「B4、B5、B9、B10 隔離環境實跑」）：cube2 驗收部署 `accept-b`（`1a12cb8`，`dpl_EddMGiDnxyDLJ26DWKjy5raYvZ8j`，`dbSource: staging`）只信任 cube2 自建的**隔離測試 Identity** `https://cube2-test-identity.vercel.app`（自己的 issuer、Ed25519 測試金鑰、測試 client secret、合成帳號），**不是 cube1 Identity staging**。開關 `TID_SWITCH=B9`（token 正常，`/v1/token/status` 回 200 `active:false`）：13:13:27 設定、13:13:53 `/health` 顯示 `B9`；13:14:27 換成 B10。合成存檔 `sg3wz8hh` 13:14:02 開始→`revoked`。Vercel 日誌 13:14:15.687 `[zz] auth revoked (status 200)`；DB：session `link`→`revoked`，沒有 identity 列 | 同 B4 |
+| B10 | PASS（隔離環境） | 2026-11-23 13:14:27 → 13:15:36 | 隔離環境（見下方「B4、B5、B9、B10 隔離環境實跑」）：cube2 驗收部署 `accept-b`（`1a12cb8`，`dpl_EddMGiDnxyDLJ26DWKjy5raYvZ8j`，`dbSource: staging`）只信任 cube2 自建的**隔離測試 Identity** `https://cube2-test-identity.vercel.app`（自己的 issuer、Ed25519 測試金鑰、測試 client secret、合成帳號），**不是 cube1 Identity staging**。開關 `TID_SWITCH=B10`（`/v1/token/status` 回 503）：13:14:27 設定、13:14:53 `/health` 顯示 `B10`；13:15:36 關閉，13:16:05 `/health` 顯示 `none`。合成存檔 `2ckgf8cs` 13:15:01 開始→`unavailable`。Vercel 日誌 13:15:22.945 `[zz] auth unavailable (status 503)`；DB：session `link`→`unavailable`，沒有 identity 列 | 同 B4 |
 | B11 | PASS | 2026-11-23 11:39:31–11:39:34 | 同 B1 的執行：在 cube1 同意頁按拒絕→`denied`，沒有綁定。Vercel 日誌 11:39:34 `[zz] auth denied`；DB：session `link`→`denied`，存檔 `evxcnqm7` 沒有 identity 列 | — |
 | B12 | PASS | 2026-11-23 11:50:15–11:50:18 | 同 B1 的執行：帳號 1 的存檔先刪除（200），再用 `restore`→`recovered`，同一份存檔、可用且仍連結。DB：session 11:50:15 `restore`→`recovered`；`a8ccaanz` 狀態為使用中、有 restored 標記、仍有 identity 列 | — |
 | B13 | PASS | 2026-11-22 19:38 | staging `acc6f6a`、`link: true` 時，合成匿名玩家 `staging-test-b0`（不連結）照常：`hello` 建檔、`sync` 改名與回報一場 200、`/api/board` 200、`history` 1 場。正式站同時是 `link: false` | — |
+
+### B4、B5、B9、B10 隔離環境實跑（2026-11-23 13:09–13:16 UTC，台北 21:09–21:16）
+
+- 為什麼要隔離：cube1 不在共用的 Identity staging 簽發路徑放「故意省略或錯配 nonce」的開關（cube1 Work 回報），建議另建一套隔離的測試 Identity。Owner 同意後由 cube2 這邊（Claude）自己建、自己開關、自己跑，不需要 cube1 傳話。
+- **範圍說明**：這四項驗的是 **cube2 BFF 遇到這四種 Identity 回應時的處理**，對象是 cube2 自建的隔離測試 Identity，不是 cube1 的真正 Identity staging。cube1 那邊的簽發程式沒有被測到，也沒有被改動。
+- 隔離測試 Identity：Vercel 專案 `cube2-test-identity`（`prj_ELZKsG6i2zDQ1k7tugfZwzZ6uw1r`），網址 `https://cube2-test-identity.vercel.app`，程式在 `tools/test-identity/`。
+  - 回應方式照 cube1 Identity staging v4：登入頁、同意頁、303 帶 `iss`／`state`／`code` 回呼、`POST /oauth/token`（六個欄位＋PKCE）、`POST /v1/token/status`。
+  - 自己的 issuer（就是這個網址）、自己的 Ed25519 測試金鑰（kid `tidaccept01`）、自己的測試 client secret、兩個合成帳號（`test-one@accept.invalid`、`test-two@accept.invalid`，用按鈕選，沒有密碼）。
+  - 金鑰和 secret 是在沙盒裡新產生的，只放進 Vercel 的 sensitive 環境變數，沒有進 repo、聊天或日誌。cube1 的金鑰與 secret 都沒有用到。
+  - 開關 `TID_SWITCH`：`B4` 拿掉 nonce、`B5` 換一個 nonce、`B9` status 回 `active:false`、`B10` status 回 503，其他值都是關。每次切換都改環境變數並重新部署，以 `/health` 顯示的值為準。
+- 隔離的 cube2 部署：分支 `accept-b`，部署 `dpl_EddMGiDnxyDLJ26DWKjy5raYvZ8j`（`1a12cb8`，跟 main 同一份程式），網址 `https://cube2-git-accept-b-luffyskys-projects.vercel.app`（Vercel 登入保護）。
+  - 只有這個分支的環境變數指向測試 Identity：`IDENTITY_STAGING=1`、`IDENTITY_LINK_ENABLED=1`、`IDENTITY_ISSUER`／`_JWKS_URL`／`_AUTHORIZE_URL`＝測試 Identity、`IDENTITY_AUDIENCE`、`IDENTITY_STAGING_REDIRECT`＝accept-b 的回呼、`IDENTITY_STAGING_CLIENT_SECRET`＝測試 secret。`staging` 分支和正式站的設定都沒有動。
+  - 資料庫用 staging DB：`STAGING_DATABASE_URL` 的分支範圍在 12:58:44 暫時改成 `accept-b`，部署建好後 13:00:05 改回 `staging`（約 1 分 20 秒；沒有讀取或改動它的值，staging 現有部署不受影響，期間也沒有新的 staging 部署）。`/api/health`：`dbSource: staging`、`link: true`、`admin: false`。
+  - 為了先建分支再設定環境變數，`accept-b` 第一個提交是不部署的佔位提交（`git.deploymentEnabled: false`），之後換成 main 的 `1a12cb8`。
+- 對照組（開關關閉）：13:09:38 合成存檔 `an6zuqm5` 用 `test-two` 連結→`linked`（畫面「已連結」，新金鑰 `idStatus` 為已連結）。證明整條路是通的，後面四項的失敗是開關造成的。成功的 `linked` 依設計不寫日誌。
+- 四項都用 `test-two` 在新的合成存檔上跑（跟 `SWITCH` 模式一樣用帳號 2、新存檔）。`test-two` 已經連給對照組，如果開關沒有讓流程在 token／status 擋下，結果會是 `conflict` 而不是預期的字，所以這樣跑也分得出來。
+- Vercel 日誌（`accept-b`，13:09–13:16 全部 `[zz] auth` 行）：只有 4 行，依序 13:12:02 `token (nonce)`、13:13:11 `token (nonce)`、13:14:15 `revoked (status 200)`、13:15:22 `unavailable (status 503)`。
+- staging DB（Neon `neon-crimson-envelope` 的 `staging` 分支，只執行一次 SELECT）：
+  - 五份合成存檔（名稱 `acceptb-*`）：`acceptb-ctl` 有連結（sub 開頭 `f8649ebd`，就是 test-two），`acceptb-B4`／`B5`／`B9`／`B10` 都沒有 identity 列。
+  - 每份存檔的登入 session 結果：ctl `linked`、B4 `token`、B5 `token`、B9 `revoked`、B10 `unavailable`。
+  - 兩個測試帳號合計只有 1 筆連結（對照組）。
+- 結果：B4、B5、B9、B10 標 **PASS（隔離環境）**。B 組 13 項全部有實際證據：B1–B3、B6–B8、B11–B13 對 cube1 Identity staging；B4、B5、B9、B10 對隔離測試 Identity。
+- 收尾（等 Owner 同意才刪）：`accept-b` 分支、它的 8 個環境變數、`cube2-test-identity` 專案。在刪之前，測試 Identity 的開關維持關閉。合成存檔留在 staging DB，跟之前的合成玩家一起等 Owner 決定。
 
 ### B 組第一次實跑（2026-11-23 11:38:59–11:50:19 UTC，cube1 Actions 45167007292）
 
@@ -170,6 +193,8 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 - workflow 範本 `docs/handoff/cube1-joint-link-check.yml` 多了 `cases` 和 `switch` 兩個輸入。
 
 ### B7 重跑與目前狀態（2026-11-23 12:40 UTC）
+
+> 更新（13:16 UTC）：B4、B5、B9、B10 已在隔離環境跑完，標 PASS（隔離環境），見上方「B4、B5、B9、B10 隔離環境實跑」。以下是 12:40 當時的狀態。
 
 - B7 重跑：cube1 Actions 45171423771，staging `90295f0`，`cases=B7`、`b7=1`，12:19:29 得到 `expired`，沒有綁定。
   - cube2 用 Vercel staging 日誌（12:19:27 `[zz] auth expired`）和 staging DB 唯讀查詢核對過：那一次登入流程的結果記為 `expired`，那份合成存檔沒有連結。B7 改為 **PASS**。
