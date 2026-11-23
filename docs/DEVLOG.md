@@ -1609,7 +1609,7 @@
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：正式與 staging 各一次 DELETE（如上，C-044 核准）。｜刪除：如上。
 - 補記：上一條的 commit 為 [`3797206`](https://github.com/luffysky/cube2/commit/3797206)。
 
-## 2026-11-24 01:14（Asia/Taipei）｜綁定面板：「連結」改成主按鈕，網站連結註明「不會連結存檔」，已連結就直接說
+## 2026-11-24 01:09（Asia/Taipei）｜綁定面板：「連結」改成主按鈕，網站連結註明「不會連結存檔」，已連結就直接說
 
 - 專案：cube2｜執行者：Claude｜Owner 回報：「轉磚那個按了只是到games那頁 根本沒綁定」
 - 查證：正式庫 `zz.authsess` 在綁定開放（16:43Z）之後是 0 筆，代表這段時間沒有人真的開始綁定。面板最上面那顆主按鈕「到 SnowRealm Games 註冊／登入 ↗」只會開網站、不會綁，最容易被當成綁定按鈕。
