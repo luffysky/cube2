@@ -1298,3 +1298,22 @@
   - `test/bricks.js` 的遊戲數從 10 改成 11；`gameslang`、`drawer`、`cloudui` 和翻譯測試都通過。
 - 檔案：`games/dungeon/index.html`、`games/dungeon/rules.js`、`games/dungeon/dungeon.js`、`games/dungeon/dungeon.css`（都是新的）、`games/index.html`、`games/nav.js`、`src/games-dict.js`、`src/modes.js`、`src/style.css`、`build.js`、`test/dungeon.test.js`、`test/dungeon.js`、`test/run.js`、`test/browser-run.js`、`test/bricks.js`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構，也沒有新的資料。｜刪除：無。
 - 補記：上一條的 commit 為 [`775619f`](https://github.com/luffysky/cube2/commit/775619f)。
+
+## 2026-11-23 10:12（Asia/Taipei）｜第一次進來就取名字
+
+- 專案：cube2｜執行者：Claude
+- 林董：「轉磚一開始進來就給他們取名字好了」。
+- 流程：第一次進來先看完「開始之前」（條款、地區、年齡），接著跳出「幫自己取個名字」。
+  - 名字欄已經先填好一個隨機名字，按「就用這個」就好；不喜歡可以按「換一個」，或自己打。按 Enter 也能送出。
+  - 隨機名字照語言產生，例如「閃電疊疊樂」「SwiftMason42」，最多 12 個字。
+- 會擋的情況：空白的名字不收；不能用的名字（例如被過濾的字）會說明原因、讓玩家重取。
+- 用其他方式關掉（例如按 Esc）時，會保留當下顯示的那個名字，不會變成沒名字。
+- 什麼時候不問：
+  - 未滿 13 歲：本來就沒有公開名字，所以不問。
+  - 已經有名字的玩家（包括從別的裝置帶過來的）不問。
+  - 從邀請連結進來時，先處理房間。
+  - 同一台裝置只問一次。
+- 已經同意過條款、但還沒取名字的老玩家，下次進來時會問一次。
+- 測試：新的瀏覽器測試 `test/naming.js` 15 項，涵蓋上面的流程、擋名字、按 Esc 保留名字、不問的幾種情況，以及英文介面產生英文名字。`consent` 31 項、`flow` 60 項也重跑過，全過。
+- 檔案：`src/consent.js`、`test/naming.js`、`test/browser-run.js`、`docs/DEVLOG.md`。｜資料庫：沒有改。｜刪除：無。
+- 補記：上一條的 commit 為 [`8b98711`](https://github.com/luffysky/cube2/commit/8b98711)。

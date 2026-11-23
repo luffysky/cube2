@@ -84,6 +84,13 @@
   }
 
   L.add({
+    'nm.title': ['幫自己取個名字', 'Pick a name', '名前を決めよう', '이름을 정해 주세요'],
+    'nm.p': ['排行榜、連線對戰和地城小隊都會顯示這個名字，之後也可以在個人資料裡改。', 'It shows on the leaderboards, in online matches and in Dungeon Party. You can change it later in your profile.', 'ランキングやオンライン対戦、ダンジョン小隊で表示されます。あとでプロフィールから変えられます。', '랭킹, 온라인 대전, 던전 파티에 표시돼요. 나중에 프로필에서 바꿀 수 있어요.'],
+    'nm.label': ['名字', 'Name', '名前', '이름'],
+    'nm.roll': ['換一個', 'Another one', '別の名前', '다른 이름'],
+    'nm.ok': ['就用這個', 'Use this name', 'この名前にする', '이 이름으로'],
+    'nm.empty': ['名字不能空白', 'The name cannot be empty', '名前を入れてください', '이름을 입력해 주세요'],
+    'nm.hi': ['你好，{0}！', 'Hello, {0}!', 'こんにちは、{0}！', '안녕하세요, {0}!'],
     'cs.title': ['開始之前', 'Before you start', 'はじめる前に', '시작하기 전에'],
     'cs.p1': ['轉磚不用註冊。遊戲進度存在你的裝置上；第一次打完一場之後，也會存一份匿名的雲端存檔，換裝置不會不見。沒有廣告、沒有追蹤程式。會用到一個必要的 cookie：只在你把存檔連結到 SnowRealm Games 帳號（或用帳號找回存檔）時設定，用來確認登入後回來的是同一個瀏覽器，最長 10 分鐘，用完就失效，不做追蹤。', 'No sign-up. Your progress is kept on your device and, after your first match, in an anonymous cloud save so it survives a new device. No ads, no trackers. One necessary cookie is used: it is set only when you link your save to a SnowRealm Games account (or get it back with one), to check that the same browser comes back after signing in. It lasts at most 10 minutes, ends once used and is never used for tracking.', '登録は不要です。進行状況は端末に保存され、最初の対戦のあとは匿名のクラウドセーブにも保存されます。広告やトラッカーは使いません。必要な Cookie を一つだけ使います：セーブを SnowRealm Games アカウントに連携する（またはアカウントで取り戻す）ときだけ設定し、ログイン後に同じブラウザが戻ってきたかの確認に使います。最長10分で、使用後は無効になり、追跡には使いません。', '가입이 필요 없습니다. 진행 상황은 기기에 저장되고, 첫 대전 후에는 익명 클라우드 저장에도 보관됩니다. 광고와 추적기는 쓰지 않습니다. 꼭 필요한 쿠키 하나를 사용합니다: 저장 데이터를 SnowRealm Games 계정에 연결하거나 계정으로 되찾을 때만 설정되며, 로그인 후 같은 브라우저로 돌아왔는지 확인하는 데 씁니다. 최대 10분이며 사용하면 무효가 되고 추적에는 쓰지 않습니다.'],
     'cs.lang': ['語言', 'Language', '言語', '언어'],
@@ -162,6 +169,7 @@
   App.inputs.push(function (el) {
     if (el.id === 'sFonts') { Consent.set({ fonts: el.checked }); return true; }
     if (el.id === 'csNoAsk') { noAsk = el.checked; return true; }
+    if (el.id === 'nmName') { candidate = String(el.value || ''); return true; }
     if (el.id === 'sAskAge') { Consent.set({ ask: el.checked }); return true; }
     return false;
   });
@@ -210,6 +218,59 @@
   var setName = Meta.setName;
   Meta.setName = function (v) { if (Consent.child() && v) { App.toast(t('cs.nameChild')); return false; } return setName(v); };
 
+  // ---------- a name, right at the start ----------
+  // Everyone 13 and over picks a name on the first visit (after the screen above), with a made-up one already filled in
+  // so a single tap is enough. Asked once per device; a player who already has one (from another device too) is not
+  // asked. Under 13 there is no public name at all, so nothing is asked.
+  var NAMED = 'zhuanzhuan.named.v1';
+  var PARTS = {
+    'zh-Hant': [['疾風', '閃電', '旋轉', '無敵', '小小', '超級', '傳說', '快樂', '暴走', '冷靜', '神速', '夜行'], ['磚師', 'T轉手', '方塊王', '砌牆工', '消行者', '磚頭', '建築師', '疊疊樂', '勇者', '騎士']],
+    'zh-Hans': [['疾风', '闪电', '旋转', '无敌', '小小', '超级', '传说', '快乐', '暴走', '冷静', '神速', '夜行'], ['砖师', 'T转手', '方块王', '砌墙工', '消行者', '砖头', '建筑师', '叠叠乐', '勇者', '骑士']],
+    en: [['Swift', 'Lucky', 'Mighty', 'Clever', 'Rapid', 'Brave', 'Jolly', 'Calm', 'Sly'], ['Mason', 'Stacker', 'Spinner', 'Builder', 'Brick', 'Knight', 'Fox', 'Owl']],
+    ja: [['疾風の', '無敵の', 'はやての', '最強の', '陽気な', '静かな', '伝説の'], ['職人', 'レンガ', 'ビルダー', '勇者', '騎士', 'スピナー']],
+    ko: [['번개', '무적', '전설의', '행운의', '용감한', '조용한', '질풍'], ['벽돌공', '건축가', '스피너', '용사', '기사', '블록왕']]
+  };
+  var candidate = '', nmWarn = '';
+  function rollName() {
+    var p = PARTS[L.lang] || PARTS['zh-Hant'], a = p[0][Math.floor(Math.random() * p[0].length)], b = p[1][Math.floor(Math.random() * p[1].length)];
+    var n = Meta.cleanName(a + b + (L.lang === 'en' && (a + b).length <= 10 ? Math.floor(10 + Math.random() * 90) : ''));      // twelve characters at most
+    return n || 'Player' + Math.floor(100 + Math.random() * 900);
+  }
+  function asked() { try { return window.localStorage.getItem(NAMED) === '1'; } catch (e) { return true; } }
+  function markAsked() { try { window.localStorage.setItem(NAMED, '1'); } catch (e) { /* asked again next time */ } }
+  function wantName() { return Consent.done() && !Consent.child() && !Meta.data.name && !asked() && !(navigator.webdriver === true && !window.__zzAskName); }
+  function askName(late) {
+    // a moment later: a cloud save brought in on this visit may carry the name already, and other sheets go first
+    setTimeout(function () { if (wantName() && !App.sheet() && !/[?&](room|go|lv)=/.test(window.location.search)) { candidate = rollName(); nmWarn = ''; App.openSheet('naming'); } }, late ? 1200 : 150);
+  }
+  App.sheets.naming = function () {
+    return '<h2>' + t('nm.title') + '</h2><p class="note">' + t('nm.p') + '</p>' +
+      '<form id="nmForm" class="field line"><label for="nmName">' + t('nm.label') + '</label><input type="text" id="nmName" maxlength="12" autocomplete="nickname" value="' + esc(candidate) + '"></form>' +
+      (nmWarn ? '<p class="warn" role="alert">' + t(nmWarn) + '</p>' : '') +
+      '<div class="row">' + btn('nmRoll', 'nm.roll') + btn('nmOk', 'nm.ok', true) + '</div>';
+  };
+  function nameOk() {
+    var box = document.getElementById('nmName'), want = box ? String(box.value || '').trim() : candidate;
+    if (!want) { nmWarn = 'nm.empty'; return App.openSheet('naming'); }
+    Meta.setName(want);
+    if (!Meta.data.name) { candidate = want; nmWarn = 'p.badName'; return App.openSheet('naming'); }
+    markAsked();
+    App.closeSheet();
+    App.toast(t('nm.hi', Meta.data.name), 2400);
+    if (App.updateMenu) App.updateMenu();
+  }
+  App.acts.nmOk = nameOk;
+  App.acts.nmRoll = function () { var box = document.getElementById('nmName'); candidate = rollName(); nmWarn = ''; if (box) { box.value = candidate; box.focus(); } else App.openSheet('naming'); };
+  // closed some other way (Esc): the name that was showing is kept, so nobody ends up nameless by accident
+  App.closed = App.closed || {};
+  App.closed.naming = function () {
+    if (!Meta.data.name && !Consent.child()) { Meta.setName(candidate); if (!Meta.data.name) Meta.setName(rollName()); }
+    markAsked();
+    if (App.updateMenu) App.updateMenu();
+  };
+  document.addEventListener('submit', function (e) { if (e.target && e.target.id === 'nmForm') { e.preventDefault(); nameOk(); } });
+  App.closed.consent = (function (prev) { return function () { if (prev) prev(); askName(false); }; })(App.closed.consent);
+
   load();
   App.boot.push(function () {
     apply();
@@ -218,6 +279,7 @@
     var robot = navigator.webdriver === true && !window.__zzAskConsent;
     noAsk = !C.ask;
     if ((!Consent.done() || C.ask) && !robot) { pick = C.age; pickR = C.region; setTimeout(function () { if (!App.sheet() || room) App.openSheet('consent'); }, room ? 400 : 80); }
+    else askName(true);
   });
   App.langChanged = App.langChanged || [];
   App.langChanged.push(notice);
