@@ -822,6 +822,15 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(r.json.st === 'ok', 'and the two are friends again');
     const rows = await pg.query('SELECT st FROM zz.friends');
     ok(rows.length === 1, 'one row per pair, whatever happens', rows);
+    // an ended friendship is removed by the daily job once its day is over, with any invitation between the two
+    await rpc({ a: 'frAdd', p: F3.pub }, F1); await rpc({ a: 'frAdd', p: F1.pub }, F3);
+    await rpc({ a: 'frInv', p: F3.pub, g: 'zz', code: 'ABCDE' }, F1);
+    await rpc({ a: 'frDrop', p: F1.pub }, F3);
+    let td = await core.friendsTidy(pg, now);
+    ok(td.friends === 0 && (await pg.query('SELECT count(*)::int AS n FROM zz.friends'))[0].n === 2, 'not before the day is over (it still stops asking again)', td);
+    td = await core.friendsTidy(pg, now + DAY + MIN);
+    const left = await pg.query('SELECT st FROM zz.friends'), invs = await pg.query('SELECT count(*)::int AS n FROM zz.invites i JOIN zz.players p ON p.id = i.src WHERE p.pub = $1 AND i.dst = (SELECT id FROM zz.players WHERE pub = $2)', [F1.pub, F3.pub]);
+    ok(td.friends === 1 && td.invites === 1 && left.length === 1 && left[0].st === 'ok' && invs[0].n === 0, 'after a day: the ended one and its invitation are gone; friends stay', [td, left]);
     r = await rpc({ a: 'fr' }, null);
     ok(r.status === 401, 'not without a save');
   }

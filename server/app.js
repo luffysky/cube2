@@ -155,7 +155,10 @@ const routes = {
     let watch = null;
     try { watch = await db.run(d => retention.watch(d, now)); } catch (e) { log('cron-watch', e); }
     if (watch && (watch.adminLog.pastKeep > 0 || watch.authSessions.expired > 1000)) console.warn('[zz] retention ' + JSON.stringify(watch));
-    send(res, out.status, Object.assign({}, out.body, { watch }));
+    // ended friendships past their one day (Owner decision C-040)
+    let friends = null;
+    try { friends = await db.run(d => core.friendsTidy(d, now)); } catch (e) { log('cron-friends', e); }
+    send(res, out.status, Object.assign({}, out.body, { watch, friends }));
   },
   // the rewarded-ad network's callback (GET, signed). Not for pages: nothing is paid without a valid signature.
   async ad(req, res, url) {

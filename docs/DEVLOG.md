@@ -1388,3 +1388,20 @@
 - 檔案：`src/friends.js`（新）、`src/cloud.js`、`src/consent.js`、`src/shop.js`、`src/modes.js`、`src/ui.js`、`src/i18n.js`、`src/style.css`、`src/index.template.html`、`src/games-dict.js`、`games/drawer-icons.js`、`games/dungeon/index.html`、`games/dungeon/dungeon.js`、`games/dungeon/dungeon.css`、`server/db.js`、`server/core.js`、`server/app.js`、`build.js`、`test/friends.js`（新）、`test/api.test.js`、`test/naming.js`、`test/dungeon.js`、`test/i18n.test.js`、`test/browser-run.js`、`docs/TODO.md`、`docs/DEVLOG.md`。
 - 資料庫：新增兩張表和一個欄位（上面說的三項）。沒有刪除任何東西。
 - 補記：上一條的 commit 為 [`af77b9e`](https://github.com/luffysky/cube2/commit/af77b9e)。
+
+## 2026-11-23 10:36（Asia/Taipei）｜已結束的好友紀錄改成一天後刪除
+
+- 專案：cube2｜執行者：Claude
+- 林董回覆「已結束的好友關係要不要定期清掉」：「好 就刪」（記為 Owner 決定 C-040）。
+- 做法：
+  - 被拒絕、被取消、被移除的好友紀錄，先保留一天。這一天是用來擋住被拒絕的一方立刻再送申請。
+  - 一天後，由每天跑一次的排程（`/api/cron`，原本清理已移除雲端檔案的那支）把它刪掉，兩人之間剩下的邀請也一起刪。
+  - 還是好友的、還在等對方同意的申請，都不會被動到。
+  - 排程回應多一欄 `friends`，寫這次刪了幾筆好友紀錄和幾筆邀請。
+- 範圍：只刪這兩種資料，其他排程原本「只計數不刪」的項目（管理稽核紀錄、登入暫存）維持原樣。
+- 順手補記：今天的三項 Owner 決定寫進 `docs/OWNER_DECISIONS.md`：C-038 地城小隊、C-039 取名字＋好友＋骰子、C-040 這一項。
+- 測試：`test/api.test.js` 多 2 項，全部 445 項通過。
+  - 結束未滿一天：不刪，因為還要擋再次申請。
+  - 過一天：那一筆和兩人之間的邀請都刪掉，還在的好友留著。
+- 檔案：`server/core.js`、`server/app.js`、`test/api.test.js`、`docs/OWNER_DECISIONS.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構；排程每天刪除已結束超過一天的好友紀錄。
+- 補記：上一條的 commit 為 [`7a15cd7`](https://github.com/luffysky/cube2/commit/7a15cd7)。

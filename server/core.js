@@ -574,7 +574,7 @@ async function friendAdd(db, cred, body, now) {
   if (!got[0]) return fail(409, 'wait');
   return good({ st: got[0].st, n: them.name, p: pub, now });
 }
-// turn down a request, take back my own, or stop being friends: the row stays, marked ended (nothing is deleted here)
+// turn down a request, take back my own, or stop being friends: the row is marked ended (and removed by the daily job a day later)
 async function friendDrop(db, cred, body, now) {
   const row = await findPlayer(db, cred);
   if (!row) return fail(401, 'auth');
@@ -601,6 +601,16 @@ async function friendInvite(db, cred, body, now) {
   await db.query(`INSERT INTO zz.invites (dst, src, g, code, at) VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT (dst, src) DO UPDATE SET g = $3, code = $4, at = $5`, [them.id, row.id, g, code, now]);
   return good({ now });
+}
+
+// An ended friendship (turned down, taken back or removed) is kept only for the day that stops the other side asking
+// again; after that the daily job removes it, with any invitation left between the two (Owner decision C-040).
+async function friendsTidy(db, now) {
+  const out = await db.batch([
+    [`DELETE FROM zz.invites i USING zz.friends f WHERE f.st = 'x' AND f.at < $1 AND f.a = LEAST(i.src, i.dst) AND f.b = GREATEST(i.src, i.dst) RETURNING 1`, [now - FR.AGAIN]],
+    [`DELETE FROM zz.friends WHERE st = 'x' AND at < $1 RETURNING 1`, [now - FR.AGAIN]]
+  ]);
+  return { friends: out[1].length, invites: out[0].length };
 }
 
 // ---------- SnowRealm Identity: link this save to a platform player, and get it back on another device ----------
@@ -666,4 +676,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, FR, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

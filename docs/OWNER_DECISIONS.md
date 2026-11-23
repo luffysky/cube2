@@ -41,6 +41,9 @@
 | C-035 | 11-21 | 轉交 GPT 交辦：cube2 唯讀營運 API（7 支）＋ OAuth BFF callback（正式綁定仍不可開） | 七支 `/internal/admin/v1/*` 已實作，未設定前 503；BFF `start/callback/result` 已實作，`IDENTITY_LINK_ENABLED` 維持關閉；新增兩張表 `zz.admin_log`、`zz.authsess`。兩者的定期清除（稽核 180 天、過期 session）屬於刪除，未實作，待 Owner 核准 | 程式已上線（功能關閉） |
 | C-036 | 11-21 | 轉交 GPT 契約補充：nonce 必填、管理 sub 限定、清理先提案、R2 測試與 cookie 法律審查另外追蹤 | BFF 的 token 缺 nonce 或不同一律拒絕；管理 API 測試以外只接受 `svc:snowrealm-games-admin`；`/api/cron` 加只讀監控；清理方案寫在 `docs/RETENTION_PROPOSAL.md`，未執行任何刪除 | 已上線（清理待 Owner） |
 | C-037 | 11-21 | 轉交 GPT「Staging 回呼與 A1–A14／B1–B13 對接補充」 | 只在 Vercel Preview 生效的 staging callback（單一精確 URI、獨立 client／secret／issuer，production 一律忽略）；staging 只用 `STAGING_DATABASE_URL`、不讀正式資料庫；`brickduel-staging.snowrealm.pet` 已在 Vercel 綁 `staging` 分支，DNS 待 Owner 在 Cloudflare 加 | 程式已上線（staging 未生效） |
+| C-038 | 11-23 | 「多人遊戲那裡也加點別的遊戲，不用再跟俄羅斯方塊有關，可以試試做個小型 RPG」；選合作地城、獨立頁面＋兩個入口、先不給金幣 | 地城小隊（`games/dungeon/`）：2–4 人回合制合作地城，房主跑規則、其他人送選擇；轉磚連線對戰與遊戲總覽兩個入口；不碰存檔與金幣 | 已上線 |
+| C-039 | 11-23 | 「轉磚一開始進來就給他們取名字」「再加上新增好友功能」（選「加好友＋邀請一起玩」）「名字可以用那種骰子隨機」 | 第一次進來同意條款後取名（未滿 13 歲不問）；好友碼加好友、同意／移除、在線狀態、房間邀請（轉磚與地城小隊）；名字旁加骰子 | 已上線 |
+| C-040 | 11-23 | 已結束的好友關係要不要定期清掉：「好 就刪」 | 被拒絕、取消或移除的好友紀錄，保留一天（擋住再次申請），之後由每天的排程連同兩人之間的邀請一起刪除；還在的好友與申請不動 | 已上線 |
 | C-016 | 11-19 | 律師審閱、統一編號登記的提醒 | 記在待辦；正式商用前完成 | 待辦 |
 | C-017 | 11-19 | 中國大陸版號等事項之後交給暖寶處理 | 不在 cube2 範圍內處理 | 待辦 |
 
