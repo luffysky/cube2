@@ -1,7 +1,9 @@
 'use strict';
 /* 轉磚's OAuth BFF for "connect to SnowRealm Games" (authorization code + PKCE S256, all secrets on the server).
 
-     POST /api/auth/start      { intent: 'link' | 'recover' | 'restore' }   → { url } and a session cookie
+     POST /api/auth/start      { intent: 'login' | 'link' | 'recover' | 'restore' }   → { url } and a session cookie
+                               (login, the page's one button: no save on the account yet → this one becomes it,
+                               linked; the account has another → that one comes to this device, recovered)
      GET  /api/auth/callback   ?code=&state=  (from the Games portal)        → 303 to /?auth=<outcome>
      POST /api/auth/result     (same browser, the cookie)                    → the outcome once, then nothing
 
@@ -52,7 +54,9 @@ const COOKIE = '__Host-zzauth', LIFE = 10 * 60000, RESULT_LIFE = 5 * 60000, TOKE
 // lets a player who comes back late be told "expired" (start again) rather than "no session". A cookie that lived
 // exactly LIFE was already gone from the browser by then (joint acceptance B7, cube1 Actions run 45167007292).
 const COOKIE_LIFE = LIFE + 20 * 60000;
-const INTENTS = ['link', 'recover', 'restore'];
+// login: sign in with the SnowRealm Games account from this device. The account has no 轉磚 save yet: this device's save
+// becomes the account's (the guest becomes a member). It has one (on another device): this device is given that one.
+const INTENTS = ['link', 'login', 'recover', 'restore'];
 const ACCEPT_MAX = 8, PUB_RE = /^[abcdefghjkmnpqrstuvwxyz23456789]{8}$/;
 // the acceptance saves' public tags, or [] (not set, too many, or one that is not a tag)
 function acceptList(env) {
@@ -154,7 +158,7 @@ async function start(db, body, who, tag, now, env, host) {
     const t = who ? await core.findPlayer(db, who) : null;
     if (!t || s.accept.indexOf(t.pub) < 0) return { status: 503, body: { ok: false, why: 'off' } };
   }
-  if (intent === 'link') {
+  if (intent === 'link' || intent === 'login') {
     if (!who) return { status: 401, body: { ok: false, why: 'auth' } };
     const p = await core.findPlayer(db, who);
     if (!p) return { status: 401, body: { ok: false, why: 'auth' } };
@@ -233,11 +237,16 @@ async function finish(db, q, cookie, now, env, host) {
     const held = await db.query('SELECT p.pub FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [v.sub]);
     if (held[0] && s.accept.indexOf(held[0].pub) < 0) return done('off', null, 'accept');
   }
-  let out;
-  if (row.intent === 'link') out = await core.idLink(db, { id: row.pid, hash: row.cred }, v, now);
+  let out, kind = row.intent === 'link' ? 'linked' : 'recovered';
+  if (row.intent === 'login') {
+    // the account already holds a save that is not this one: that save comes to this device (this one stays as it was)
+    const held = await db.query('SELECT pid FROM zz.identity WHERE platform_id = $1', [v.sub]);
+    kind = held[0] && held[0].pid !== row.pid ? 'recovered' : 'linked';
+  }
+  if (kind === 'linked') out = await core.idLink(db, { id: row.pid, hash: row.cred }, v, now);
   else out = await core.idRecover(db, v, now, row.intent === 'restore');
   const b = out.body || {};
-  if (out.status === 200) return done(row.intent === 'link' ? 'linked' : 'recovered', b);
+  if (out.status === 200) return done(kind, b);
   const why = b.why;
   const outcome = why === 'pending' ? 'pending' : why === 'none' ? 'none' : why === 'ban' ? 'ban' : why === 'purged' ? 'purged' : why === 'auth' ? 'session'
     : why === 'replay' ? 'replay' : out.status === 409 ? 'conflict' : 'unavailable';

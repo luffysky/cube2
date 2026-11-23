@@ -268,6 +268,42 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   x = await round('restore', null, U2); eq(where(x.cb), '/?auth=recovered', 'restore takes the deletion back (the 30 days still hold)');
   ok((await pg.query('SELECT gone FROM zz.players WHERE id = $1', [P3.id]))[0].gone === null, 'and the save is back');
 
+  // ---------- login: one button; the guest becomes a member, or this device gets the account's save ----------
+  {
+    const U5 = '5c5c5c5c-1111-4222-8333-444455556666', U6 = '6d6d6d6d-1111-4222-8333-444455556666';
+    const G1 = await newPlayer(), G2 = await newPlayer(), G3 = await newPlayer();
+    eq((await startIt('login')).status, 401, 'login needs the device\'s own key (its save is what becomes the account\'s)');
+    x = await round('login', G1, U5);
+    eq(where(x.cb), '/?auth=linked', 'login with an account that has no save: this save becomes the account\'s');
+    r = await resultOf(x.cookie);
+    ok(r.json.outcome === 'linked' && r.json.id === G1.id && r.json.key, 'the same save, with a new key', r.json);
+    const G1b = { id: G1.id, key: r.json.key };
+    eq((await rpc({ a: 'sync', ops: [] }, G1)).status, 401, 'the old guest key stops');
+    const g2coins = await coinsOf(G2.id);
+    x = await round('login', G2, U5);
+    eq(where(x.cb), '/?auth=recovered', 'login on another device (its guest save not linked): it gets the account\'s save');
+    r = await resultOf(x.cookie);
+    ok(r.json.outcome === 'recovered' && r.json.id === G1.id && r.json.key && r.json.st, 'the account\'s save, with a key for this device', r.json);
+    const G2on1 = { id: r.json.id, key: r.json.key };
+    ok((await pg.query('SELECT count(*)::int AS n FROM zz.identity WHERE pid = $1', [G2.id]))[0].n === 0 && await coinsOf(G2.id) === g2coins, 'the guest save there stays as it was: not linked, not merged');
+    eq((await rpc({ a: 'sync', ops: [] }, G2)).status, 200, 'and its own key still works (the player chooses on the page)');
+    x = await round('login', G1b, U5);
+    eq(where(x.cb), '/?auth=linked', 'login again with the same save: linked, nothing changes');
+    r = await resultOf(x.cookie);
+    ok(r.json.outcome === 'linked' && !r.json.key, 'no new key for a save already linked to that account', r.json);
+    x = await round('login', G1b, U6);
+    eq(where(x.cb), '/?auth=conflict', 'a save linked to one account cannot sign in to another account that has none');
+    eq((await pg.query('SELECT platform_id FROM zz.identity WHERE pid = $1', [G1.id]))[0].platform_id, U5, 'it stays with the first');
+    // signing out on a device
+    eq((await rpc({ a: 'signout' }, G3)).status, 409, 'a guest save cannot sign out (nothing would bring it back)');
+    eq((await rpc({ a: 'sync', ops: [] }, G3)).status, 200, 'and its key is untouched');
+    eq((await rpc({ a: 'signout' })).status, 401, 'signing out needs a key');
+    eq((await rpc({ a: 'signout' }, G1b)).status, 200, 'a linked save signs out on this device');
+    eq((await rpc({ a: 'sync', ops: [] }, G1b)).status, 401, 'that device\'s key stops');
+    eq((await rpc({ a: 'sync', ops: [] }, G2on1)).status, 200, 'the other device stays signed in');
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.identity WHERE pid = $1', [G1.id]))[0].n, 1, 'and the save stays linked');
+  }
+
   // ---------- limits ----------
   let last = 0;
   for (let i = 0; i < 12; i++) last = (await startIt('recover', null, { ip: LIMIT_IP })).status;

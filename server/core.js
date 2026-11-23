@@ -657,6 +657,16 @@ async function idLink(db, cred, claims, now) {
   }
   return good({ linked: true, id: p.id, key: secret, now });
 }
+// sign out on this device: only a save linked to a SnowRealm Games account (signing in again brings it back); this
+// device's own key stops working, the save and the other devices' keys stay as they are
+async function signOut(db, cred) {
+  const p = await findPlayer(db, cred);
+  if (!p) return fail(401, 'auth');
+  const l = await db.query('SELECT 1 FROM zz.identity WHERE pid = $1', [p.id]);
+  if (!l[0]) return fail(409, 'unlinked');
+  await db.query('DELETE FROM zz.keys WHERE hash = $1 AND pid = $2', [cred.hash, p.id]);
+  return good({ out: true });
+}
 // another device: the platform player's 轉磚 save, with a key of its own for this device
 // back: true takes back a deletion that is waiting (the player signed in to SnowRealm again and chose to keep the save).
 async function idRecover(db, claims, now, back) {
@@ -677,4 +687,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

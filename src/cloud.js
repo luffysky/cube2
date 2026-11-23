@@ -143,6 +143,8 @@
   Cloud.follow = function () {
     var v = readStore() || {}, id = v.id && v.key ? v.id : '', mine = Cloud.cred ? Cloud.cred.id : '', gone = !id && !!v.gone;
     if (id === mine && gone === Cloud.gone) return false;
+    // another tab signed out of SnowRealm Games: this one does too (the page starts over as a new guest)
+    if (!id && v.out && mine) { Cloud.cred = null; Cloud.pub = ''; Cloud.q = []; Cloud.id = null; Cloud.base = null; if (Cloud.onSignedOut) Cloud.onSignedOut(); return true; }
     if (!id && !gone && mine) { persist(); return false; }   // a tab that had not heard of the account wrote over it: put it back
     var join = !!id && !mine;                                  // it made the account this tab was about to make
     Cloud.cred = id ? { id: v.id, key: v.key } : null;
@@ -368,28 +370,59 @@
   // The server keeps every secret; the page only goes to the address it is given.
   Cloud.authStart = function (intent) {
     if (!Cloud.link) return Promise.resolve({ ok: false, why: 'off' });
+    var own = intent === 'link' || intent === 'login';   // this device's save goes along (it is what becomes the account's)
+    try { root.sessionStorage.setItem('zz.authIntent', intent); } catch (e) { /* private mode */ }
     var go = function () {
-      return call('POST', 'auth/start', { intent: intent }, intent === 'link').then(function (r) {
+      return call('POST', 'auth/start', { intent: intent }, own).then(function (r) {
         var b = answer(r);
         if (r.status === 200 && b.ok && typeof b.url === 'string' && /^https:\/\//.test(b.url)) { (Cloud.go || function (u) { root.location.assign(u); })(b.url); return { ok: true }; }
         return b;
       }, offline);
     };
-    return intent === 'link' ? Cloud.ensure().then(function (ok) { return ok ? go() : offline(); }) : go();
+    return own ? Cloud.ensure().then(function (ok) { return ok ? go() : offline(); }) : go();
   };
   // back from the portal (?auth=<outcome>): the result is read once, with the cookie; a new device key is taken
-  Cloud.authResult = function () {
+  // hold(b): for a save from the account that would replace this device's progress, the page may ask first; then the
+  // answer is kept back (b.held) and Cloud.useResult(b) takes it once the player says so
+  Cloud.authResult = function (hold) {
     return call('POST', 'auth/result', {}).then(function (r) {
       var b = answer(r);
       if (r.status !== 200 || !b.ok) return b;
-      if (b.id && b.key) {
-        if (b.outcome === 'recovered') { Cloud.q = []; take(b); if (b.st) adopt(b.st); }
-        else take({ id: b.id, key: b.key, pub: Cloud.pub, now: b.now });
-        Cloud.id = { linked: true, at: b.linked && b.now ? b.now : (Cloud.id && Cloud.id.at) || 0 };
-        changed();
-      }
+      if (b.outcome === 'recovered' && b.id && b.key && hold && hold(b)) { b.held = true; return b; }
+      if (b.outcome === 'linked' || (b.outcome === 'recovered' && b.id && b.key)) Cloud.useResult(b);
       return b;
     }, offline);
+  };
+  Cloud.useResult = function (b) {
+    if (b.id && b.key) {
+      if (b.outcome === 'recovered') { Cloud.q = []; take(b); if (b.st) adopt(b.st); }
+      else take({ id: b.id, key: b.key, pub: Cloud.pub, now: b.now });
+    }
+    Cloud.id = { linked: true, at: b.outcome === 'linked' && b.key && b.now ? b.now : 0 };
+    changed();
+    if (!Cloud.id.at) Cloud.idCheck().then(changed);
+  };
+  // sign out on this device (only a save linked to a SnowRealm Games account): what is not sent yet goes first, the
+  // server stops this device's key, and the device starts over as a new guest. Signing in again brings the save back.
+  Cloud.signOut = function () {
+    if (!Cloud.cred || !(Cloud.id && Cloud.id.linked)) return Promise.resolve({ ok: false, why: 'unlinked' });
+    return Promise.resolve(Cloud.flush()).then(function () {
+      if (Cloud.q.length) return { ok: false, why: 'net' };
+      return call('POST', 'rpc', { a: 'signout' }, true).then(function (r) {
+        var b = answer(r);
+        if (r.status !== 200 || !b.ok) return b;
+        Meta.quiet++;
+        try { Meta.reset(); Meta.save(); } finally { Meta.quiet--; }
+        Cloud.cred = null; Cloud.pub = ''; Cloud.q = []; Cloud.id = null; Cloud.gone = false; Cloud.want = false;
+        Cloud.base = snapshot();
+        // written straight to the store, marked as a sign-out: persist() would take the account back as one another tab
+        // had just made, and the other tabs, seeing the mark, sign out too instead of putting it back
+        var st = storage();
+        try { if (st) st.setItem(KEY, JSON.stringify({ id: '', key: '', pub: '', gone: false, seen: Cloud.seen, base: Cloud.base, del: Cloud.del, q: [], out: Cloud.now() })); } catch (e) { /* this visit only */ }
+        changed();
+        return b;
+      }, offline);
+    });
   };
   // a member's own files in the cloud: a = 'fileUp' | 'fileOk' | 'fileList' | 'fileHide' (see server/files.js)
   Cloud.file = function (body) {
@@ -734,13 +767,26 @@
     'sr.p': ['轉磚不用註冊就能玩。想用同一個帳號玩 SnowRealm 的每一款遊戲，請到 SnowRealm Games：已經有帳號就按右上角「登入」，還沒有就在登入畫面選「註冊」。', 'You can play 轉磚 without an account. To use one account across every SnowRealm game, go to SnowRealm Games: press "Sign in" at the top right, or choose "Register" there if you have no account yet.', '轉磚は登録なしで遊べます。SnowRealm の全ゲームで同じアカウントを使うには SnowRealm Games へ：右上の「ログイン」、まだなら「登録」を選んでください。', '轉磚는 가입 없이 즐길 수 있어요. SnowRealm의 모든 게임을 한 계정으로 즐기려면 SnowRealm Games에서 오른쪽 위 "로그인", 계정이 없으면 "회원가입"을 고르세요.'],
     'sr.kid': ['13 歲以下先不用註冊帳號，直接玩就可以，進度會存在這台裝置。', 'Under 13 there is no need for an account: just play, and progress stays on this device.', '13歳未満の方はアカウント登録なしでそのまま遊べます。', '13세 미만은 계정 없이 그대로 즐기면 돼요.'],
     'sr.menu': ['登入／註冊', 'Sign in / Register', 'ログイン／登録', '로그인/가입'],
-    'sr.link': ['把這份存檔連結到 SnowRealm Games 帳號', 'Link this save to your SnowRealm Games account', 'このセーブを SnowRealm Games アカウントに連携', '이 저장 데이터를 SnowRealm Games 계정에 연결'],
-    'sr.linkP': ['按下面的按鈕會到 SnowRealm Games：確認右上角是你的帳號，按「繼續前往授權」，再按「同意」，就會回到轉磚完成連結。之後換裝置只要按「找回」；金幣、進度都不會合併或移動。', 'The button below takes you to SnowRealm Games: check that your account is shown at the top right, press "Continue to authorize", then "Agree", and you come back here with this save linked. After that, "Get my save back" on another device is all it takes; coins and progress are never merged or moved.', '下のボタンで SnowRealm Games へ移動します。右上が自分のアカウントか確認し、「認可に進む」→「同意」を押すと轉磚に戻って連携が完了します。その後は別の端末で「取り戻す」だけ。コインや進行状況が合算・移動されることはありません。', '아래 버튼을 누르면 SnowRealm Games로 이동해요. 오른쪽 위가 내 계정인지 확인하고 "승인 계속" → "동의"를 누르면 轉磚로 돌아와 연결이 끝나요. 이후 다른 기기에서는 "되찾기"만 누르면 돼요. 코인과 진행 상황은 합쳐지거나 옮겨지지 않아요.'],
-    'sr.isLinked': ['這份存檔已經連結 SnowRealm Games 帳號（{0}）。換裝置時，在新裝置按「用 SnowRealm Games 帳號找回存檔」就好。', 'This save is linked to your SnowRealm Games account ({0}). On a new device, just use "Get my save back with SnowRealm Games".', 'このセーブは SnowRealm Games アカウントと連携済みです（{0}）。新しい端末では「SnowRealm Games アカウントでセーブを取り戻す」を押すだけです。', '이 저장 데이터는 SnowRealm Games 계정과 연결되어 있어요({0}). 새 기기에서는 "SnowRealm Games 계정으로 저장 데이터 되찾기"만 누르면 돼요.'],
     'sr.noAcc': ['還沒有 SnowRealm Games 帳號？先到網站註冊，再回來按上面的「連結」。（這個按鈕只會打開網站，不會連結存檔。）', 'No SnowRealm Games account yet? Register on the site first, then come back and use "Link" above. (This button only opens the site; it does not link your save.)', 'SnowRealm Games のアカウントがまだなら、先にサイトで登録してから上の「連携」を押してください。（このボタンはサイトを開くだけで、セーブは連携されません）', 'SnowRealm Games 계정이 아직 없다면 먼저 사이트에서 가입한 뒤 위의 "연결"을 눌러 주세요. (이 버튼은 사이트만 열고 저장 데이터를 연결하지 않아요.)'],
-    'sr.recover': ['用 SnowRealm Games 帳號找回存檔', 'Get my save back with SnowRealm Games', 'SnowRealm Games アカウントでセーブを取り戻す', 'SnowRealm Games 계정으로 저장 데이터 되찾기'],
-    'sr.recoverP': ['找回後，這台裝置現在的進度（{0}、{1} 金幣）會換成帳號上的那份。', 'This device\'s current progress ({0}, {1} coins) is replaced by the save on the account.', 'この端末の現在の進行状況（{0}、{1}コイン）はアカウントのセーブに置き換わります。', '이 기기의 현재 진행 상황({0}, {1}코인)은 계정의 저장 데이터로 바뀌어요.'],
-    'sr.linked': ['已連結 SnowRealm Games 帳號。', 'Linked to your SnowRealm Games account.', 'SnowRealm Games アカウントと連携しました。', 'SnowRealm Games 계정과 연결했어요.'],
+    'sr.linked': ['已連結 SnowRealm Games。這份存檔現在是你帳號的，換裝置登入同一個帳號就能接著玩。', 'Linked to SnowRealm Games. This save now belongs to your account: sign in with it on any device to carry on.', 'SnowRealm Games と連携しました。このセーブはあなたのアカウントのものになり、どの端末でも同じアカウントでログインすれば続きから遊べます。', 'SnowRealm Games와 연결했어요. 이 저장 데이터는 이제 내 계정의 것이라, 어느 기기에서든 같은 계정으로 로그인하면 이어서 할 수 있어요.'],
+    'sr.on': ['已連結 SnowRealm Games', 'Linked to SnowRealm Games', 'SnowRealm Games 連携済み', 'SnowRealm Games 연결됨'],
+    'sr.onP': ['這份存檔屬於你的 SnowRealm Games 帳號，進度都存在雲端。換裝置時登入同一個帳號就會接上。', 'This save belongs to your SnowRealm Games account and all of it is kept in the cloud. Sign in with the same account on another device to pick it up.', 'このセーブは SnowRealm Games アカウントのもので、進行状況はすべてクラウドに保存されています。別の端末では同じアカウントでログインすれば引き継げます。', '이 저장 데이터는 SnowRealm Games 계정의 것이고 진행 상황은 모두 클라우드에 있어요. 다른 기기에서 같은 계정으로 로그인하면 이어져요.'],
+    'sr.onAt': ['這份存檔屬於你的 SnowRealm Games 帳號（{0} 連結），進度都存在雲端。換裝置時登入同一個帳號就會接上。', 'This save belongs to your SnowRealm Games account (linked {0}) and all of it is kept in the cloud. Sign in with the same account on another device to pick it up.', 'このセーブは SnowRealm Games アカウントのもの（{0} 連携）で、進行状況はすべてクラウドに保存されています。別の端末では同じアカウントでログインすれば引き継げます。', '이 저장 데이터는 SnowRealm Games 계정의 것({0} 연결)이고 진행 상황은 모두 클라우드에 있어요. 다른 기기에서 같은 계정으로 로그인하면 이어져요.'],
+    'sr.login': ['用 SnowRealm Games 帳號登入', 'Sign in with SnowRealm Games', 'SnowRealm Games でログイン', 'SnowRealm Games로 로그인'],
+    'sr.loginP': ['你現在是訪客。登入後，這台的進度會變成你 SnowRealm Games 帳號的存檔，換裝置登入同一個帳號就是同一份；帳號裡已經有轉磚存檔的話，就會換成帳號那份（會先問你）。按下去會到 SnowRealm Games：確認右上角是你的帳號，按「繼續前往授權」，再按「同意」。', 'You are playing as a guest. Sign in and this device\'s progress becomes your SnowRealm Games account\'s save, the same one on every device you sign in on. If the account already has a 轉磚 save, this device switches to it (you are asked first). At SnowRealm Games, check your account at the top right, press "Continue to authorize", then "Agree".', '今はゲストです。ログインすると、この端末の進行状況が SnowRealm Games アカウントのセーブになり、どの端末でも同じものを使えます。アカウントにすでに轉磚のセーブがあれば、そちらに切り替わります（先に確認します）。SnowRealm Games で右上のアカウントを確認し、「認可に進む」→「同意」を押してください。', '지금은 게스트예요. 로그인하면 이 기기의 진행 상황이 SnowRealm Games 계정의 저장 데이터가 되고, 어느 기기에서든 같은 것을 써요. 계정에 이미 轉磚 저장 데이터가 있으면 그쪽으로 바뀌어요(먼저 물어봐요). SnowRealm Games에서 오른쪽 위 계정을 확인하고 "승인 계속" → "동의"를 누르세요.'],
+    'sr.conflictLinked': ['這台的存檔已經連結另一個 SnowRealm Games 帳號。請用那個帳號登入；兩邊都保持原樣。', 'This device\'s save is linked to another SnowRealm Games account. Sign in with that one; both stay as they are.', 'この端末のセーブは別の SnowRealm Games アカウントと連携済みです。そのアカウントでログインしてください。どちらもそのままです。', '이 기기의 저장 데이터는 다른 SnowRealm Games 계정과 연결되어 있어요. 그 계정으로 로그인하세요. 둘 다 그대로예요.'],
+    'sr.switchT': ['帳號裡已經有轉磚存檔', 'Your account already has a 轉磚 save', 'アカウントにはすでに轉磚のセーブがあります', '계정에 이미 轉磚 저장 데이터가 있어요'],
+    'sr.switchP': ['要在這台裝置改用帳號的存檔嗎？', 'Use the account\'s save on this device?', 'この端末でアカウントのセーブを使いますか？', '이 기기에서 계정의 저장 데이터를 쓸까요?'],
+    'sr.switchAcc': ['帳號的存檔：{0}、{1} 金幣、{2} 場', 'The account\'s save: {0}, {1} coins, {2} matches', 'アカウントのセーブ：{0}、{1}コイン、{2}戦', '계정의 저장 데이터: {0}, {1}코인, {2}판'],
+    'sr.switchHere': ['這台的訪客進度：{0}、{1} 金幣、{2} 場', 'This device\'s guest progress: {0}, {1} coins, {2} matches', 'この端末のゲスト進行：{0}、{1}コイン、{2}戦', '이 기기의 게스트 진행: {0}, {1}코인, {2}판'],
+    'sr.switchNote': ['兩份不會合併。改用帳號的存檔後，這台的訪客進度就不再使用。', 'The two are never merged. Once you switch, this device\'s guest progress is no longer used.', '2つが合算されることはありません。切り替えると、この端末のゲスト進行は使われなくなります。', '두 가지는 합쳐지지 않아요. 바꾸면 이 기기의 게스트 진행은 더 이상 쓰지 않아요.'],
+    'sr.switchYes': ['改用帳號的存檔', 'Use the account\'s save', 'アカウントのセーブを使う', '계정 저장 데이터 사용'],
+    'sr.switchNo': ['先不要，留在訪客', 'Not now, stay a guest', '今はやめてゲストのまま', '지금은 게스트로 남기'],
+    'sr.switchKept': ['沒有切換，這台還是訪客進度。', 'Nothing changed: this device keeps its guest progress.', '切り替えていません。この端末はゲストのままです。', '바꾸지 않았어요. 이 기기는 게스트 진행 그대로예요.'],
+    'sr.outT': ['登出 SnowRealm Games', 'Sign out of SnowRealm Games', 'SnowRealm Games からログアウト', 'SnowRealm Games 로그아웃'],
+    'sr.outP': ['登出後，這台裝置會變回全新的訪客。你的進度都留在 SnowRealm Games 帳號裡，之後再登入同一個帳號就會回來。', 'After signing out, this device starts over as a new guest. All your progress stays on your SnowRealm Games account and comes back when you sign in again.', 'ログアウトすると、この端末は新しいゲストに戻ります。進行状況はすべて SnowRealm Games アカウントに残り、もう一度ログインすれば戻ってきます。', '로그아웃하면 이 기기는 새 게스트로 돌아가요. 진행 상황은 모두 SnowRealm Games 계정에 남고, 다시 로그인하면 돌아와요.'],
+    'sr.outDone': ['已登出。這台現在是新的訪客，登入同一個帳號就能拿回進度。', 'Signed out. This device is a new guest now; sign in with the same account to get your progress back.', 'ログアウトしました。この端末は新しいゲストです。同じアカウントでログインすれば進行状況が戻ります。', '로그아웃했어요. 이 기기는 이제 새 게스트예요. 같은 계정으로 로그인하면 진행 상황이 돌아와요.'],
+    'sr.outFail': ['現在沒辦法登出（連不上伺服器，或還有進度沒存上去）。什麼都沒變，稍後再試。', 'Could not sign out now (no connection, or progress still waiting to be saved). Nothing changed; try again later.', '今はログアウトできません（接続できないか、未保存の進行状況があります）。何も変わっていません。', '지금은 로그아웃할 수 없어요(연결이 안 되거나 아직 저장되지 않은 진행 상황이 있어요). 아무것도 바뀌지 않았어요.'],
     'sr.recovered': ['找回了，這台裝置現在用的是帳號上的存檔。', 'Done. This device now uses the save on your account.', '取り戻しました。この端末はアカウントのセーブを使います。', '되찾았어요. 이 기기는 이제 계정의 저장 데이터를 사용해요.'],
     'sr.conflict': ['這個帳號或這份存檔已經連結了別的，兩邊都保持原樣，沒有合併。', 'That account or this save is already linked to another; both stay as they are and nothing was merged.', 'このアカウントかこのセーブは別のものと連携済みです。どちらもそのままで、合算はしていません。', '그 계정이나 이 저장 데이터는 이미 다른 것과 연결되어 있어요. 둘 다 그대로이고 합치지 않았어요.'],
     'sr.none': ['這個帳號還沒有連結轉磚的存檔。先在有進度的裝置上按「連結」。', 'That account has no 轉磚 save linked yet. Use "Link" on the device that has your progress first.', 'このアカウントにはまだ轉磚のセーブが連携されていません。先に進行状況のある端末で「連携」してください。', '그 계정에는 아직 轉磚 저장 데이터가 연결되어 있지 않아요. 진행 상황이 있는 기기에서 먼저 "연결"하세요.'],
@@ -820,34 +866,76 @@
     var go = function (main) { return '<a class="btn' + (main ? ' main' : '') + '" href="' + SR_URL + '" target="_blank" rel="noopener" data-sr="signup">' + esc(t('sr.go')) + ' ↗</a>'; };
     // linking is shown only once the server says it is fully set up (it stays off until both sides have tested it)
     if (!Cloud.link) return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.p') + '</p><div class="row">' + go(true) + '</div><p class="note">' + t('sr.soon') + '</p>';
-    // linking is on: linking (or getting a save back) comes first; the plain link to the site is only for signing up,
-    // and says it does not link anything (the site alone never connects this save)
-    var d = Meta.data, h = '<h3>' + t('sr.title') + '</h3>';
-    if (Cloud.cred && Cloud.id && Cloud.id.linked) h += '<p class="note" data-sr="linked">' + esc(Cloud.id.at ? t('sr.isLinked', when(Cloud.id.at)) : t('sr.linked')) + '</p>';
-    else if (Cloud.cred) h += '<p class="note">' + t('sr.linkP') + '</p><div class="row">' + btn('srLink', 'sr.link', true) + '</div>';
-    h += '<p class="note">' + esc(t('sr.recoverP', rankText(d.rp), L.num(d.coins))) + '</p><div class="row">' + btn('srRecover', 'sr.recover') + (ui.srPending ? btn('srRestore', 'sr.restore') : '') + '</div>';
-    h += '<p class="note">' + t('sr.noAcc') + '</p><div class="row">' + go(false) + '</div>';
-    if (Cloud.cred && !idAsked) { idAsked = true; Cloud.idCheck().then(function (s) { if (s) refresh(); }); }
-    return h;
+    if (Cloud.cred && !idAsked) { idAsked = true; Cloud.idCheck().then(function (s) { if (s) { labels(); refresh(); } }); }
+    // signed in: this save is the account's
+    if (linked()) return '<h3 data-sr="linked">' + t('sr.on') + '</h3><p class="note">' + esc(Cloud.id.at ? t('sr.onAt', when(Cloud.id.at)) : t('sr.onP')) + '</p>' +
+      '<div class="row">' + btn('srOutAsk', 'dr.logout') + '</div>';
+    // a guest: one button signs in (this save becomes the account's, or the account's save comes here); the plain link
+    // to the site is only for signing up, and says it signs nothing in (the site alone never connects this save)
+    var h = '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.loginP') + '</p><div class="row">' + btn('srLogin', 'sr.login', true) + (ui.srPending ? btn('srRestore', 'sr.restore') : '') + '</div>';
+    return h + '<p class="note">' + t('sr.noAcc') + '</p><div class="row">' + go(false) + '</div>';
   }
   var idAsked = false;
+  function linked() { return !!(Cloud.link && Cloud.cred && Cloud.id && Cloud.id.linked); }
+  App.srLinked = linked;
+  // the menu's and the side panel's "Sign in / Register" read "Linked to SnowRealm Games" once this save is the account's
+  function labels() {
+    var on = linked();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-sheet="srAccount"]'), function (b) {
+      var e = b.querySelector('[data-t]') || b;
+      e.setAttribute('data-t', on ? 'sr.on' : 'sr.menu');
+      e.textContent = t(on ? 'sr.on' : 'sr.menu');
+    });
+  }
+  App.srLabels = labels;
   App.srBlock = srBlock;
   function srGo(intent) { Cloud.authStart(intent).then(function (b) { if (!b || !b.ok) App.toast(t(b && b.why === 'slow' ? 'cl.slow' : 'sr.authFail'), 4200); }); }
-  App.acts.srLink = function () { srGo('link'); };
+  App.acts.srLogin = function () { srGo('login'); };
+  App.acts.srLink = App.acts.srLogin;
   App.acts.srRecover = function () { srGo('recover'); };
   App.acts.srRestore = function () { srGo('restore'); };
+  // signing in found a save on the account while this device has progress of its own: the player chooses
+  App.sheets.srSwitch = function () {
+    var b = ui.srHeld, d = Meta.data, a = b && b.st ? b.st : {};
+    var line = function (key, rp, coins, games) { return '<li>' + esc(t(key, rankText(rp || 0), L.num(coins || 0), L.num(games || 0))) + '</li>'; };
+    return '<h2>' + t('sr.switchT') + '</h2><p>' + t('sr.switchP') + '</p><ul>' + line('sr.switchAcc', a.rp, a.coins, a.tot && a.tot.games) + line('sr.switchHere', d.rp, d.coins, d.tot.games) + '</ul>' +
+      '<p class="note">' + t('sr.switchNote') + '</p><div class="row">' + btn('srSwitchYes', 'sr.switchYes', true) + btn('srSwitchNo', 'sr.switchNo') + '</div>';
+  };
+  App.acts.srSwitchYes = function () { var b = ui.srHeld; ui.srHeld = null; App.closeSheet(); if (b) { Cloud.useResult(b); after(b); } };
+  App.acts.srSwitchNo = function () { ui.srHeld = null; App.closeSheet(); App.toast(t('sr.switchKept'), 5000); };
+  function after(b) {
+    labels();
+    App.toast(t(b.outcome === 'recovered' ? 'sr.recovered' : 'sr.linked'), 6000);
+    if (b.outcome === 'recovered') { Cloud._forget(); App.applyLook(); if (App.screen() === 'menu') App.updateMenu(); }
+    refresh();
+  }
+  App.acts.srOutAsk = function () { App.openSheet('drLogout'); };
+  App.acts.srOut = function () {
+    if (ui.wait) return;
+    ui.wait = true;
+    Cloud.signOut().then(function (b) {
+      ui.wait = false;
+      App.closeSheet();
+      if (b && b.ok) { labels(); App.applyLook(); if (App.screen() === 'menu') App.updateMenu(); App.toast(t('sr.outDone'), 6000); }
+      else App.toast(t('sr.outFail'), 5000);
+    });
+  };
   // back from SnowRealm Games: /?auth=<outcome> (a word only). The address is cleaned at once, then the result read.
   function authBack() {
-    var m = /[?&]auth=([a-z]{2,12})\b/.exec(window.location.search || '');
+    var m = /[?&]auth=([a-z]{2,12})\b/.exec(window.location.search || ''), intent = '';
     if (!m) return;
     try { var u = new URL(window.location.href); u.searchParams.delete('auth'); window.history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { /* old browser */ }
+    try { intent = window.sessionStorage.getItem('zz.authIntent') || ''; window.sessionStorage.removeItem('zz.authIntent'); } catch (e) { /* private mode */ }
     Cloud.whenKnown(function (up) {
       if (!up || !Cloud.link) return;
-      Cloud.authResult().then(function (b) {
+      // signing in brought the account's save while this device has played: ask before it replaces what is here
+      var ask = function (b) { return intent === 'login' && Meta.data.tot.games > 0 && !(Cloud.cred && b.id === Cloud.cred.id); };
+      Cloud.authResult(ask).then(function (b) {
         var o = (b && b.outcome) || m[1];
         ui.srPending = o === 'pending';
-        App.toast(t(o === 'linked' ? 'sr.linked' : o === 'recovered' ? 'sr.recovered' : o === 'conflict' ? 'sr.conflict' : o === 'none' ? 'sr.none' : o === 'pending' ? 'sr.pendingP' : 'sr.authFail'), 6000);
-        if (o === 'recovered') { Cloud._forget(); App.applyLook(); if (App.screen() === 'menu') App.updateMenu(); }
+        if (b && b.held) { ui.srHeld = b; App.openSheet('srSwitch'); return; }
+        if (o === 'recovered' || o === 'linked') { after(b && b.ok ? b : { outcome: o }); return; }
+        App.toast(t(o === 'conflict' ? (b && b.why === 'linked' ? 'sr.conflictLinked' : 'sr.conflict') : o === 'none' ? 'sr.none' : o === 'pending' ? 'sr.pendingP' : 'sr.authFail'), 6000);
         refresh();
       });
     });
@@ -1135,6 +1223,7 @@
   // ---------- wiring ----------
   function showLink() { var e = $('mBoard'); if (e) e.hidden = !Cloud.on; }
   var wasOn = null;
+  Cloud.onSignedOut = function () { try { window.location.reload(); } catch (e) { /* tests */ } };
   Cloud.onChange = function () {
     showLink();
     refresh();
@@ -1165,6 +1254,7 @@
     Cloud.init({ local: local });
     showLink();
     authBack();
+    Cloud.whenKnown(function (up) { if (up && Cloud.link && Cloud.cred) Cloud.idCheck().then(function () { labels(); refresh(); }); });
     window.addEventListener('online', function () { Cloud.fails = 0; if (Cloud.on) Cloud.flush(true); else if (!Cloud.dead) Cloud.probe(); else Cloud.recheck(); });
     window.addEventListener('pagehide', function () { Cloud.flush(); });
     document.addEventListener('visibilitychange', function () {

@@ -397,6 +397,33 @@ const match = o => Object.assign({ mode: 'ai', result: 1, level: 2, ko: 2, koOpp
     const old = R.importState({ coins: 10, sign: { m: 202610, days: [1, 2, 3], paid: [] } }, now);
     ok(old.sign.days.length === 0, 'last month\'s sheet does not');
   }
+  // ---------- signing out of SnowRealm Games on a device ----------
+  {
+    const S = device('S');
+    await open(S);
+    fin(match()); await send();
+    ok(!!C.cred, 'a guest with a cloud save');
+    C.link = true; C.id = null;
+    let r = await C.signOut();
+    ok(!r.ok && r.why === 'unlinked' && !!C.cred, 'a guest cannot sign out (nothing would bring the save back)', r);
+    const old = { id: C.cred.id, key: C.cred.key }, games = M.data.tot.games;
+    await pg.query("INSERT INTO zz.identity (platform_id, pid, linked_at, provider_hint) VALUES ('7e7e7e7e-1111-4222-8333-444455556666', $1, $2, 'snowrealm')", [old.id, now]);
+    C.id = { linked: true, at: now };                 // (what idStatus says once linking is on; not set up in this test)
+    fin(match());                                      // a change not sent yet goes first
+    r = await C.signOut();
+    ok(r.ok && !C.cred && !C.id && M.data.tot.games === 0 && C.q.length === 0, 'signed out: this device is a new guest', [r, M.data.tot.games, !!C.cred, C.id, C.q]);
+    ok(JSON.parse(S.mem['zhuanzhuan.cloud.v1']).id === '' && JSON.parse(S.mem['zhuanzhuan.cloud.v1']).out > 0, 'the device keeps no key, marked as signed out (for the other tabs)');
+    const kept = (await pg.query("SELECT (state->'tot'->>'games')::int AS g FROM zz.players WHERE id = $1", [old.id]))[0].g;
+    eq(kept, games + 1, 'the save on the server has everything, the last match included');
+    const s2 = await new Promise(res => fakeFetch('/api/rpc', { method: 'POST', headers: { authorization: 'Bearer ' + old.id + '.' + old.key, 'content-type': 'application/json' }, body: JSON.stringify({ a: 'sync', ops: [] }) }).then(x => res(x.status)));
+    eq(s2, 401, 'and this device\'s old key no longer works');
+    // a second tab on the same device, still on the old account, follows the sign-out instead of putting it back
+    let gone2 = false;
+    C.cred = { id: old.id, key: old.key }; C.onSignedOut = () => { gone2 = true; };
+    ok(C.follow() === true && !C.cred && gone2, 'another tab sees the sign-out and signs out too');
+    C.onSignedOut = null;
+    C.link = false;
+  }
   await pg.close();
   console.log('cloud tests: ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

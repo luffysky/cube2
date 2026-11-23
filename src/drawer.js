@@ -17,7 +17,7 @@
     'dr.srHome': ['平台主頁・所有遊戲', 'Platform home · every SnowRealm game', 'プラットフォーム・全ゲーム', '플랫폼 홈 · 모든 게임'],
     'dr.guest': ['訪客・存在這台裝置', 'Guest · saved on this device', 'ゲスト・この端末に保存', '게스트 · 이 기기에 저장'],
     'dr.cloud': ['訪客・雲端存檔', 'Guest · cloud save', 'ゲスト・クラウド保存', '게스트 · 클라우드 저장'],
-    'dr.linked': ['已連結 SnowRealm 帳號', 'Linked to SnowRealm', 'SnowRealm と連携済み', 'SnowRealm 연결됨'],
+    'dr.linked': ['已連結 SnowRealm Games', 'Linked to SnowRealm Games', 'SnowRealm Games 連携済み', 'SnowRealm Games 연결됨'],
     'dr.logoutT': ['登出', 'Sign out', 'ログアウト', '로그아웃'],
     'dr.logoutP': ['轉磚現在不用帳號密碼，你的存檔是跟著這台裝置走的。這時候登出，這台就找不回存檔了，所以要等存檔綁好 SnowRealm 帳號以後才能登出（登出後用帳號登入就能找回來）。', '轉磚 has no password today: your save goes with this device. Signing out now would leave this device unable to find it again, so signing out opens once the save is linked to a SnowRealm account (sign back in to get it back).', '現在の轉磚にはパスワードがなく、セーブはこの端末に紐づいています。今ログアウトすると見つけられなくなるため、SnowRealm アカウント連携後に利用できます。', '지금 轉磚는 비밀번호 없이 이 기기에 저장돼요. 지금 로그아웃하면 다시 찾을 수 없어서, SnowRealm 계정 연결 후에 로그아웃할 수 있어요.'],
     'dr.logoutMove': ['想換裝置的話，用「雲端存檔」裡的引繼碼。', 'To move to another device, use a transfer code in "Cloud save".', '端末を移すにはクラウドセーブの引き継ぎコードを使ってください。', '기기를 옮기려면 클라우드 저장의 이전 코드를 쓰세요.']
@@ -31,7 +31,7 @@
     App.txt('drCoins', L.num(d.coins));
     $('drAv').textContent = Array.from(name)[0] || '磚';
     var C = ZZ.Cloud, st = C && C.status ? C.status() : 'none';
-    App.txt('drAcct', t(st === 'ok' || st === 'busy' || st === 'wait' ? 'dr.cloud' : 'dr.guest'));
+    App.txt('drAcct', t(App.srLinked && App.srLinked() ? 'dr.linked' : st === 'ok' || st === 'busy' || st === 'wait' ? 'dr.cloud' : 'dr.guest'));
     $('drJobsDot').hidden = !(Meta.jobsReady() > 0);
     if ($('drSignDot')) $('drSignDot').hidden = !Meta.loginDue();
     $('drBoxDot').hidden = !(Meta.drawsLeft && Meta.drawsLeft() > 0);
@@ -54,6 +54,7 @@
   }
   App.drawer = show;
   App.sheets.drLogout = function () {
+    if (App.srLinked && App.srLinked()) return '<h2>' + t('sr.outT') + '</h2><p>' + t('sr.outP') + '</p><div class="row">' + App.btn('srOut', 'dr.logout', true) + App.btn('close', 'close') + '</div>';
     return '<h2>' + t('dr.logoutT') + '</h2><p>' + t('dr.logoutP') + '</p><p class="note">' + t('dr.logoutMove') + '</p>' +
       '<div class="row">' + App.btn('cloud', 'cl.title') + App.btn('close', 'close', true) + '</div>';
   };

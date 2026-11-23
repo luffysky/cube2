@@ -25,7 +25,7 @@ function server(port, env) {
     let p = await (await browser.newContext({ locale: 'zh-TW' })).newPage(); p.on('pageerror', e => problems.push(e.message));
     await p.goto('http://127.0.0.1:' + PORT + '/index.html?sw=off&lang=zh-Hant'); await sleep(1200);
     await p.evaluate(() => ZZ.App.openSheet('srAccount')); await sleep(200);
-    ok(await p.evaluate(() => !document.querySelector('[data-do="srLink"],[data-do="srRecover"]') && /統一登入/.test(document.getElementById('sheetCard').textContent)), 'off: no link buttons, the "coming" note instead');
+    ok(await p.evaluate(() => !document.querySelector('[data-do="srLogin"],[data-do="srRecover"]') && /統一登入/.test(document.getElementById('sheetCard').textContent)), 'off: no sign-in button, the "coming" note instead');
     // on
     const ctx = await browser.newContext({ locale: 'zh-TW' });
     p = await ctx.newPage(); p.on('pageerror', e => problems.push(e.message));
@@ -35,18 +35,26 @@ function server(port, env) {
     ok(await p.evaluate(() => ZZ.Cloud.link === true), 'health says linking is on');
     await p.evaluate(() => ZZ.Cloud.ensure()); await sleep(600);
     await p.evaluate(() => { window.__went = null; ZZ.Cloud.go = u => { window.__went = u; }; ZZ.App.openSheet('srAccount'); }); await sleep(200);
-    ok(await p.evaluate(() => !!document.querySelector('[data-do="srLink"]') && !!document.querySelector('[data-do="srRecover"]')), 'on, with a cloud save: link and recover buttons');
-    // the plain link to the site (it links nothing) is not the main button and comes after linking, saying so
+    // a guest: one main "sign in" button; the plain link to the site comes later and says it signs nothing in
     ok(await p.evaluate(() => {
       const card = document.getElementById('sheetCard'), all = [...card.querySelectorAll('.btn')];
-      const link = card.querySelector('[data-do="srLink"]'), site = card.querySelector('a[data-sr="signup"]');
-      return link.classList.contains('main') && site && !site.classList.contains('main') && all.indexOf(link) < all.indexOf(site) && /不會連結存檔/.test(card.textContent) && /繼續前往授權/.test(card.textContent);
-    }), 'on: "link" is the main button, the site link comes later and says it does not link');
-    // a save already linked: says so instead of offering to link it again
-    await p.evaluate(() => { ZZ.Cloud.id = { linked: true, at: Date.UTC(2026, 10, 24) }; ZZ.App.openSheet('srAccount'); }); await sleep(200);
-    ok(await p.evaluate(() => !document.querySelector('[data-do="srLink"]') && !!document.querySelector('[data-sr="linked"]') && !!document.querySelector('[data-do="srRecover"]')), 'linked: no link button, a "linked" note, recovery still there');
-    await p.evaluate(() => { ZZ.Cloud.id = null; ZZ.App.openSheet('srAccount'); }); await sleep(200);
-    await p.click('[data-do="srLink"]');
+      const login = card.querySelector('[data-do="srLogin"]'), site = card.querySelector('a[data-sr="signup"]');
+      return login && login.classList.contains('main') && /SnowRealm Games 帳號登入/.test(login.textContent) && site && !site.classList.contains('main') && all.indexOf(login) < all.indexOf(site)
+        && /不會連結存檔/.test(card.textContent) && /繼續前往授權/.test(card.textContent) && /訪客/.test(card.textContent) && !card.querySelector('[data-do="srRecover"]');
+    }), 'guest: "sign in with SnowRealm Games" is the main button; the site link comes later and says it does not link');
+    ok(await p.evaluate(() => /登入/.test(document.querySelector('#menu [data-sheet="srAccount"]').textContent)), 'the menu says "sign in" for a guest');
+    // signed in: says "linked to SnowRealm Games" in the sheet, the menu and the side panel, and offers to sign out
+    await p.evaluate(() => { ZZ.Cloud.id = { linked: true, at: Date.UTC(2026, 10, 24) }; ZZ.App.srLabels(); ZZ.App.openSheet('srAccount'); }); await sleep(200);
+    ok(await p.evaluate(() => {
+      const card = document.getElementById('sheetCard'), h = card.querySelector('[data-sr="linked"]');
+      return h && /已連結 SnowRealm Games/.test(h.textContent) && !card.querySelector('[data-do="srLogin"]') && !!card.querySelector('[data-do="srOutAsk"]') && /雲端/.test(card.textContent);
+    }), 'linked: "已連結 SnowRealm Games", no sign-in button, a sign-out button');
+    ok(await p.evaluate(() => [...document.querySelectorAll('[data-sheet="srAccount"]')].every(b => /已連結 SnowRealm Games/.test(b.textContent))), 'the menu and the side panel say "已連結 SnowRealm Games"');
+    await p.click('[data-do="srOutAsk"]'); await sleep(200);
+    ok(await p.evaluate(() => !!document.querySelector('#sheetCard [data-do="srOut"]') && /訪客/.test(document.getElementById('sheetCard').textContent)), 'signing out asks first and says the progress stays on the account');
+    await p.evaluate(() => { ZZ.Cloud.id = null; ZZ.App.srLabels(); ZZ.App.openSheet('srAccount'); }); await sleep(200);
+    ok(await p.evaluate(() => [...document.querySelectorAll('[data-sheet="srAccount"]')].every(b => /登入/.test(b.textContent) && !/已連結/.test(b.textContent))), 'and back to "sign in" when not linked');
+    await p.click('[data-do="srLogin"]');
     let went = null;
     for (let i = 0; i < 40 && !went; i++) { went = await p.evaluate(() => window.__went); await sleep(100); }
     ok(went && /^https:\/\/games-staging\.test\.example\/\?sso=brickduel&client_id=brickduel-bff-staging&redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A\d+%2Fapi%2Fauth%2Fcallback/.test(went) && /code_challenge_method=S256/.test(went), 'link goes to the portal with the exact callback', went);

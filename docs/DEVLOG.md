@@ -1621,3 +1621,19 @@
 - 測試：`test/authui.js` 11 項（多 2 項：按鈕順序與說明、已連結時的畫面）；全部單元測試、`minipay`、`cloudui`、`drawer`、`legal` 瀏覽器測試都通過。
 - 檔案：`src/cloud.js`、`test/authui.js`、`index.html`（建置）、`docs/DEVLOG.md`。｜資料庫：只讀。｜刪除：無。
 - 補記：上一條的 commit 為 [`017b7d6`](https://github.com/luffysky/cube2/commit/017b7d6)。
+
+## 2026-11-24 01:33（Asia/Taipei）｜改成「用 SnowRealm Games 帳號登入」：訪客變正式帳號、已連結顯示、可登出
+
+- 專案：cube2｜執行者：Claude｜Owner：「綁定是兩個帳號可以同步，原本的訪客帳號變成實質帳號，所有數據雲端化」「可以 做吧，登入那要寫 已連結SnowRealmGames」
+- 伺服器：
+  - `server/bff.js` 新增 intent `login`（要這台的裝置鑰匙）。帳號還沒有轉磚存檔，就把這台的存檔連上帳號（`linked`）；帳號已經有別份，就把那份交給這台（`recovered`），這台的訪客存檔不動、不合併；同一份再登入只回 `linked`，不換鑰匙；這台存檔已屬於別的帳號、而這個帳號沒有存檔，回 `conflict`（`linked`）。
+  - `server/core.js` `signOut` ＋ RPC `signout`：只有已連結的存檔能登出，只停用這台的鑰匙；存檔、連結、其他裝置都不動。這是玩家自己觸發、只動自己這台憑證的功能。
+- 頁面（`src/cloud.js`、`src/drawer.js`）：
+  - 訪客只看到一顆主按鈕「用 SnowRealm Games 帳號登入」，說明訪客會變成帳號存檔、到 Games 要按「繼續前往授權」→「同意」；網站連結在最下面，註明不會連結存檔。
+  - 已連結：標題「已連結 SnowRealm Games」，選單、側欄的「登入／註冊」都改成「已連結 SnowRealm Games」，側欄帳號列也是；有「登出」。
+  - 登入時帳號已有存檔、這台又打過比賽：先跳出兩邊的段位、金幣、場數，玩家選「改用帳號的存檔」或「先不要」，不會默默蓋掉。
+  - 登出：先把沒送出的進度送完，伺服器停用這台鑰匙，這台變回新的訪客；同一台的其他分頁看到登出標記也一起登出（重新載入），不會把帳號寫回去。
+- 測試：`bff` 150 項（多 19 項：login 四種情況、signout）、`cloud` 101 項（多 7 項：登出、另一分頁跟著登出）、`authui` 14 項；全部單元測試與 `drawer`、`cloudui`、`minipay`、`legal`、`flow`、`consent` 瀏覽器測試通過。
+- 還沒做：存檔同步到 Games（C-042），下一步。
+- 檔案：`server/bff.js`、`server/core.js`、`server/app.js`、`src/cloud.js`、`src/drawer.js`、`test/bff.test.js`、`test/cloud.test.js`、`test/authui.js`、建置產物、`docs/DEVLOG.md`。｜資料庫：沒改結構。｜刪除：無（登出只停用該裝置自己的鑰匙）。
+- 補記：上一條的 commit 為 [`6258358`](https://github.com/luffysky/cube2/commit/6258358)。

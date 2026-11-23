@@ -266,6 +266,10 @@ const routes = {
         // (during the acceptance before linking opens, the acceptance saves see their own link state)
         out = await db.run(d => core.idStatus(d, cred, identity.enabled(), bff.accepting()));
         break;
+      case 'signout':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.signOut(d, cred));
+        break;
       case 'idLink': case 'idRecover': {
         if (!identity.enabled()) return send(res, 503, { ok: false, why: 'off' });
         if (body.a === 'idLink' && !cred) return send(res, 401, { ok: false, why: 'auth' });
