@@ -71,8 +71,8 @@
 - [x] cube1：兩個合成測試帳號 → 跑 B1–B12（B1–B3、B6–B8、B11、B12 PASS，cube1 Actions 45167007292、45171423771）
 - [x] B4、B5、B9、B10：cube2 自建隔離測試 Identity＋`accept-b` 部署實跑，PASS（隔離環境，2026-11-23 13:09–13:16 UTC）
 - [x] 刪掉 `accept-b` 分支、它的 8 個環境變數、Vercel 專案 `cube2-test-identity`（Owner 同意，2026-11-23 21:31）
-- [ ] Owner 決定：cube2 專案裡的 `accept-b` 舊部署要不要刪
-- [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`
+- [x] 刪掉 cube2 專案裡的 `accept-b` 舊部署（C-041，2026-11-23 21:35）
+- [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`（C-041：Owner 已授權 Claude 執行；2026-11-23 21:31 檢查 `identity.snowrealm.pet` 仍連不上）
 - [ ] Owner 同意後刪 `accept-jwks` 分支（A7–A9 驗收用的暫時 JWKS，已不被信任）
 
 - [ ] SnowRealm Identity 上線並通過兩帳號驗收 → 才打開「註冊／登入」綁定

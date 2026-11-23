@@ -1491,3 +1491,12 @@
   - 依規則要先在正式站用兩個帳號跑一次端對端驗收，Owner 核准後才開 `IDENTITY_LINK_ENABLED`。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有動。
 - 補記：上一條的 commit 為 [`ab1e3e1`](https://github.com/luffysky/cube2/commit/ab1e3e1)。
+
+## 2026-11-23 21:36（Asia/Taipei）｜刪掉 accept-b 舊部署；記下正式站綁定的授權
+
+- 專案：cube2｜執行者：Claude｜Owner：「我授權給你做」（C-041）
+- 刪除：cube2 專案裡的 `accept-b` 部署 `dpl_EddMGiDnxyDLJ26DWKjy5raYvZ8j`（在 Owner 的 Chrome 從 Vercel 後台刪除，先核對是 Preview、`accept-b` 分支、`1a12cb8`；API 查詢回 404；Vercel 1 天內可復原）。
+- 正式站綁定：記為 C-041。等 cube1 正式 Identity 上線後由 Claude 做設定和兩帳號驗收，通過才開 `IDENTITY_LINK_ENABLED`；正式 client secret 仍由 Owner 自己貼。現在 `identity.snowrealm.pet` 連不上，所以還不能開始。
+- 沒刪：staging DB 的 5 份 `acceptb-*` 合成存檔（不在這次授權內）。
+- 檔案：`docs/OWNER_DECISIONS.md`、`docs/TODO.md`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：沒有動。
+- 補記：上一條的 commit 為 [`5a45d9a`](https://github.com/luffysky/cube2/commit/5a45d9a)。
