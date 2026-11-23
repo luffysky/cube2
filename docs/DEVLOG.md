@@ -1500,3 +1500,11 @@
 - 沒刪：staging DB 的 5 份 `acceptb-*` 合成存檔（不在這次授權內）。
 - 檔案：`docs/OWNER_DECISIONS.md`、`docs/TODO.md`、`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：沒有動。
 - 補記：上一條的 commit 為 [`5a45d9a`](https://github.com/luffysky/cube2/commit/5a45d9a)。
+
+## 2026-11-23 21:49（Asia/Taipei）｜記下 cube1 對正式 Identity 的回報
+
+- 專案：cube2｜執行者：Claude
+- cube1 回報（Owner 轉述）：正式授權入口還沒實作、還沒部署；由 cube1 接手，包含正式網域綁定與實測登入、授權、token 兌換。正式端點驗證通過後，Owner 才把正式 client secret 填進 cube2 的 Vercel；現在不用動。
+- cube2 這邊：沒有要改的程式，照 C-041 等。`docs/TODO.md` 記下順序。
+- 檔案：`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有動。｜刪除：無。
+- 補記：上一條的 commit 為 [`3ed9916`](https://github.com/luffysky/cube2/commit/3ed9916)。

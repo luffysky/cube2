@@ -73,6 +73,7 @@
 - [x] 刪掉 `accept-b` 分支、它的 8 個環境變數、Vercel 專案 `cube2-test-identity`（Owner 同意，2026-11-23 21:31）
 - [x] 刪掉 cube2 專案裡的 `accept-b` 舊部署（C-041，2026-11-23 21:35）
 - [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`（C-041：Owner 已授權 Claude 執行；2026-11-23 21:31 檢查 `identity.snowrealm.pet` 仍連不上）
+  - cube1 回報（11-23 21:48）：正式授權入口還沒實作、也還沒部署，由 cube1 接手做完、綁正式網域、實測登入／授權／token 兌換。順序：cube1 正式端點驗證通過 → Owner 把正式 client secret 貼進 cube2 Vercel Production → Claude 設其他正式變數、兩帳號驗收 → 開 `IDENTITY_LINK_ENABLED`
 - [ ] Owner 同意後刪 `accept-jwks` 分支（A7–A9 驗收用的暫時 JWKS，已不被信任）
 
 - [ ] SnowRealm Identity 上線並通過兩帳號驗收 → 才打開「註冊／登入」綁定
