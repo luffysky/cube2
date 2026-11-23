@@ -36,6 +36,16 @@ function server(port, env) {
     await p.evaluate(() => ZZ.Cloud.ensure()); await sleep(600);
     await p.evaluate(() => { window.__went = null; ZZ.Cloud.go = u => { window.__went = u; }; ZZ.App.openSheet('srAccount'); }); await sleep(200);
     ok(await p.evaluate(() => !!document.querySelector('[data-do="srLink"]') && !!document.querySelector('[data-do="srRecover"]')), 'on, with a cloud save: link and recover buttons');
+    // the plain link to the site (it links nothing) is not the main button and comes after linking, saying so
+    ok(await p.evaluate(() => {
+      const card = document.getElementById('sheetCard'), all = [...card.querySelectorAll('.btn')];
+      const link = card.querySelector('[data-do="srLink"]'), site = card.querySelector('a[data-sr="signup"]');
+      return link.classList.contains('main') && site && !site.classList.contains('main') && all.indexOf(link) < all.indexOf(site) && /不會連結存檔/.test(card.textContent) && /繼續前往授權/.test(card.textContent);
+    }), 'on: "link" is the main button, the site link comes later and says it does not link');
+    // a save already linked: says so instead of offering to link it again
+    await p.evaluate(() => { ZZ.Cloud.id = { linked: true, at: Date.UTC(2026, 10, 24) }; ZZ.App.openSheet('srAccount'); }); await sleep(200);
+    ok(await p.evaluate(() => !document.querySelector('[data-do="srLink"]') && !!document.querySelector('[data-sr="linked"]') && !!document.querySelector('[data-do="srRecover"]')), 'linked: no link button, a "linked" note, recovery still there');
+    await p.evaluate(() => { ZZ.Cloud.id = null; ZZ.App.openSheet('srAccount'); }); await sleep(200);
     await p.click('[data-do="srLink"]');
     let went = null;
     for (let i = 0; i < 40 && !went; i++) { went = await p.evaluate(() => window.__went); await sleep(100); }

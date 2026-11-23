@@ -1608,3 +1608,16 @@
 - 剩：cube1 刪 `+bd1`、`+bd2`；正式管理 API 等 Owner 決定白名單。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：正式與 staging 各一次 DELETE（如上，C-044 核准）。｜刪除：如上。
 - 補記：上一條的 commit 為 [`3797206`](https://github.com/luffysky/cube2/commit/3797206)。
+
+## 2026-11-24 01:14（Asia/Taipei）｜綁定面板：「連結」改成主按鈕，網站連結註明「不會連結存檔」，已連結就直接說
+
+- 專案：cube2｜執行者：Claude｜Owner 回報：「轉磚那個按了只是到games那頁 根本沒綁定」
+- 查證：正式庫 `zz.authsess` 在綁定開放（16:43Z）之後是 0 筆，代表這段時間沒有人真的開始綁定。面板最上面那顆主按鈕「到 SnowRealm Games 註冊／登入 ↗」只會開網站、不會綁，最容易被當成綁定按鈕。
+- 修改（`src/cloud.js`）：
+  - 綁定開放時，「把這份存檔連結到 SnowRealm Games 帳號」放最上面、是主按鈕；說明寫出到 Games 後要做的事：確認右上角帳號，按「繼續前往授權」，再按「同意」。
+  - 網站連結移到最下面、改成一般按鈕，旁邊註明「只會打開網站，不會連結存檔」。
+  - 新增 `Cloud.idCheck()`：打開面板時查一次 `idStatus`。已連結就顯示「已經連結（時間）」，不再出現連結按鈕；綁定回來成功時也會記住。
+  - 綁定還沒開的時候，畫面跟以前一樣。
+- 測試：`test/authui.js` 11 項（多 2 項：按鈕順序與說明、已連結時的畫面）；全部單元測試、`minipay`、`cloudui`、`drawer`、`legal` 瀏覽器測試都通過。
+- 檔案：`src/cloud.js`、`test/authui.js`、`index.html`（建置）、`docs/DEVLOG.md`。｜資料庫：只讀。｜刪除：無。
+- 補記：上一條的 commit 為 [`017b7d6`](https://github.com/luffysky/cube2/commit/017b7d6)。

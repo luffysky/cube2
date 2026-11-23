@@ -385,6 +385,7 @@
       if (b.id && b.key) {
         if (b.outcome === 'recovered') { Cloud.q = []; take(b); if (b.st) adopt(b.st); }
         else take({ id: b.id, key: b.key, pub: Cloud.pub, now: b.now });
+        Cloud.id = { linked: true, at: b.linked && b.now ? b.now : (Cloud.id && Cloud.id.at) || 0 };
         changed();
       }
       return b;
@@ -614,6 +615,15 @@
     return call('POST', 'rpc', body, true).then(function (r) { return { status: r.status, body: r.body || {} }; }, function () { return null; });
   };
   Cloud._forget = function () { boards = {}; };
+  // is this save linked to a SnowRealm Games account? { linked, at } once asked; null until then or when unknown
+  Cloud.id = null;
+  Cloud.idCheck = function () {
+    if (!Cloud.link || !Cloud.cred) return Promise.resolve(null);
+    return Cloud.rpc({ a: 'idStatus' }).then(function (r) {
+      if (r && r.status === 200 && r.body.ok) Cloud.id = { linked: r.body.linked === true, at: r.body.linkedAt || 0 };
+      return Cloud.id;
+    });
+  };
 
   ZZ.Cloud = Cloud;
   if (typeof module !== 'undefined' && module.exports) module.exports = ZZ;
@@ -725,7 +735,9 @@
     'sr.kid': ['13 歲以下先不用註冊帳號，直接玩就可以，進度會存在這台裝置。', 'Under 13 there is no need for an account: just play, and progress stays on this device.', '13歳未満の方はアカウント登録なしでそのまま遊べます。', '13세 미만은 계정 없이 그대로 즐기면 돼요.'],
     'sr.menu': ['登入／註冊', 'Sign in / Register', 'ログイン／登録', '로그인/가입'],
     'sr.link': ['把這份存檔連結到 SnowRealm Games 帳號', 'Link this save to your SnowRealm Games account', 'このセーブを SnowRealm Games アカウントに連携', '이 저장 데이터를 SnowRealm Games 계정에 연결'],
-    'sr.linkP': ['會先到 SnowRealm Games 登入並確認。連結後換裝置只要登入就能找回；金幣、進度都不會合併或移動。', 'You sign in and confirm at SnowRealm Games first. Once linked, signing in on another device brings this save back; coins and progress are never merged or moved.', 'まず SnowRealm Games でログインして確認します。連携後は別の端末でもログインすれば取り戻せます。コインや進行状況が合算・移動されることはありません。', '먼저 SnowRealm Games에서 로그인하고 확인해요. 연결하면 다른 기기에서도 로그인만 하면 되찾을 수 있고, 코인과 진행 상황은 합쳐지거나 옮겨지지 않아요.'],
+    'sr.linkP': ['按下面的按鈕會到 SnowRealm Games：確認右上角是你的帳號，按「繼續前往授權」，再按「同意」，就會回到轉磚完成連結。之後換裝置只要按「找回」；金幣、進度都不會合併或移動。', 'The button below takes you to SnowRealm Games: check that your account is shown at the top right, press "Continue to authorize", then "Agree", and you come back here with this save linked. After that, "Get my save back" on another device is all it takes; coins and progress are never merged or moved.', '下のボタンで SnowRealm Games へ移動します。右上が自分のアカウントか確認し、「認可に進む」→「同意」を押すと轉磚に戻って連携が完了します。その後は別の端末で「取り戻す」だけ。コインや進行状況が合算・移動されることはありません。', '아래 버튼을 누르면 SnowRealm Games로 이동해요. 오른쪽 위가 내 계정인지 확인하고 "승인 계속" → "동의"를 누르면 轉磚로 돌아와 연결이 끝나요. 이후 다른 기기에서는 "되찾기"만 누르면 돼요. 코인과 진행 상황은 합쳐지거나 옮겨지지 않아요.'],
+    'sr.isLinked': ['這份存檔已經連結 SnowRealm Games 帳號（{0}）。換裝置時，在新裝置按「用 SnowRealm Games 帳號找回存檔」就好。', 'This save is linked to your SnowRealm Games account ({0}). On a new device, just use "Get my save back with SnowRealm Games".', 'このセーブは SnowRealm Games アカウントと連携済みです（{0}）。新しい端末では「SnowRealm Games アカウントでセーブを取り戻す」を押すだけです。', '이 저장 데이터는 SnowRealm Games 계정과 연결되어 있어요({0}). 새 기기에서는 "SnowRealm Games 계정으로 저장 데이터 되찾기"만 누르면 돼요.'],
+    'sr.noAcc': ['還沒有 SnowRealm Games 帳號？先到網站註冊，再回來按上面的「連結」。（這個按鈕只會打開網站，不會連結存檔。）', 'No SnowRealm Games account yet? Register on the site first, then come back and use "Link" above. (This button only opens the site; it does not link your save.)', 'SnowRealm Games のアカウントがまだなら、先にサイトで登録してから上の「連携」を押してください。（このボタンはサイトを開くだけで、セーブは連携されません）', 'SnowRealm Games 계정이 아직 없다면 먼저 사이트에서 가입한 뒤 위의 "연결"을 눌러 주세요. (이 버튼은 사이트만 열고 저장 데이터를 연결하지 않아요.)'],
     'sr.recover': ['用 SnowRealm Games 帳號找回存檔', 'Get my save back with SnowRealm Games', 'SnowRealm Games アカウントでセーブを取り戻す', 'SnowRealm Games 계정으로 저장 데이터 되찾기'],
     'sr.recoverP': ['找回後，這台裝置現在的進度（{0}、{1} 金幣）會換成帳號上的那份。', 'This device\'s current progress ({0}, {1} coins) is replaced by the save on the account.', 'この端末の現在の進行状況（{0}、{1}コイン）はアカウントのセーブに置き換わります。', '이 기기의 현재 진행 상황({0}, {1}코인)은 계정의 저장 데이터로 바뀌어요.'],
     'sr.linked': ['已連結 SnowRealm Games 帳號。', 'Linked to your SnowRealm Games account.', 'SnowRealm Games アカウントと連携しました。', 'SnowRealm Games 계정과 연결했어요.'],
@@ -805,14 +817,20 @@
   function srBlock() {
     // under 13: no sign-up push (accounts for children need a parent's consent, which is not in place)
     if (ZZ.Consent && ZZ.Consent.child()) return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.kid') + '</p>';
-    var h = '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.p') + '</p><div class="row"><a class="btn main" href="' + SR_URL + '" target="_blank" rel="noopener" data-sr="signup">' + esc(t('sr.go')) + ' ↗</a></div>';
+    var go = function (main) { return '<a class="btn' + (main ? ' main' : '') + '" href="' + SR_URL + '" target="_blank" rel="noopener" data-sr="signup">' + esc(t('sr.go')) + ' ↗</a>'; };
     // linking is shown only once the server says it is fully set up (it stays off until both sides have tested it)
-    if (!Cloud.link) return h + '<p class="note">' + t('sr.soon') + '</p>';
-    var d = Meta.data;
-    if (Cloud.cred) h += '<p class="note">' + t('sr.linkP') + '</p><div class="row">' + btn('srLink', 'sr.link', true) + '</div>';
+    if (!Cloud.link) return '<h3>' + t('sr.title') + '</h3><p class="note">' + t('sr.p') + '</p><div class="row">' + go(true) + '</div><p class="note">' + t('sr.soon') + '</p>';
+    // linking is on: linking (or getting a save back) comes first; the plain link to the site is only for signing up,
+    // and says it does not link anything (the site alone never connects this save)
+    var d = Meta.data, h = '<h3>' + t('sr.title') + '</h3>';
+    if (Cloud.cred && Cloud.id && Cloud.id.linked) h += '<p class="note" data-sr="linked">' + esc(Cloud.id.at ? t('sr.isLinked', when(Cloud.id.at)) : t('sr.linked')) + '</p>';
+    else if (Cloud.cred) h += '<p class="note">' + t('sr.linkP') + '</p><div class="row">' + btn('srLink', 'sr.link', true) + '</div>';
     h += '<p class="note">' + esc(t('sr.recoverP', rankText(d.rp), L.num(d.coins))) + '</p><div class="row">' + btn('srRecover', 'sr.recover') + (ui.srPending ? btn('srRestore', 'sr.restore') : '') + '</div>';
+    h += '<p class="note">' + t('sr.noAcc') + '</p><div class="row">' + go(false) + '</div>';
+    if (Cloud.cred && !idAsked) { idAsked = true; Cloud.idCheck().then(function (s) { if (s) refresh(); }); }
     return h;
   }
+  var idAsked = false;
   App.srBlock = srBlock;
   function srGo(intent) { Cloud.authStart(intent).then(function (b) { if (!b || !b.ok) App.toast(t(b && b.why === 'slow' ? 'cl.slow' : 'sr.authFail'), 4200); }); }
   App.acts.srLink = function () { srGo('link'); };
@@ -886,6 +904,7 @@
   function refresh() {
     var sh = App.sheet(), e;
     if (sh === 'cloud') { if (document.activeElement && document.activeElement.id === 'clCode') { e = $('clState'); if (e) e.textContent = stateText(); } else App.openSheet('cloud'); }
+    else if (sh === 'srAccount') App.openSheet('srAccount');
     else if (sh === 'profile') { if (document.activeElement && document.activeElement.id === 'pName') { e = $('clState'); if (e) e.textContent = stateText(); } else App.openSheet('profile'); }
   }
   function say(b) { return t(b && b.why === 'slow' ? 'cl.slow' : b && b.why === 'code' ? 'cl.badCode' : 'cl.err'); }
