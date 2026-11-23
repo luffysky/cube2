@@ -169,7 +169,7 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
   - 每份存檔的登入 session 結果：ctl `linked`、B4 `token`、B5 `token`、B9 `revoked`、B10 `unavailable`。
   - 兩個測試帳號合計只有 1 筆連結（對照組）。
 - 結果：B4、B5、B9、B10 標 **PASS（隔離環境）**。B 組 13 項全部有實際證據：B1–B3、B6–B8、B11–B13 對 cube1 Identity staging；B4、B5、B9、B10 對隔離測試 Identity。
-- 收尾（等 Owner 同意才刪）：`accept-b` 分支、它的 8 個環境變數、`cube2-test-identity` 專案。在刪之前，測試 Identity 的開關維持關閉。合成存檔留在 staging DB，跟之前的合成玩家一起等 Owner 決定。
+- 收尾（Owner 2026-11-23 21:25 同意「好 刪」）：13:27–13:31 UTC 刪掉 `accept-b` 的 8 個環境變數（staging 與正式站的變數都還在）、`accept-b` 分支、Vercel 專案 `cube2-test-identity`（連同它的部署與測試金鑰；API 查詢回 404）。cube2 專案裡那一個 `accept-b` 部署還在（受 Vercel 登入保護，信任的測試 Identity 已不存在），要不要刪等 Owner。合成存檔留在 staging DB，跟之前的合成玩家一起等 Owner 決定。
 
 ### B 組第一次實跑（2026-11-23 11:38:59–11:50:19 UTC，cube1 Actions 45167007292）
 

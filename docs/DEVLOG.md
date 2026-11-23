@@ -1475,3 +1475,19 @@
 - 資料庫：沒有改結構；`accept-b` 在 staging DB 留下 5 份合成存檔（`acceptb-*`）、1 筆合成連結和 5 個登入 session，都是測試資料。正式站與正式資料庫沒有碰。
 - 刪除：無。待 Owner 同意：`accept-b` 分支、它的 8 個環境變數、`cube2-test-identity` 專案。
 - 補記：上一條的 commit 為 [`1a12cb8`](https://github.com/luffysky/cube2/commit/1a12cb8)。
+
+## 2026-11-23 21:32（Asia/Taipei）｜收掉 B4、B5、B9、B10 的隔離環境
+
+- 專案：cube2｜執行者：Claude｜Owner 指示：「好 刪」
+- 刪除（都經 Owner 同意）：
+  - cube2 專案裡 `accept-b` 分支專用的 8 個環境變數（Vercel 後台逐一確認 Key 與分支後刪除；之後用 API 查 `accept-b` 分支為空，`staging` 分支 13 個變數、正式站變數都還在）。
+  - GitHub 分支 `accept-b`（沙盒的 git 代理不允許刪分支，改在 Owner 的 Chrome 用 GitHub 網頁刪；`git ls-remote` 確認已不存在）。
+  - Vercel 專案 `cube2-test-identity`，連同它的部署、測試金鑰與 secret（API 查詢回 404）。沙盒裡暫存的測試金鑰檔也刪了。
+- 留著的：cube2 專案裡那一個 `accept-b` 部署（受登入保護，它信任的測試 Identity 已不存在）、staging DB 裡 5 份 `acceptb-*` 合成存檔。要不要刪等 Owner。
+- 確認：staging `/api/health` 仍是 `link: true`、`admin: true`、`dbSource: staging`；正式站 `link: false`、`admin: false`、`dbSource: main`。
+- 正式站的帳號綁定還不能開：
+  - cube1 正式 Identity `identity.snowrealm.pet` 目前連不上（Chrome 開 `/.well-known/jwks.json` 是瀏覽器錯誤頁）。
+  - cube2 正式站還沒有 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`、`IDENTITY_BRICKDUEL_CLIENT_SECRET`，`IDENTITY_LINK_ENABLED` 也沒有開。
+  - 依規則要先在正式站用兩個帳號跑一次端對端驗收，Owner 核准後才開 `IDENTITY_LINK_ENABLED`。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有動。
+- 補記：上一條的 commit 為 [`ab1e3e1`](https://github.com/luffysky/cube2/commit/ab1e3e1)。

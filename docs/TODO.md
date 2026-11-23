@@ -70,7 +70,8 @@
 - [ ] Owner：在 Neon 主控台複製 cube1 staging 的 `IDENTITY_BRICKDUEL_CLIENT_SECRET`，直接貼進 Vercel `IDENTITY_STAGING_CLIENT_SECRET`（覆蓋佔位值）→ 我用 `token 400` 驗證兩邊一致
 - [x] cube1：兩個合成測試帳號 → 跑 B1–B12（B1–B3、B6–B8、B11、B12 PASS，cube1 Actions 45167007292、45171423771）
 - [x] B4、B5、B9、B10：cube2 自建隔離測試 Identity＋`accept-b` 部署實跑，PASS（隔離環境，2026-11-23 13:09–13:16 UTC）
-- [ ] Owner 同意後刪：`accept-b` 分支、它的 8 個環境變數、Vercel 專案 `cube2-test-identity`（開關已關）
+- [x] 刪掉 `accept-b` 分支、它的 8 個環境變數、Vercel 專案 `cube2-test-identity`（Owner 同意，2026-11-23 21:31）
+- [ ] Owner 決定：cube2 專案裡的 `accept-b` 舊部署要不要刪
 - [ ] Identity `/oauth/authorize`、`/oauth/token` 正式上線、給 `IDENTITY_BRICKDUEL_CLIENT_SECRET` → 兩帳號 E2E 驗收後才開正式 `IDENTITY_LINK_ENABLED`
 - [ ] Owner 同意後刪 `accept-jwks` 分支（A7–A9 驗收用的暫時 JWKS，已不被信任）
 
