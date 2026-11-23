@@ -1597,3 +1597,14 @@
 - 這次推送會讓正式站重新部署並載入新設定。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：上述 Vercel 環境變數（C-044 核准）。
 - 補記：上一條的 commit 為 [`8248502`](https://github.com/luffysky/cube2/commit/8248502)。
+
+## 2026-11-24 00:50（Asia/Taipei）｜C-044 收尾：正式綁定已開、驗收存檔與測試殘留清掉
+
+- 專案：cube2｜執行者：Claude｜依據：C-044（Owner 核准刪除）
+- 正式站 `3797206`：`link: true`、`admin: false`、`dbSource: main`；遊戲面板出現連結／找回按鈕（只看沒按）。
+- 正式庫（Neon `main`）：刪 6 份驗收存檔（`accept-A/B/Y`、`accept2-A/B/Y`，先 SELECT 核對）與 16 筆驗收期間的登入 session；連帶刪掉它們的鑰匙與連結。核對剩 0／0／0、孤兒鑰匙 0；正式玩家 15 份沒動。舊鑰匙打正式站都 401。
+- staging（Neon `staging`）：刪 14 份合成玩家、30 筆測試 session；`admin_log` 稽核保留。
+- GitHub：刪 `accept-jwks` 分支。Chrome：清 `zzaccept.*`。
+- 剩：cube1 刪 `+bd1`、`+bd2`；正式管理 API 等 Owner 決定白名單。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/OWNER_DECISIONS.md`、`docs/DEVLOG.md`。｜資料庫：正式與 staging 各一次 DELETE（如上，C-044 核准）。｜刪除：如上。
+- 補記：上一條的 commit 為 [`3797206`](https://github.com/luffysky/cube2/commit/3797206)。

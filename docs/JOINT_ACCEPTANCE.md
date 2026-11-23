@@ -185,6 +185,11 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 
 - 16:41:20Z 正式環境新增 `IDENTITY_LINK_ENABLED=1`。
 - 16:42:21Z 刪除正式環境變數（逐筆比對 id、名稱、環境後才刪，全部 200）：`IDENTITY_LINK_ACCEPT_PUBS`、`IDENTITY_STAGING`、`STAGING_DATABASE_URL`、`BRICKDUEL_ADMIN_TEST_TRUST`、`BRICKDUEL_ADMIN_ISSUER`、`BRICKDUEL_ADMIN_JWKS_URL`、`BRICKDUEL_ADMIN_SUBJECTS`；另刪 `accept-jwks` 分支上的佔位 `IDENTITY_STAGING_CLIENT_SECRET`。`staging` 分支的同名變數都保留。這些在正式環境本來就不會被讀（程式在 `VERCEL_ENV=production` 時一律忽略）。正式管理 API 因此維持關閉，等 cube1 正式管理金鑰再設正式值。
+- 16:43Z 正式部署 `3797206`（`dpl_GejYD134YjETTymxN72AJoz1R6Fr`）：`/api/health` 回 `link: true`、`admin: false`、`dbSource: main`、`build: 3797206`；`?deep=1` 200、`ready: true`。遊戲的「登入／註冊」面板出現「把這份存檔連結到 SnowRealm Games 帳號」和「用 SnowRealm Games 帳號找回存檔」（只開面板確認，沒按）。沒帶存檔鑰匙開始綁定回 401 `auth`。
+- 16:46Z 刪正式庫驗收資料（Neon 主控台 SQL Editor，`main` 分支，單一語句）：先 SELECT 確認 6 份都是 `accept-*`／`accept2-*`、各 200 金幣、0 場比賽；再刪 6 份存檔（連帶它們的裝置鑰匙、連結等）和 16 筆登入 session（全部是 15:08–16:38 驗收時建的，正式綁定開放前沒有別人能建）。核對：剩 0 份驗收存檔、0 筆 session、0 筆連結、0 把孤兒鑰匙，正式玩家 15 份沒動。用舊鑰匙打正式站都回 401。Chrome 裡的 `zzaccept.*` 已清掉。
+- 16:47Z staging 分支：14 份合成玩家（`staging-*`、`acceptb-*`）和 30 筆測試 session 刪除；staging 部署、設定、`admin_log` 稽核紀錄保留。
+- GitHub `accept-jwks` 分支已刪（可從 GitHub 還原）。
+- 剩下：cube1 刪 `+bd1`、`+bd2` 驗收帳號（Work）。`zz.idjti` 裡驗收用過的 token 編號只有 jti 與到期時間、不連到任何存檔，到期自動清，沒動。
 
 ## 實測報告
 
