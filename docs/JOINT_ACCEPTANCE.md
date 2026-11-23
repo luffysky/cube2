@@ -113,7 +113,7 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 - **先做預檢（A0）**：每次執行都先查 `/api/health?deep=1`。必須是 `dbSource: "staging"`、`db: true`、`admin: true`；有給 `EXPECT_BUILD` 時，部署版本也要相符；有給 `ADMIN_JWKS_URL` 時，JWKS 必須是 https、只有公鑰、全部是 Ed25519，而且含 `ADMIN_KID`。任何一項不符就整個停下來，不建資料、不跑任何 A 項。本機演練過：沒設管理信任、或版本不符時，都會在寫入前停下。
 - 加 `SEED=1` 會先在 staging 建一個合成測試玩家（名字 `staging-test-xxxxxx`），再開一次免費寶箱，讓 A1 的 `players/{id}`、`draws` 有東西可讀。正式站一律拒絕這個選項，玩家的金鑰也不會印出來。
 
-## 正式站串接驗收（2026-11-23 15:06–16:30 UTC，台北 23:06–00:30）
+## 正式站串接驗收（2026-11-23 15:06–16:40 UTC，台北 23:06–00:40）
 
 只記實際打到正式站的結果。報告不含密碼、Secret、token、授權碼或 cookie。正式部署：`ff3a55a`（`dpl_6Wcy55jvyivQui4qnkSefvnRa9m4`，2026-11-24 00:02 起；之前是 `4bd6281`），`link: false`、`admin: false`、`dbSource: main`。程式從 `f3d989e` 起沒有改，之後的部署只動文件。
 
@@ -142,10 +142,10 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 |---|---|---|
 | P1 首次綁定（帳號 1 → 存檔 A） | PASS | cube1 Identity v8。16:26:34Z 用存檔 A 的鑰匙 start 200（導到 `games.snowrealm.pet`）→ 同意頁 GET 200 → 16:27:11.9Z 送出「同意」→ 瀏覽器到 `/api/auth/callback`（cube2 收到）→ `/?auth=linked`。`/api/auth/result` 200 `{outcome:"linked", linked:true}`，回同一個存檔 id 和新鑰匙。新鑰匙 `idStatus` 200 `{linked:true, linkedAt:1795451232311}`；舊鑰匙 401 `auth`（換鑰匙生效）；金幣 200 |
 | P2 換裝置找回（帳號 1，入場券 Y） | PASS | 16:28:26Z 用存檔 Y 的鑰匙 start `recover` 200 → 同意 16:29:12.9Z → `/?auth=recovered`。`result` 200 `{outcome:"recovered"}`，拿回的是存檔 A（id、pub 都等於 A，不是 Y），金幣 200，`idStatus` linked、linkedAt 和 P1 相同。P1 拿到的鑰匙仍可用（200）。存檔 Y 沒被動：未連結、200 金幣 |
-| P3a 帳號 1 綁存檔 B（帳號已綁 A） | PASS | 16:29:43Z start `link` 200 → 同意 16:30:10.0Z → `/?auth=conflict`。`result` 200 `{outcome:"conflict", why:"taken"}`，附帳號已連結那份存檔的摘要（pub、名字、金幣、場數）。B 仍未連結、200 金幣；A 仍 200 金幣。正式日誌只有一行 warn `[zz] auth conflict`（16:30:10.404Z），沒有其他錯誤 |
-| P3b 帳號 2 綁存檔 A（A 已被帳號 1 綁） | BLOCKED | 要 Owner 在遊戲館改登入帳號 2（`+bd2`） |
-| P3c 帳號 2 找回（帳號 2 沒有存檔） | BLOCKED | 同上 |
-| 存檔與金幣核對 | PASS（到 P3a 為止） | A 200（已連結）、B 200（未連結）、Y 200（未連結），每一步之後都重查過 |
+| P3a 帳號 1 綁存檔 B（帳號已綁 A） | PASS | 16:29:43Z start `link` 200 → 同意 16:30:10.0Z → `/?auth=conflict`。`result` 200 `{outcome:"conflict", why:"taken"}`，附帳號已連結那份存檔的摘要（pub、名字、金幣、場數）。B 仍未連結、200 金幣；A 仍 200 金幣。正式日誌只有一行 warn `[zz] auth conflict`（16:30:10.404Z），沒有其他錯誤（P3b、P3c 各一行 `conflict`、`none`，16:38:21Z、16:39:21Z；成功的不記） |
+| P3b 帳號 2 綁存檔 A（A 已被帳號 1 綁） | PASS | 帳號 2（`+bd2`，遊戲館顯示名稱和帳號 1 不同）。16:37:43Z 用存檔 A 的鑰匙 start `link` 200 → 同意 16:38:20.9Z → `/?auth=conflict`。`result` 200 `{outcome:"conflict", why:"linked", other:null}`：只說這份存檔已連結別的帳號，不透露是誰。A 仍連結帳號 1、linkedAt 沒變、200 金幣 |
+| P3c 帳號 2 找回（帳號 2 沒有存檔） | PASS | 16:38:52Z 用存檔 Y 的鑰匙 start `recover` 200 → 同意 16:39:21.3Z → `/?auth=none`。`result` 200 `{outcome:"none"}`，沒有交出任何存檔 |
+| 存檔與金幣核對 | PASS | 16:39:46Z 最後一次核對：A 200（連結帳號 1）、B 200（未連結）、Y 200（未連結）。每一步之後都重查過，金幣一直沒變 |
 
 - cube1 同意頁的修正過程（cube2 程式都沒改）：
   - v4 以前：送出「同意」回 400「授權請求無效」（15:51、15:55、15:58、16:05:20Z）。cube1 查出是 `consent_cookie_missing`。
@@ -157,7 +157,7 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
   - 登入框限 10 碼 → cube1 v35 改為登入不限長度、註冊 8–128 碼。
   - Owner 用的 `oauth-test-1-…@example.test` 是 staging 帳號，正式站沒有 → 改在正式站註冊 `+bd1` 帳號，登入成功。
 - 同意頁的卡點已由 cube1 v8 修好（見上）。帳密錯誤的提示 cube1 v5 已改成「帳號或密碼錯誤」。
-- `IDENTITY_LINK_ENABLED` 保持關閉，等驗收通過、Owner 核准公開。
+- 雙帳號驗收全部通過（16:39Z）。依 C-044，16:41Z 起開正式綁定，見下方「驗收後收尾」。
 
 ### 4. 流量防護
 
@@ -180,6 +180,11 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 - 刻意不加邊緣限流的：`/api/room`、`/api/ws`。對戰時一人每秒最多約 9 次，同一網路好幾個人一起玩容易誤擋；開房、加入、快速配對在程式裡已有每 IP 次數限制。
 - 共用網路：邊緣規則只以 IP 計，所以上限放寬（學校、網咖幾十人共用一個出口還有空間）；細的限制都在程式裡以存檔或工作階段計。
 - 驗證：規則發布後用一般請求各打一次：`/api/health` 200、`?deep=1` 200、`/api/rpc` 200、`/api/board` 200、首頁 200。沒有壓測。
+
+### 5. 驗收後收尾（C-044，Owner 已核准）
+
+- 16:41:20Z 正式環境新增 `IDENTITY_LINK_ENABLED=1`。
+- 16:42:21Z 刪除正式環境變數（逐筆比對 id、名稱、環境後才刪，全部 200）：`IDENTITY_LINK_ACCEPT_PUBS`、`IDENTITY_STAGING`、`STAGING_DATABASE_URL`、`BRICKDUEL_ADMIN_TEST_TRUST`、`BRICKDUEL_ADMIN_ISSUER`、`BRICKDUEL_ADMIN_JWKS_URL`、`BRICKDUEL_ADMIN_SUBJECTS`；另刪 `accept-jwks` 分支上的佔位 `IDENTITY_STAGING_CLIENT_SECRET`。`staging` 分支的同名變數都保留。這些在正式環境本來就不會被讀（程式在 `VERCEL_ENV=production` 時一律忽略）。正式管理 API 因此維持關閉，等 cube1 正式管理金鑰再設正式值。
 
 ## 實測報告
 

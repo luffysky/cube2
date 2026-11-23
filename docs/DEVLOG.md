@@ -1587,3 +1587,13 @@
 - `IDENTITY_LINK_ENABLED` 仍關閉、健康檢查 `link: false`。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：只有驗收流程本身的寫入（存檔 A 的 `zz.identity` 連結、新裝置鑰匙）。｜刪除：無。
 - 補記：上一條的 commit 為 [`ff3a55a`](https://github.com/luffysky/cube2/commit/ff3a55a)。
+
+## 2026-11-24 00:43（Asia/Taipei）｜雙帳號驗收全部 PASS；依 C-044 開正式綁定、刪 staging 複製來的正式變數
+
+- 專案：cube2｜執行者：Claude｜依據：C-044（Owner：驗收通過後開正式綁定、測試殘留都不留）
+- P3b 帳號 2 綁已被帳號 1 綁的存檔 A：`conflict`（`linked`，不透露對方）。P3c 帳號 2 找回：`none`。A/B/Y 金幣一直是 200。P1～P3 全部 PASS。
+- 16:41:20Z 正式環境新增 `IDENTITY_LINK_ENABLED=1`。
+- 16:42:21Z 刪正式環境變數 7 個（`IDENTITY_LINK_ACCEPT_PUBS`、`IDENTITY_STAGING`、`STAGING_DATABASE_URL`、`BRICKDUEL_ADMIN_TEST_TRUST`、`BRICKDUEL_ADMIN_ISSUER`、`BRICKDUEL_ADMIN_JWKS_URL`、`BRICKDUEL_ADMIN_SUBJECTS`）和 `accept-jwks` 分支的佔位 secret。逐筆比對 id／名稱／環境後才刪。staging 分支的變數保留。
+- 這次推送會讓正式站重新部署並載入新設定。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：上述 Vercel 環境變數（C-044 核准）。
+- 補記：上一條的 commit 為 [`8248502`](https://github.com/luffysky/cube2/commit/8248502)。
