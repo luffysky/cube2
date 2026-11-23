@@ -1573,3 +1573,17 @@
 - 記為 C-044，收尾順序寫進 `docs/TODO.md`。驗收還沒通過（卡在 cube1 同意頁），所以現在什麼都沒動。
 - 檔案：`docs/OWNER_DECISIONS.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無（已核准，等驗收通過）。
 - 補記：上一條的 commit 為 [`0790f7a`](https://github.com/luffysky/cube2/commit/0790f7a)。
+
+## 2026-11-24 00:32（Asia/Taipei）｜正式雙帳號驗收：P1、P2、P3a PASS（cube1 Identity v8）
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 交辦「接手 BrickDuel 正式串接驗收」、cube1 回報 v5～v8 已部署
+- cube1 同意頁修正過程（cube2 程式沒改）：v4 以前 400 `consent_cookie_missing`（最後一次 16:05:20Z）；v6 500 `identity_unavailable`（16:12:23.8Z）；v7 同意後跳轉被同意頁自己的 CSP `form-action` 擋下（16:19:00.4Z、16:20:23.06Z，cube1 查到兩筆授權碼有寫入、未兌換）；v8 放行已註冊的 callback 網域。
+- v8 實測（正式站 `ff3a55a`，帳號 `+bd1`）：
+  - P1 首次綁定存檔 A：callback 到 cube2 → `linked`；新鑰匙 `idStatus` linked、舊鑰匙 401；金幣 200。PASS。
+  - P2 用存檔 Y 當入場券找回：`recovered`，拿回的是存檔 A（id、pub 相同）、200 金幣；Y 沒被動。PASS。
+  - P3a 同帳號再綁存檔 B：`conflict`（`taken`），B 不變。PASS。
+  - P3b、P3c 要第二個帳號（`+bd2`），等 Owner 在遊戲館換登入。BLOCKED。
+- 新鑰匙只存在 Chrome 的 `zzaccept.v1`（A、A_recovered），沒有寫進聊天、檔案或日誌。
+- `IDENTITY_LINK_ENABLED` 仍關閉、健康檢查 `link: false`。
+- 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/DEVLOG.md`。｜資料庫：只有驗收流程本身的寫入（存檔 A 的 `zz.identity` 連結、新裝置鑰匙）。｜刪除：無。
+- 補記：上一條的 commit 為 [`ff3a55a`](https://github.com/luffysky/cube2/commit/ff3a55a)。
