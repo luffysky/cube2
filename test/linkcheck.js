@@ -42,6 +42,22 @@ const up = (args, env) => { const s = spawn(process.execPath, args, { stdio: ['i
     const b1 = rep && rep.cases.find(c => c.id === 'B1');
     ok(b1 && b1.result === 'FAIL' && b1.got === 'login-failed' && r.code === 1, 'a bad password shows as a failed login', b1);
     ok(!/wrong/.test(r.out), 'and is not printed');
+    // one case at a time
+    r = await run(Object.assign({ STAGING_URL: 'http://127.0.0.1:' + APP, LINKCHECK_ALLOW_DBSOURCE: 'test', CASES: 'B8,b11' }, accounts));
+    try { rep = JSON.parse(r.out); } catch (e) { rep = null; }
+    ok(rep && rep.cases.map(c => c.id).join() === 'B0,B8,B11' && rep.cases.every(c => c.result === 'PASS'), 'CASES runs only the cases named', rep && rep.cases.map(c => c.id + ' ' + c.result));
+    // cube1's switches, done here by the stand-in: each gives its own refusal and links nothing
+    for (const [id, want] of [['B4', 'token'], ['B5', 'token'], ['B9', 'revoked'], ['B10', 'unavailable']]) {
+      await fetch('http://127.0.0.1:' + MOCK + '/__switch?c=' + id, { method: 'POST' });
+      r = await run(Object.assign({ STAGING_URL: 'http://127.0.0.1:' + APP, LINKCHECK_ALLOW_DBSOURCE: 'test', SWITCH: id, SWITCH_NOTE: 'on 12:00-12:05Z' }, accounts));
+      try { rep = JSON.parse(r.out); } catch (e) { rep = null; }
+      const c = rep && rep.cases.find(x => x.id === id);
+      ok(c && c.result === 'PASS' && c.got === want && /12:00-12:05Z/.test(c.note) && r.code === 0 && rep.cases.length === 2, id + ' with the switch on: ' + want + ', nothing linked', c || (rep && (rep.error || rep.stopped)));
+    }
+    await fetch('http://127.0.0.1:' + MOCK + '/__switch?c=', { method: 'POST' });
+    r = await run(Object.assign({ STAGING_URL: 'http://127.0.0.1:' + APP, LINKCHECK_ALLOW_DBSOURCE: 'test', SWITCH: 'B4' }, accounts));
+    try { rep = JSON.parse(r.out); } catch (e) { rep = null; }
+    ok(rep && rep.cases.find(x => x.id === 'B4').result === 'FAIL' && r.code === 1, 'a switch that is not really on shows as a failure (the link went through)', rep && rep.cases);
     r = await run(Object.assign({ STAGING_URL: 'https://brickduel.snowrealm.pet' }, accounts));
     ok(r.code === 2 && /production host/.test(r.out), 'the production host is refused before anything runs');
   } catch (e) { fail++; console.log('CRASH', e); }

@@ -12,6 +12,10 @@
      ACCOUNT1_EMAIL, ACCOUNT1_PASSWORD, ACCOUNT2_EMAIL, ACCOUNT2_PASSWORD   the two cube1 staging test accounts
      EXPECT_BUILD         the cube2 commit staging should run (7 characters; checked first)
      B7=1                 also run B7 (waits 10.5 minutes)
+     CASES                only these, e.g. "B7" or "B8,B11" (B1, B2, B6, B3 and B12 go together: each needs B1's save)
+     SWITCH               B4, B5, B9 or B10: cube1 has turned that case's test switch on; one link attempt is made with
+                          account 2 on a new save and the outcome checked (token, token, revoked, unavailable), with
+                          nothing linked. SWITCH_NOTE (optional, no secrets) goes into the report, e.g. when it was on.
      CHROME_PATH          a Chrome to use instead of Playwright's own Chromium (optional)
 
      node tools/joint-link-check.js > b-results.json
@@ -27,7 +31,11 @@ const BASE = (process.env.STAGING_URL || 'https://brickduel-staging.snowrealm.pe
 const ORIGIN = new URL(BASE).origin;
 const BYPASS = process.env.VERCEL_BYPASS || '';
 const ACC = [1, 2].map(n => ({ n, email: process.env['ACCOUNT' + n + '_EMAIL'] || '', password: process.env['ACCOUNT' + n + '_PASSWORD'] || '' }));
-const LONG = process.env.B7 === '1';
+const ONLY = String(process.env.CASES || '').toUpperCase().split(/[\s,]+/).filter(Boolean);
+const wants = id => !ONLY.length || ONLY.indexOf(id) >= 0;
+const LONG = process.env.B7 === '1' || ONLY.indexOf('B7') >= 0;
+const SWITCHES = { B4: 'token', B5: 'token', B9: 'revoked', B10: 'unavailable' };
+const SW = String(process.env.SWITCH || '').toUpperCase().trim();
 const report = { tool: 'joint-link-check', base: BASE, started: new Date().toISOString(), build: null, cases: [] };
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -139,14 +147,28 @@ function finish(code) { report.finished = new Date().toISOString(); process.stdo
     report.cases.push({ id: 'B0', at: now(), result: bad.length ? 'FAIL' : 'PASS', note: bad.join('; ') || 'link true, dbSource staging, build ' + report.build });
     if (bad.length) return stop('preflight failed: ' + bad.join('; '));
 
+    // ---------- one of cube1's switches is on: B4, B5, B9 or B10, and nothing else ----------
+    if (SW) {
+      if (!SWITCHES[SW]) return stop('SWITCH must be B4, B5, B9 or B10');
+      const sv = await save(X, SW.toLowerCase());
+      const fs = await flow(X, 'link', sv, ACC[1]);
+      const sl = await linkedOf(X, sv);
+      record(SW, SWITCHES[SW], fs.outcome, [['nothing was linked', !sl.linked]], 'with cube1\'s ' + SW + ' switch on' + (process.env.SWITCH_NOTE ? ' (' + String(process.env.SWITCH_NOTE).slice(0, 120) + ')' : '') + '; save ' + sv.pub);
+      for (const d of devices) await d.ctx.close().catch(() => {});
+      await browser.close().catch(() => {});
+      return finish(report.cases.some(c => c.result === 'FAIL') ? 1 : 0);
+    }
+
+    let f, p = null, keyX = null;
+    if (['B1', 'B2', 'B6', 'B3', 'B12'].some(wants)) {
     // ---------- B1: account 1 links the save on device X ----------
-    const p = await save(X, 'b1');
-    let f = await flow(X, 'link', p, ACC[0]);
+    p = await save(X, 'b1');
+    f = await flow(X, 'link', p, ACC[0]);
     const newKey = f.result && f.result.key ? { id: f.result.id, key: f.result.key } : null;
     const nowLinked = newKey ? await linkedOf(X, newKey) : { status: 0, linked: false };
     const oldKey = await linkedOf(X, p);
     record('B1', 'linked', f.outcome, [['result read once with a new device key', !!newKey && newKey.key !== p.key], ['the new key sees the save linked', nowLinked.linked], ['the old key no longer opens the save', oldKey.status === 401]], 'save ' + p.pub);
-    const keyX = newKey || p;
+    keyX = newKey || p;
 
     // ---------- B2: account 1 recovers it on device Y ----------
     const Y = await device();
@@ -173,40 +195,50 @@ function finish(code) { report.finished = new Date().toISOString(); process.stdo
     const none2 = await flow(Z2, 'recover', null, ACC[1]);
     record('B3', 'conflict', f.outcome, [['the save stays linked (to account 1)', stillX.linked], ['account 2 has no save (recover says none)', none2.outcome === 'none']]);
 
+    }
+
     // ---------- B8: started on one browser, finished on another ----------
+    if (wants('B8')) {
     const X2 = await device(), Y2 = await device();
     const q = await save(X2, 'b8');
     f = await flow(X2, 'link', q, ACC[1], { other: Y2 });
     const qLinked = await linkedOf(X2, q);
     record('B8', 'session', f.outcome === 'state' ? 'session' : f.outcome, [['nothing was linked', !qLinked.linked]], 'outcome ' + f.outcome + ' (session or state both pass)');
+    }
 
     // ---------- B11: the player presses 拒絕 ----------
+    if (wants('B11')) {
     const D11 = await device();
     const r = await save(D11, 'b11');
     f = await flow(D11, 'link', r, ACC[1], { decision: 'deny' });
     const rLinked = await linkedOf(D11, r);
     record('B11', 'denied', f.outcome, [['nothing was linked', !rLinked.linked]]);
+    }
 
     // ---------- B7: back after more than ten minutes ----------
-    if (LONG) {
+    if (LONG && wants('B7')) {
       const D7 = await device();
       const s7 = await save(D7, 'b7');
       f = await flow(D7, 'link', s7, ACC[1], { wait: 10.5 * 60000 });
       const s7Linked = await linkedOf(D7, s7);
       record('B7', 'expired', f.outcome, [['nothing was linked', !s7Linked.linked]]);
-    } else manual('B7', 'run again with B7=1 (waits 10.5 minutes between start and consent)');
+    } else if (wants('B7')) manual('B7', 'run again with B7=1 (waits 10.5 minutes between start and consent)');
 
     // ---------- B12: account 1's save deleted, then restored within 30 days ----------
+    if (p) {
     const del = await api(X, '/api/rpc', { a: 'delete' }, keyX);
     const W = await device();
     f = await flow(W, 'restore', null, ACC[0]);
     const back = f.result && f.result.key ? await linkedOf(W, { id: f.result.id, key: f.result.key }) : { status: 0, linked: false };
     record('B12', 'recovered', f.outcome, [['the delete was accepted first', del.status === 200], ['the same save (pub)', f.result && f.result.pub === p.pub], ['usable and still linked after restoring', back.status === 200 && back.linked]]);
+    }
 
+    if (!ONLY.length) {
     manual('B4', 'cube1: have /oauth/token return a validly signed token with no nonce once; expect auth=token and the cube2 log "[zz] auth token (nonce)"');
     manual('B5', 'cube1: the same with a different nonce; expect auth=token, log "(nonce)"');
     manual('B9', 'cube1: revoke the token between exchange and status; expect auth=revoked, log "(status 200)" or "(status 401)"');
     manual('B10', 'cube1: make /v1/token/status answer 503 or time out; expect auth=unavailable, log "(status 503)" or "(status fetch failed)"');
+    }
   } catch (e) {
     report.error = hide(e && e.message ? e.message : e);
   } finally {

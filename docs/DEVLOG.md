@@ -1405,3 +1405,31 @@
   - 過一天：那一筆和兩人之間的邀請都刪掉，還在的好友留著。
 - 檔案：`server/core.js`、`server/app.js`、`test/api.test.js`、`docs/OWNER_DECISIONS.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有改結構；排程每天刪除已結束超過一天的好友紀錄。
 - 補記：上一條的 commit 為 [`7a15cd7`](https://github.com/luffysky/cube2/commit/7a15cd7)。
+
+## 2026-11-23 20:01（Asia/Taipei）｜B 組第一次實跑的覆核；修 B7（登入流程的 cookie 太早消失）
+
+- 專案：cube2｜執行者：Claude
+- cube1 Work 回報 Actions 45167007292：7 項通過、B7 失敗、B4／B5／B9／B10 未執行。
+- 覆核：沒有直接採用報告，而是用三份證據逐項對過。
+  - Actions 日誌裡的完整 JSON 報告。artifact 下載不到，因為儲存主機不在本環境的允許清單裡，但內容和日誌相同。
+  - Vercel staging 的伺服器日誌。
+  - staging 資料庫的一次唯讀 SELECT，透過 Neon 主控台，在 `staging` 分支上執行。
+  - 三者一致。B1、B2、B3、B6、B8、B11、B12 標為 PASS，每一項都寫上時間和證據。細節見 `docs/JOINT_ACCEPTANCE.md` 的「B 組第一次實跑」。
+- B7 失敗的原因在 cube2：
+  - 登入流程的 cookie 只活 10 分鐘，和 session 一樣長。玩家超過 10 分鐘才回來時，瀏覽器已經把 cookie 丟了，伺服器只能回「沒有 session」，認不出「過期」。
+  - 安全上沒有問題（沒有綁定，資料庫也確認了），只是提示錯了。
+  - 修法：cookie 改成 30 分鐘，session 仍然 10 分鐘就失效。
+  - 本機測試之前沒抓到，因為測試是手動把 cookie 帶回去。現在多一項檢查：11 分鐘時 cookie 還在，30 分鐘內消失。
+- B4、B5、B9、B10 要靠 cube1 那邊的測試開關，cube2 自己做不到。驗收工具改了兩處：
+  - 新增 `SWITCH`：cube1 打開某一項的開關後，只跑那一項，用帳號 2 在新存檔上連結，檢查結果並確認沒有綁定。
+  - 新增 `CASES`：只跑指定的幾項，例如重跑 B7。
+  - 本機替身 Identity 也加了這四個開關。演練時四項都通過；開關沒開時工具會判 FAIL。
+- 給 cube1 的文件：
+  - `docs/handoff/cube1-joint-link-check.yml` 多了 `cases`、`switch`、`switch_note` 三個輸入。
+  - `docs/B_GROUP_RUNBOOK_FOR_CUBE1.md` 加了第二輪的做法。
+- 部署：修好的版本推到 `main`，也推到 `staging` 分支，讓 cube1 用新版本重跑 B7。正式站的 `IDENTITY_LINK_ENABLED` 和 admin 仍是關的。
+- 測試：
+  - `test/bff.test.js` 102 項，多 1 項 cookie 壽命檢查。兩處預期值從 600 秒改成 1800 秒。
+  - `test/linkcheck.js` 25 項，多 5 項：只跑指定項、四個開關各一、開關沒打開時判 FAIL。
+- 檔案：`server/bff.js`、`tools/joint-link-check.js`、`test/fixtures/mock-identity-v4.js`、`test/linkcheck.js`、`test/bff.test.js`、`docs/JOINT_ACCEPTANCE.md`、`docs/B_GROUP_RUNBOOK_FOR_CUBE1.md`、`docs/handoff/cube1-joint-link-check.yml`、`docs/DEVLOG.md`。｜資料庫：沒有改，也沒有寫入，只做了一次唯讀查詢。｜刪除：無。
+- 補記：上一條的 commit 為 [`a531578`](https://github.com/luffysky/cube2/commit/a531578)。

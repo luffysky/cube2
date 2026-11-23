@@ -41,6 +41,10 @@ const CLIENT_ID = 'brickduel-bff', REDIRECT = 'https://brickduel.snowrealm.pet/a
 const PORTAL = 'https://games.snowrealm.pet/', PROD_ISS = 'https://identity.snowrealm.pet';
 const PROD_HOST = 'brickduel.snowrealm.pet', CLIENT_RE = /^[a-z0-9][a-z0-9_-]{2,79}$/;
 const COOKIE = '__Host-zzauth', LIFE = 10 * 60000, RESULT_LIFE = 5 * 60000, TOKEN_MS = 5000, STATUS_MS = 4000;
+// The cookie outlives the session it names by twenty minutes. The session itself still ends after LIFE; the cookie only
+// lets a player who comes back late be told "expired" (start again) rather than "no session". A cookie that lived
+// exactly LIFE was already gone from the browser by then (joint acceptance B7, cube1 Actions run 45167007292).
+const COOKIE_LIFE = LIFE + 20 * 60000;
 const INTENTS = ['link', 'recover', 'restore'];
 const OUTCOMES = ['linked', 'recovered', 'conflict', 'pending', 'none', 'ban', 'purged', 'session', 'expired', 'replay', 'state', 'denied', 'code', 'token', 'revoked', 'unavailable', 'off'];
 let fetcher = null;
@@ -147,7 +151,7 @@ async function start(db, body, who, tag, now, env, host) {
   u.searchParams.set('code_challenge_method', 'S256');
   u.searchParams.set('state', state);
   u.searchParams.set('nonce', nonce);
-  return { status: 200, body: { ok: true, url: u.href }, cookie: setCookie(sid, LIFE) };
+  return { status: 200, body: { ok: true, url: u.href }, cookie: setCookie(sid, COOKIE_LIFE) };
 }
 
 // ---------- callback ----------

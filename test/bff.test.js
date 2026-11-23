@@ -130,7 +130,7 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   eq((await call('authStart', { method: 'GET' })).status, 405, 'start is POST only');
   r = await startIt('link', P1);
   const sc = r.headers['set-cookie'];
-  ok(r.status === 200 && /^__Host-zzauth=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=600; Secure; HttpOnly; SameSite=Lax$/.test(sc), 'a __Host- cookie: Secure, HttpOnly, Lax, ten minutes', sc);
+  ok(r.status === 200 && /^__Host-zzauth=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=1800; Secure; HttpOnly; SameSite=Lax$/.test(sc), 'a __Host- cookie: Secure, HttpOnly, Lax, thirty minutes (the session inside it lasts ten)', sc);
   const u = new URL(r.json.url);
   ok(u.origin === 'https://games.snowrealm.pet' && u.searchParams.get('sso') === 'brickduel' && u.searchParams.get('client_id') === 'brickduel-bff' && u.searchParams.get('redirect_uri') === 'https://brickduel.snowrealm.pet/api/auth/callback' && u.searchParams.get('code_challenge_method') === 'S256' && /^[A-Za-z0-9_-]{43}$/.test(u.searchParams.get('code_challenge')), 'to the portal with the fixed callback and an S256 challenge', r.json.url);
   ok(!/verifier|secret/i.test(r.json.url) && r.json.url.indexOf(cookieFrom(r)) < 0, 'no verifier, secret or session id in the address');
@@ -207,6 +207,9 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   const s3 = await startIt('recover'), p3 = portal(s3.json.url, U1);
   now += 11 * 60000;
   eq(where(await back('code=' + p3.code + '&state=' + p3.state, cookieFrom(s3))), '/?auth=expired', 'after ten minutes: expired');
+  // and a real browser still has the cookie then (one that lived only ten minutes would be gone: B7 said "session")
+  const age = +((/Max-Age=(\d+)/.exec(s3.headers['set-cookie']) || [])[1] || 0);
+  ok(age * 1000 > 11 * 60000 && age * 1000 <= 30 * 60000, 'the cookie is still in the browser eleven minutes on, and gone within half an hour', age);
   // another browser (換機): no cookie, or someone else's
   const s4 = await startIt('recover'), p4 = portal(s4.json.url, U1);
   eq(where(await back('code=' + p4.code + '&state=' + p4.state)), '/?auth=session', 'the callback in another browser (no cookie): refused');
@@ -312,7 +315,7 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   r = await startIt('recover');
   const su = new URL(r.json.url);
   ok(r.status === 200 && su.origin === 'https://games-staging.test.example' && su.searchParams.get('client_id') === 'brickduel-bff-staging' && su.searchParams.get('redirect_uri') === STG, 'staging start: staging portal, client and callback', r.json.url);
-  ok(/^__Host-zzauth=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=600; Secure; HttpOnly; SameSite=Lax$/.test(r.headers['set-cookie']), 'the same __Host- cookie (Secure, HttpOnly, Lax, host only, 10 minutes)', r.headers['set-cookie']);
+  ok(/^__Host-zzauth=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=1800; Secure; HttpOnly; SameSite=Lax$/.test(r.headers['set-cookie']), 'the same __Host- cookie (Secure, HttpOnly, Lax, host only, 30 minutes)', r.headers['set-cookie']);
   eq((await startIt('recover', null, { headers: { host: 'brickduel.snowrealm.pet' } })).json.why, 'host', 'a staging start on the production host: refused');
   x = await round('recover', null, U1);
   eq(where(x.cb), '/?auth=recovered', 'a whole staging round');

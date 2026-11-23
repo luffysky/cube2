@@ -24,8 +24,11 @@ function grantOf(u) {
 }
 const loginPage = (res, u, failed) => page(res, failed ? 401 : 200, '登入 SnowRealm Games 測試站', (failed ? '<p>登入失敗。</p>' : '') +
   '<form method="post" action="/oauth/authorize' + u.search.replace(/&/g, '&amp;') + '"><input name="email" type="email"><input name="password" type="password"><button type="submit">登入</button></form>');
+// the stand-in's own copies of cube1's acceptance switches (B4 no nonce, B5 another nonce, B9 revoked, B10 status down)
+let sw = '';
 http.createServer(async (req, res) => {
   const u = new URL(req.url, ISS);
+  if (u.pathname === '/__switch' && req.method === 'POST') { sw = ['B4', 'B5', 'B9', 'B10'].indexOf(u.searchParams.get('c')) >= 0 ? u.searchParams.get('c') : ''; return json(res, 200, { sw }); }
   if (req.method === 'GET' && u.pathname === '/.well-known/jwks.json') return json(res, 200, { keys: [jwk] });
   if (u.pathname === '/oauth/authorize' && req.method === 'GET') {
     const g = grantOf(u);
@@ -60,9 +63,15 @@ http.createServer(async (req, res) => {
       crypto.createHash('sha256').update(b.codeVerifier || '').digest('base64url') === c.codeChallenge;
     if (!ok) return json(res, 400, { error: 'invalid_grant' });
     const iat = Math.floor(Date.now() / 1000), h = b64({ alg: 'EdDSA', typ: 'JWT', kid: KID });
-    const p = b64({ iss: ISS, sub: c.sub, aud: 'snowrealm:brickduel:api', scope: 'brickduel:account:link', nonce: c.nonce, iat, nbf: iat, exp: iat + 300, jti: crypto.randomUUID() });
+    const claims = { iss: ISS, sub: c.sub, aud: 'snowrealm:brickduel:api', scope: 'brickduel:account:link', nonce: c.nonce, iat, nbf: iat, exp: iat + 300, jti: crypto.randomUUID() };
+    if (sw === 'B4') delete claims.nonce;
+    if (sw === 'B5') claims.nonce = crypto.randomBytes(24).toString('base64url');
+    const p = b64(claims);
     return json(res, 200, { access_token: h + '.' + p + '.' + crypto.sign(null, Buffer.from(h + '.' + p), privateKey).toString('base64url'), token_type: 'Bearer', expires_in: 300 });
   }
-  if (u.pathname === '/v1/token/status' && req.method === 'POST') return json(res, req.headers['x-snowrealm-client-secret'] === SECRET ? 200 : 401, { active: req.headers['x-snowrealm-client-secret'] === SECRET });
+  if (u.pathname === '/v1/token/status' && req.method === 'POST') {
+    if (sw === 'B10') return json(res, 503, { error: 'unavailable' });
+    return json(res, req.headers['x-snowrealm-client-secret'] === SECRET ? 200 : 401, { active: req.headers['x-snowrealm-client-secret'] === SECRET && sw !== 'B9' });
+  }
   json(res, 404, { error: 'not_found' });
 }).listen(PORT, '127.0.0.1', () => process.stdout.write('mock identity ' + ISS + '\n'));

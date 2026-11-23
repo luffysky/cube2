@@ -134,19 +134,40 @@ cube1 預定的值是 issuer `https://identity-staging.snowrealm.pet`、JWKS `ht
 | A12 | PASS | 2026-11-22 17:44:17–32 | 稽核表：同一分鐘內第 1–60 次有效呼叫 200（id 1–9、13–63），第 61 次（id 64）429 | — |
 | A13 | PASS | 2026-11-22 17:44 | cube1 Work 於 2026-11-22 17:44:10–17:44:32 UTC 用 staging admin kid `srstagea_EWW-tM7u8uSnvCwV` 對 cube2 staging `1d1e1ca` 跑 `tools/joint-admin-check.js`（cube1 回報 PASS；證據 [cube1 Actions #45051087698](https://github.com/luffysky/cube1/actions/runs/45051087698)、[Issue #18](https://github.com/luffysky/cube1/issues/18#issuecomment-7084081394)）。405 不帶 sub，依設計不寫入稽核表 | — |
 | A14 | PASS | 2026-11-22 17:56（台北 11-23 01:56） | Neon 主控台 SQL Editor，專案 `neon-crimson-envelope`、**`staging` 分支**（`br-raspy-silence-azzokuib`）、資料庫 `neondb`，只執行 SELECT。見下方「A14 稽核查核」 | — |
-| B1 | FAIL（cube1） | 2026-11-22 20:09–20:22 | staging `e1296ad`：`link: true`、`dbSource: staging`；secret 一致（假 code 換 token → cube1 回 400）。① `POST /api/auth/start`（link，合成玩家 `cvqwyq4a` 自己的金鑰）200 → ② `GET https://identity-staging.snowrealm.pet/oauth/authorize?…` 200，顯示 cube1 登入頁（表單 `POST /oauth/authorize`，查詢字串帶齊 8 個參數，欄位只有 email、password）→ ③ Owner 20:13:58 UTC 用 staging 測試帳號 1 登入送出 → cube1 回「授權請求無效」，沒有導回 callback，cube2 沒收到任何 code。**對照實驗**：用不存在的假帳號送出，結果一樣是「授權請求無效」（不是帳密錯誤）→ POST 在檢查帳密之前就拒絕了。拿掉 `sso`、`response_type` 兩個參數時，連 GET 都變成「授權請求無效」→ cube2 送的參數格式正是 GET 接受的那組 | **由 cube1 修**：`POST /oauth/authorize` 在驗證帳密之前就拒絕了自己頁面送出的表單。可能原因（cube1 v3 原始碼尚未推上 GitHub，cube2 看不到）：Origin 檢查只放行 `games.snowrealm.pet`（自己的 `identity-staging` 頁面被擋），或 POST 讀參數的地方跟 GET 不同（表單沒有 hidden 欄位，參數只在 action 的查詢字串），或缺 CSRF token。cube2 這邊不需要改 |
-| B2 | BLOCKED | 2026-11-22 20:22 | 同 B1 | 同 B1，另需第二個瀏覽器設定檔 |
-| B3 | BLOCKED | 2026-11-22 20:22 | 同 B1 | 同 B1（需兩個測試帳號） |
-| B4 | BLOCKED | 2026-11-22 19:40 | — | 同 B1，另需 cube1 的隔離 harness（有效簽章、沒有 nonce） |
-| B5 | BLOCKED | 2026-11-22 20:22 | — | 同 B1 |
-| B6 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：同一個 session 第二次回呼 → `/?auth=replay`（沒有 cube1 的真 code，不算完整流程） | 同 B1 |
-| B7 | BLOCKED | 2026-11-22 20:22 | — | 同 B1（本機測試已涵蓋 10 分鐘過期） |
-| B8 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：state 不對 → `/?auth=state`（不算完整流程） | 同 B1 |
-| B9 | BLOCKED | 2026-11-22 20:22 | — | 同 B1，另需 cube1 撤銷 token |
-| B10 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：cube1 token 端點還沒開的時候（19:34 UTC）回呼得到 `/?auth=unavailable`，沒有放行 | 同 B1，另需 cube1 讓 status 端點暫時失效 |
-| B11 | BLOCKED | 2026-11-22 20:22 | cube2 端預先實測：回呼帶 `error=access_denied` → `/?auth=denied`（不算完整流程，要 cube1 入口真的按取消） | 同 B1 |
-| B12 | BLOCKED | 2026-11-22 20:22 | — | 同 B1 |
+| B1 | PASS | 2026-11-23 11:39:04–11:39:11 | cube1 Actions [45167007292](https://github.com/luffysky/cube1/actions/runs/45167007292)（staging `e1296ad`，B0 前置通過：`link: true`、`dbSource: staging`）：`linked`；結果只能讀一次並換新裝置金鑰、新金鑰看到已連結、舊金鑰 401。staging DB：session 11:39:04 `link`→`linked`（11:39:08 用掉），合成存檔 `a8ccaanz` 有 identity 列 | — |
+| B2 | PASS | 2026-11-23 11:39:11–11:39:15 | 同 B1 的執行：裝置 Y `recover`→`recovered`，同一份存檔 `a8ccaanz`、拿到新金鑰。DB：session 11:39:11 `recover`→`recovered` | — |
+| B3 | PASS | 2026-11-23 11:39:19–11:39:26 | 同 B1 的執行：帳號 2 連已連給帳號 1 的存檔→`conflict`，存檔仍連帳號 1；帳號 2 `recover`→`none`（沒有存檔）。Vercel 日誌 11:39:22 `[zz] auth conflict`、11:39:26 `[zz] auth none`；DB：兩個 session 各為 `conflict`、`none` | — |
+| B4 | BLOCKED | 2026-11-23 11:50 | 工具標 MANUAL：cube1 的測試開關（簽一張沒有 nonce 的 token）沒有打開，沒有開關時間 | 需要 cube1 在 Identity staging 打開 B4 開關，再用 `SWITCH=B4` 跑一次（見下方「B 組第一次實跑」） |
+| B5 | BLOCKED | 2026-11-23 11:50 | 同 B4（nonce 不同的 token） | 同 B4，`SWITCH=B5` |
+| B6 | PASS | 2026-11-23 11:39:15–11:39:19 | 同 B1 的執行：第一次回呼 `recovered`，同一個 callback 網址再開一次→`replay`，第一次的結果仍可讀。Vercel 日誌 11:39:18 `[zz] auth replay` | — |
+| B7 | FAIL（cube2，已修） | 2026-11-23 11:39:35 → 11:50:10 | 同 B1 的執行：開始後等 10.5 分鐘才回來，預期 `expired`，實得 `session`；沒有發生綁定（DB：合成存檔 `mvhx8fx8` 沒有 identity 列；那個 session 沒被用掉）。Vercel 日誌 11:50:10 `[zz] auth session`。原因在 cube2：登入流程的 cookie 壽命和 session 一樣是 10 分鐘，瀏覽器 10 分鐘後就把 cookie 丟了，伺服器收不到、只能回 `session`，認不出「過期」 | 已改成 cookie 30 分鐘、session 仍 10 分鐘（`server/bff.js` `COOKIE_LIFE`）；部署到 staging 後要用 `CASES=B7` 重跑一次 |
+| B8 | PASS | 2026-11-23 11:39:27–11:39:30 | 同 B1 的執行：A 瀏覽器開始、B 瀏覽器完成→`session`（`session` 或 `state` 都算過），沒有綁定。Vercel 日誌 11:39:30 `[zz] auth session`；DB：該 session 未被用掉，存檔 `f8kf7fzw` 沒有 identity 列 | — |
+| B9 | BLOCKED | 2026-11-23 11:50 | 同 B4（交換後、查狀態前撤銷 token） | 同 B4，`SWITCH=B9` |
+| B10 | BLOCKED | 2026-11-23 11:50 | 同 B4（status 端點 503 或逾時） | 同 B4，`SWITCH=B10` |
+| B11 | PASS | 2026-11-23 11:39:31–11:39:34 | 同 B1 的執行：在 cube1 同意頁按拒絕→`denied`，沒有綁定。Vercel 日誌 11:39:34 `[zz] auth denied`；DB：session `link`→`denied`，存檔 `evxcnqm7` 沒有 identity 列 | — |
+| B12 | PASS | 2026-11-23 11:50:15–11:50:18 | 同 B1 的執行：帳號 1 的存檔先刪除（200），再用 `restore`→`recovered`，同一份存檔、可用且仍連結。DB：session 11:50:15 `restore`→`recovered`；`a8ccaanz` 狀態為使用中、有 restored 標記、仍有 identity 列 | — |
 | B13 | PASS | 2026-11-22 19:38 | staging `acc6f6a`、`link: true` 時，合成匿名玩家 `staging-test-b0`（不連結）照常：`hello` 建檔、`sync` 改名與回報一場 200、`/api/board` 200、`history` 1 場。正式站同時是 `link: false` | — |
+
+### B 組第一次實跑（2026-11-23 11:38:59–11:50:19 UTC，cube1 Actions 45167007292）
+
+- 執行者：cube1 Work，在 cube1 Actions 的 `staging` Environment 跑 `tools/joint-link-check.js`（工具取自 cube2 `main`）。參數：`expect_build=e1296ad`、`B7=1`。
+- 結果：通過 7 項（B1、B2、B3、B6、B8、B11、B12），失敗 1 項（B7），未執行 4 項（B4、B5、B9、B10）。B0 前置檢查通過。
+- cube2 端的覆核（Claude，2026-11-23 12:00 UTC 左右）：
+  - 工具報告：從 Actions 日誌取回完整 JSON。artifact 檔下載不到（儲存主機不在本環境的允許清單），但日誌中的 JSON 是同一份輸出。
+  - Vercel staging 日誌（`dpl_CFkf5ehtKTz9BPYwjny6HJkYL6gk`，`staging` 分支）：同一時段只有 6 行 `[zz] auth`，依序為 `replay`、`conflict`、`none`、`session`、`denied`、`session`，跟報告一一對上。成功的 `linked`／`recovered` 本來就不記錄。
+  - staging DB（Neon `neon-crimson-envelope` 的 `staging` 分支，只執行一次 SELECT，沒有輸出任何金鑰或識別碼）：
+    - 9 個登入 session 的意圖和結果：link→linked、recover→recovered ×2、link→conflict、recover→none、link（B8，沒被用掉）、link→denied、link（B7，沒被用掉）、restore→recovered。
+    - 4 份合成存檔：只有 `a8ccaanz` 有連結（B1 連結、B12 刪除後找回）；B7、B8、B11 的存檔都沒有連結。
+- B7 為什麼失敗，以及怎麼修：
+  - 原因：開始登入時，cube2 發的 cookie 壽命是 10 分鐘，跟 session 一樣。過了 10.5 分鐘，瀏覽器已經把 cookie 丟掉，回呼時沒帶 cookie，伺服器只能回「沒有 session」。安全上沒問題（沒有綁定），但說不出「過期了、請重來」。
+  - 修法：cookie 改成 30 分鐘，session 本身仍然 10 分鐘就失效。單元測試多一項：檢查 11 分鐘後 cookie 還在、30 分鐘內消失。
+  - 之前本機測試沒抓到，是因為測試是手動把 cookie 帶回去，沒有模擬瀏覽器自己丟掉 cookie。
+- B4、B5、B9、B10 要 cube1 的測試開關，cube2 做不到：
+  - 工具新增 `SWITCH=B4|B5|B9|B10`：cube1 打開那一項的開關後，工具用帳號 2 在新存檔上跑一次連結，檢查結果（依序 `token`、`token`、`revoked`、`unavailable`），並確認沒有綁定。
+  - 可以用 `SWITCH_NOTE` 寫開關的開、關時間（不要放秘密）。
+  - 本機用替身 Identity 演練過，四項都通過。替身「開關沒打開」時，工具會判 FAIL。
+- 只重跑部分項目：新增 `CASES`，例如 `CASES=B7`，就只跑 B7。B1、B2、B6、B3、B12 一定一起跑，因為後面幾項都要用 B1 的存檔。
+- workflow 範本 `docs/handoff/cube1-joint-link-check.yml` 多了 `cases` 和 `switch` 兩個輸入。
 
 ### B 組準備（2026-11-23 03:45 台北）
 

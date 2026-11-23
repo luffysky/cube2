@@ -79,3 +79,25 @@ cube2 已經用一個模擬 cube1 v4 的本機服務演練過這支工具（`tes
 - B4、B5、B9、B10 用了哪個 harness 或開關，什麼時候開、什麼時候關。
 
 cube2 收到之後，會用 staging 資料庫唯讀查詢和 Vercel 伺服器日誌逐項核對，再在 `docs/JOINT_ACCEPTANCE.md` 標 PASS／FAIL／BLOCKED。只看瀏覽器結果、沒有伺服器證據的項目不會標 PASS。
+
+## 第二輪：補 B7，以及 B4、B5、B9、B10（2026-11-23 更新）
+
+第一輪（cube1 Actions 45167007292）的結果：B1、B2、B3、B6、B8、B11、B12 都已在 cube2 端用日誌和資料庫核對完畢，標為 PASS。B7 是 cube2 的問題，已經修好。剩下要跑的就是下面這兩種。
+
+先更新 workflow：cube1 那份 workflow 換成 cube2 `docs/handoff/cube1-joint-link-check.yml` 的新版。新版多了 `cases`、`switch`、`switch_note` 三個輸入。工具本身會照舊從 cube2 `main` 取最新版。
+
+1. **B7 重跑**（大約 12 分鐘）
+   - 輸入：`expect_build` 填 cube2 staging 現在的版本（cube2 會告訴你；也可以看 `/api/health` 的 `build`）、`cases` 填 `B7`、`b7` 填 `1`。
+   - 預期：`B7 PASS`，結果是 `expired`，而且沒有綁定。
+2. **B4、B5、B9、B10**（每項各跑一次，每次大約 1 分鐘）
+   - 先在 cube1 Identity staging 打開那一項的測試開關：
+     - B4：簽一張沒有 nonce 的 token。
+     - B5：nonce 不一樣。
+     - B9：換 token 之後就撤銷，或讓 `/v1/token/status` 回 `active:false`。
+     - B10：讓 `/v1/token/status` 回 503 或逾時。
+   - 跑 workflow：`switch` 填那一項（例如 `B4`），`switch_note` 填開關打開的時間（UTC），`cases` 留空。
+   - 跑完立刻關掉開關，再把關閉的時間補在交回的表裡。
+   - 工具會用帳號 2 在一份新的合成存檔上試一次連結。預期結果依序是 `token`、`token`、`revoked`、`unavailable`，而且都沒有綁定。
+   - 如果開關其實沒打開，連結會成功，工具就會判 FAIL。這時候帳號 2 會被綁到那份合成存檔上，請告訴 cube2，由 cube2 處理。
+
+交回：每次的 Actions 連結，以及每個開關打開、關閉的 UTC 時間。

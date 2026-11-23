@@ -16,6 +16,18 @@ on:
         description: 也跑 B7（要等 10.5 分鐘；1 = 是）
         required: true
         default: '0'
+      cases:
+        description: 只跑這幾項，例如 B7 或 B8,B11（空白 = 全部；B1、B2、B6、B3、B12 一定一起跑）
+        required: false
+        default: ''
+      switch:
+        description: cube1 已打開哪一項的測試開關：B4、B5、B9 或 B10（空白 = 沒有；填了就只跑那一項）
+        required: false
+        default: ''
+      switch_note:
+        description: 開關的開、關時間等說明（不要放秘密）
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -54,6 +66,9 @@ jobs:
           STAGING_URL: https://brickduel-staging.snowrealm.pet
           EXPECT_BUILD: ${{ inputs.expect_build }}
           B7: ${{ inputs.b7 }}
+          CASES: ${{ inputs.cases }}
+          SWITCH: ${{ inputs.switch }}
+          SWITCH_NOTE: ${{ inputs.switch_note }}
         run: |
           set -o pipefail
           node tools/joint-link-check.js | tee "$RUNNER_TEMP/b-results.json"
