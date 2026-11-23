@@ -1508,3 +1508,18 @@
 - cube2 這邊：沒有要改的程式，照 C-041 等。`docs/TODO.md` 記下順序。
 - 檔案：`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒有動。｜刪除：無。
 - 補記：上一條的 commit 為 [`3ed9916`](https://github.com/luffysky/cube2/commit/3ed9916)。
+
+## 2026-11-23 23:07（Asia/Taipei）｜正式站「只限驗收存檔」的綁定入口
+
+- 專案：cube2｜執行者：Claude｜Owner 指示：正式串接驗收用受限入口，`IDENTITY_LINK_ENABLED` 保持關閉，等 Owner 核准才公開。
+- 卡點：原本正式站只要 `IDENTITY_LINK_ENABLED` 沒開，`/api/auth/*` 一律 503，沒辦法在不公開的情況下驗收。
+- 新增 `IDENTITY_LINK_ACCEPT_PUBS`（server/bff.js）：
+  - `IDENTITY_LINK_ENABLED` 沒開、但列了幾個驗收存檔的公開代號（逗號分隔，最多 8 個）時，登入流程只對這幾個存檔開放。
+  - 每一次開始（連結、找回、復原都一樣）都要拿名單內存檔的裝置金鑰當入場券，其他人照舊拿到 503 `off`。
+  - callback 不會連結、找回或透露名單外的存檔：平台帳號若已連著名單外的存檔，直接回 `off`，不給名字和金幣。
+  - `/api/health` 仍是 `link: false`，畫面上任何人都看不到按鈕；直接用 token 的 `idLink`／`idRecover` 也維持關閉。
+  - 名單裡有一個格式不對，整份名單作廢。`IDENTITY_LINK_ENABLED=1` 時名單不再有作用。
+- 正式環境變數（Production）：新增 `IDENTITY_ISSUER`、`IDENTITY_JWKS_URL`、`IDENTITY_AUDIENCE`（Owner 給的值）與 `IDENTITY_LINK_ACCEPT_PUBS`（3 份驗收存檔 `accept-A`／`accept-B`／`accept-Y`，各 200 金幣）。`IDENTITY_LINK_ENABLED` 沒設。
+- 測試：`test/bff.test.js` 131 項（多 29 項：只限名單、名單格式、首次綁定、換裝置找回、兩種衝突、找不到、金幣不變、名單外存檔不被動到也不被說出、公開後名單失效）。
+- 檔案：`server/bff.js`、`server/app.js`、`server/core.js`、`test/bff.test.js`、`docs/DEVLOG.md`。｜資料庫：沒改結構；正式庫多 3 份驗收存檔。｜刪除：無。
+- 補記：上一條的 commit 為 [`1621852`](https://github.com/luffysky/cube2/commit/1621852)。

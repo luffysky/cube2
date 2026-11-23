@@ -619,11 +619,12 @@ async function useJti(db, claims) {
   const r = await db.query('INSERT INTO zz.idjti (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING RETURNING jti', [claims.jti, claims.exp * 1000]);
   return !!r[0];
 }
-async function idStatus(db, cred, on) {
+// only: the acceptance saves' tags while linking is open to them alone (server/bff.js), else nothing
+async function idStatus(db, cred, on, only) {
   const p = await findPlayer(db, cred);
   if (!p) return fail(401, 'auth');
   if (p.pending) return pending(p.pending);
-  if (!on) return good({ enabled: false, linked: false });
+  if (!on && !(Array.isArray(only) && only.indexOf(p.pub) >= 0)) return good({ enabled: false, linked: false });
   const r = await db.query('SELECT linked_at FROM zz.identity WHERE pid = $1', [p.id]);
   return good({ enabled: true, linked: !!r[0], linkedAt: r[0] ? r[0].linked_at : 0 });
 }

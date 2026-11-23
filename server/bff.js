@@ -31,7 +31,14 @@
 
    Off unless server/identity.js is fully set up and IDENTITY_LINK_ENABLED=1 and the client secret is set
    (IDENTITY_BRICKDUEL_CLIENT_SECRET, at least 32 characters). Until then every route answers 503 and the anonymous
-   game is untouched. Expired sessions are not removed by anything yet: clearing them is a deletion and waits for the
+   game is untouched.
+
+   Acceptance before it opens (Owner 2026-11-23, production two-account acceptance): with IDENTITY_LINK_ENABLED not 1
+   but IDENTITY_LINK_ACCEPT_PUBS set to the public tags of a few acceptance saves (comma separated, at most 8), the
+   routes work for those saves only. Every start, whatever its intent, needs the device key of a listed save (the key
+   is the ticket; anyone else gets the same 503 "off" as before). A callback never links, recovers or names a save
+   that is not listed. /api/health still says link: false, so the page shows no button to anyone. One malformed
+   entry turns the whole list off. Expired sessions are not removed by anything yet: clearing them is a deletion and waits for the
    Owner. Used ones keep no secrets (the encrypted parts are cleared when used). */
 const crypto = require('crypto');
 const identity = require('./identity.js');
@@ -46,6 +53,12 @@ const COOKIE = '__Host-zzauth', LIFE = 10 * 60000, RESULT_LIFE = 5 * 60000, TOKE
 // exactly LIFE was already gone from the browser by then (joint acceptance B7, cube1 Actions run 45167007292).
 const COOKIE_LIFE = LIFE + 20 * 60000;
 const INTENTS = ['link', 'recover', 'restore'];
+const ACCEPT_MAX = 8, PUB_RE = /^[abcdefghjkmnpqrstuvwxyz23456789]{8}$/;
+// the acceptance saves' public tags, or [] (not set, too many, or one that is not a tag)
+function acceptList(env) {
+  const list = String((env || process.env).IDENTITY_LINK_ACCEPT_PUBS || '').split(',').map(x => x.trim()).filter(Boolean);
+  return list.length && list.length <= ACCEPT_MAX && list.every(x => PUB_RE.test(x)) ? list : [];
+}
 const OUTCOMES = ['linked', 'recovered', 'conflict', 'pending', 'none', 'ban', 'purged', 'session', 'expired', 'replay', 'state', 'denied', 'code', 'token', 'revoked', 'unavailable', 'off'];
 let fetcher = null;
 
@@ -63,7 +76,10 @@ let fetcher = null;
 function settings(env) {
   env = env || process.env;
   const id = identity.settings(env);
-  if (!id || !id.on) return null;
+  if (!id) return null;
+  // open to everyone (on), or only to the acceptance saves (accept: their tags), or not at all
+  const accept = id.on ? null : acceptList(env);
+  if (!id.on && !accept.length) return null;
   const http = !!env.IDENTITY_ALLOW_HTTP_FOR_TESTS, base = id.iss.replace(/\/+$/, '');
   const staging = env.VERCEL_ENV !== 'production' && env.IDENTITY_STAGING === '1';
   let clientId = CLIENT_ID, redirect = REDIRECT, secret = env.IDENTITY_BRICKDUEL_CLIENT_SECRET || '', authorize = env.IDENTITY_AUTHORIZE_URL || PORTAL;
@@ -85,9 +101,14 @@ function settings(env) {
   const token = env.IDENTITY_TOKEN_URL || base + '/oauth/token', status = env.IDENTITY_STATUS_URL || base + '/v1/token/status';
   if (staging && [token, status].some(x => x.indexOf(PROD_ISS) === 0)) return null;
   if (!http && ![authorize, token, status].every(x => /^https:\/\//.test(x))) return null;
-  return { iss: id.iss, secret, authorize, token, status, env, clientId, redirect, host: new URL(redirect).host, staging };
+  return { iss: id.iss, secret, authorize, token, status, env, clientId, redirect, host: new URL(redirect).host, staging, accept };
 }
-const enabled = env => !!settings(env);
+// open to everyone (what /api/health and the page go by)
+const enabled = env => { const s = settings(env); return !!s && !s.accept; };
+// the routes work at all (for everyone, or for the acceptance saves only)
+const usable = env => !!settings(env);
+// the acceptance saves' tags while only they may link, else null
+const accepting = env => { const s = settings(env); return s && s.accept ? s.accept : null; };
 
 // ---------- small pieces ----------
 const rand = n => crypto.randomBytes(n).toString('base64url');
@@ -128,6 +149,11 @@ async function start(db, body, who, tag, now, env, host) {
   const intent = body && body.intent;
   if (INTENTS.indexOf(intent) < 0) return { status: 400, body: { ok: false, why: 'intent' } };
   let pid = null, cred = null;
+  // acceptance only: the device must hold one of the listed saves, whatever the intent (the same answer as off)
+  if (s.accept) {
+    const t = who ? await core.findPlayer(db, who) : null;
+    if (!t || s.accept.indexOf(t.pub) < 0) return { status: 503, body: { ok: false, why: 'off' } };
+  }
   if (intent === 'link') {
     if (!who) return { status: 401, body: { ok: false, why: 'auth' } };
     const p = await core.findPlayer(db, who);
@@ -201,6 +227,12 @@ async function finish(db, q, cookie, now, env, host) {
   let st;
   try { st = await post(s.status, { Authorization: 'Bearer ' + token, 'x-snowrealm-client-secret': s.secret }, {}, STATUS_MS); } catch (e) { return done('unavailable', null, 'status fetch failed'); }
   if (st.status !== 200 || !st.body || st.body.active !== true) return done(st.status === 200 || st.status === 401 || st.status === 403 ? 'revoked' : 'unavailable', null, 'status ' + st.status);
+  // acceptance only: this platform player may already hold a save that is not listed; then nothing happens to it and
+  // nothing about it is said (a link would answer "taken" with its name and coins, a recovery would hand it over)
+  if (s.accept) {
+    const held = await db.query('SELECT p.pub FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [v.sub]);
+    if (held[0] && s.accept.indexOf(held[0].pub) < 0) return done('off', null, 'accept');
+  }
   let out;
   if (row.intent === 'link') out = await core.idLink(db, { id: row.pid, hash: row.cred }, v, now);
   else out = await core.idRecover(db, v, now, row.intent === 'restore');
@@ -223,5 +255,5 @@ async function result(db, cookie, now, env) {
   return { status: 200, body: Object.assign({ ok: true, outcome: r[0].outcome }, r[0].res0 ? open(sid, r[0].res0) || {} : {}), cookie: setCookie('', 0) };
 }
 
-module.exports = { settings, enabled, start, finish, result, cookieOf, CLIENT_ID, REDIRECT, COOKIE, OUTCOMES,
+module.exports = { settings, enabled, usable, accepting, start, finish, result, cookieOf, CLIENT_ID, REDIRECT, COOKIE, OUTCOMES,
   setFetch(fn) { fetcher = fn; } };

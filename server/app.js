@@ -90,7 +90,7 @@ const routes = {
   async authStart(req, res) {
     if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
     if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
-    if (!bff.enabled()) return send(res, 503, { ok: false, why: 'off' });
+    if (!bff.usable()) return send(res, 503, { ok: false, why: 'off' });
     const body = await readBody(req), now = clock(), cred = core.readCred(header(req, 'authorization'));
     const out = await db.run(d => bff.start(d, body, cred, ipTag(req), now, undefined, String(header(req, 'host') || '').toLowerCase()));
     send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
@@ -98,7 +98,7 @@ const routes = {
   async authCallback(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
     let outcome, note = '';
-    if (!bff.enabled()) outcome = 'off';
+    if (!bff.usable()) outcome = 'off';
     else {
       try { const f = await db.run(d => bff.finish(d, url.searchParams, header(req, 'cookie'), clock(), undefined, String(header(req, 'host') || '').toLowerCase())); outcome = f.outcome; note = f.note || ''; }
       catch (e) { log('auth', e); outcome = 'unavailable'; }
@@ -114,7 +114,7 @@ const routes = {
   async authResult(req, res) {
     if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
     if (foreign(req)) return send(res, 403, { ok: false, why: 'origin' });
-    if (!bff.enabled()) return send(res, 503, { ok: false, why: 'off' });
+    if (!bff.usable()) return send(res, 503, { ok: false, why: 'off' });
     const out = await db.run(d => bff.result(d, header(req, 'cookie'), clock()));
     send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
   },
@@ -261,7 +261,8 @@ const routes = {
       // SnowRealm Identity (off until IDENTITY_LINK_ENABLED is set and the service is live; see server/identity.js)
       case 'idStatus':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
-        out = await db.run(d => core.idStatus(d, cred, identity.enabled()));
+        // (during the acceptance before linking opens, the acceptance saves see their own link state)
+        out = await db.run(d => core.idStatus(d, cred, identity.enabled(), bff.accepting()));
         break;
       case 'idLink': case 'idRecover': {
         if (!identity.enabled()) return send(res, 503, { ok: false, why: 'off' });

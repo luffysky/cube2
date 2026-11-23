@@ -327,6 +327,66 @@ const coinsOf = async id => +(await pg.query("SELECT (state->>'coins') AS c FROM
   for (const k of Object.keys(stg)) delete process.env[k];
   HOST = 'brickduel.snowrealm.pet';
 
+  // ---------- production acceptance before linking opens (IDENTITY_LINK_ACCEPT_PUBS) ----------
+  bff.setFetch(lastFetch); want.client = 'brickduel-bff'; want.redirect = 'https://brickduel.snowrealm.pet/api/auth/callback';
+  const U3 = '3a3a3a3a-1111-4222-8333-444455556666', U4 = '4b4b4b4b-1111-4222-8333-444455556666';
+  const pubOf = async c => (await pg.query('SELECT pub FROM zz.players WHERE id = $1', [c.id]))[0].pub;
+  const A = await newPlayer(), B = await newPlayer(), Y = await newPlayer(), Z = await newPlayer();
+  const list = [await pubOf(A), await pubOf(B), await pubOf(Y)].join(',');
+  const coinsA0 = await coinsOf(A.id), coinsB0 = await coinsOf(B.id);
+  Object.assign(process.env, { IDENTITY_LINK_ENABLED: '', IDENTITY_LINK_ACCEPT_PUBS: list });
+  eq((await call('health', { method: 'GET' })).json.link, false, 'acceptance: health still says link false (no button for anyone)');
+  eq((await startIt('recover')).json.why, 'off', 'acceptance: a start without a device key is off');
+  eq((await startIt('link', Z)).json.why, 'off', 'acceptance: a save that is not listed is off');
+  eq((await startIt('recover', Z)).status, 503, 'acceptance: not listed, recover: 503');
+  eq((await rpc({ a: 'idLink', idt: sign({ sub: U3 }) }, A)).status, 503, 'acceptance: the direct token route stays closed');
+  eq((await rpc({ a: 'idStatus' }, Z)).json.enabled, false, 'acceptance: idStatus for others says off');
+  for (const bad of [list + ',ABCDEFGH', list + ',', 'a,b', Array(9).fill(await pubOf(A)).join(',')]) {
+    process.env.IDENTITY_LINK_ACCEPT_PUBS = bad;
+    if (bad === list + ',') { eq((await startIt('link', A)).status, 200, 'acceptance: a trailing comma is ignored'); continue; }
+    eq((await startIt('link', A)).status, 503, 'acceptance: a malformed list (' + bad.length + ' chars) turns it all off');
+  }
+  process.env.IDENTITY_LINK_ACCEPT_PUBS = list;
+  // first link
+  x = await round('link', A, U3);
+  eq(where(x.cb), '/?auth=linked', 'acceptance: a listed save links');
+  r = await resultOf(x.cookie);
+  ok(r.status === 200 && r.json.outcome === 'linked' && r.json.key, 'acceptance: the result is read once with a new key');
+  const A2 = { id: A.id, key: r.json.key };
+  r = await rpc({ a: 'idStatus' }, A2);
+  ok(r.json.enabled === true && r.json.linked === true, 'acceptance: the listed save sees itself linked', r.json);
+  eq((await rpc({ a: 'idStatus' }, A)).status, 401, 'acceptance: the old key no longer works');
+  // another device: the ticket is a listed save of its own
+  eq((await startIt('recover')).status, 503, 'acceptance: recover with no ticket is off');
+  x = await round('recover', Y, U3);
+  eq(where(x.cb), '/?auth=recovered', 'acceptance: recover on another device (ticket Y)');
+  r = await resultOf(x.cookie);
+  ok(r.status === 200 && r.json.id === A.id && r.json.pub === await pubOf(A) && r.json.key, 'acceptance: the recovered save is A, with a key for the new device', { id: r.json.id });
+  // conflicts: the other account on A, and the first account on B
+  x = await round('link', A2, U4);
+  eq(where(x.cb), '/?auth=conflict', 'acceptance: account 2 on a save already linked: conflict');
+  x = await round('link', B, U3);
+  eq(where(x.cb), '/?auth=conflict', 'acceptance: account 1 on a second save: conflict');
+  x = await round('recover', Y, U4);
+  eq(where(x.cb), '/?auth=none', 'acceptance: account 2 recover finds nothing');
+  eq(await coinsOf(A.id), coinsA0, 'acceptance: A keeps its coins');
+  eq(await coinsOf(B.id), coinsB0, 'acceptance: B keeps its coins');
+  eq((await pg.query('SELECT count(*)::int AS n FROM zz.identity WHERE pid = $1', [B.id]))[0].n, 0, 'acceptance: B is not linked');
+  // a platform player who already holds a save that is not listed: nothing happens and nothing is said about it
+  const heldU1 = await pg.query('SELECT p.pub FROM zz.identity i JOIN zz.players p ON p.id = i.pid WHERE i.platform_id = $1', [U1]);
+  ok(heldU1[0] && list.split(',').indexOf(heldU1[0].pub) < 0, 'acceptance: (U1 holds a save that is not listed)');
+  x = await round('recover', Y, U1);
+  eq(where(x.cb), '/?auth=off', 'acceptance: recovering an unlisted save is refused');
+  r = await resultOf(x.cookie);
+  ok(!r.json.key && !r.json.other, 'acceptance: and no key or save details come back', r.json);
+  x = await round('link', B, U1);
+  eq(where(x.cb), '/?auth=off', 'acceptance: linking to a player who holds an unlisted save is refused without naming it');
+  // opening it to everyone: the list no longer matters
+  process.env.IDENTITY_LINK_ENABLED = '1';
+  eq((await call('health', { method: 'GET' })).json.link, true, 'open to everyone: health link true');
+  eq((await startIt('link', Z)).status, 200, 'open to everyone: any save may start');
+  delete process.env.IDENTITY_LINK_ACCEPT_PUBS;
+
   console.log('bff tests: ' + pass + ' passed, ' + fail + ' failed');
   for (const k of Object.keys(ENV)) delete process.env[k];
   process.exit(fail ? 1 : 0);
