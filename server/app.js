@@ -77,7 +77,9 @@ const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
     const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), admin: admin.configured(), dbSource: db.source(), build: String(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null, region: process.env.VERCEL_REGION || '', now: clock() };
-    if (url.searchParams.get('deep') && out.db) {
+    // only the exact address /api/health?deep=1 reaches the database (cached 15 s), so adding other parameters cannot
+    // make every request a database round trip
+    if (url.search === '?deep=1' && out.db) {
       // a look at the database itself: is it reachable, how long does one round trip take
       const t0 = Date.now();
       try { await db.run(d => d.query('SELECT count(*)::int AS n FROM zz.players')); out.ready = true; } catch (e) { out.ready = false; log('health', e); }
@@ -253,8 +255,8 @@ const routes = {
           const row = await core.findPlayer(d, cred);
           if (!row || row.pending) return { status: 401, body: { ok: false, why: 'auth' } };
           const a = body.a;
-          return a === 'mailStatus' ? mail.status(d, row) : a === 'mailStart' ? mail.start(d, row, body, now) : a === 'mailVerify' ? mail.verify(d, row, body, now)
-            : a === 'mailRemind' ? mail.remind(d, row, now) : mail.swap(d, row, body, now);
+          return a === 'mailStatus' ? mail.status(d, row) : a === 'mailStart' ? mail.start(d, row, body, now, undefined, ipTag(req)) : a === 'mailVerify' ? mail.verify(d, row, body, now)
+            : a === 'mailRemind' ? mail.remind(d, row, now, undefined, ipTag(req)) : mail.swap(d, row, body, now);
         });
         break;
       }

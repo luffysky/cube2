@@ -12,7 +12,9 @@
    Without all three, everything here answers 503 and the page shows the option as not ready.
 
    Limits: three mails an hour and six a day for one save; five tries at a six-digit code, which lasts 15 minutes. The
-   address is never shown back in full (a***@example.com), and nothing here says whether an address is known. */
+   address is never shown back in full (a***@example.com), and nothing here says whether an address is known.
+   Also (2026-11-23, so new saves cannot be used to send mail to anyone): ten mails an hour from one network address
+   (a keyed hash, as everywhere else), three a day to one address, and MAIL_DAY_CAP (default 200) a day in all. */
 const crypto = require('crypto');
 const core = require('./core.js');
 
@@ -53,8 +55,17 @@ async function send(c, to, subject, text) {
   });
   return r.status >= 200 && r.status < 300;
 }
-async function slow(db, pid, now) {
-  return (await core.bump(db, 'mailh', pid, HOUR, now)) > 3 || (await core.bump(db, 'maild', pid, DAY, now)) > 6;
+// ip: the keyed hash of the network address; to: the address the mail is going to
+async function slow(db, pid, now, ip, to, env) {
+  env = env || process.env;
+  if ((await core.bump(db, 'mailh', pid, HOUR, now)) > 3 || (await core.bump(db, 'maild', pid, DAY, now)) > 6) return true;
+  // one network address cannot spread mail over many new saves (a school's shared address still gets ten an hour)
+  if (ip && (await core.bump(db, 'mailip', ip, HOUR, now)) > 10) return true;
+  // one inbox is not flooded from many saves
+  if (to && (await core.bump(db, 'mailto', sha('to|' + String(to).toLowerCase()).slice(0, 32), DAY, now)) > 3) return true;
+  // and the sending account has a ceiling for the day
+  const cap = Math.max(1, Math.min(100000, parseInt(env.MAIL_DAY_CAP, 10) || 200));
+  return (await core.bump(db, 'mailall', 'all', DAY, now)) > cap;
 }
 
 // what the page may know: is it set up, is an address kept for this save (shown hidden)
@@ -65,13 +76,13 @@ async function status(db, row, env) {
 }
 // a new address (and the recovery code to keep with it): a six-digit code goes to it. Replaces any earlier address
 // only once the new one is proven.
-async function start(db, row, body, now, env) {
+async function start(db, row, body, now, env, ip) {
   const c = conf(env);
   if (!c) return no(503, 'off');
   const email = String(body.email || '').trim(), code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (email.length > 254 || !EMAIL.test(email)) return no(400, 'email');
   if (!CODE.test(code)) return no(400, 'code');
-  if (await slow(db, row.id, now)) return no(429, 'slow');
+  if (await slow(db, row.id, now, ip, email, env)) return no(429, 'slow');
   const pin = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   await db.query(`INSERT INTO zz.mailbox (pid, email, rcode, verified, pend_email, pend_rcode, pin, pin_exp, tries, at)
     VALUES ($1, '', '', false, $2, $3, $4, $5, 0, $6)
@@ -95,12 +106,12 @@ async function verify(db, row, body, now, env) {
   return ok({ kept: true });
 }
 // lost the recovery code: it goes to the address kept for this save
-async function remind(db, row, now, env) {
+async function remind(db, row, now, env, ip) {
   const c = conf(env);
   if (!c) return no(503, 'off');
   const r = (await db.query('SELECT email, rcode FROM zz.mailbox WHERE pid = $1 AND verified', [row.id]))[0];
   if (!r) return no(404, 'none');
-  if (await slow(db, row.id, now)) return no(429, 'slow');
+  if (await slow(db, row.id, now, ip, r.email, env)) return no(429, 'slow');
   let code;
   try { code = open(c.escrow, r.rcode); } catch (e) { return no(500, 'escrow'); }
   let sent = false;

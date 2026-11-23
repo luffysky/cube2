@@ -1523,3 +1523,14 @@
 - 測試：`test/bff.test.js` 131 項（多 29 項：只限名單、名單格式、首次綁定、換裝置找回、兩種衝突、找不到、金幣不變、名單外存檔不被動到也不被說出、公開後名單失效）。
 - 檔案：`server/bff.js`、`server/app.js`、`server/core.js`、`test/bff.test.js`、`docs/DEVLOG.md`。｜資料庫：沒改結構；正式庫多 3 份驗收存檔。｜刪除：無。
 - 補記：上一條的 commit 為 [`1621852`](https://github.com/luffysky/cube2/commit/1621852)。
+
+## 2026-11-23 23:40（Asia/Taipei）｜寄信加上網路位址、收件信箱與每日總量上限；深度健康檢查只認 `?deep=1`
+
+- 專案：cube2｜執行者：Claude｜Owner 指示：盤點登入、寄驗證碼、重設密碼、帳號綁定與高成本 API 的防護。
+- 寄信（寄驗證碼 `mailStart`、寄回救援碼 `mailRemind`，也就是雲端檔案「用救援碼重設密碼」的那封信）：
+  - 原本只有「同一份存檔一小時 3 封、一天 6 封」。一個網路位址一天可開 40 份新存檔，等於一天能寄 240 封到任何信箱。
+  - 新增：同一網路位址（雜湊後）一小時 10 封、同一收件信箱一天 3 封（不分大小寫）、全站一天 `MAIL_DAY_CAP`（預設 200）封。學校共用網路一小時仍可寄 10 封。
+- `/api/health?deep=1` 會查資料庫，原本加任何參數（`?deep=1&x=亂數`）都能繞過 CDN 快取，每次打一次資料庫。現在只有剛好 `?deep=1` 才查，有快取 15 秒。
+- 測試：`test/mail.test.js` 31 項（多 4 項），`test/api.test.js` 446 項（多 1 項）。
+- 檔案：`server/mail.js`、`server/app.js`、`test/mail.test.js`、`test/api.test.js`、`docs/DEVLOG.md`。｜資料庫：沒改。｜刪除：無。
+- 補記：上一條的 commit 為 [`f3d989e`](https://github.com/luffysky/cube2/commit/f3d989e)。

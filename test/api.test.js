@@ -58,6 +58,8 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(missing, 'the database starts empty');
   r = await call('health', { url: '/api/health?deep=1' });
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
+  r = await call('health', { url: '/api/health?deep=1&x=' + Math.random() });
+  ok(r.json.ok && r.json.ready === undefined, 'only the exact ?deep=1 goes to the database (other parameters get the plain answer)', r.json);
   eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 26, 'twenty-six tables in their own schema (friends and invites the newest)');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
