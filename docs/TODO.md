@@ -143,10 +143,11 @@
 - [ ] 關卡模式收尾、第二款遊戲「磚蛇」完整版（11-19 日誌提過一直被往後推）
 - [ ] 推廣歌曲合作功能：等 Owner 回覆規格書最後一頁的決策項目才開始第一階段
 
-## 正式站驗收後的收尾（等 Owner）
+## 正式站驗收後的收尾（C-044 已核准，驗收全部通過後依序做）
 
-- [ ] 驗收通過後拿掉 `IDENTITY_LINK_ACCEPT_PUBS`；Owner 核准才開 `IDENTITY_LINK_ENABLED`
-- [ ] 正式庫的驗收存檔：`accept-A/B/Y`（鑰匙已遺失）、`accept2-A/B/Y`
-- [ ] 正式環境裡從 staging 複製過來的設定（`IDENTITY_STAGING`、`STAGING_DATABASE_URL`、`BRICKDUEL_ADMIN_*`、`BRICKDUEL_ADMIN_TEST_TRUST`）
+- [ ] 開 `IDENTITY_LINK_ENABLED=1`、拿掉 `IDENTITY_LINK_ACCEPT_PUBS`，確認健康檢查 `link: true`、畫面出現綁定按鈕
+- [ ] 刪正式庫 6 份驗收存檔（`accept-A/B/Y`、`accept2-A/B/Y`）與它們的連結、登入 session；瀏覽器裡的 `zzaccept.v1` 一併清掉；cube1 的 `+bd1`、`+bd2` 驗收帳號請 Work 處理
+- [ ] 刪正式環境裡從 staging 複製過來的變數（`IDENTITY_STAGING`、`STAGING_DATABASE_URL`、`BRICKDUEL_ADMIN_*`、`BRICKDUEL_ADMIN_TEST_TRUST`）；正式管理設定等 cube1 正式管理金鑰再重設
+- [ ] 其他測試殘留：`accept-jwks` 分支與它的佔位變數、staging 合成玩家（staging 部署與設定保留）
 - [ ] cube1：同意頁 400、帳密錯誤的提示文字、正式管理金鑰 `admin-jwks.json`、存檔同步介面草案回覆
 - [ ] 告警：Firewall 告警要 Priority 方案，Owner 決定要不要升級

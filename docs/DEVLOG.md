@@ -1565,3 +1565,11 @@
 - 流量防護：Vercel WAF 4 條每 IP 限流已發布（Owner 同意計費）；寄信新增每 IP、每收件者、全站每日上限；深度健康檢查只認 `?deep=1`。`/api/room`、`/api/ws` 刻意不加邊緣限流（理由見 JOINT_ACCEPTANCE）。告警要 Priority 方案。
 - 檔案：`docs/JOINT_ACCEPTANCE.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒改結構；正式庫有 6 份驗收存檔。｜刪除：無。
 - 補記：上一條時間更正為 23:53；commit 為 [`ea1b3fa`](https://github.com/luffysky/cube2/commit/ea1b3fa)。
+
+## 2026-11-24 00:03（Asia/Taipei）｜記錄 C-044：正式驗收通過後開綁定、清掉所有測試殘留
+
+- 專案：cube2｜執行者：Claude
+- Owner：驗收通過後打開正式站綁定；正式庫 6 份驗收存檔要清；從 staging 複製來的舊設定要清，「測試的等正式過後都不留」。
+- 記為 C-044，收尾順序寫進 `docs/TODO.md`。驗收還沒通過（卡在 cube1 同意頁），所以現在什麼都沒動。
+- 檔案：`docs/OWNER_DECISIONS.md`、`docs/TODO.md`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無（已核准，等驗收通過）。
+- 補記：上一條的 commit 為 [`0790f7a`](https://github.com/luffysky/cube2/commit/0790f7a)。
