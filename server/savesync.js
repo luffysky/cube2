@@ -9,6 +9,8 @@
                              (production https://identity.snowrealm.pet/v1/games/brickduel/saves/{platformId},
                               staging the same on identity-staging.snowrealm.pet)
      SAVE_SYNC_PRIVATE_JWK   this environment's own Ed25519 signing key (a private JWK; never shared, never logged)
+       or SAVE_SYNC_KEY=self  outside production only (staging): the server makes its own key the first time and keeps
+                             it in its own database (zz.synckey), so nobody ever handles the private half
      SAVE_SYNC_ISSUER        this environment's origin; production may leave it out (https://brickduel.snowrealm.pet),
                              anywhere else it must be set (staging: https://brickduel-staging.snowrealm.pet)
    The public half is published at /.well-known/sync-jwks.json on this origin whenever the key is set, so Games can
@@ -53,20 +55,49 @@ function keyOf(env) {
     return { key, kid, x: pub.x };
   } catch (e) { return null; }
 }
-function settings(env) {
+// a key this server made itself (SAVE_SYNC_KEY=self, never in production), kept in its database
+let selfKey = null;
+const selfMode = env => env.SAVE_SYNC_KEY === 'self' && !env.SAVE_SYNC_PRIVATE_JWK && env.VERCEL_ENV !== 'production';
+async function ownKey(db) {
+  if (selfKey) return selfKey;
+  const load = async () => {
+    const made = JSON.stringify(crypto.generateKeyPairSync('ed25519').privateKey.export({ format: 'jwk' }));
+    await db.query('INSERT INTO zz.synckey (id, jwk, made) VALUES (1, $1, $2) ON CONFLICT (id) DO NOTHING', [made, Date.now()]);
+    return (await db.query('SELECT jwk FROM zz.synckey WHERE id = 1'))[0].jwk;      // whichever instance was first
+  };
+  let raw;
+  try { raw = await load(); } catch (e) {
+    const dbm = require('./db.js');
+    if (!dbm.missing(e)) throw e;
+    await dbm.migrate();
+    raw = await load();
+  }
+  selfKey = keyOf({ SAVE_SYNC_PRIVATE_JWK: raw });
+  return selfKey;
+}
+// switch, address and issuer, and where the key comes from; the key itself may still have to be read (keyFor)
+function base(env) {
   env = env || process.env;
   if (env.SAVE_SYNC_ENABLED !== '1') return null;
   const url = String(env.SAVE_SYNC_URL || ''), tests = !!env.SAVE_SYNC_ALLOW_HTTP_FOR_TESTS;
   if (!/^https:\/\/[a-z0-9.-]+(:\d+)?\/\S*\{platformId\}\S*$/i.test(url) && !(tests && /^http:\/\/\S*\{platformId\}/.test(url))) return null;
   const iss = env.SAVE_SYNC_ISSUER || (env.VERCEL_ENV === 'production' ? PROD : '');
   if (!/^https:\/\/[a-z0-9.-]+$/i.test(iss)) return null;
+  if (selfMode(env)) return { url, iss, self: true };
   const k = keyOf(env);
   return k ? { url, iss, key: k.key, kid: k.kid } : null;
 }
-const enabled = env => !!settings(env);
+async function keyFor(db, env) {
+  const b = base(env);
+  if (!b || !b.self) return b;
+  const k = await ownKey(db);
+  return k ? { url: b.url, iss: b.iss, key: k.key, kid: k.kid } : null;
+}
+const enabled = env => !!base(env);
 // the public key, for anyone (Games checks the tokens with it); empty when no key is set
-function jwks(env) {
-  const k = keyOf(env || process.env);
+async function jwks(db, env) {
+  env = env || process.env;
+  const k = selfMode(env) ? (db ? await ownKey(db) : null) : keyOf(env);
   return { keys: k ? [{ kty: 'OKP', crv: 'Ed25519', x: k.x, kid: k.kid, use: 'sig', alg: 'EdDSA' }] : [] };
 }
 function token(s, now) {
@@ -147,7 +178,7 @@ async function sendOne(db, s, pid, now) {
 // sends what is due: first the save named (the one the current request changed), then up to max others. The saves
 // deleted for good since the last time are found here and their purge is made due.
 async function drain(db, now, max, first, env) {
-  const s = settings(env);
+  const s = await keyFor(db, env);
   if (!s) return { sent: 0, later: 0, aside: 0 };
   const out = { sent: 0, later: 0, aside: 0 }, seen = {};
   const one = async pid => { if (seen[pid]) return; seen[pid] = 1; out[await sendOne(db, s, pid, now)]++; };
@@ -162,4 +193,4 @@ async function drain(db, now, max, first, env) {
   return out;
 }
 
-module.exports = { settings, enabled, jwks, touch, drain, SCHEMA, AUD, SUB, SCOPE, setFetch(fn) { fetcher = fn; } };
+module.exports = { settings: base, enabled, jwks, _forgetOwnKey() { selfKey = null; }, touch, drain, SCHEMA, AUD, SUB, SCOPE, setFetch(fn) { fetcher = fn; } };

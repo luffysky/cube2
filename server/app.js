@@ -108,7 +108,8 @@ const routes = {
   // the public key SnowRealm Games checks this game's save-sync tokens with (empty while no key is set)
   async syncJwks(req, res) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    send(res, 200, savesync.jwks(), { 'Cache-Control': 'public, max-age=300' });
+    const keys = db.configured() ? await db.run(d => savesync.jwks(d)) : await savesync.jwks(null);
+    send(res, 200, keys, { 'Cache-Control': 'public, max-age=300' });
   },
   async authCallback(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });

@@ -340,7 +340,13 @@ const SCHEMA = [
      ended boolean NOT NULL DEFAULT false
    )`,
   'CREATE INDEX IF NOT EXISTS syncs_due ON zz.syncs (due) WHERE due IS NOT NULL',
-  'CREATE INDEX IF NOT EXISTS syncs_platform ON zz.syncs (platform_id)'
+  'CREATE INDEX IF NOT EXISTS syncs_platform ON zz.syncs (platform_id)',
+  // outside production only (SAVE_SYNC_KEY=self): the save-sync signing key this server made for itself
+  `CREATE TABLE IF NOT EXISTS zz.synckey (
+     id smallint PRIMARY KEY CHECK (id = 1),
+     jwk text NOT NULL,
+     made double precision NOT NULL
+   )`
 ];
 let migrating = null;
 function migrate() {

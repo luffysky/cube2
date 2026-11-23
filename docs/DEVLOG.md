@@ -1649,3 +1649,12 @@
 - 還要做：staging 設金鑰與開關，跟 cube1 staging 端到端驗收；之後 Owner 核准才開正式站。
 - 檔案：`server/savesync.js`、`server/core.js`、`server/app.js`、`server/db.js`、`api/sync-jwks.js`、`vercel.json`、`test/savesync.test.js`、`test/api.test.js`、`test/run.js`、`docs/handoff/BRICKDUEL_SAVE_SYNC_TO_GAMES.md`、`docs/DEVLOG.md`。｜刪除：無。
 - 補記：上一條的 commit 為 [`0e89d25`](https://github.com/luffysky/cube2/commit/0e89d25)。
+
+## 2026-11-24 02:02（Asia/Taipei）｜存檔同步 staging 設定：伺服器自產金鑰（只限非正式環境）
+
+- 專案：cube2｜執行者：Claude｜依據：cube1 回報 identity-staging 已就緒（PR #23、migration 005）
+- 新增 `SAVE_SYNC_KEY=self`：只在非正式環境可用。伺服器第一次需要時自己產生 Ed25519 金鑰，存在自己的資料庫（新表 `zz.synckey`，只有一列），只公開公鑰，私鑰沒有人經手、也不會出現在聊天、原始碼或日誌。正式站一律要從 Vercel 環境變數讀金鑰，設了 `self` 也不會啟用。
+- staging（Preview，限 `staging` 分支）新增：`SAVE_SYNC_ENABLED=1`、`SAVE_SYNC_URL`（identity-staging 的接收位址）、`SAVE_SYNC_ISSUER=https://brickduel-staging.snowrealm.pet`、`SAVE_SYNC_KEY=self`。正式環境沒動。
+- 測試：`savesync` 53 項（多 5 項：自產金鑰只產一次、只公開公鑰、用它簽、`iss` 是 staging、正式環境不啟用）；`api` 表數 28。
+- 檔案：`server/savesync.js`、`server/db.js`、`server/app.js`、`test/savesync.test.js`、`test/api.test.js`、`docs/DEVLOG.md`。｜刪除：無。
+- 補記：上一條的 commit 為 [`3c1c09f`](https://github.com/luffysky/cube2/commit/3c1c09f)。

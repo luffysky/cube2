@@ -19,7 +19,7 @@ const K = crypto.generateKeyPairSync('ed25519');
 const JWK = JSON.stringify(K.privateKey.export({ format: 'jwk' }));
 const URL_T = 'https://games.test.example/v1/games/brickduel/saves/{platformId}', ISS = 'https://brickduel.snowrealm.pet';
 const ON = { SAVE_SYNC_ENABLED: '1', SAVE_SYNC_URL: URL_T, SAVE_SYNC_PRIVATE_JWK: JWK, SAVE_SYNC_ISSUER: ISS };
-const NAMES = ['SAVE_SYNC_ENABLED', 'SAVE_SYNC_URL', 'SAVE_SYNC_PRIVATE_JWK', 'SAVE_SYNC_ISSUER'];
+const NAMES = ['SAVE_SYNC_ENABLED', 'SAVE_SYNC_URL', 'SAVE_SYNC_PRIVATE_JWK', 'SAVE_SYNC_ISSUER', 'SAVE_SYNC_KEY'];
 const setEnv = o => { for (const k of NAMES) delete process.env[k]; Object.assign(process.env, o || {}); };
 
 // ---------- the stand-in Games endpoint (the receiver's rules from cube1 docs/BRICKDUEL_SAVE_SYNC.md) ----------
@@ -209,6 +209,26 @@ const SUB = '8f8f8f8f-1111-4222-8333-444455556666', SUB2 = '9e9e9e9e-1111-4222-8
   ok(got.length === 0 && (await rowOf(D.id)).err === 'unlinked', 'a save no longer linked is put aside without sending', await rowOf(D.id));
   await rpc({ a: 'sync', ops: [op()] }, D);
   ok(got.length === 0 && (await rowOf(D.id)).due === null, 'and its next changes are not sent');
+
+  // ---------- staging: a key the server makes for itself (nobody handles the private half) ----------
+  setEnv({ SAVE_SYNC_ENABLED: '1', SAVE_SYNC_URL: URL_T, SAVE_SYNC_ISSUER: 'https://brickduel-staging.snowrealm.pet', SAVE_SYNC_KEY: 'self' });
+  ok(sync.enabled(), 'self-made key: on');
+  const own1 = (await call('syncJwks', { method: 'GET' })).json;
+  sync._forgetOwnKey();
+  const own2 = (await call('syncJwks', { method: 'GET' })).json;
+  ok(own1.keys.length === 1 && JSON.stringify(own1) === JSON.stringify(own2) && own1.keys[0].x !== pubList.keys[0].x && !('d' in own1.keys[0]), 'it is made once, kept, and only its public half is published', own1);
+  ok((await pg.query('SELECT count(*)::int AS n FROM zz.synckey'))[0].n === 1, 'one key in the database');
+  const E = (await rpc({ a: 'hello' })).json;
+  await link(E.id, '7a7a7a7a-1111-4222-8333-444455556666');
+  got.length = 0;
+  await rpc({ a: 'sync', ops: [op()] }, E);
+  const tk = got[0] && got[0].headers.Authorization.replace(/^Bearer /, '').split('.');
+  const goodOwn = tk && crypto.verify(null, Buffer.from(tk[0] + '.' + tk[1]), crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: own1.keys[0].x }, format: 'jwk' }), Buffer.from(tk[2], 'base64url'));
+  const claims = tk && JSON.parse(Buffer.from(tk[1], 'base64url'));
+  ok(goodOwn && claims.iss === 'https://brickduel-staging.snowrealm.pet' && JSON.parse(Buffer.from(tk[0], 'base64url')).kid === own1.keys[0].kid, 'events are signed with it, iss the staging origin', claims);
+  setEnv({ SAVE_SYNC_ENABLED: '1', SAVE_SYNC_URL: URL_T, SAVE_SYNC_KEY: 'self', VERCEL_ENV: 'production' });
+  ok(!sync.enabled(), 'never in production: there the key must come from the hosting settings');
+  delete process.env.VERCEL_ENV;
 
   // ---------- switched off again: the daily job leaves Games alone ----------
   setEnv({});
