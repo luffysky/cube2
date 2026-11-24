@@ -25,6 +25,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: drill key (public half shown as an annotation)
+        env:
+          DRILL_STEP: key
+        run: node tools/drill/staging-drill.js
       - name: drill
         env:
           STAGING_BYPASS: ${{ secrets.STAGING_BYPASS }}

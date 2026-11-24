@@ -101,8 +101,16 @@ async function p0a() {
 }
 
 // ---------- part 2: payment notices ----------
+// The drill key lives in the runner's temporary folder between the job's two steps (gone with the runner).
+const KEY_FILE = path.join(process.env.RUNNER_TEMP || require('os').tmpdir(), 'brickduel-drill-key.pem');
+function loadKey() {
+  if (!fs.existsSync(KEY_FILE)) return null;
+  const privateKey = crypto.createPrivateKey(fs.readFileSync(KEY_FILE)), x = crypto.createPublicKey(privateKey).export({ format: 'jwk' }).x;
+  return { privateKey, KID: 'drill-' + crypto.createHash('sha256').update(x).digest('base64url').slice(0, 12) };
+}
 function makeKey() {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  fs.writeFileSync(KEY_FILE, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
   const jwk = publicKey.export({ format: 'jwk' }), KID = 'drill-' + crypto.createHash('sha256').update(jwk.x).digest('base64url').slice(0, 12);
   const pub = JSON.stringify({ keys: [{ kty: 'OKP', crv: 'Ed25519', x: jwk.x, kid: KID, use: 'sig', alg: 'EdDSA' }] });
   // the public half only, as an annotation too: annotations can be read while the job is still running (its log cannot)
@@ -198,6 +206,8 @@ async function ent(key) {
 }
 
 (async () => {
+  // step one of the job: only make the key and say its public half (an annotation, readable once this step ends)
+  if (process.env.DRILL_STEP === 'key') { makeKey(); return; }
   if (!BYPASS) { console.log('STAGING_BYPASS is not set: nothing run'); process.exit(2); }
   // staging builds the same commit this job runs (pushed to main and to staging together): wait for it
   const want = String(process.env.GITHUB_SHA || '').slice(0, 7), t0 = Date.now();
@@ -209,7 +219,7 @@ async function ent(key) {
   console.log('staging ' + JSON.stringify({ status: h.status, build: h.json && h.json.build, dbSource: h.json && h.json.dbSource, entitle: h.json && h.json.entitle, link: h.json && h.json.link }));
   if (h.status !== 200 || !h.json || h.json.dbSource !== 'staging') { console.log('not the staging database: stopped'); process.exit(3); }
   // the key first, so staging can be set to trust it while part 1 runs
-  const key = PART === 'all' || PART === 'ent' ? makeKey() : null;
+  const key = PART === 'all' || PART === 'ent' ? loadKey() || makeKey() : null;
   if (PART === 'all' || PART === 'p0a') await p0a();
   if (key) await ent(key);
   const pass = results.filter(x => x.result === 'PASS').length, failed = results.length - pass;
