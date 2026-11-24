@@ -125,63 +125,153 @@ function effective(row, now) {
   if (!row || row.tier === 'free' || ['active', 'canceled'].indexOf(row.status) < 0 || !(row.period_end > now)) return { until: 0, tier: '' };
   return { until: row.period_end, tier: row.tier };
 }
-// tells the linked save, if there is one (the server's own change, saved like any other)
-async function applyMembership(db, platformId, now) {
+// ---------- delivering what is recorded to the save (every step can be done again without harm) ----------
+// the linked save gets the membership as recorded; then the record notes which version it has
+async function pushMembership(db, platformId, now) {
   const core = require('./core.js');
   const e = (await db.query('SELECT tier, status, period_end, version FROM zz.entitle WHERE platform_id = $1', [platformId]))[0];
-  if (!e) return false;
+  if (!e) return 'none';
   const link = (await db.query('SELECT pid FROM zz.identity WHERE platform_id = $1', [platformId]))[0];
-  if (!link) return false;
+  if (!link) return 'unlinked';
   const v = effective(e, now);
-  return core.serverOp(db, link.pid, 'ent:' + e.version + ':' + v.until, 'ent', [v.until, v.tier], now);
-}
-
-async function handle(db, body, now) {
-  const ev = read(body);
-  if (!ev) return { status: 400, body: { ok: false, why: 'event' } };
-  const seen = await db.query('INSERT INTO zz.entevents (event_id, at) VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING RETURNING 1', [ev.eventId, now]);
-  if (!seen[0]) return { status: 200, body: { ok: true, result: 'duplicate' } };
-  if (ev.kind === 'membership') {
-    const up = await db.query(`INSERT INTO zz.entitle (platform_id, tier, status, period_end, version, at) VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (platform_id) DO UPDATE SET tier = EXCLUDED.tier, status = EXCLUDED.status, period_end = EXCLUDED.period_end, version = EXCLUDED.version, at = EXCLUDED.at
-      WHERE zz.entitle.version < EXCLUDED.version RETURNING 1`, [ev.platformId, ev.tier, ev.status, ev.end, ev.version, now]);
-    if (!up[0]) return { status: 200, body: { ok: true, result: 'stale' } };
-    await applyMembership(db, ev.platformId, now);
-    return { status: 200, body: { ok: true, result: 'applied' } };
-  }
-  const up = await db.query(`INSERT INTO zz.orders (order_id, platform_id, sku, status, platform, version, at, updated) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-    ON CONFLICT (order_id) DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version, updated = EXCLUDED.updated
-    WHERE zz.orders.version < EXCLUDED.version AND zz.orders.platform_id = EXCLUDED.platform_id AND zz.orders.sku = EXCLUDED.sku RETURNING granted`,
-  [ev.orderId, ev.platformId, ev.sku, ev.status, ev.platform, ev.version, now]);
-  if (!up[0]) {
-    // an order id that comes back for another account or product is not one this game will change
-    const o = (await db.query('SELECT platform_id, sku FROM zz.orders WHERE order_id = $1', [ev.orderId]))[0];
-    if (o && (o.platform_id !== ev.platformId || o.sku !== ev.sku)) return { status: 409, body: { ok: false, why: 'order' } };
-    return { status: 200, body: { ok: true, result: 'stale' } };
-  }
-  await settleOrder(db, ev.orderId, now);
-  return { status: 200, body: { ok: true, result: 'applied' } };
+  // (the change sets the membership outright, so doing it again is harmless; each time has an id of its own)
+  const done = await core.serverOp(db, link.pid, 'ent:' + e.version + ':' + crypto.randomBytes(6).toString('hex'), 'ent', [v.until, v.tier], now);
+  if (!done) throw Object.assign(new Error('save not written'), { code: 'save' });
+  await db.query('UPDATE zz.entitle SET pushed = $2, checked = $3 WHERE platform_id = $1 AND version = $2', [platformId, e.version, now]);
+  return 'pushed';
 }
 // a one-time product: granted once on succeeded, taken back on refunded or revoked (nothing is for sale yet)
 async function settleOrder(db, orderId, now) {
   const { Meta } = require('./rules.js'), core = require('./core.js');
   const o = (await db.query('SELECT order_id, platform_id, sku, status, granted FROM zz.orders WHERE order_id = $1', [orderId]))[0];
-  if (!o || !(Meta.PAID || {})[o.sku]) return false;
+  if (!o || !(Meta.PAID || {})[o.sku]) return 'none';
   const link = (await db.query('SELECT pid FROM zz.identity WHERE platform_id = $1', [o.platform_id]))[0];
-  if (!link) return false;
+  if (!link) return 'unlinked';
   const want = o.status === 'succeeded';
-  if (want === o.granted) return true;
+  if (want === o.granted) return 'same';
   const done = await core.serverOp(db, link.pid, (want ? 'paid:' : 'unpaid:') + o.order_id, want ? 'paid' : 'unpaid', [o.sku], now);
-  if (done) await db.query('UPDATE zz.orders SET granted = $2, updated = $3 WHERE order_id = $1', [o.order_id, want, now]);
-  return done;
+  if (!done) throw Object.assign(new Error('save not written'), { code: 'save' });
+  await db.query('UPDATE zz.orders SET granted = $2, updated = $3 WHERE order_id = $1', [o.order_id, want, now]);
+  return 'settled';
+}
+// after a notice is recorded: the save is told; a failure here is logged and left to the next pass (reconcile)
+async function deliver(db, ev, now) {
+  try {
+    if (ev.kind === 'membership') await pushMembership(db, ev.platformId, now);
+    else await settleOrder(db, ev.orderId, now);
+    return true;
+  } catch (e) { console.warn('[zz] entitle deliver failed (' + ev.kind + ', ' + ((e && e.code) || (e && e.name) || 'error') + ')'); return false; }
+}
+
+// ---------- the notice ----------
+// 1) record: the token is used up and the notice put in the inbox in one step (both, or neither)
+async function record(db, ev, raw, jti, exp, now) {
+  try {
+    await db.batch([
+      ['INSERT INTO zz.idjti (jti, exp) VALUES ($1, $2)', ['ent:' + String(jti).slice(0, 120), exp * 1000]],
+      ['INSERT INTO zz.entevents (event_id, at, platform_id, kind, version, body) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (event_id) DO NOTHING',
+        [ev.eventId, now, ev.platformId, ev.kind, ev.version, JSON.stringify(ev)]]
+    ]);
+  } catch (e) { if (e && e.code === '23505') return { status: 401, body: { ok: false, why: 'token' } }; throw e; }
+  // the same event id with other content is not the same notice
+  const got = (await db.query('SELECT body FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
+  const was = got && (typeof got.body === 'string' ? JSON.parse(got.body) : got.body);
+  if (!was || JSON.stringify(sorted(was)) !== JSON.stringify(sorted(ev))) return { status: 409, body: { ok: false, why: 'event' } };
+  return null;
+}
+const sorted = v => Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.keys(v).sort().reduce((o, k) => { o[k] = sorted(v[k]); return o; }, {}) : v;
+// 2) apply: the change and the notice marked done, in one step. Versions only move forward; a refunded or revoked
+// order is final. Gives 'applied' | 'stale' | 'conflict' (an order id seen for another account or product)
+async function apply(db, ev, now) {
+  let res;
+  if (ev.kind === 'membership') {
+    res = await db.batch([
+      [`INSERT INTO zz.entitle (platform_id, tier, status, period_end, version, at) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (platform_id) DO UPDATE SET tier = EXCLUDED.tier, status = EXCLUDED.status, period_end = EXCLUDED.period_end, version = EXCLUDED.version, at = EXCLUDED.at
+        WHERE zz.entitle.version < EXCLUDED.version`, [ev.platformId, ev.tier, ev.status, ev.end, ev.version, now]],
+      [`UPDATE zz.entevents SET applied = $2, result = CASE WHEN EXISTS (SELECT 1 FROM zz.entitle WHERE platform_id = $3 AND version = $4) THEN 'applied' ELSE 'stale' END
+        WHERE event_id = $1 AND applied IS NULL RETURNING result`, [ev.eventId, now, ev.platformId, ev.version]]
+    ]);
+  } else {
+    res = await db.batch([
+      [`INSERT INTO zz.orders (order_id, platform_id, sku, status, platform, version, at, updated) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+        ON CONFLICT (order_id) DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version, updated = EXCLUDED.updated
+        WHERE zz.orders.version < EXCLUDED.version AND zz.orders.platform_id = EXCLUDED.platform_id AND zz.orders.sku = EXCLUDED.sku
+          AND zz.orders.status NOT IN ('refunded', 'revoked')`, [ev.orderId, ev.platformId, ev.sku, ev.status, ev.platform, ev.version, now]],
+      [`UPDATE zz.entevents SET applied = $2, result = CASE
+          WHEN EXISTS (SELECT 1 FROM zz.orders WHERE order_id = $3 AND (platform_id <> $4 OR sku <> $5)) THEN 'conflict'
+          WHEN EXISTS (SELECT 1 FROM zz.orders WHERE order_id = $3 AND version = $6 AND status = $7) THEN 'applied' ELSE 'stale' END
+        WHERE event_id = $1 AND applied IS NULL RETURNING result`, [ev.eventId, now, ev.orderId, ev.platformId, ev.sku, ev.version, ev.status]]
+    ]);
+  }
+  const mark = res[1] && res[1][0];
+  if (mark) return mark.result;
+  // already applied (by a notice sent twice at once): its first answer stands
+  const was = (await db.query('SELECT result FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
+  return was && was.result ? 'duplicate:' + was.result : 'stale';
+}
+// a recorded notice, applied if it is not yet, then delivered (both steps safe to repeat)
+async function processOne(db, ev, now) {
+  const e = (await db.query('SELECT applied, result FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
+  let result = e && e.applied ? 'duplicate' : await apply(db, ev, now);
+  if (result.indexOf('duplicate') === 0) result = 'duplicate';
+  else if (result === 'conflict') return { status: 409, body: { ok: false, why: 'order' } };
+  const mine = e && e.applied ? e.result : result;
+  if (mine === 'applied' || result === 'duplicate') await deliver(db, ev, now);
+  return { status: 200, body: { ok: true, result } };
+}
+async function handle(db, body, now, jti, exp) {
+  const ev = read(body);
+  if (!ev) return { status: 400, body: { ok: false, why: 'event' } };
+  const bad = await record(db, ev, body, jti || crypto.randomUUID(), exp || Math.floor(now / 1000) + 300, now);
+  if (bad) return bad;
+  return processOne(db, ev, now);
+}
+
+// ---------- the pass that puts things right (the daily job, and after each notice) ----------
+// notices recorded but never applied (the step after recording failed); memberships the save has not been told;
+// orders whose grant does not match their state; and memberships checked against the save, oldest check first.
+// Nothing here can grant twice: every step is the same as the first time.
+async function reconcile(db, now, max) {
+  max = max || 50;
+  const out = { applied: 0, pushed: 0, settled: 0, fixed: 0, left: 0 };
+  for (const r of await db.query('SELECT body FROM zz.entevents WHERE applied IS NULL AND at < $1 ORDER BY at LIMIT $2', [now - 30000, max])) {
+    const ev = typeof r.body === 'string' ? JSON.parse(r.body) : r.body;
+    try { await processOne(db, ev, now); out.applied++; } catch (e) { out.left++; }
+  }
+  for (const r of await db.query('SELECT e.platform_id FROM zz.entitle e JOIN zz.identity i ON i.platform_id = e.platform_id WHERE e.pushed < e.version ORDER BY e.at LIMIT $1', [max])) {
+    try { if (await pushMembership(db, r.platform_id, now) === 'pushed') out.pushed++; } catch (e) { out.left++; }
+  }
+  const { Meta } = require('./rules.js'), skus = Object.keys(Meta.PAID || {});
+  if (skus.length) for (const r of await db.query(`SELECT o.order_id FROM zz.orders o JOIN zz.identity i ON i.platform_id = o.platform_id
+      WHERE (o.status = 'succeeded') <> o.granted AND o.sku = ANY($1) ORDER BY o.updated LIMIT $2`, [skus, max])) {
+    try { if (await settleOrder(db, r.order_id, now) === 'settled') out.settled++; } catch (e) { out.left++; }
+  }
+  // the save against the record (someone or something may have written the save since): told again where they differ
+  for (const r of await db.query(`SELECT e.platform_id, e.tier, e.status, e.period_end, e.version, p.state->'sub' AS sub FROM zz.entitle e
+      JOIN zz.identity i ON i.platform_id = e.platform_id JOIN zz.players p ON p.id = i.pid WHERE e.pushed = e.version ORDER BY e.checked LIMIT $1`, [max])) {
+    const want = effective(r, now), sub = (typeof r.sub === 'string' ? JSON.parse(r.sub) : r.sub) || {};
+    const has = sub.demo === false && +sub.until > now ? { until: +sub.until, tier: sub.tier || '' } : { until: 0, tier: '' };
+    const wantNow = want.until > now ? want : { until: 0, tier: '' };
+    if (has.until !== wantNow.until || has.tier !== wantNow.tier) {
+      await db.query('UPDATE zz.entitle SET pushed = 0 WHERE platform_id = $1 AND version = $2', [r.platform_id, r.version]);
+      try { await pushMembership(db, r.platform_id, now); out.fixed++; } catch (e) { out.left++; }
+    } else await db.query('UPDATE zz.entitle SET checked = $2 WHERE platform_id = $1', [r.platform_id, now]);
+  }
+  const backlog = (await db.query(`SELECT (SELECT count(*)::int FROM zz.entevents WHERE applied IS NULL AND at < $1) AS ev,
+      (SELECT count(*)::int FROM zz.entitle e JOIN zz.identity i ON i.platform_id = e.platform_id WHERE e.pushed < e.version) AS push`, [now - 300000]))[0];
+  if (out.left || backlog.ev || backlog.push) console.warn('[zz] entitle backlog ' + JSON.stringify({ failed: out.left, unapplied: backlog.ev, unpushed: backlog.push }));
+  return Object.assign(out, { backlog });
 }
 // a save has just been linked (or come to a new device): what its account already has comes with it
 async function linked(db, pid, now) {
   const r = (await db.query('SELECT platform_id FROM zz.identity WHERE pid = $1', [pid]))[0];
   if (!r) return;
-  await applyMembership(db, r.platform_id, now);
-  for (const o of await db.query('SELECT order_id FROM zz.orders WHERE platform_id = $1', [r.platform_id])) await settleOrder(db, o.order_id, now);
+  try { await pushMembership(db, r.platform_id, now); } catch (e) { console.warn('[zz] entitle link push failed'); }
+  for (const o of await db.query('SELECT order_id FROM zz.orders WHERE platform_id = $1', [r.platform_id])) {
+    try { await settleOrder(db, o.order_id, now); } catch (e) { console.warn('[zz] entitle link settle failed'); }
+  }
 }
 
-module.exports = { settings, enabled, verify, handle, linked, effective, read, SCHEMA, AUD, SCOPE, SERVICE, ISSUER, JWKS_URL,
+module.exports = { settings, enabled, verify, handle, linked, reconcile, record, apply, processOne, effective, read, SCHEMA, AUD, SCOPE, SERVICE, ISSUER, JWKS_URL,
   setFetch(fn) { fetcher = fn; cache = { url: '', at: 0, keys: null }; } };

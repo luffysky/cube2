@@ -367,6 +367,18 @@ const SCHEMA = [
      event_id uuid PRIMARY KEY,
      at double precision NOT NULL
    )`,
+  // the inbox: every notice as it came, recorded together with its token before anything is done with it; applied is
+  // set in the same step as the change it makes, so a notice is never marked done without its change
+  'ALTER TABLE zz.entevents ADD COLUMN IF NOT EXISTS platform_id uuid',
+  'ALTER TABLE zz.entevents ADD COLUMN IF NOT EXISTS kind text',
+  'ALTER TABLE zz.entevents ADD COLUMN IF NOT EXISTS version bigint',
+  'ALTER TABLE zz.entevents ADD COLUMN IF NOT EXISTS body jsonb',
+  'ALTER TABLE zz.entevents ADD COLUMN IF NOT EXISTS applied double precision',
+  'ALTER TABLE zz.entevents ADD COLUMN IF NOT EXISTS result text',
+  'CREATE INDEX IF NOT EXISTS entevents_open ON zz.entevents (at) WHERE applied IS NULL',
+  // the version of an account's membership last written into its save (behind: the save still has to be told)
+  'ALTER TABLE zz.entitle ADD COLUMN IF NOT EXISTS pushed bigint NOT NULL DEFAULT 0',
+  'ALTER TABLE zz.entitle ADD COLUMN IF NOT EXISTS checked double precision NOT NULL DEFAULT 0',
   // outside production only (SAVE_SYNC_KEY=self): the save-sync signing key this server made for itself
   `CREATE TABLE IF NOT EXISTS zz.synckey (
      id smallint PRIMARY KEY CHECK (id = 1),

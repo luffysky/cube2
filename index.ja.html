@@ -2487,6 +2487,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'st.combo': ['最長連擊', 'Longest combo', '最大コンボ', '최대 콤보'],
     'st.items': ['拿到的道具', 'Items collected', '入手アイテム', '획득 아이템'],
     'earned': ['這場拿到', 'Earned', '獲得', '획득'],
+    'pay.none': ['這場用了道具或是特殊房間，沒有可以驗證的對局紀錄，所以只記戰績，不發金幣和經驗。不帶道具的對戰、排位、40 行競速和關卡挑戰都會照常發。', 'This match used items or a special room, so there is no replay to check it by: it counts as a game played, with no coins or experience. Matches without items, ranked, 40-line sprints and levels pay as usual.', 'このマッチはアイテムか特殊ルームを使ったため、検証できるリプレイがありません。戦績のみ記録し、コインと経験値は付きません。アイテムなしの対戦・ランク・40ライン・レベルは通常どおりです。', '이 판은 아이템이나 특수 방을 써서 확인할 리플레이가 없어요. 전적만 기록하고 코인과 경험치는 없어요. 아이템 없는 대전·랭크·40줄·레벨은 평소대로예요.'],
+    'pay.items': ['開道具戰、帶道具上場，或是守塔、搶地盤這類特殊規則的對戰，沒有辦法驗證，只記戰績、不發金幣和經驗。', 'Matches with items (switched on or brought along), or with special rules such as towers or territory, cannot be checked: they count as games played, with no coins or experience.', 'アイテム戦・アイテム持ち込み、タワーや陣取りなど特殊ルールの対戦は検証できないため、戦績のみでコインと経験値は付きません。', '아이템전·아이템 지참, 타워나 땅따먹기 같은 특수 규칙 대전은 확인할 수 없어서 전적만 기록하고 코인과 경험치는 없어요.'],
+    'pay.cap': ['今天對戰的金幣已經到上限（{0}），明天再來。經驗和戰績照算。', 'Today\'s match coins have reached the daily limit ({0}). More tomorrow; experience and records still count.', '今日の対戦コインは上限（{0}）に達しました。また明日。経験値と戦績は記録されます。', '오늘 대전 코인이 상한({0})에 도달했어요. 내일 또 와요. 경험치와 전적은 그대로예요.'],
     'coinsN': ['+{0} 金幣', '+{0} coins', '+{0}コイン', '+{0}코인'],
     'w.score': ['分數', 'Score', 'スコア', '점수'],
     'w.win': ['贏了', 'Win', '勝利', '승리'],
@@ -3869,7 +3872,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
    A mini game is a page of its own, so it does not touch the record itself: it leaves the result in a queue in this
    browser's storage. The next time 轉磚 opens (here, on the same site) it takes the queue, pays each result through
    Meta, and, when the player has a cloud save, the server checks it: a result may not claim more than the time it
-   says it took could produce, and mini games pay at most DAY_CAP coins a day.
+   says it took could produce, and mini games pay at most DAY_CAP coins a day. (For now they pay none: a result cannot
+   be checked by the server yet, so only the record and the stars count. coins() stays for when there is a proof.)
 
    Kinds of game:
      score   paid by the score, more on harder difficulties            (snake, breakout, stack, merge)
@@ -3937,9 +3941,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var rec = localRecord(), mini = rec && rec.mini || {}, prev = mini[r.game], q = readQueue();
     // results already waiting in the queue count as if paid, so the estimate does not pay the same thing twice
     q.forEach(function (o) { if (o.game === r.game) prev = record(o, prev); });
-    var c = coins(r, prev);
-    var today = rec && rec.daily ? rec.daily.mini || 0 : 0, waiting = q.reduce(function (a, o) { return a + (o.est || 0); }, 0);
-    c = Math.max(0, Math.min(c, DAY_CAP - today - waiting));
+    // a brick game's result cannot be checked by the server yet, so it pays no coins (the record and stars still count)
+    var c = 0;
     q.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c });
     var s = store();
     try { if (s) s.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX))); } catch (e) { /* not kept */ }
@@ -3959,8 +3962,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var p = doc.createElement('p');
     p.className = 'coins';
     var W = root.SRW, T = function () { return W ? W.t.apply(null, arguments) : arguments[0]; };
-    p.innerHTML = c ? '<b>' + T('rw.plus', c) + '</b>' + T('g.sep') + '<a href="../../?from=games">' + T('rw.claim') + '</a>'
-      : T('rw.none', T(r && GAMES[r.game] && GAMES[r.game].kind === 'levels' ? 'rw.noStars' : 'rw.noCoins'), DAY_CAP);
+    p.innerHTML = T('rw.records');
     after.parentNode.insertBefore(p, after.nextSibling);
     return c;
   }
@@ -4347,7 +4349,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
   // what each of the 200 items costs in the shop (engine.js ITEMS; the first seven keep their old prices)
   var ITEM_PRICE = ZZ.ITEMS.map(function (d) { return d ? d.price : 0; });
-  var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30;
+  var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30, FIN_CAP = 1200, FIN_CAP_SUB = 1800;
   var PLAN = { name: '轉磚會員', month: 90, year: 890 };   // planned prices in NT$, shown in the shop; nothing is charged yet
   function find(kind, id) {
     var list = CATALOG[kind] || [];
@@ -4399,10 +4401,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // second, the third waits twelve hours. Three waves a day at most, and a new day starts again from the first.
   // Every job here is an ordinary one (cat 'gen'); level jobs join when the levels mode does.
   var WAVE = { size: 5, max: 3, wait: 12 * 3600000 };
+  var UNCHECKED = ['wx', 'mini', 'endless', 'custom'];
   // a wave: three everyday jobs and two level jobs
   function pickWave(day, wave) {
     var rnd = new ZZ.RNG(day * 2654435761 + wave * 40503), jobs = [];
-    var gen = JOBS.filter(function (j) { return j.cat !== 'lvl'; }).map(function (j) { return j.id; }), lvl = JOBS.filter(function (j) { return j.cat === 'lvl'; }).map(function (j) { return j.id; });
+    // only jobs a checked result can move (items, weather runs, the brick games, endless and custom levels have no proof)
+    var ok = JOBS.filter(function (j) { return UNCHECKED.indexOf(j.ev || '') < 0 && j.id !== 'item'; });
+    var gen = ok.filter(function (j) { return j.cat !== 'lvl'; }).map(function (j) { return j.id; }), lvl = ok.filter(function (j) { return j.cat === 'lvl'; }).map(function (j) { return j.id; });
     for (var i = 0; i < WAVE.size; i++) { var pool = i < WAVE.size - 2 ? gen : lvl; jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false }); }
     return jobs;
   }
@@ -4451,7 +4456,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       sign: { m: 0, days: [], paid: [] },
       // ranked against people (真人排位): the rating only the server changes, once both players' records agree
       pvp: { rp: 0, games: 0, wins: 0 },
-      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
+      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0, fc: 0 },
       // the brick games: best score or time per difficulty, stars per level
       mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
       box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0, wxr: 0 },
@@ -4465,7 +4470,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
     TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, SITE: SITE, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
-    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
+    SUB_BOOST: SUB_BOOST, FIN_CAP: FIN_CAP, FIN_CAP_SUB: FIN_CAP_SUB, UNCHECKED: UNCHECKED, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
     TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
   function storage() {
@@ -4532,7 +4537,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var d = Meta.data.daily, day = Meta.dayNo();
     if (d.day === day && d.jobs.length) return;
     // the first wave of the day, picked by the date so everyone gets the same set
-    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0;
+    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0; d.fc = 0;
   };
   // a day number as its calendar month: { m: 202611, d: 21, len: 30, first: weekday of the 1st (0 = Sunday) }
   function monthOf(day) {
@@ -4681,7 +4686,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     var r = Meta.data.rpg, d = Meta.data;
     stage = Math.floor(+stage); pieces = Math.floor(+pieces);
     if (!(stage >= 1 && stage <= RPG.STAGES.length) || stage > r.best + 1 || !(pieces >= 3 && pieces <= 2000) || cls !== r.cls) return { ok: false, why: 'no' };
-    var first = stage > r.best, coins = RPG.reward(stage, first), drop = '';
+    // no proof of an adventure stage exists yet (skills change the wall), so it pays no coins: the stage, gear and
+    // record count as before
+    var first = stage > r.best, coins = 0, drop = '';
     if (first) {
       r.best = stage;
       var dp = RPG.STAGES[stage - 1].drop;
@@ -4700,9 +4707,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   Meta.lvOpen = function (n) { return n >= 1 && n <= 1000 && (n === 1 || Meta.lvStars(n - 1) > 0); };
   Meta.lvTotal = function () { var s = Meta.data.lv.stars, t = 0; for (var i = 0; i < s.length; i++) t += +s.charAt(i); return t; };
   // a numbered level finished in so many pieces: the stars are worked out here (the same on the server)
-  Meta.levelClear = function (n, pieces) {
+  // tape: the replay of the clear (the page); proven: true on the server once it checked out. Without proof nothing is
+  // recorded or paid (an honest page always has a tape: a level never runs past the tape's length).
+  Meta.levelClear = function (n, pieces, tape, proven) {
     var Lv = ZZ.Levels;
     n = Math.floor(+n); pieces = Math.floor(+pieces);
+    if (proven === undefined) proven = !!tape;
+    if (!proven) return { ok: false, why: 'proof' };
     if (!Lv || !Meta.lvOpen(n) || !(pieces >= 1)) return { ok: false, why: 'no' };
     var lv = Lv.level(n);
     if (pieces > Lv.limitOf(lv)) return { ok: false, why: 'no' };
@@ -4719,7 +4730,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (st === 3) jobEvent('lvl3s', 1);
     if (st > had) jobEvent('lvlStars', st - had);
     Meta.save();
-    emit('lvl', [n, pieces]);
+    emit('lvl', tape ? [n, pieces, tape] : [n, pieces]);
     return { ok: true, stars: st, had: had, coins: coins };
   };
   // an endless run reached this stage
@@ -4742,7 +4753,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (!practice) {
       if (score > d.lv.wx) { d.lv.wx = score; out.best = true; }
       if (sec > d.lv.wxs) { d.lv.wxs = sec; out.bestSec = true; }
-      if (sec >= 20) out.coins = Meta.earn(Math.min(60, Math.floor(sec / 20) + Math.floor(lines / 4)));
+      // no proof of a weather run exists yet (the weather changes the wall): records only, no coins
     }
     jobEvent('wx', 1);
     Meta.save();
@@ -4769,7 +4780,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     r = { game: r.game, lv: int(r.lv, 0, 2), value: g.kind === 'levels' ? int(r.value, 0, g.count - 1) : int(r.value, 0, 1e9), stars: int(r.stars, 0, 3), ms: int(r.ms, 0, 3600000) };
     if (g.kind === 'levels' && r.stars < 1) return { ok: false, why: 'stars' };
     if (g.kind === 'time' && r.value < 1000) return { ok: false, why: 'fast' };
-    var prev = d.mini[r.game], c = Math.max(0, Math.min(MINI.coins(r, prev), MINI.DAY_CAP - d.daily.mini));
+    // no proof of a brick game exists yet: records and boards only, no coins
+    var prev = d.mini[r.game], c = 0;
     var best = g.kind === 'levels' ? r.stars > (+String(prev).charAt(r.value) || 0) : g.kind === 'score' ? r.value > prev[r.lv] : !prev[r.lv] || r.value < prev[r.lv];
     d.mini[r.game] = MINI.record(r, prev);
     if (c) { d.daily.mini += c; Meta.earn(c); }
@@ -5256,10 +5268,24 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     };
   };
   // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, ms }
-  // tape: the proof that goes to the server with the result (see replay.js); it plays no part in the sums here
-  Meta.finish = function (m, tape) {
+  // tape: the proof that goes to the server with the result (see replay.js).
+  // proven: whether the result is backed by a tape the server replays (on the page: a tape is there; on the server: it
+  // checked out). Only a proven result pays: coins, experience and daily-job progress. A result without proof (items
+  // were used, a special room, an old page) is kept in the record as a game played, and pays nothing.
+  // Coins from matches are held to FIN_CAP a day (FIN_CAP_SUB for members), so even played-out results cannot be
+  // farmed without end.
+  Meta.finish = function (m, tape, proven) {
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
     m = Meta.cleanMatch(m);
+    if (proven === undefined) proven = !!tape;
+    if (!proven) {
+      Meta.rollDay();
+      if (m.mode !== 'sprint') { d.tot.games++; if (m.mode === 'net') d.tot.online++; }
+      out.unproven = true; out.xp = 0; out.level = null; out.titles = [];
+      Meta.save();
+      emit('fin', tape ? [m, tape] : [m]);
+      return out;
+    }
     m.battle = m.mode !== 'sprint';
     var st = m.stats, sc = st.score;
     function add(key, n) { n = Math.round(n); if (n > 0) parts.push({ key: key, n: n }); }
@@ -5316,6 +5342,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (m.mode === 'net' && m.team && m.result > 0) d.tot.duo++;
     if (m.mode === 'net' && m.quick) { d.tot.qstreak = m.result > 0 ? d.tot.qstreak + 1 : 0; d.tot.qbest = Math.max(d.tot.qbest, d.tot.qstreak); }
     out.titles = earnTitles(m);
+    var room = Math.max(0, (Meta.isSub() ? FIN_CAP_SUB : FIN_CAP) - (d.daily.fc | 0));
+    if (out.coins > room) { out.capped = out.coins - room; out.coins = room; }
+    d.daily.fc = (d.daily.fc | 0) + out.coins;
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
     delete m.battle;
@@ -5352,7 +5381,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     adFree: function () { if (!here()) return yes(Meta.isSub() && Meta.adsLeft() >= 1); var r = Meta.adFree(); return r.ok ? { ok: true } : { ok: false, why: r.why }; },
     draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
-    fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
+    fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}, null, a[1] === true || !!(a[1] && typeof a[1] === 'object')) }; },
     sbuy: function (a) { return Meta.buySite(str(a[0])); },
     swear: function (a) { return yes(Meta.wearSite(str(a[0]))); },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
@@ -5365,7 +5394,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
     wave: function () { return Meta.nextWave(); },
-    lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
+    lvl: function (a) { var r = Meta.levelClear(a[0], a[1], null, a[2] === true || !!(a[2] && typeof a[2] === 'object')); return r.ok ? { ok: true, out: r } : r; },
     rpg: function (a) { var r = Meta.rpgClear(a[0], a[1], str(a[2])); return r.ok ? { ok: true, out: r } : r; },
     rpgUp: function (a) { var r = Meta.rpgUp(str(a[0]), str(a[1])); return r.ok ? { ok: true, out: r } : r; },
     rpgCls: function (a) { return Meta.rpgClass(str(a[0])); },
@@ -7251,9 +7280,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   function whole(v, lo, hi) { return typeof v === 'number' && v === Math.floor(v) && v >= lo && v <= hi; }
   // Plays a tape through the rules. Gives what really happened, or null when the tape is not a possible game:
   // a piece the sequence would not have dealt, a spot a piece cannot rest in, a twist that is not one.
-  function check(p) {
+  // o.board: the starting wall (a numbered level's terrain); the game played is given back as v.game, so the caller can
+  // check the level's goal on the wall as it ended
+  function check(p, o) {
     if (!p || typeof p !== 'object' || p.v !== 1 || p.rv !== ZZ.RULES || !whole(p.seed, 0, 4294967295) || !Array.isArray(p.ev) || p.ev.length > TAPE_MAX) return null;
-    var g = new ZZ.Game({ seed: p.seed, manual: true, garbage: false, events: false }), last = 0, kos = 0, i, j;
+    var g = new ZZ.Game({ seed: p.seed, manual: true, garbage: false, events: false, board: o && o.board ? o.board : undefined }), last = 0, kos = 0, i, j;
     g.start();
     for (i = 0; i < p.ev.length; i++) {
       var e = p.ev[i];
@@ -7297,7 +7328,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       } else return null;
     }
     var st = g.stats;
-    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+    var v = { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+    if (o && o.board) Object.defineProperty(v, 'game', { value: g, enumerable: false });
+    return v;
   }
 
   ZZ.Replay = { Tape: Tape, check: check, Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };
@@ -7329,7 +7362,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     vol: 60, mvol: 45, real: true, haptic: true, swap: false, half: false, pad: 1, hand: 'two', howto: true, lang: '', ai: 0
   };
   // (level: which computer rival was picked last. Someone new starts against the gentlest one.)
-  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 1, itip: 0, fresh: 0 };
+  var set = {}, save = { best: 0, dojo: 0, level: 5, minutes: 2, tip: 0, items: 0, itip: 0, fresh: 0 };
   var STORE = 'zhuanzhuan.v2';
   function keyCopy(src) { var o = {}; ACTIONS.forEach(function (a) { o[a] = (src && Array.isArray(src[a]) ? src[a] : KEYDEF[a]).filter(function (c) { return typeof c === 'string'; }).slice(0, KEY_MAX); }); return o; }
   function loadStore() {
@@ -8325,7 +8358,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var mineK = a, assists = 0, koRoom = 0;
       if (S.multi) { S.stand = standings(why); r = why === 'quit' ? -1 : S.stand.r; a = S.ko.me = Math.min(60, S.stand.foeDowns); koRoom = a; mineK = Math.min(60, S.kda.k); assists = Math.min(60, S.kda.a); }
       S.result = r; S.why = why || '';
-      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, terr: !!S.terr, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used ? S.tape.done() : null);
+      S.reward = Meta.finish({ mode: S.mode, result: r, level: S.level, stats: ms, ko: mineK, koOpp: b, assists: assists, koRoom: koRoom, tower: !!S.tower, royale: !!S.royale, relay: !!S.relay, terr: !!S.terr, itemsUsed: S.used, ms: played, team: !!(S.multi && S.multi.teams), quick: S.mode === 'net' && !!ZZ.Net && ZZ.Net.matched, pr: !!S.o.pr, place: S.multi && S.stand ? (S.stand.list.filter(function (p) { return p.me; })[0] || {}).place || 0 : 0, room: S.mode === 'net' && ZZ.Net ? ZZ.Net.code : '', seats: S.multi ? 1 + S.multi.order.length : 2 }, S.tape && !S.used && !S.tower && !S.terr ? S.tape.done() : null);
       if (S.sky && App.wxBattleEnd) S.wxRes = App.wxBattleEnd(r, played);
       S.saved = false;
       if (S.rec && ZZ.Replay && played > 20000) {
@@ -8373,7 +8406,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
 
   // ---------- sheets ----------
-  var pick = { level: 1, minutes: 2, items: true, tower: false, terr: false };
+  var pick = { level: 1, minutes: 2, items: false, tower: false, terr: false };
   function btn(act, key, main) { return '<button class="btn' + (main ? ' main' : '') + '" type="button" data-do="' + act + '">' + t(key) + '</button>'; }
   // the big centred win / lose line at the top of a battle result
   function verdict() {
@@ -8399,6 +8432,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       h += '</ul></div>';
     }
     for (i = 0; i < rw.jobs.length; i++) h += '<p class="note">' + esc(t('jobDone', t('j.' + rw.jobs[i]))) + '</p>';
+    // a result without a replay (items, a special room) is a game played and pays nothing; the daily match cap
+    if (rw.unproven) h += '<p class="note" data-pay="none">' + t('pay.none') + '</p>';
+    else if (rw.capped) h += '<p class="note" data-pay="cap">' + esc(t('pay.cap', L.num(Meta.isSub() ? Meta.FIN_CAP_SUB : Meta.FIN_CAP))) + '</p>';
     return h;
   }
   function keyRows() {
@@ -8422,7 +8458,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       }
       h += '</div>' + (aiStep() ? '<p class="note">' + t('aiNow', t('s.ai' + aiKey(aiStep()))) + '</p>' : '') + '<h3>' + t('matchTime') + '</h3><div class="seg" role="radiogroup" aria-label="' + t('matchTime') + '">';
       for (i = 1; i <= 3; i++) h += '<button type="button" role="radio" aria-checked="' + (pick.minutes === i) + '" data-min="' + i + '">' + t('minutes', i) + '</button>';
-      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label>' +
+      h += '</div><label class="toggle" for="bItems">' + t('itemsMode') + '<input type="checkbox" id="bItems"></label><p class="note" data-pay="items">' + t('pay.items') + '</p>' +
         '<label class="toggle" for="bTower">' + t('tw.toggle') + '<input type="checkbox" id="bTower"></label><p class="note">' + t('tw.rule', Meta.TOWER.perLine, Meta.TOWER.perDown) + '</p>' +
         '<label class="toggle" for="bTerr">' + t('tr.toggle') + '<input type="checkbox" id="bTerr"></label><p class="note">' + t('tr.rule') + '</p>' + bringHtml() +
         '<div class="row">' + btn('close', 'cancel') + btn('fight', 'fight', true) + '</div>';
@@ -13770,6 +13806,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       var lv = o.custom ? o.custom : o.endless ? Lv.endless(o.stage, o.eseed) : Lv.level(o.n);
       S.lv = lv; S.pieces = 0; S.limit = Lv.limitOf(lv);
       S.me = new ZZ.Game({ board: lv.board, seed: lv.seed, gravity: lv.gravity, lockDelay: App.set.lock, garbage: false, sdf: App.sdfVal() });
+      // a numbered level's clear goes to the server with its replay, which is what makes it count (and pay)
+      S.tape = !o.custom && !o.endless && ZZ.Replay ? new ZZ.Replay.Tape(lv.seed, false) : null;
       S.state = 'play';
     },
     started: function () { var S = App.S(); S.me.start(); say(); },
@@ -13804,7 +13842,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
         return;
       }
       if (lv.custom) { Meta.customPlayed(); S.res = { custom: true, pieces: S.pieces }; }
-      else S.res = Meta.levelClear(lv.n, S.pieces);
+      else S.res = Meta.levelClear(lv.n, S.pieces, S.tape ? S.tape.done() : null);
       S.res.pieces = S.pieces;
       S.after = function () { App.openSheet('levelDone'); };
     },
@@ -14466,6 +14504,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'rp.hit': ['-{0}', '-{0}', '-{0}', '-{0}'],
     'rp.win': ['打倒了！', 'Defeated!', '撃破！', '처치!'],
     'rp.winP': ['用了 {0} 塊，拿到 {1} 金幣', '{0} pieces · {1} coins', '{0}個使用・{1}コイン', '{0}개 사용 · {1}코인'],
+    'rp.winNoPay': ['用了 {0} 塊。冒險關卡目前沒辦法驗證，所以不發金幣；進度和裝備照算。', '{0} pieces. Adventure stages cannot be checked yet, so they pay no coins; progress and gear still count.', '{0}個使用。冒険ステージはまだ検証できないため、コインは付きません。進行と装備は記録されます。', '{0}개 사용. 모험 스테이지는 아직 확인할 수 없어서 코인은 없어요. 진행과 장비는 그대로예요.'],
     'rp.drop': ['解鎖新裝備：{0}！三個職業都拿到了這一格。', 'New gear unlocked: {0}! All three classes get this slot.', '新装備を解放：{0}！3職業とも使えます。', '새 장비 해제: {0}! 세 직업 모두 이 칸을 얻었어요.'],
     'rp.clear': ['第一章完成！黑龍倒下了。', 'Chapter 1 complete! The Black Dragon has fallen.', '第1章クリア！黒竜を倒しました。', '1장 클리어! 흑룡을 쓰러뜨렸어요.'],
     'rp.lose': ['被打倒了', 'Knocked out', 'やられた', '쓰러졌어요'],
@@ -14617,7 +14656,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   // ---------- after a fight ----------
   App.sheets.rpgWin = function () {
     var S = App.S(), r = S.res || {}, R = S.rpg, last = R.n >= RPG.STAGES.length;
-    var h = '<h2 class="verdict win">' + t('rp.win') + '</h2><p>' + esc(t('rp.winP', R.pieces, r.coins || 0)) + '</p>';
+    var h = '<h2 class="verdict win">' + t('rp.win') + '</h2><p>' + esc(r.coins ? t('rp.winP', R.pieces, r.coins) : t('rp.winNoPay', R.pieces)) + '</p>';
     if (r.drop) h += '<p><b>' + esc(t('rp.drop', t('rp.g.' + RPG.GEAR[R.cls][r.drop]))) + '</b></p>';
     if (last && r.first) h += '<p><b>' + t('rp.clear') + '</b></p>';
     return h + '<div class="row">' + (last ? '' : btn('rpNext', 'rp.nextSt', true)) + btn('again', 'rp.again', last) + btn('rpMap', 'rp.map') + '</div>';

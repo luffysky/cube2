@@ -102,6 +102,8 @@
       var lv = o.custom ? o.custom : o.endless ? Lv.endless(o.stage, o.eseed) : Lv.level(o.n);
       S.lv = lv; S.pieces = 0; S.limit = Lv.limitOf(lv);
       S.me = new ZZ.Game({ board: lv.board, seed: lv.seed, gravity: lv.gravity, lockDelay: App.set.lock, garbage: false, sdf: App.sdfVal() });
+      // a numbered level's clear goes to the server with its replay, which is what makes it count (and pay)
+      S.tape = !o.custom && !o.endless && ZZ.Replay ? new ZZ.Replay.Tape(lv.seed, false) : null;
       S.state = 'play';
     },
     started: function () { var S = App.S(); S.me.start(); say(); },
@@ -136,7 +138,7 @@
         return;
       }
       if (lv.custom) { Meta.customPlayed(); S.res = { custom: true, pieces: S.pieces }; }
-      else S.res = Meta.levelClear(lv.n, S.pieces);
+      else S.res = Meta.levelClear(lv.n, S.pieces, S.tape ? S.tape.done() : null);
       S.res.pieces = S.pieces;
       S.after = function () { App.openSheet('levelDone'); };
     },

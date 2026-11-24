@@ -330,11 +330,12 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     const sl = TAPE.fin('sprint', { seed: 4301 }); sl[0].ms = Math.max(15000, sl[0].ms - 20000);
     ok((await res(sl)).res[0].why === 'proof', 'a sprint reported faster than its own tape');
     ok((await res([sp[0]])).res[0].why === 'proof', 'a sprint with no tape');
-    // other matches still pay without a tape, but only checked ones reach the score board
+    // other matches without a tape: a game played, and nothing paid (no coins, no experience), never on a board
     now += HOUR;
     const free = TAPE.fin('ai', { seed: 4400, ms: 60000 });
+    const before = (await sync(T)).json.st;
     j = await res([Object.assign({}, free[0], { stats: Object.assign({}, free[0].stats, { score: 150000 }) })]);
-    ok(j.res[0].ok && j.st.tot.best === 150000, 'a match against the computer without a tape still pays', j.res);
+    ok(j.res[0].ok && j.st.coins === before.coins && j.st.xp === before.xp && j.st.tot.games === before.tot.games + 1 && j.st.tot.best !== 150000, 'a match against the computer without a tape: counted as played, pays nothing', [j.res, j.st.coins - before.coins]);
     let b = (await call('board', { url: '/api/board?b=score&s=all&me=' + T.pub })).json;
     ok(!b.me || b.me.v < 150000, 'but its score stays off the board', b.me);
     j = await res(free);
@@ -775,13 +776,22 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(r.json.res[0].ok === false, 'more pieces than the limit is not a clear');
     const c0 = r.json.st.coins;
     r = await sync(V, [op('lvl', [1, par1])]);
-    ok(r.json.res[0].ok && r.json.st.lv.stars === '3' && r.json.st.coins === c0 + 20 + 30, 'level 1 at par: three stars, first-clear coins and star coins', [r.json.st.lv, r.json.st.coins - c0]);
-    r = await sync(V, [op('lvl', [1, par1])]);
-    ok(r.json.st.coins === c0 + 50, 'clearing it again pays nothing more');
-    const many = []; for (let n = 2; n <= 220; n++) many.push(op('lvl', [n, rules.ZZ.Levels.level(n).par]));
-    let fastSeen = false;
-    for (let i = 0; i < many.length; i += 10) { r = await sync(V, many.slice(i, i + 10)); if (r.json.res.some(x => x.why === 'fast')) fastSeen = true; }
-    ok(fastSeen && r.json.st.lv.stars.length < 220, 'levels cannot be reported faster than they could be played', r.json.st.lv.stars.length);
+    ok(r.json.res[0].ok === false && r.json.res[0].why === 'proof' && r.json.st.lv.stars === '', 'a clear without its replay is not recorded', r.json.res);
+    const L1 = TAPE.level(1), lv1 = rules.ZZ.Levels.level(1), st1 = rules.ZZ.Levels.stars(lv1, L1.pieces);
+    r = await sync(V, [op('lvl', [1, L1.pieces + 3, L1.tape])]);
+    ok(r.json.res[0].why === 'proof', 'nor one reporting other piece counts than its replay', r.json.res);
+    r = await sync(V, [op('lvl', [2, L1.pieces, L1.tape])]);
+    ok(r.json.res[0].ok === false, 'nor level 1\'s replay handed in for level 2', r.json.res);
+    const short = JSON.parse(JSON.stringify(L1.tape)); short.ev = short.ev.slice(0, -2);
+    r = await sync(V, [op('lvl', [1, L1.pieces - 2, short])]);
+    ok(r.json.res[0].why === 'proof', 'nor a replay that stops before the goal is met', r.json.res);
+    r = await sync(V, [op('lvl', [1, L1.pieces, L1.tape])]);
+    ok(r.json.res[0].ok && r.json.st.lv.stars === String(st1) && r.json.st.coins === c0 + 20 + st1 * 10, 'level 1 with its replay: stars, first-clear coins and star coins', [r.json.res, r.json.st.lv, r.json.st.coins - c0]);
+    r = await sync(V, [op('lvl', [1, L1.pieces, L1.tape])]);
+    ok(r.json.res[0].why === 'proof' && r.json.st.coins === c0 + 20 + st1 * 10, 'the same replay a second time counts for nothing', r.json.res);
+    const many = []; for (let n = 2; n <= 40; n++) many.push(op('lvl', [n, rules.ZZ.Levels.level(n).par]));
+    r = await sync(V, many);
+    ok(r.json.res.every(x => !x.ok) && r.json.st.lv.stars.length === 1, 'forty levels reported without replays: none taken', r.json.st.lv.stars);
     const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'lvl'", [V.id]);
     ok(lg[0].n >= 1, 'level coins are in the coin ledger');
   }
@@ -860,7 +870,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     r = await sync(Q, [op('rpg', [1, 40, 'mage'])]);
     ok(r.json.res[0].ok === false, 'the class must be the one on record', r.json.res);
     r = await sync(Q, [op('rpgCls', ['rogue']), op('rpg', [1, 40, 'rogue'])]);
-    ok(r.json.res.every(x => x.ok) && r.json.st.rpg.best === 1 && r.json.st.rpg.cls === 'rogue' && r.json.st.coins === c0 + 40, 'a class is picked and stage 1 is beaten: 40 coins', [r.json.res, r.json.st.rpg, r.json.st.coins - c0]);
+    ok(r.json.res.every(x => x.ok) && r.json.st.rpg.best === 1 && r.json.st.rpg.cls === 'rogue' && r.json.st.coins === c0, 'a class is picked and stage 1 is beaten: progress counts, no coins (no proof of a stage yet)', [r.json.res, r.json.st.rpg, r.json.st.coins - c0]);
     r = await sync(Q, [op('rpg', [2, 40, 'rogue']), op('rpg', [3, 40, 'rogue'])]);
     ok(['tank', 'rogue', 'mage'].every(c => r.json.st.rpg.gear[c].w === 1), 'stage 3 opens the weapon slot for every class on the server too', r.json.st.rpg);
     r = await sync(Q, [op('rpgUp', ['rogue', 'w']), op('rpgUp', ['rogue', 'a'])]);
@@ -869,7 +879,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     for (let k = 0; k < 3 && !fast; k++) { const many = []; for (let i = 0; i < 30; i++) many.push(op('rpg', [1, 3, 'rogue'])); r = await sync(Q, many); fast = r.json.res.some(x => x.why === 'fast'); }
     ok(fast, 'stages cannot be reported faster than they could be played', r.json.res.filter(x => !x.ok).length);
     const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'rpg'", [Q.id]);
-    ok(lg[0].n >= 1, 'adventure coins are in the coin ledger');
+    ok(lg[0].n === 0, 'and the coin ledger has no adventure coins');
   }
 
   // ---------- weather runs: paid by time, never faster than they could be played, on their own board ----------
@@ -877,14 +887,14 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     const X = await newPlayer(null, '203.0.113.65');
     const c0 = (await sync(X)).json.st.coins;
     r = await sync(X, [op('wx', [120, 20, 30000, 0])]);
-    ok(r.json.res[0].ok && r.json.st.coins === c0 + 6 + 5 && r.json.st.lv.wx === 30000 && r.json.st.lv.wxs === 120, 'a two-minute run pays and is kept as the best', [r.json.res, r.json.st.coins - c0, r.json.st.lv]);
+    ok(r.json.res[0].ok && r.json.st.coins === c0 && r.json.st.lv.wx === 30000 && r.json.st.lv.wxs === 120, 'a two-minute run is kept as the best and pays no coins (no proof of a run yet)', [r.json.res, r.json.st.coins - c0, r.json.st.lv]);
     r = await call('board', { url: '/api/board?b=wx&s=all' });
     ok(r.status === 200 && r.json.top.some(x => x.v === 30000), 'and it is on the weather board', r.json);
     r = await sync(X, [op('wx', [3000, 999, 1e9, 0])]);
     ok(r.json.res[0].ok === false && r.json.res[0].why === 'fast', 'an hour-long run cannot be reported straight after', r.json.res);
     r = await sync(X, [op('wx', [10, 2, 1e9, 1])]);
     const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'wx'", [X.id]);
-    ok(lg[0].n === 1, 'only the paid run is in the coin ledger', lg);
+    ok(lg[0].n === 0, 'no weather coins in the coin ledger', lg);
     r = await sync(X, [op('wxb', [1, 1])]);
     ok(r.json.res[0].ok && r.json.st.lv.wxr === 25, 'a weather battle won against a person: storm points', r.json.st.lv);
     r = await call('board', { url: '/api/board?b=wxr&s=all' });
@@ -898,13 +908,13 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     const Y = await newPlayer(null, '203.0.113.95');
     const c0 = (await sync(Y)).json.st.coins;
     r = await sync(Y, [op('mini', ['snake', 1, 400, 0, 120000])]);
-    ok(r.json.res[0].ok && r.json.st.coins === c0 + 10 && r.json.st.mini.snake[1] === 400, 'a brick game result pays on the server and the best is kept', [r.json.res, r.json.st.coins - c0, r.json.st.mini]);
+    ok(r.json.res[0].ok && r.json.st.coins === c0 && r.json.st.mini.snake[1] === 400, 'a brick game result: the best is kept, no coins (no proof of a brick game yet)', [r.json.res, r.json.st.coins - c0, r.json.st.mini]);
     r = await sync(Y, [op('mini', ['push', 0, 0, 3, 30000])]);
     ok(r.json.res[0].ok && r.json.st.mini.push === '3', 'a level cleared: its stars are kept', r.json.st.mini);
     r = await sync(Y, [op('mini', ['breakout', 2, 1e7, 0, 3600000])]);
     ok(r.json.res[0].ok === false && r.json.res[0].why === 'fast', 'an hour-long game cannot be reported straight after', r.json.res);
     const lg = await pg.query("SELECT count(*)::int AS n FROM zz.ledger WHERE pid = $1 AND kind = 'mini'", [Y.id]);
-    ok(lg[0].n === 2, 'brick game coins are in the coin ledger', lg);
+    ok(lg[0].n === 0, 'no brick game coins in the coin ledger', lg);
   }
   // ---------- random matching keeps weather battles apart from ordinary ones ----------
   {
@@ -964,8 +974,9 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   {
     now += 3 * 3600000;
     const L1 = await newPlayer(null, '198.51.100.244');
-    let x = await sync(L1, [op('lvl', [1, 6]), op('lvl', [2, 8]), op('endless', [12])]);
-    ok(x.json.res.every(y => y.ok), 'levels and an endless run are taken', x.json.res);
+    const T1 = TAPE.level(1, { step: 260 });        // a play of its own (another account's replay would not count)
+    let x = await sync(L1, [op('lvl', [1, T1.pieces, T1.tape]), op('endless', [12])]);
+    ok(x.json.res.every(y => y.ok), 'a level with its replay and an endless run are taken', x.json.res);
     const stars = String(x.json.st.lv.stars).split('').reduce((n, c) => n + (+c || 0), 0);
     r = await call('board', { url: '/api/board?b=lvs&me=' + L1.pub });
     ok(stars > 0 && r.json.me && r.json.me.v === stars, 'the stars add up on the levels board', [stars, r.json.me]);

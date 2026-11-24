@@ -195,9 +195,11 @@
   function whole(v, lo, hi) { return typeof v === 'number' && v === Math.floor(v) && v >= lo && v <= hi; }
   // Plays a tape through the rules. Gives what really happened, or null when the tape is not a possible game:
   // a piece the sequence would not have dealt, a spot a piece cannot rest in, a twist that is not one.
-  function check(p) {
+  // o.board: the starting wall (a numbered level's terrain); the game played is given back as v.game, so the caller can
+  // check the level's goal on the wall as it ended
+  function check(p, o) {
     if (!p || typeof p !== 'object' || p.v !== 1 || p.rv !== ZZ.RULES || !whole(p.seed, 0, 4294967295) || !Array.isArray(p.ev) || p.ev.length > TAPE_MAX) return null;
-    var g = new ZZ.Game({ seed: p.seed, manual: true, garbage: false, events: false }), last = 0, kos = 0, i, j;
+    var g = new ZZ.Game({ seed: p.seed, manual: true, garbage: false, events: false, board: o && o.board ? o.board : undefined }), last = 0, kos = 0, i, j;
     g.start();
     for (i = 0; i < p.ev.length; i++) {
       var e = p.ev[i];
@@ -241,7 +243,9 @@
       } else return null;
     }
     var st = g.stats;
-    return { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+    var v = { ms: last, kos: kos, pieces: st.pieces, lines: st.lines, attack: st.attack, score: st.score, spins: st.spins, tst: st.tst, minis: st.minis, xspins: st.xspins, quads: st.quads, maxCombo: st.maxCombo };
+    if (o && o.board) Object.defineProperty(v, 'game', { value: g, enumerable: false });
+    return v;
   }
 
   ZZ.Replay = { Tape: Tape, check: check, Recorder: Recorder, Ghost: Ghost, queueOf: queueOf, botCfg: botCfg, list: list, save: save, remove: remove, trim: trim, _reset: function () { mem = null; } };

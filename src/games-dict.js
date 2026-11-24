@@ -51,6 +51,7 @@
     'g.groupNote': ['{0}', '{0}', '{0}', '{0}'],
 
     // ---------- coins (games/rewards.js) ----------
+    'rw.records': ['紀錄已存進<a href="../../?from=games">轉磚</a>：最佳紀錄和星星都會保留。磚塊小遊戲的成績目前沒辦法驗證，所以不發金幣。', 'Saved to <a href="../../?from=games">轉磚</a>: your best records and stars are kept. Brick game results cannot be checked yet, so they pay no coins.', '<a href="../../?from=games">轉磚</a>に記録しました。ベスト記録と星は残ります。ブロックゲームの成績はまだ検証できないため、コインは付きません。', '<a href="../../?from=games">轉磚</a>에 기록했어요. 최고 기록과 별은 남아요. 블록 게임 성적은 아직 확인할 수 없어서 코인은 없어요.'],
     'rw.plus': ['+{0} 金幣', '+{0} coins', '+{0} コイン', '+{0} 코인'],
     'rw.claim': ['回到轉磚入帳', 'Collect them in 轉磚', '轉磚で受け取る', '轉磚에서 받기'],
     'rw.none': ['<a href="../../?from=games">轉磚</a>的金幣：這場沒有{0}（磚塊小遊戲每天最多 {1}）', '<a href="../../?from=games">轉磚</a> coins: {0} this time (brick games pay up to {1} a day)', '<a href="../../?from=games">轉磚</a>のコイン：今回は{0}（ブロックゲームは1日最大 {1}）', '<a href="../../?from=games">轉磚</a> 코인: 이번엔 {0} (블록 게임은 하루 최대 {1})'],
@@ -92,7 +93,7 @@
     'dir.title': ['磚塊遊戲', 'Brick games', 'ブロックゲーム', '블록 게임'],
     'dir.desc': ['斯諾瑞姆工作室的磚塊遊戲：轉磚、磚蛇、打磚塊、疊磚塔、推磚倉庫、磚塊合成、分磚、磚畫謎、磚道、掃磚。打開瀏覽器就能玩，不用下載。', 'Brick games from SnowRealm: 轉磚, Brick Snake, Brick Breaker, Brick Tower, Brick Warehouse, Brick Merge, Brick Sort, Brick Picross, Brick Pipes and Brick Sweeper. Play in your browser, nothing to download.', 'SnowRealm のブロックゲーム：轉磚、ブロックスネーク、ブロック崩し、ブロックタワー、ブロック倉庫、ブロック合体、ブロック仕分け、お絵かきロジック、ブロック水路、ブロックスイーパー。ブラウザですぐ遊べます。', 'SnowRealm의 블록 게임: 轉磚, 블록 스네이크, 벽돌깨기, 블록 타워, 블록 창고, 블록 합치기, 블록 정리, 그림 퍼즐, 블록 수로, 블록 찾기. 설치 없이 브라우저에서 바로 즐겨요.'],
     'dir.sub': ['打開就能玩，不用下載', 'Open and play, nothing to download', '開いてすぐ遊べる、ダウンロード不要', '열면 바로 플레이, 다운로드 필요 없음'],
-    'dir.intro': ['每款都能賺<a href="../">轉磚</a>的金幣（每天最多 300），在轉磚打開時入帳；有雲端存檔的話，星星和最佳紀錄換裝置也帶得走。', 'Every game earns <a href="../">轉磚</a> coins (up to 300 a day), paid when you open 轉磚. With a cloud save, your stars and records come with you to other devices.', 'どのゲームでも<a href="../">轉磚</a>のコインがもらえます（1日最大 300）。轉磚を開いたときに受け取れます。クラウドセーブがあれば、星やベスト記録も別の端末に引き継げます。', '모든 게임에서 <a href="../">轉磚</a> 코인을 벌 수 있어요(하루 최대 300). 轉磚을 열면 들어와요. 클라우드 저장이 있으면 별과 최고 기록도 다른 기기로 가져갈 수 있어요.'],
+    'dir.intro': ['每款的星星和最佳紀錄都會記進<a href="../">轉磚</a>的存檔；有雲端存檔的話，換裝置也帶得走。磚塊小遊戲的成績目前沒辦法驗證，所以不發轉磚金幣。', 'Every game keeps its stars and best records in your <a href="../">轉磚</a> save, and with a cloud save they come with you to other devices. Brick game results cannot be checked yet, so they do not pay 轉磚 coins.', 'どのゲームも星とベスト記録が<a href="../">轉磚</a>のセーブに残り、クラウドセーブがあれば別の端末にも引き継げます。ブロックゲームの成績はまだ検証できないため、轉磚のコインは付きません。', '모든 게임의 별과 최고 기록은 <a href="../">轉磚</a> 저장 데이터에 남고, 클라우드 저장이 있으면 다른 기기로도 가져갈 수 있어요. 블록 게임 성적은 아직 확인할 수 없어서 轉磚 코인은 없어요.'],
     'dir.now': ['現在就能玩', 'Play now', '今すぐ遊べる', '지금 플레이'],
     'dir.new': ['新', 'New', 'NEW', 'NEW'],
     'dir.zz': ['疊磚消行、轉 T 送水泥。對電腦、連線最多 8 人、1000 關、挑戰大自然。', 'Clear lines, spin the T, send cement. Play the computer, up to 8 online, 1000 levels, and Nature mode.', 'ラインを消して T を回し、相手にセメントを送る。CPU 戦、最大 8 人のオンライン、1000 ステージ、自然モード。', '줄을 지우고 T를 돌려 시멘트를 보내요. 컴퓨터 대전, 최대 8명 온라인, 1000 스테이지, 자연 도전.'],

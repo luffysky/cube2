@@ -67,7 +67,7 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.evaluate(() => { const S = ZZ.peek().S; S.time = 65000; S.me.stats.lines = 12; S.me.topOut('block'); });
     await sleep(1500);
     const end = await page.evaluate(() => ({ sheet: ZZ.peek().sheet, text: document.getElementById('sheetCard').textContent, coins: ZZ.Meta.data.coins, best: ZZ.Meta.data.lv.wx }));
-    ok(end.sheet === 'wxOver' && /撐了 1:05/.test(end.text) && end.coins === c0 + 3 + 3 && end.best > 0, 'the result: time, coins and a best score', end);
+    ok(end.sheet === 'wxOver' && /撐了 1:05/.test(end.text) && end.coins === c0 && end.best > 0, 'the result: time and a best score, no coins (no proof of a run yet)', end);
     await page.screenshot({ path: path.join(OUT, 'wx-over.png') });
     await page.click('[data-do="again"]'); await sleep(400);
     ok(await page.evaluate(() => ZZ.peek().S && ZZ.peek().S.kind === 'weather'), 'go again starts a new run');

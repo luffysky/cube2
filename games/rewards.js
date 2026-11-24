@@ -6,7 +6,8 @@
    A mini game is a page of its own, so it does not touch the record itself: it leaves the result in a queue in this
    browser's storage. The next time 轉磚 opens (here, on the same site) it takes the queue, pays each result through
    Meta, and, when the player has a cloud save, the server checks it: a result may not claim more than the time it
-   says it took could produce, and mini games pay at most DAY_CAP coins a day.
+   says it took could produce, and mini games pay at most DAY_CAP coins a day. (For now they pay none: a result cannot
+   be checked by the server yet, so only the record and the stars count. coins() stays for when there is a proof.)
 
    Kinds of game:
      score   paid by the score, more on harder difficulties            (snake, breakout, stack, merge)
@@ -74,9 +75,8 @@
     var rec = localRecord(), mini = rec && rec.mini || {}, prev = mini[r.game], q = readQueue();
     // results already waiting in the queue count as if paid, so the estimate does not pay the same thing twice
     q.forEach(function (o) { if (o.game === r.game) prev = record(o, prev); });
-    var c = coins(r, prev);
-    var today = rec && rec.daily ? rec.daily.mini || 0 : 0, waiting = q.reduce(function (a, o) { return a + (o.est || 0); }, 0);
-    c = Math.max(0, Math.min(c, DAY_CAP - today - waiting));
+    // a brick game's result cannot be checked by the server yet, so it pays no coins (the record and stars still count)
+    var c = 0;
     q.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c });
     var s = store();
     try { if (s) s.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX))); } catch (e) { /* not kept */ }
@@ -96,8 +96,7 @@
     var p = doc.createElement('p');
     p.className = 'coins';
     var W = root.SRW, T = function () { return W ? W.t.apply(null, arguments) : arguments[0]; };
-    p.innerHTML = c ? '<b>' + T('rw.plus', c) + '</b>' + T('g.sep') + '<a href="../../?from=games">' + T('rw.claim') + '</a>'
-      : T('rw.none', T(r && GAMES[r.game] && GAMES[r.game].kind === 'levels' ? 'rw.noStars' : 'rw.noCoins'), DAY_CAP);
+    p.innerHTML = T('rw.records');
     after.parentNode.insertBefore(p, after.nextSibling);
     return c;
   }

@@ -150,6 +150,81 @@ const link = (platformId, pid) => pg.query("INSERT INTO zz.identity (platform_id
   ok((await pg.query('SELECT state FROM zz.players WHERE id = $1', [C.id]))[0].state.owned.tile.indexOf('pixel') >= 0, 'granted when it links');
   delete rules.Meta.PAID['brickduel.look.pixel'];
 
+  // ---------- P1-A: never "marked done but not received", and every failure can be retried ----------
+  {
+    const P9 = '9f9f9f9f-1111-4222-8333-444455556666';
+    const G = (await rpc({ a: 'hello' })).json;
+    await link(P9, G.id);
+    const ledger0 = (await rpc({ a: 'ledger' }, G)).json;
+    // the save cannot be written right after the notice is recorded (delivery fails)
+    const realOp = core.serverOp;
+    core.serverOp = async () => false;
+    const warn = console.warn, lines = []; console.warn = x => lines.push(String(x));
+    let ev = mem(P9, 'plus', 'active', now + 30 * DAY);
+    r = await send(ev);
+    console.warn = warn;
+    ok(r.status === 200 && r.json.result === 'applied' && !((await subOf(G.id)).until > now), 'recorded and applied, the save not reached yet (delivery failed)', [r.json, await subOf(G.id)]);
+    ok(lines.some(l => /^\[zz\] entitle deliver failed \(membership, save\)$/.test(l)), 'and the failure is in the log', lines);
+    let row = (await pg.query('SELECT version, pushed FROM zz.entitle WHERE platform_id = $1', [P9]))[0];
+    ok(Number(row.pushed) < Number(row.version), 'the record says the save is still behind');
+    core.serverOp = realOp;
+    // the sender resends the same notice with a new token: it is a duplicate, and the save is told now
+    r = await send(ev);
+    s = await subOf(G.id);
+    ok(r.json.result === 'duplicate' && s.until === now + 30 * DAY && s.tier === 'plus', 'resending the same notice (new token) delivers it, once', [r.json, s]);
+    // or, without a resend, the hourly pass catches up (Vercel tells the hourly call apart by its schedule header)
+    core.serverOp = async () => false;
+    ev = mem(P9, 'pro', 'active', now + 40 * DAY);
+    console.warn = () => {}; await send(ev); console.warn = warn;
+    core.serverOp = realOp;
+    let rc = await call('cron', { method: 'GET', headers: { 'x-vercel-cron-schedule': '23 * * * *' } });
+    s = await subOf(G.id);
+    ok(rc.json.quick === true && rc.json.watch === null && rc.json.friends === null && rc.json.entitlements && rc.json.entitlements.pushed === 1 && s.tier === 'pro', 'the hourly pass (catch-up jobs only) delivers what was left behind', [rc.json, s]);
+    // the database fails between recording the notice and applying it: the request fails, nothing half done
+    const realBatch = pg.batch; let n = 0;
+    pg.batch = async list => { if (++n === 2) { const e = new Error('timeout'); e.name = 'TimeoutError'; throw e; } return realBatch(list); };
+    ev = mem(P9, 'pro', 'canceled', now + 40 * DAY);
+    r = await send(ev);
+    pg.batch = realBatch;
+    let rec = (await pg.query('SELECT applied FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
+    ok(r.status === 503 && rec && rec.applied === null, 'a timeout after recording: the sender is told to retry; the notice waits, not marked done', [r.status, rec]);
+    r = await send(ev);
+    ok(r.json.result === 'applied' && (await pg.query('SELECT status FROM zz.entitle WHERE platform_id = $1', [P9]))[0].status === 'canceled', 'the retry (new token) applies it');
+    // the step after recording never ran at all (the server stopped): the daily pass applies it
+    ev = mem(P9, 'pro', 'active', now + 50 * DAY);
+    const E = require('../server/entitle.js');
+    await E.record(dbm.get(), E.read(ev), ev, crypto.randomUUID(), Math.floor(now / 1000) + 300, now);
+    ok((await pg.query('SELECT applied FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0].applied === null, 'recorded, not applied (as if the server stopped)');
+    now += 60000;
+    rc = await call('cron', { method: 'GET' });
+    ok(rc.json.entitlements.applied === 1 && (await subOf(G.id)).until === now - 60000 + 50 * DAY, 'the daily pass applies and delivers it', rc.json.entitlements);
+    // a notice id reused with other content
+    r = await send(Object.assign({}, ev, { membership: { tier: 'plus', status: 'active', periodEnd: isoAt(now + 99 * DAY) } }));
+    ok(r.status === 409, 'the same notice id with other content: refused', r.json);
+    // a refund and a payment notice of one order racing each other, both orders
+    rules.Meta.PAID['brickduel.look.pixel'] = { kind: 'tile', id: 'pixel' };
+    for (const flip of [false, true]) {
+      const id = 'order_race_' + (flip ? 'b' : 'a');
+      const paidE = ord(P9, id, 'brickduel.look.pixel', 'succeeded'), refE = ord(P9, id, 'brickduel.look.pixel', 'refunded');
+      await Promise.all(flip ? [send(refE), send(paidE)] : [send(paidE), send(refE)]);
+      const o = (await pg.query('SELECT status, granted FROM zz.orders WHERE order_id = $1', [id]))[0];
+      ok(o.status === 'refunded' && o.granted === false, 'payment and refund arriving together (' + (flip ? 'refund first' : 'payment first') + '): refunded, not granted', o);
+    }
+    r = await send(ord(P9, 'order_race_a', 'brickduel.look.pixel', 'succeeded'));
+    const o2 = (await pg.query("SELECT status, granted FROM zz.orders WHERE order_id = 'order_race_a'"))[0];
+    ok(r.json.result === 'stale' && o2.status === 'refunded' && !o2.granted, 'a refund is final: even a newer "succeeded" does not undo it', [r.json, o2]);
+    ok((await pg.query('SELECT state FROM zz.players WHERE id = $1', [G.id]))[0].state.owned.tile.indexOf('pixel') < 0, 'and the look is not in the save');
+    delete rules.Meta.PAID['brickduel.look.pixel'];
+    // the save changed behind the record's back: the daily pass puts it right
+    await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{sub}', '{\"until\": 0, \"demo\": false, \"tier\": \"\"}'::jsonb), ver = ver + 1 WHERE id = $1", [G.id]);
+    await pg.query('UPDATE zz.entitle SET checked = 0 WHERE platform_id = $1', [P9]);
+    rc = await call('cron', { method: 'GET' });
+    ok(rc.json.entitlements.fixed >= 1 && (await subOf(G.id)).until > now, 'a save that differs from the record is told again', rc.json.entitlements);
+    // wallets apart: none of this touched the game's coins or its coin ledger
+    const ledger1 = (await rpc({ a: 'ledger' }, G)).json;
+    ok(ledger1.coins === ledger0.coins && ledger1.n === ledger0.n && ledger1.sum === ledger1.coins, 'memberships and orders never touch 轉磚 coins or the coin ledger', [ledger0.coins, ledger1.coins, ledger0.n, ledger1.n]);
+  }
+
   // ---------- test settings do nothing in production ----------
   const E = require('../server/entitle.js');
   ok(E.settings({ ENTITLE_ENABLED: '1', ENTITLE_TEST_ISSUER: 'https://evil.example', VERCEL_ENV: 'production' }).iss === ISS, 'in production the issuer is always SnowRealm\'s');

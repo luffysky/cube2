@@ -175,11 +175,33 @@ async function serverOp(db, pid, key, k, a, now) {
   }
   return false;
 }
+// A replay (the tape of a match or a level) proves one play, by one player. The first save to hand a tape in owns it
+// for 60 days; the same tape from another save (one recording passed around many accounts) counts as no proof at all.
+// Kept in zz.rate like the other short-lived marks (cleared when they expire).
+const TAPE_KEEP = 60 * 86400000;
+function tapeOf(op) { const t = op.k === 'fin' ? op.a[1] : op.k === 'lvl' ? op.a[2] : null; return t && typeof t === 'object' && !Array.isArray(t) ? t : null; }
+async function claimTapes(db, pid, ops, now) {
+  const mine = crypto.createHash('sha256').update(String(pid)).digest().readInt32BE(0);
+  const out = [];
+  for (const op of ops) {
+    const t = tapeOf(op);
+    if (!t || t.standIn) { out.push(op); continue; }
+    let fp;
+    try { fp = sha(op.k + '|' + t.seed + '|' + JSON.stringify(t.ev)).slice(0, 32); } catch (e) { out.push(op); continue; }
+    const got = await db.query('INSERT INTO zz.rate (k, n, exp) VALUES ($1, $2, $3) ON CONFLICT (k) DO UPDATE SET exp = zz.rate.exp RETURNING n', ['tape:' + fp, mine, now + TAPE_KEEP]);
+    if (got[0] && got[0].n === mine) { out.push(op); continue; }
+    const a = op.a.slice(); a[op.k === 'fin' ? 1 : 2] = null;      // someone else's tape: no proof
+    out.push({ i: op.i, k: op.k, a });
+  }
+  return out;
+}
 async function sync(db, cred, ops, now) {
+  let claimed = null;
   for (let tries = 0; tries < LIMIT.SAVE_TRIES; tries++) {
     const row = await findPlayer(db, cred);
     if (!row) return fail(401, 'auth');
     if (row.pending) return pending(row.pending);
+    if (!claimed && ops.length) { claimed = await claimTapes(db, row.id, ops, now); ops = claimed; }
     if (!ops.length) return good({ st: rules.current(row.state, now), ver: row.ver, pub: row.pub, res: [], now });
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
     const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
@@ -675,6 +697,16 @@ async function idLink(db, cred, claims, now) {
   await onSaved(db, p.id, now);            // the first full copy for Games: "the data it had before"
   return good({ linked: true, id: p.id, key: secret, now });
 }
+// The player's own coin ledger (金幣明細): the latest entries, and the sum of every entry next to the balance, which
+// must be the same (each change of the balance is one line, written in the same step as the save itself).
+async function ledger(db, cred, body) {
+  const p = await findPlayer(db, cred);
+  if (!p) return fail(401, 'auth');
+  const before = Math.max(0, Math.floor(+(body && body.before)) || 0);
+  const rows = await db.query('SELECT id, kind, why, delta, bal, at FROM zz.ledger WHERE pid = $1' + (before ? ' AND id < $2' : '') + ' ORDER BY id DESC LIMIT 50', before ? [p.id, before] : [p.id]);
+  const t = (await db.query('SELECT COALESCE(sum(delta), 0)::bigint AS s, count(*)::int AS n FROM zz.ledger WHERE pid = $1', [p.id]))[0];
+  return good({ coins: p.state.coins, sum: Number(t.s), n: t.n, rows: rows.map(r => ({ id: Number(r.id), kind: r.kind, why: r.why, delta: r.delta, bal: r.bal, at: r.at })) });
+}
 // sign out on this device: only a save linked to a SnowRealm Games account (signing in again brings it back); this
 // device's own key stops working, the save and the other devices' keys stay as they are
 async function signOut(db, cred) {
@@ -709,4 +741,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, hooks, serverOp, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, hooks, serverOp, ledger, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

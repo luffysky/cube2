@@ -4,6 +4,9 @@
 const ZZ = require('../src/engine.js');
 require('../src/meta.js');
 const M = ZZ.Meta;
+// level clears here stand for proven ones (the page sends a tape; the server replays it); see the proof checks below
+const clearAny = M.levelClear;
+M.levelClear = (n, p, tape, proven) => clearAny(n, p, tape, proven === undefined ? true : proven);
 let pass = 0, fail = 0;
 function ok(c, name) { if (c) pass++; else { fail++; console.log('FAIL', name); } }
 const mem = {}; M.store = { getItem: k => mem[k] || null, setItem: (k, v) => { mem[k] = v; } };
@@ -99,5 +102,6 @@ const code = Lv.encode({ goal: 'lines', need: 12, limit: 50, board: ['XX.XXXXXXX
 ok(lvBack && lvBack.goal === 'lines' && lvBack.need === 12 && lvBack.limit === 50 && lvBack.board.join() === 'XX.XXXXXXX,X.XXXXXXXX', 'a custom level survives its share code');
 ok(Lv.decode('AAAA') === null && Lv.decode(Lv.encode({ goal: 'dig', need: 0, limit: 30, board: ['XXXXXXXXXX'] })) === null && Lv.decode('<script>') === null, 'a broken or impossible code is refused');
 
+ok(clearAny(3, 10).ok === false && clearAny(3, 10).why === 'proof', 'a level clear without a tape is not recorded');
 console.log('luck tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

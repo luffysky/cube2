@@ -24,19 +24,19 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 120000; });
     await page.waitForFunction(() => window.__snake().state === 'over', null, { timeout: 8000 });
     const card = await page.evaluate(() => document.querySelector('#end p.coins') && document.querySelector('#end p.coins').textContent);
-    ok(/\+10 金幣/.test(card || ''), 'the end card says what it brings', card);
+    ok(/紀錄已存進/.test(card || '') && /不發金幣/.test(card || '') && !/\+\d+ 金幣/.test(card || ''), 'the end card says the record is kept and no coins are paid (no proof of a brick game yet)', card);
     ok(await page.evaluate(() => JSON.parse(localStorage.getItem('snowrealm.mini.queue')).length === 1), 'the result waits in the queue');
     await page.screenshot({ path: path.join(OUT, 'minipay-snake.png') });
     await page.goto(BASE + 'games/'); await sleep(300);
     const wallet = await page.evaluate(() => { const w = document.getElementById('wallet'); return w.hidden ? '' : w.textContent; });
-    ok(/轉磚金幣 \d+/.test(wallet) && /\+10 待入帳/.test(wallet), 'the directory shows the coins and what is waiting', wallet);
+    ok(!/待入帳/.test(wallet), 'the directory shows nothing waiting to be paid', wallet);
     ok(await page.evaluate(() => !!document.querySelector('a[href="https://games.snowrealm.pet/"]')), 'the directory links SnowRealm Games sign-up');
     await page.screenshot({ path: path.join(OUT, 'minipay-dir.png') });
     await page.addInitScript(() => { window.__toasts = []; document.addEventListener('DOMContentLoaded', () => { ['toast', 'mtoast'].forEach(id => { const t = document.getElementById(id); if (t) new MutationObserver(() => window.__toasts.push(t.textContent)).observe(t, { childList: true, characterData: true, subtree: true }); }); }); });
     await page.goto(BASE + 'index.html?sw=off&lang=zh-Hant'); await sleep(2600);
     const after = await page.evaluate(() => ({ coins: ZZ.Meta.data.coins, best: ZZ.Meta.data.mini.snake[1], q: localStorage.getItem('snowrealm.mini.queue'), toast: window.__toasts.join(' | ') }));
-    ok(after.coins === c0 + 10 && after.best === 400 && !after.q, '轉磚 pays it on opening and keeps the best', after);
-    ok(/\+10 金幣入帳/.test(after.toast), 'and says so', after.toast);
+    ok(after.coins === c0 && after.best === 400 && !after.q, '轉磚 takes it on opening: the best is kept, no coins', after);
+    ok(!/金幣入帳/.test(after.toast), 'and says no coins came in', after.toast);
     // a level game: stars carried in the record show in the game's own list
     await page.evaluate(() => { ZZ.Meta.data.mini.push = '30'; ZZ.Meta.save(); });
     await page.goto(BASE + 'games/push/'); await sleep(400);

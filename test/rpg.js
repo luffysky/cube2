@@ -56,8 +56,8 @@ function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', 
     const c0 = await A.evaluate(() => ZZ.Meta.data.coins);
     await A.evaluate(() => { const S = ZZ.App.S(); S.rpg.pieces = 30; ZZ.App.kinds.rpg.lock({ lines: 4, attack: 4 }); });
     ok(await until(() => A.evaluate(() => /打倒了/.test(document.getElementById('sheetCard').textContent)), 5000), 'beating it shows the win card');
-    ok(await until(() => A.evaluate(c => ZZ.Meta.data.rpg.best === 1 && ZZ.Meta.data.coins === c + 40 && ZZ.Cloud.q.length === 0, c0), 8000), 'the server agrees: stage 1 beaten, 40 coins', await A.evaluate(() => [ZZ.Meta.data.rpg, ZZ.Meta.data.coins]));
-    ok(await A.evaluate(() => /40 金幣/.test(document.getElementById('sheetCard').textContent)), 'the card shows the coins');
+    ok(await until(() => A.evaluate(c => ZZ.Meta.data.rpg.best === 1 && ZZ.Meta.data.coins === c && ZZ.Cloud.q.length === 0, c0), 8000), 'the server agrees: stage 1 beaten, no coins (no proof of a stage yet)', await A.evaluate(() => [ZZ.Meta.data.rpg, ZZ.Meta.data.coins]));
+    ok(await A.evaluate(() => !/\d+ 金幣/.test(document.getElementById('sheetCard').textContent)), 'the card shows no coins');
     // ---------- the boss gets angry at half its hit points ----------
     await A.evaluate(() => { ZZ.App.closeSheet(); ZZ.App.begin('rpg', { stage: 10 }); }); await sleep(600);
     f = await fight();

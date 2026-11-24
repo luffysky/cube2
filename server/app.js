@@ -116,11 +116,10 @@ const routes = {
     if (!s) return send(res, 503, { ok: false, why: 'off' });
     const now = clock(), v = await entitle.verify(header(req, 'authorization'), s, now);
     if (!v.ok) return send(res, v.status, { ok: false, why: v.status === 503 ? 'keys' : v.status === 403 ? 'scope' : 'token' }, v.status === 401 ? { 'WWW-Authenticate': 'Bearer' } : null);
-    // each token once
-    const used = await db.run(d => d.query('INSERT INTO zz.idjti (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING RETURNING 1', ['ent:' + v.jti.slice(0, 120), v.exp * 1000]));
-    if (!used[0]) return send(res, 401, { ok: false, why: 'token' });
+    // the token is used up together with recording the notice (server/entitle.js record), so a notice is never lost
+    // to a token spent on a request that then failed
     const body = await readBody(req);
-    const out = await db.run(d => entitle.handle(d, body, now));
+    const out = await db.run(d => entitle.handle(d, body, now, v.jti, v.exp));
     send(res, out.status, out.body);
   },
   // the public key SnowRealm Games checks this game's save-sync tokens with (empty while no key is set)
@@ -185,18 +184,24 @@ const routes = {
     }
     if (!db.configured()) return send(res, 503, { ok: false, why: 'db' });
     const now = clock();
-    const out = await db.run(d => files.purge(d, now));
+    // the hourly call (vercel.json, told apart by Vercel's x-vercel-cron-schedule header; ?only=sync by hand) does just
+    // the two catch-up jobs below: saves on their way to SnowRealm Games, and payment notices not yet fully done
+    const quick = /[?&]only=sync(&|$)/.test(req.url || '') || String(header(req, 'x-vercel-cron-schedule') || '') === '23 * * * *';
+    const out = quick ? { status: 200, body: { ok: true, quick: true } } : await db.run(d => files.purge(d, now));
     // how much of the audit log and the sign-in scratch table is past its time: counted only, nothing removed
     let watch = null;
-    try { watch = await db.run(d => retention.watch(d, now)); } catch (e) { log('cron-watch', e); }
+    if (!quick) try { watch = await db.run(d => retention.watch(d, now)); } catch (e) { log('cron-watch', e); }
     if (watch && (watch.adminLog.pastKeep > 0 || watch.authSessions.expired > 1000)) console.warn('[zz] retention ' + JSON.stringify(watch));
     // ended friendships past their one day (Owner decision C-040)
     let friends = null;
-    try { friends = await db.run(d => core.friendsTidy(d, now)); } catch (e) { log('cron-friends', e); }
+    if (!quick) try { friends = await db.run(d => core.friendsTidy(d, now)); } catch (e) { log('cron-friends', e); }
     // linked saves still waiting to reach SnowRealm Games (only while the sync is on)
     let saveSync = null;
     if (savesync.enabled()) { try { saveSync = await db.run(d => savesync.drain(d, now, 200)); } catch (e) { log('cron-savesync', e); } }
-    send(res, out.status, Object.assign({}, out.body, { watch, friends, saveSync }));
+    // payment notices not yet fully done, and memberships checked against the saves (only while it is switched on)
+    let entitlements = null;
+    if (entitle.enabled()) { try { entitlements = await db.run(d => entitle.reconcile(d, now, 200)); } catch (e) { log('cron-entitle', e); } }
+    send(res, out.status, Object.assign({}, out.body, { watch, friends, saveSync, entitlements }));
   },
   // the rewarded-ad network's callback (GET, signed). Not for pages: nothing is paid without a valid signature.
   async ad(req, res, url) {
@@ -304,6 +309,10 @@ const routes = {
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         // (during the acceptance before linking opens, the acceptance saves see their own link state)
         out = await db.run(d => core.idStatus(d, cred, identity.enabled(), bff.accepting()));
+        break;
+      case 'ledger':
+        if (!cred) return send(res, 401, { ok: false, why: 'auth' });
+        out = await db.run(d => core.ledger(d, cred, body));
         break;
       case 'signout':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });

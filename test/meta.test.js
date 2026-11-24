@@ -3,6 +3,10 @@ const ZZ = require('../src/engine.js');
 require('../src/bot.js'); require('../src/drills.js'); require('../src/openers.js');
 require('../src/meta.js');
 const M = ZZ.Meta;
+// the pay rules below are for proven results (a tape the server replayed); the checks for results without one are
+// in their own section ("only a proven result pays")
+const finishAny = M.finish;
+M.finish = (m, tape, proven) => finishAny(m, tape === undefined ? { standIn: true } : tape, proven === undefined ? true : proven);
 let pass = 0, fail = 0;
 function ok(c, name) { if (c) pass++; else { fail++; console.log('FAIL', name); } }
 function eq(a, b, name) { ok(JSON.stringify(a) === JSON.stringify(b), name + ' got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b)); }
@@ -337,9 +341,10 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   ok(!M.rpgClear(1, 40, 'mage').ok, 'the class must be the one on record');
   ok(!M.rpgClear(1, 2, 'tank').ok, 'nobody beats a monster in two pieces');
   let r = M.rpgClear(1, 40, 'tank');
-  ok(r.ok && r.first && r.coins === 40 && M.data.rpg.best === 1 && M.data.coins === 40, 'stage 1 first clear: 40 coins, stage 2 opens', r);
+  // no proof of an adventure stage exists yet: progress and gear count, no coins
+  ok(r.ok && r.first && r.coins === 0 && M.data.rpg.best === 1 && M.data.coins === 0, 'stage 1 first clear: stage 2 opens, no coins (no proof yet)', r);
   r = M.rpgClear(1, 40, 'tank');
-  ok(r.ok && !r.first && r.coins === 5, 'beating it again pays 5', r);
+  ok(r.ok && !r.first && r.coins === 0, 'beating it again: no coins', r);
   M.rpgClear(2, 40, 'tank');
   r = M.rpgClear(3, 40, 'tank');
   ok(r.drop === 'w' && R.CLASSES.every(c => M.data.rpg.gear[c].w === 1 && M.data.rpg.gear[c].a === 0), 'stage 3 opens the weapon slot for every class', [r, M.data.rpg.gear]);
@@ -371,6 +376,32 @@ M.use('garbage'); eq(M.data.coins, 200, 'use() of nonsense starts fresh');
   // the first version kept one set for every class: each class starts from it
   M.use(Object.assign({}, M.data, { rpg: { cls: 'rogue', best: 6, gear: { w: 3, a: 1, c: 0 }, wins: 4 } }));
   eq([M.data.rpg.gear.tank, M.data.rpg.gear.rogue], [{ w: 3, a: 1, c: 0 }, { w: 3, a: 1, c: 0 }], 'an old save\'s gear carries over to every class');
+}
+// ---------- only a proven result pays ----------
+{
+  M.reset();
+  const c0 = M.data.coins, xp0 = M.data.xp, g0 = M.data.tot.games;
+  const win = { mode: 'ai', result: 1, level: 2, ko: 2, koOpp: 0, itemsUsed: 2, ms: 120000, stats: { score: 12000, spins: 3, minis: 0, sent: 30, quads: 1, maxCombo: 2, xspins: 0, lines: 30, pieces: 80 } };
+  let r = finishAny(win, null);
+  ok(r.unproven && r.coins === 0 && M.data.coins === c0 && M.data.xp === xp0 && M.data.tot.games === g0 + 1 && M.data.tot.wins === 0, 'no tape (items were used): a game played, no coins, no experience, not a win', r);
+  ok(M.data.daily.jobs.every(j => j.n === 0), 'and no daily-job progress');
+  r = M.run('fin', [win]);
+  ok(r.ok && r.out.unproven && M.data.coins === c0, 'the same through the op the server repeats (no proof given)');
+  r = M.run('fin', [win, true]);
+  ok(r.ok && !r.out.unproven && M.data.coins > c0, 'and with the server\'s word that it checked out, it pays');
+  // the daily cap on match coins
+  M.reset();
+  let paid = 0;
+  for (let i = 0; i < 40; i++) paid += M.finish(Object.assign({}, win, { itemsUsed: 0 })).coins;
+  ok(paid === M.FIN_CAP && M.data.daily.fc === M.FIN_CAP, 'match coins stop at the daily cap', [paid, M.data.daily.fc]);
+  r = M.finish(Object.assign({}, win, { itemsUsed: 0 }));
+  ok(r.coins === 0 && r.capped > 0, 'over the cap: says so, pays nothing', r);
+  const day = M.data.daily.day; M.now = () => (day + 1) * 86400000 + 3600000; M.rollDay();
+  ok(M.data.daily.fc === 0 && M.finish(Object.assign({}, win, { itemsUsed: 0 })).coins > 0, 'a new day pays again');
+  M.now = () => Date.now();
+  // the daily jobs are only ones a proven result can move
+  const pool = new Set(); for (let d = 20000; d < 20400; d++) M.pickWave(d, 1).forEach(j => pool.add(j.id));
+  ok(['item', 'wx', 'mini', 'lvEndless', 'lvCustom'].every(id => !pool.has(id)) && pool.size > 10, 'no daily job asks for something that cannot be checked', [...pool]);
 }
 console.log('meta tests: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

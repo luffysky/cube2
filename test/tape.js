@@ -1,7 +1,7 @@
 'use strict';
 // For the tests: a real match played by the computer, with the tape and the report a page would send for it.
 const ZZ = require('../src/engine.js');
-require('../src/bot.js'); require('../src/meta.js'); require('../src/replay.js');
+require('../src/bot.js'); require('../src/levels.js'); require('../src/meta.js'); require('../src/replay.js');
 // o: { seed, ms (how long to play), level, garbage (rows thrown at the player every five seconds), sprint }
 function play(o) {
   // the computer player rolls dice for its slips; fixed here so the same seed always plays the same match
@@ -47,10 +47,33 @@ function stub(zz) {
   zz = zz || ZZ;
   const real = zz.Replay.check;
   if (real.stubbed) return;
-  zz.Replay.check = t => (t && t.standIn ? t.standIn : real(t));
+  zz.Replay.check = (t, o) => (t && t.standIn ? t.standIn : real(t, o));
   zz.Replay.check.stubbed = true;
 }
-module.exports = { play, fin, fake, stub, ZZ };
+// A numbered level cleared by the computer, the way the page plays it: the level's wall and pieces, a tape of every
+// piece, stopping as soon as the goal is met. Gives { tape, pieces } or null when the computer could not clear it.
+function level(n, cfg) {
+  const dice = Math.random; let d = (n * 7919) >>> 0;
+  Math.random = () => { d = (d + 0x6D2B79F5) | 0; let t = Math.imul(d ^ (d >>> 15), 1 | d); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  try { return levelOne(n, cfg); } finally { Math.random = dice; }
+}
+function levelOne(n, cfg) {
+  const Lv = ZZ.Levels, lv = Lv.level(n), g = new ZZ.Game({ board: lv.board, seed: lv.seed, manual: true });
+  const tape = new ZZ.Replay.Tape(lv.seed, false), think = Object.assign({ depth: 1, hold: false }, ZZ.Bot.LEVELS[6], { noise: 0 }, cfg || {}); delete think.step;
+  g.start();
+  let pieces = 0;
+  const step = (cfg && cfg.step) || 250, flush = () => { const ev = g.events; g.events = []; for (const e of ev) { tape.tick(step); tape.on(g, e); if (e.type === 'lock') pieces++; } };
+  flush();
+  while (!g.over && pieces < Lv.limitOf(lv)) {
+    const d = ZZ.Bot.think(g, think);
+    if (d) { if (d.hold) g.hold(); for (const a of d.path) { if (a === ZZ.Bot.L) g.move(-1); else if (a === ZZ.Bot.R) g.move(1); else if (a === ZZ.Bot.CW) g.rotate(1); else if (a === ZZ.Bot.CCW) g.rotate(-1); else g.sonicDrop(); } }
+    g.hardDrop();
+    flush();
+    if (Lv.met(lv, g)) return { tape: tape.done(), pieces };
+  }
+  return null;
+}
+module.exports = { play, fin, fake, stub, level, ZZ };
 if (require.main === module) {
   let bad = 0;
   for (let seed = 1; seed <= 40; seed++) {

@@ -7,6 +7,7 @@ const { Readable } = require('stream');
 const dbm = require('../server/db.js');
 const app = require('../server/app.js');
 const { make } = require('../tools/pglite-db.js');
+const TAPE = require('./tape.js'); TAPE.stub(require('../server/rules.js').ZZ);
 
 let pass = 0, fail = 0;
 function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', name, extra !== undefined ? JSON.stringify(extra).slice(0, 700) : ''); } }
@@ -61,6 +62,8 @@ function browser(locks) {
       if (k === KEY) tabs.forEach(t => { if (t !== tab && !t.closed) setTimeout(() => { if (!t.closed) t.C.follow(); }, 0); });
     } };
     tab.M.store = tab.store; tab.M.onOp = null; tab.M.load();
+    // a match as the page ends one: with its tape (a stand-in here, which the server's checker is taught to accept)
+    const fin0 = tab.M.finish; tab.M.finish = (m, tape) => fin0(m, tape === undefined ? TAPE.fake(m) : tape);
     tab.C.onNote = k => tab.notes.push(k);
     tabs.push(tab);
     await tab.C.init({ store: tab.store, fetch: fakeFetch, now: () => now, auto: false, locks: B.locks });

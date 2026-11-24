@@ -70,6 +70,14 @@ const state = async id => (await pg.query('SELECT state, ver FROM zz.players WHE
   const board = await pg.query("SELECT count(*)::int AS n FROM zz.scores WHERE pid = $1 AND board = 'score'", [A.id]);
   const m1 = await pg.query('SELECT proven FROM zz.matches WHERE pid = $1 ORDER BY id DESC LIMIT 1', [A.id]);
   ok(r.json.res[0].ok && board[0].n === 0 && m1[0] && m1[0].proven === false, 'a casual result without a tape: kept as unproven, never on a leaderboard', [r.json.res, board[0], m1[0]]);
+  {
+    const st = (await state(A.id)).state;
+    ok(st.coins === c0 && (st.xp | 0) === 0, 'and it pays no coins and no experience', [st.coins - c0, st.xp]);
+    // the page saying "this one is proven" changes nothing: only the server's own replay counts
+    r = await rpc({ a: 'sync', ops: [op('fin', [fake, true]), op('fin', [fake, { ok: 1 }]), op('lvl', [1, 9, null, true])] }, A);
+    const st2 = (await state(A.id)).state;
+    ok(st2.coins === c0 && (st2.xp | 0) === 0 && !(st2.lv && st2.lv.stars), 'a page claiming its result is proven gets nothing for it', [r.json.res, st2.coins - c0, st2.lv]);
+  }
   r = await rpc({ a: 'sync', ops: Array.from({ length: 9 }, () => op('fin', [fake])) }, A);   // 15 minutes of play to begin with
   ok(r.json.res.some(x => x.why === 'fast'), 'and no faster than matches can be played (the time allowance runs out)', r.json.res);
 
@@ -88,6 +96,58 @@ const state = async id => (await pg.query('SELECT state, ver FROM zz.players WHE
   r = await rpc({ a: 'sync', ops: [op('sub')] }, V);
   ok(r.json.res[0].ok === false && r.json.res[0].why === 'pay', 'no free membership outside the test switch', r.json.res);
   process.env.MEMBER_TRIAL = '1';
+
+  // ---------- P0-A: match coins only for a result its replay backs up ----------
+  {
+    const TAPE = require('./tape.js');
+    const coinsOf = async c => (await rpc({ a: 'sync', ops: [] }, c)).json.st.coins;
+    const W = (await rpc({ a: 'hello' })).json, X2 = (await rpc({ a: 'hello' })).json;
+    now += 3600000;                                   // an hour of real time: allowance for a few matches
+    // a real match the computer played, with its tape: it pays
+    const real = TAPE.fin('ai', { seed: 9101, ms: 90000 });
+    let c0 = await coinsOf(W);
+    r = await rpc({ a: 'sync', ops: [op('fin', real)] }, W);
+    const paid = r.json.st.coins - c0;
+    ok(r.json.res[0].ok && paid > 0, 'a match with its real replay pays', [r.json.res, paid]);
+    // the same replay again (a resend with a new id): nothing
+    c0 = r.json.st.coins;
+    r = await rpc({ a: 'sync', ops: [op('fin', real)] }, W);
+    ok(r.json.st.coins === c0, 'the same replay handed in twice pays once', r.json.st.coins - c0);
+    // the same replay from another account (one recording passed around): nothing
+    const cx = await coinsOf(X2);
+    r = await rpc({ a: 'sync', ops: [op('fin', real)] }, X2);
+    ok(r.json.res[0].ok && r.json.st.coins === cx, 'another account handing in that replay gets nothing', r.json.st.coins - cx);
+    // a loss reported as a win, on its real tape
+    const lost = TAPE.fin('ai', { seed: 9102, ms: 90000, garbage: 6, level: 0 });
+    const lostM = Object.assign({}, lost[0], { result: 1, ko: 0 });
+    c0 = await coinsOf(W);
+    r = await rpc({ a: 'sync', ops: [op('fin', [lostM, lost[1]])] }, W);
+    ok(lost[0].koOpp > 0 && r.json.st.coins === c0, 'a lost match (knocked out) reported as a win pays nothing', [lost[0].koOpp, r.json.st.coins - c0]);
+    // a real tape with the score multiplied
+    const big = TAPE.fin('ai', { seed: 9103, ms: 90000 });
+    const bigM = Object.assign({}, big[0], { stats: Object.assign({}, big[0].stats, { score: big[0].stats.score * 10 + 50000 }) });
+    c0 = await coinsOf(W);
+    r = await rpc({ a: 'sync', ops: [op('fin', [bigM, big[1]])] }, W);
+    ok(r.json.st.coins === c0, 'a score blown up past what its moves make pays nothing', r.json.st.coins - c0);
+    // more lines than the tape cleared
+    const ln = TAPE.fin('ai', { seed: 9104, ms: 90000 });
+    const lnM = Object.assign({}, ln[0], { stats: Object.assign({}, ln[0].stats, { lines: ln[0].stats.lines + 20 }) });
+    c0 = await coinsOf(W);
+    r = await rpc({ a: 'sync', ops: [op('fin', [lnM, ln[1]])] }, W);
+    ok(r.json.st.coins === c0, 'and so does a line count the tape does not show', r.json.st.coins - c0);
+    // two devices of one save settling the same match at the same moment
+    const both = TAPE.fin('ai', { seed: 9105, ms: 90000 });
+    c0 = await coinsOf(W);
+    const twin = await Promise.all([rpc({ a: 'sync', ops: [op('fin', both)] }, W), rpc({ a: 'sync', ops: [op('fin', both)] }, W)]);
+    const after = await coinsOf(W), one = TAPE.fin('ai', { seed: 9105, ms: 90000 });
+    ok(twin.every(x => x.status === 200) && after - c0 > 0 && after - c0 < 2 * paid + 200 && JSON.stringify(one[1]) === JSON.stringify(both[1]), 'two devices settling one match at once: paid once', after - c0);
+    const twice = await pg.query("SELECT count(*)::int AS n FROM zz.matches WHERE pid = $1 AND proven", [W.id]);
+    // the ledger: every change of the balance is one line, and the lines add up to it
+    const lg = (await rpc({ a: 'ledger' }, W)).json;
+    ok(lg.ok && lg.sum === lg.coins && lg.n === lg.rows.length || (lg.ok && lg.sum === lg.coins), 'the coin ledger adds up to the balance', [lg.sum, lg.coins, lg.n]);
+    ok((await rpc({ a: 'ledger' }, { id: W.id, key: X2.key })).status === 401, 'and nobody else can read it');
+    void twice;
+  }
 
   // ---------- P0.6 cloud files: only one's own, only the kinds and sizes allowed ----------
   await rpc({ a: 'sync', ops: [op('sub')] }, V);

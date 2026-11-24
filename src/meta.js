@@ -312,7 +312,7 @@
   var KIND_NAME = { tile: '方塊', bg: '牆面', theme: '主題', fx: '消行特效', set: '整套風格' };
   // what each of the 200 items costs in the shop (engine.js ITEMS; the first seven keep their old prices)
   var ITEM_PRICE = ZZ.ITEMS.map(function (d) { return d ? d.price : 0; });
-  var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30;
+  var BRING_MAX = 2, SET_OFF = 0.75, SUB_BOOST = 1.5, SUB_DAYS = 30, FIN_CAP = 1200, FIN_CAP_SUB = 1800;
   var PLAN = { name: '轉磚會員', month: 90, year: 890 };   // planned prices in NT$, shown in the shop; nothing is charged yet
   function find(kind, id) {
     var list = CATALOG[kind] || [];
@@ -364,10 +364,13 @@
   // second, the third waits twelve hours. Three waves a day at most, and a new day starts again from the first.
   // Every job here is an ordinary one (cat 'gen'); level jobs join when the levels mode does.
   var WAVE = { size: 5, max: 3, wait: 12 * 3600000 };
+  var UNCHECKED = ['wx', 'mini', 'endless', 'custom'];
   // a wave: three everyday jobs and two level jobs
   function pickWave(day, wave) {
     var rnd = new ZZ.RNG(day * 2654435761 + wave * 40503), jobs = [];
-    var gen = JOBS.filter(function (j) { return j.cat !== 'lvl'; }).map(function (j) { return j.id; }), lvl = JOBS.filter(function (j) { return j.cat === 'lvl'; }).map(function (j) { return j.id; });
+    // only jobs a checked result can move (items, weather runs, the brick games, endless and custom levels have no proof)
+    var ok = JOBS.filter(function (j) { return UNCHECKED.indexOf(j.ev || '') < 0 && j.id !== 'item'; });
+    var gen = ok.filter(function (j) { return j.cat !== 'lvl'; }).map(function (j) { return j.id; }), lvl = ok.filter(function (j) { return j.cat === 'lvl'; }).map(function (j) { return j.id; });
     for (var i = 0; i < WAVE.size; i++) { var pool = i < WAVE.size - 2 ? gen : lvl; jobs.push({ id: pool.splice(Math.floor(rnd.next() * pool.length), 1)[0], n: 0, paid: false }); }
     return jobs;
   }
@@ -416,7 +419,7 @@
       sign: { m: 0, days: [], paid: [] },
       // ranked against people (真人排位): the rating only the server changes, once both players' records agree
       pvp: { rp: 0, games: 0, wins: 0 },
-      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0 },
+      daily: { day: 0, jobs: [], wave: 1, waveNext: 0, login: 0, streak: 0, win: 0, draws: 0, ads: 0, wheel: 0, slot: 0, mini: 0, fc: 0 },
       // the brick games: best score or time per difficulty, stars per level
       mini: { snake: [0, 0, 0], breakout: [0, 0, 0], stack: [0, 0, 0], merge: [0, 0, 0], pipes: [0, 0, 0], sweep: [0, 0, 0], push: '', sort: '', picross: '' },
       box: { n: 0, last: null }, wheel: { n: 0, last: null }, slot: { n: 0, last: null }, lv: { stars: '', endless: 0, wx: 0, wxs: 0, wxr: 0 },
@@ -430,7 +433,7 @@
   var Meta = {
     data: blank(), now: function () { return Date.now(); }, onChange: null, store: null, onOp: null, quiet: 0, TZ: TZ,
     TIERS: TIERS, CATALOG: CATALOG, KINDS: KINDS, SITE: SITE, KIND_NAME: KIND_NAME, ITEM_PRICE: ITEM_PRICE, ITEM_KINDS: ITEM_PRICE.length - 1, FESTIVE: FESTIVE, FEST_OPEN: FEST_OPEN, festShown: festShown, BRING_MAX: BRING_MAX, JOBS: JOBS, LOGIN: LOGIN, PLAN: PLAN,
-    SUB_BOOST: SUB_BOOST, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
+    SUB_BOOST: SUB_BOOST, FIN_CAP: FIN_CAP, FIN_CAP_SUB: FIN_CAP_SUB, UNCHECKED: UNCHECKED, rankOf: rankOf, rpDelta: rpDelta, botFor: botFor, find: find,
     TITLES: TITLES, LV_MAX: LV_MAX, levelOf: levelOf, lvCoins: lvCoins
   };
   function storage() {
@@ -497,7 +500,7 @@
     var d = Meta.data.daily, day = Meta.dayNo();
     if (d.day === day && d.jobs.length) return;
     // the first wave of the day, picked by the date so everyone gets the same set
-    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0;
+    d.day = day; d.jobs = pickWave(day, 1); d.wave = 1; d.waveNext = 0; d.draws = 0; d.ads = 0; d.wheel = 0; d.slot = 0; d.mini = 0; d.fc = 0;
   };
   // a day number as its calendar month: { m: 202611, d: 21, len: 30, first: weekday of the 1st (0 = Sunday) }
   function monthOf(day) {
@@ -646,7 +649,9 @@
     var r = Meta.data.rpg, d = Meta.data;
     stage = Math.floor(+stage); pieces = Math.floor(+pieces);
     if (!(stage >= 1 && stage <= RPG.STAGES.length) || stage > r.best + 1 || !(pieces >= 3 && pieces <= 2000) || cls !== r.cls) return { ok: false, why: 'no' };
-    var first = stage > r.best, coins = RPG.reward(stage, first), drop = '';
+    // no proof of an adventure stage exists yet (skills change the wall), so it pays no coins: the stage, gear and
+    // record count as before
+    var first = stage > r.best, coins = 0, drop = '';
     if (first) {
       r.best = stage;
       var dp = RPG.STAGES[stage - 1].drop;
@@ -665,9 +670,13 @@
   Meta.lvOpen = function (n) { return n >= 1 && n <= 1000 && (n === 1 || Meta.lvStars(n - 1) > 0); };
   Meta.lvTotal = function () { var s = Meta.data.lv.stars, t = 0; for (var i = 0; i < s.length; i++) t += +s.charAt(i); return t; };
   // a numbered level finished in so many pieces: the stars are worked out here (the same on the server)
-  Meta.levelClear = function (n, pieces) {
+  // tape: the replay of the clear (the page); proven: true on the server once it checked out. Without proof nothing is
+  // recorded or paid (an honest page always has a tape: a level never runs past the tape's length).
+  Meta.levelClear = function (n, pieces, tape, proven) {
     var Lv = ZZ.Levels;
     n = Math.floor(+n); pieces = Math.floor(+pieces);
+    if (proven === undefined) proven = !!tape;
+    if (!proven) return { ok: false, why: 'proof' };
     if (!Lv || !Meta.lvOpen(n) || !(pieces >= 1)) return { ok: false, why: 'no' };
     var lv = Lv.level(n);
     if (pieces > Lv.limitOf(lv)) return { ok: false, why: 'no' };
@@ -684,7 +693,7 @@
     if (st === 3) jobEvent('lvl3s', 1);
     if (st > had) jobEvent('lvlStars', st - had);
     Meta.save();
-    emit('lvl', [n, pieces]);
+    emit('lvl', tape ? [n, pieces, tape] : [n, pieces]);
     return { ok: true, stars: st, had: had, coins: coins };
   };
   // an endless run reached this stage
@@ -707,7 +716,7 @@
     if (!practice) {
       if (score > d.lv.wx) { d.lv.wx = score; out.best = true; }
       if (sec > d.lv.wxs) { d.lv.wxs = sec; out.bestSec = true; }
-      if (sec >= 20) out.coins = Meta.earn(Math.min(60, Math.floor(sec / 20) + Math.floor(lines / 4)));
+      // no proof of a weather run exists yet (the weather changes the wall): records only, no coins
     }
     jobEvent('wx', 1);
     Meta.save();
@@ -734,7 +743,8 @@
     r = { game: r.game, lv: int(r.lv, 0, 2), value: g.kind === 'levels' ? int(r.value, 0, g.count - 1) : int(r.value, 0, 1e9), stars: int(r.stars, 0, 3), ms: int(r.ms, 0, 3600000) };
     if (g.kind === 'levels' && r.stars < 1) return { ok: false, why: 'stars' };
     if (g.kind === 'time' && r.value < 1000) return { ok: false, why: 'fast' };
-    var prev = d.mini[r.game], c = Math.max(0, Math.min(MINI.coins(r, prev), MINI.DAY_CAP - d.daily.mini));
+    // no proof of a brick game exists yet: records and boards only, no coins
+    var prev = d.mini[r.game], c = 0;
     var best = g.kind === 'levels' ? r.stars > (+String(prev).charAt(r.value) || 0) : g.kind === 'score' ? r.value > prev[r.lv] : !prev[r.lv] || r.value < prev[r.lv];
     d.mini[r.game] = MINI.record(r, prev);
     if (c) { d.daily.mini += c; Meta.earn(c); }
@@ -1221,10 +1231,24 @@
     };
   };
   // m: { mode: 'ai'|'rank'|'ghost'|'net'|'sprint', result: 1|0|-1, level, stats, ko, koOpp, itemsUsed, ms }
-  // tape: the proof that goes to the server with the result (see replay.js); it plays no part in the sums here
-  Meta.finish = function (m, tape) {
+  // tape: the proof that goes to the server with the result (see replay.js).
+  // proven: whether the result is backed by a tape the server replays (on the page: a tape is there; on the server: it
+  // checked out). Only a proven result pays: coins, experience and daily-job progress. A result without proof (items
+  // were used, a special room, an old page) is kept in the record as a game played, and pays nothing.
+  // Coins from matches are held to FIN_CAP a day (FIN_CAP_SUB for members), so even played-out results cannot be
+  // farmed without end.
+  Meta.finish = function (m, tape, proven) {
     var d = Meta.data, parts = [], out = { parts: parts, coins: 0, rank: null, jobs: [], best: false };
     m = Meta.cleanMatch(m);
+    if (proven === undefined) proven = !!tape;
+    if (!proven) {
+      Meta.rollDay();
+      if (m.mode !== 'sprint') { d.tot.games++; if (m.mode === 'net') d.tot.online++; }
+      out.unproven = true; out.xp = 0; out.level = null; out.titles = [];
+      Meta.save();
+      emit('fin', tape ? [m, tape] : [m]);
+      return out;
+    }
     m.battle = m.mode !== 'sprint';
     var st = m.stats, sc = st.score;
     function add(key, n) { n = Math.round(n); if (n > 0) parts.push({ key: key, n: n }); }
@@ -1281,6 +1305,9 @@
     if (m.mode === 'net' && m.team && m.result > 0) d.tot.duo++;
     if (m.mode === 'net' && m.quick) { d.tot.qstreak = m.result > 0 ? d.tot.qstreak + 1 : 0; d.tot.qbest = Math.max(d.tot.qbest, d.tot.qstreak); }
     out.titles = earnTitles(m);
+    var room = Math.max(0, (Meta.isSub() ? FIN_CAP_SUB : FIN_CAP) - (d.daily.fc | 0));
+    if (out.coins > room) { out.capped = out.coins - room; out.coins = room; }
+    d.daily.fc = (d.daily.fc | 0) + out.coins;
     d.coins += out.coins; d.tot.coins += out.coins;
     Meta.save();
     delete m.battle;
@@ -1317,7 +1344,7 @@
     adFree: function () { if (!here()) return yes(Meta.isSub() && Meta.adsLeft() >= 1); var r = Meta.adFree(); return r.ok ? { ok: true } : { ok: false, why: r.why }; },
     draw: function (a) { if (!here()) return yes(Meta.drawsLeft() >= 1); var r = drawNow(Math.max(1, Math.min(10, Math.floor(+a[0] || 1)))); return r.ok ? { ok: true, out: r } : { ok: false, why: r.why }; },
     title: function (a) { return yes(Meta.wearTitle(typeof a[0] === 'string' ? a[0].slice(0, 20) : '')); },
-    fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}) }; },
+    fin: function (a) { return { ok: true, out: Meta.finish(a[0] && typeof a[0] === 'object' ? a[0] : {}, null, a[1] === true || !!(a[1] && typeof a[1] === 'object')) }; },
     sbuy: function (a) { return Meta.buySite(str(a[0])); },
     swear: function (a) { return yes(Meta.wearSite(str(a[0]))); },
     buy: function (a) { return KINDS.indexOf(a[0]) < 0 ? yes(0) : Meta.buy(a[0], str(a[1])); },
@@ -1330,7 +1357,7 @@
     login: function () { return yes(Meta.claimLogin()); },
     job: function (a) { return yes(Meta.claimJobId(str(a[0]))); },
     wave: function () { return Meta.nextWave(); },
-    lvl: function (a) { var r = Meta.levelClear(a[0], a[1]); return r.ok ? { ok: true, out: r } : r; },
+    lvl: function (a) { var r = Meta.levelClear(a[0], a[1], null, a[2] === true || !!(a[2] && typeof a[2] === 'object')); return r.ok ? { ok: true, out: r } : r; },
     rpg: function (a) { var r = Meta.rpgClear(a[0], a[1], str(a[2])); return r.ok ? { ok: true, out: r } : r; },
     rpgUp: function (a) { var r = Meta.rpgUp(str(a[0]), str(a[1])); return r.ok ? { ok: true, out: r } : r; },
     rpgCls: function (a) { return Meta.rpgClass(str(a[0])); },

@@ -1,4 +1,5 @@
 'use strict';
+const crypto = require('crypto');
 /* What the server believes about a player's record.
 
    The record itself (coins, rating, what is owned…) is the same object the page keeps, and it is changed by the
@@ -68,7 +69,7 @@ function readSrv(srv, now) {
     at: typeof srv.at === 'number' && isFinite(srv.at) ? srv.at : now,
     hw: typeof srv.hw === 'number' ? srv.hw : f.hw, hn: int(srv.hn, 0, 1e9),
     rg: int(srv.rg, 0, 1e9), season: typeof srv.season === 'string' ? srv.season : '',
-    seeds: Array.isArray(srv.seeds) ? srv.seeds.filter(x => typeof x === 'number').slice(-LIMIT.SEEDS_KEPT) : []
+    seeds: Array.isArray(srv.seeds) ? srv.seeds.filter(x => typeof x === 'number' || (typeof x === 'string' && x.length <= 40)).slice(-LIMIT.SEEDS_KEPT) : []
   };
   // the allowance fills up with real time
   const waited = Math.max(0, now - out.at);
@@ -105,7 +106,7 @@ function applyOps(state, srv, ops, now) {
       const cost = Math.max(LIMIT.LEVEL_MIN, (Math.floor(+(op.a && op.a[1])) || 0) * 330);
       if (srv.bud < cost) r = { ok: false, why: 'fast' };
       else {
-        r = Meta.run(op.k, op.a);
+        r = Meta.run(op.k, [op.a && op.a[0], op.a && op.a[1], levelProven(op.a, srv)]);
         if (r && r.ok) { srv.bud -= cost; mark('lvs', String(Meta.data.lv.stars || '').split('').reduce((n, c) => n + (+c || 0), 0)); }
       }
     }
@@ -187,17 +188,35 @@ function proven(m, tape, srv) {
   if (m.result > 0 && m.ko < m.koOpp && m.seats <= 2) return null;                        // fewer knockouts than the rival is not a win (a room of more is won on places)
   return v;
 }
+// A numbered level's clear: its tape, played from the level's own wall and pieces, must end with the goal met in
+// exactly the pieces reported, within the level's limit, never knocked out, and not be a tape already used.
+function levelProven(a, srv) {
+  const Lv = ZZ.Levels, n = Math.floor(+(a && a[0])), pieces = Math.floor(+(a && a[1])), tape = a && a[2];
+  if (!Lv || !(n >= 1 && n <= Lv.COUNT) || !tape || typeof tape !== 'object') return false;
+  let size = 0;
+  try { size = JSON.stringify(tape).length; } catch (e) { return false; }
+  const lv = Lv.level(n);
+  if (size > LIMIT.TAPE_BYTES || tape.seed !== lv.seed) return false;
+  const v = ZZ.Replay.check(tape, { board: lv.board });
+  if (!v || v.kos !== 0 || v.pieces !== pieces || pieces > Lv.limitOf(lv) || !Lv.met(lv, v.game)) return false;
+  // the tape cannot be handed in again (the same seed for the same level would replay to the same thing)
+  const mark = 'lv' + n + ':' + crypto.createHash('sha256').update(JSON.stringify(tape.ev)).digest('base64url').slice(0, 16);
+  if (srv.seeds.indexOf(mark) >= 0) return false;
+  srv.seeds.push(mark); if (srv.seeds.length > LIMIT.SEEDS_KEPT) srv.seeds = srv.seeds.slice(-LIMIT.SEEDS_KEPT);
+  return true;
+}
 function finish(a, srv, mark) {
   const m = Meta.cleanMatch(a[0] && typeof a[0] === 'object' ? a[0] : {});
   const sprint = m.mode === 'sprint';
   if (sprint && (m.result <= 0 || m.ms < LIMIT.SPRINT_MIN || m.stats.lines < 40)) return { ok: false, why: 'range' };
-  const tape = a[1], v = proven(m, tape, srv);
+  // towers and territory decide the result by their own rules, which a tape of one wall cannot show
+  const tape = a[1], v = m.tower || m.terr ? null : proven(m, tape, srv);
   if (!v && (sprint || m.mode === 'rank')) return { ok: false, why: 'proof' };
   const cost = Math.max(LIMIT.MATCH_MIN, m.ms);
   if (srv.bud < cost) return { ok: false, why: 'fast' };
   srv.bud -= cost;
   if (v) { srv.seeds.push(tape.seed); if (srv.seeds.length > LIMIT.SEEDS_KEPT) srv.seeds = srv.seeds.slice(-LIMIT.SEEDS_KEPT); }
-  Meta.run('fin', [m]);
+  Meta.run('fin', [m, !!v]);
   if (sprint) mark('sprint', -m.ms);
   else {
     if (v && m.stats.score > 0) mark('score', m.stats.score);

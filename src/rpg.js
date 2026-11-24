@@ -67,6 +67,7 @@
     'rp.hit': ['-{0}', '-{0}', '-{0}', '-{0}'],
     'rp.win': ['打倒了！', 'Defeated!', '撃破！', '처치!'],
     'rp.winP': ['用了 {0} 塊，拿到 {1} 金幣', '{0} pieces · {1} coins', '{0}個使用・{1}コイン', '{0}개 사용 · {1}코인'],
+    'rp.winNoPay': ['用了 {0} 塊。冒險關卡目前沒辦法驗證，所以不發金幣；進度和裝備照算。', '{0} pieces. Adventure stages cannot be checked yet, so they pay no coins; progress and gear still count.', '{0}個使用。冒険ステージはまだ検証できないため、コインは付きません。進行と装備は記録されます。', '{0}개 사용. 모험 스테이지는 아직 확인할 수 없어서 코인은 없어요. 진행과 장비는 그대로예요.'],
     'rp.drop': ['解鎖新裝備：{0}！三個職業都拿到了這一格。', 'New gear unlocked: {0}! All three classes get this slot.', '新装備を解放：{0}！3職業とも使えます。', '새 장비 해제: {0}! 세 직업 모두 이 칸을 얻었어요.'],
     'rp.clear': ['第一章完成！黑龍倒下了。', 'Chapter 1 complete! The Black Dragon has fallen.', '第1章クリア！黒竜を倒しました。', '1장 클리어! 흑룡을 쓰러뜨렸어요.'],
     'rp.lose': ['被打倒了', 'Knocked out', 'やられた', '쓰러졌어요'],
@@ -218,7 +219,7 @@
   // ---------- after a fight ----------
   App.sheets.rpgWin = function () {
     var S = App.S(), r = S.res || {}, R = S.rpg, last = R.n >= RPG.STAGES.length;
-    var h = '<h2 class="verdict win">' + t('rp.win') + '</h2><p>' + esc(t('rp.winP', R.pieces, r.coins || 0)) + '</p>';
+    var h = '<h2 class="verdict win">' + t('rp.win') + '</h2><p>' + esc(r.coins ? t('rp.winP', R.pieces, r.coins) : t('rp.winNoPay', R.pieces)) + '</p>';
     if (r.drop) h += '<p><b>' + esc(t('rp.drop', t('rp.g.' + RPG.GEAR[R.cls][r.drop]))) + '</b></p>';
     if (last && r.first) h += '<p><b>' + t('rp.clear') + '</b></p>';
     return h + '<div class="row">' + (last ? '' : btn('rpNext', 'rp.nextSt', true)) + btn('again', 'rp.again', last) + btn('rpMap', 'rp.map') + '</div>';
