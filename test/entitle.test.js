@@ -29,8 +29,11 @@ function token(over, key) {
   return data + '.' + crypto.sign(null, Buffer.from(data), (key || K).privateKey).toString('base64url');
 }
 let ipN = 0;
+// the scheduled job carries Vercel's secret, as it does on the real site (without one each kind of run is held to once a window)
+process.env.CRON_SECRET = 'cron-test-secret';
 function call(name, o) {
   o = o || {};
+  if (name === 'cron') o = Object.assign({}, o, { headers: Object.assign({ authorization: 'Bearer cron-test-secret' }, o.headers || {}) });
   return new Promise(resolve => {
     const req = new Readable({ read() {} });
     req.method = o.method || 'POST'; req.url = o.url || '/api/' + name;
@@ -41,6 +44,7 @@ function call(name, o) {
     app.handle(name, req, res);
   });
 }
+const E0 = require('../server/entitle.js');
 const send = (body, tok, headers) => call('entitle', { body, headers: Object.assign({ authorization: 'Bearer ' + (tok === undefined ? token() : tok) }, headers || {}) });
 const rpc = (body, c) => call('rpc', { body, headers: c ? { authorization: 'Bearer ' + c.id + '.' + c.key } : {} });
 let opN = 0;
@@ -78,7 +82,7 @@ const link = (platformId, pid) => pg.query("INSERT INTO zz.identity (platform_id
   const A = (await rpc({ a: 'hello' })).json;
   await link(P1, A.id);
   let r = await send(mem(P1, 'plus', 'active', now + 30 * DAY));
-  eq(r.json, { ok: true, result: 'applied' }, 'a Plus membership: applied');
+  eq(r.json, { ok: true, result: 'applied', save: 'written' }, 'a Plus membership: applied, and the save has it');
   let s = await subOf(A.id);
   ok(s.until === now + 30 * DAY && s.tier === 'plus' && s.demo === false, 'the linked save is a member until the end of the paid period', s);
   r = await rpc({ a: 'sync', ops: [op('draw', [9])] }, A);
@@ -163,7 +167,7 @@ const link = (platformId, pid) => pg.query("INSERT INTO zz.identity (platform_id
     let ev = mem(P9, 'plus', 'active', now + 30 * DAY);
     r = await send(ev);
     console.warn = warn;
-    ok(r.status === 200 && r.json.result === 'applied' && !((await subOf(G.id)).until > now), 'recorded and applied, the save not reached yet (delivery failed)', [r.json, await subOf(G.id)]);
+    ok(r.status === 200 && r.json.result === 'applied' && r.json.save === 'retry' && !((await subOf(G.id)).until > now), 'recorded and applied, the save not reached yet (delivery failed; the answer says so)', [r.json, await subOf(G.id)]);
     ok(lines.some(l => /^\[zz\] entitle deliver failed \(membership, save\)$/.test(l)), 'and the failure is in the log', lines);
     let row = (await pg.query('SELECT version, pushed FROM zz.entitle WHERE platform_id = $1', [P9]))[0];
     ok(Number(row.pushed) < Number(row.version), 'the record says the save is still behind');
@@ -223,6 +227,36 @@ const link = (platformId, pid) => pg.query("INSERT INTO zz.identity (platform_id
     // wallets apart: none of this touched the game's coins or its coin ledger
     const ledger1 = (await rpc({ a: 'ledger' }, G)).json;
     ok(ledger1.coins === ledger0.coins && ledger1.n === ledger0.n && ledger1.sum === ledger1.coins, 'memberships and orders never touch 轉磚 coins or the coin ledger', [ledger0.coins, ledger1.coins, ledger0.n, ledger1.n]);
+  }
+
+  // ---------- staging drills: a token of the test issuer can ask for one step to fail (never in production) ----------
+  {
+    const TEST_ISS = 'https://commerce-drill.test', P8 = '8e8e8e8e-1111-4222-8333-444455556666';
+    process.env.ENTITLE_TEST_ISSUER = TEST_ISS;            // (VERCEL_ENV is not production here)
+    let ev = mem(P8, 'plus', 'active', now + 10 * DAY);
+    r = await send(ev, token({ iss: TEST_ISS, zzFault: 'after-record' }));
+    let rec = (await pg.query('SELECT applied FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
+    ok(r.status === 503 && rec && rec.applied === null, 'drill "after-record": the sender is told to retry; the notice is kept, not marked done', [r.status, rec]);
+    r = await send(ev, token({ iss: TEST_ISS }));
+    ok(r.json.result === 'applied' && r.json.save === 'link', 'the resend applies it; with no save linked yet the answer says it waits for the link', r.json);
+    const G8 = (await rpc({ a: 'hello' })).json;
+    await link(P8, G8.id); await E0.linked(dbm.get(), G8.id, now);   // what the link step calls (core.hooks.linked)
+    ok((await subOf(G8.id)).tier === 'plus', 'linking a save hands it over');
+    ev = mem(P8, 'pro', 'active', now + 20 * DAY);
+    r = await send(ev, token({ iss: TEST_ISS, zzFault: 'deliver' }));
+    ok(r.json.result === 'applied' && r.json.save === 'retry' && (await subOf(G8.id)).tier === 'plus', 'drill "deliver": applied, the save not reached, the answer says retry', r.json);
+    now += 61000;
+    const rc = await call('cron', { method: 'GET', url: '/api/cron?only=sync' });
+    ok(rc.json.quick && rc.json.entitlements.pushed >= 1 && (await subOf(G8.id)).tier === 'pro', 'the catch-up pass hands it over', [rc.status, rc.json, await subOf(G8.id)]);
+    r = await send(mem(P8, 'pro', 'active', now + 30 * DAY), token({ iss: TEST_ISS, zzFault: 'nonsense' }));
+    ok(r.json.save === 'written', 'an unknown drill does nothing', r.json);
+    // in production the test issuer is never trusted, so no token can ask for a drill
+    const prod = E0.settings({ ENTITLE_ENABLED: '1', ENTITLE_JWKS: JWKS, ENTITLE_TEST_ISSUER: TEST_ISS, VERCEL_ENV: 'production' });
+    const vp = await E0.verify('Bearer ' + token({ zzFault: 'deliver' }), prod, now);
+    ok(prod.drills === false && vp.ok && vp.fault === null, 'production: no drills, even with the test issuer set (a real token asking for one is just a token)', [prod.drills, vp]);
+    const vt = await E0.verify('Bearer ' + token({ iss: TEST_ISS, zzFault: 'deliver' }), prod, now);
+    ok(!vt.ok, 'and a test-issuer token is refused outright', vt);
+    delete process.env.ENTITLE_TEST_ISSUER;
   }
 
   // ---------- test settings do nothing in production ----------

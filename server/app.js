@@ -87,7 +87,7 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), admin: admin.configured(), dbSource: db.source(), build: String(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null, region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), admin: admin.configured(), entitle: entitle.enabled(), dbSource: db.source(), build: String(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null, region: process.env.VERCEL_REGION || '', now: clock() };
     // only the exact address /api/health?deep=1 reaches the database (cached 15 s), so adding other parameters cannot
     // make every request a database round trip
     if (url.search === '?deep=1' && out.db) {
@@ -119,7 +119,7 @@ const routes = {
     // the token is used up together with recording the notice (server/entitle.js record), so a notice is never lost
     // to a token spent on a request that then failed
     const body = await readBody(req);
-    const out = await db.run(d => entitle.handle(d, body, now, v.jti, v.exp));
+    const out = await db.run(d => entitle.handle(d, body, now, v.jti, v.exp, v.fault));
     send(res, out.status, out.body);
   },
   // the public key SnowRealm Games checks this game's save-sync tokens with (empty while no key is set)
@@ -184,9 +184,16 @@ const routes = {
     }
     if (!db.configured()) return send(res, 503, { ok: false, why: 'db' });
     const now = clock();
+    // (the hourly call is decided below.) Without CRON_SECRET anyone can reach this address, so each kind of run is
+    // let through at most once per window: a stranger calling it over and over only gets "too soon"
+    const quickWanted = /[?&]only=sync(&|$)/.test(req.url || '') || String(header(req, 'x-vercel-cron-schedule') || '') === '23 * * * *';
+    if (!secret) {
+      const n = await db.run(d => core.bump(d, 'cron', quickWanted ? 'quick' : 'full', quickWanted ? 60000 : 600000, now));
+      if (n > 1) return send(res, 429, { ok: false, why: 'soon' }, { 'Retry-After': quickWanted ? '60' : '600' });
+    }
     // the hourly call (vercel.json, told apart by Vercel's x-vercel-cron-schedule header; ?only=sync by hand) does just
     // the two catch-up jobs below: saves on their way to SnowRealm Games, and payment notices not yet fully done
-    const quick = /[?&]only=sync(&|$)/.test(req.url || '') || String(header(req, 'x-vercel-cron-schedule') || '') === '23 * * * *';
+    const quick = quickWanted;
     const out = quick ? { status: 200, body: { ok: true, quick: true } } : await db.run(d => files.purge(d, now));
     // how much of the audit log and the sign-in scratch table is past its time: counted only, nothing removed
     let watch = null;

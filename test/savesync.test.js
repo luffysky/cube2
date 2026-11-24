@@ -49,8 +49,11 @@ sync.setFetch(async (url, o) => {
 });
 
 let ipN = 0;
+// the scheduled job carries Vercel's secret, as it does on the real site (without one each kind of run is held to once a window)
+process.env.CRON_SECRET = 'cron-test-secret';
 function call(name, o) {
   o = o || {};
+  if (name === 'cron') o = Object.assign({}, o, { headers: Object.assign({ authorization: 'Bearer cron-test-secret' }, o.headers || {}) });
   return new Promise(resolve => {
     const req = new Readable({ read() {} });
     req.method = o.method || 'POST'; req.url = o.url || '/api/' + name;

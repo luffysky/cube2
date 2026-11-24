@@ -1751,3 +1751,15 @@
 - 測試（in-process，pglite）：`entitle` 72 項，新增 16 項：送達失敗（存檔寫不進去）→ 紀錄顯示落後 → 重送補上、只補一次；送達失敗後不重送 → 每小時那次補上；記下之後資料庫逾時 → 回 503、通知留著沒標成完成 → 重送套用；記下之後伺服器停掉、沒有套用 → 每小時那次套用並送達；同一 `eventId` 換內容 → 409；付款和退款同時到（兩種先後）→ 都是已退款、不發貨；退款後再來更新版本的「成功」→ 不改；存檔被改掉 → 每小時那次改回來；以上全部不碰轉磚金幣和金幣帳本。
 - 開關：`ENTITLE_ENABLED` 預設關、正式站沒設。
 - 檔案：`server/entitle.js`、`server/db.js`（`zz.entevents` 加欄位、`zz.entitle` 加 `pushed`、`checked`）、`server/app.js`、`vercel.json`、`test/entitle.test.js`、`docs/handoff/BRICKDUEL_ENTITLEMENTS.md`、`docs/DEVLOG.md`。｜刪除：無。
+
+## 2026-11-24 17:35（Asia/Taipei）｜付款通知回應多一個「存檔狀態」、staging 專用的故障演練、沒有 CRON_SECRET 時排程網址限次
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 任務 P1-A（故障注入只在 staging、要有安全復原）、P0-B 資安檢查
+- 付款通知的 200 回應多了 `save`：`written`（存檔已拿到）、`link`（還沒綁定存檔，綁定時帶上）、`nothing`（沒有要發的東西，例如轉磚沒賣的商品）、`retry`（寫存檔失敗，之後會補）。cube1 看回應就知道玩家是不是真的拿到了。
+- 故障演練（只在 staging）：只有「非正式環境、而且 token 是測試 issuer（`ENTITLE_TEST_ISSUER`）簽的」才看 token 裡的 `zzFault`：`after-record`（記下之後假裝資料庫逾時，回 503）、`deliver`（寫存檔失敗）。正式站不信任測試 issuer，真的 token 帶這個欄位也只是普通 token。復原方式就是正常流程本身：重送或每小時補送；關掉只要把 `ENTITLE_TEST_ISSUER` 拿掉。
+- 發現：專案沒有設 `CRON_SECRET`，所以 `/api/cron` 任何人都能叫（每天的清理、每小時的補送）。內容本身只做該做的事，但可以被拿來一直打資料庫。先加限次：沒有秘密時，每天那種 10 分鐘內只跑一次、補送那種 1 分鐘內只跑一次，其他回 429。**建議 Owner 在 Vercel Production（和 Preview）加 `CRON_SECRET`**（Vercel 排程會自動帶上；值不要貼在聊天）。
+- `/api/health` 多一個 `entitle`（付款通知接收端開了沒），用來確認正式站一直是關的。
+- staging：Preview（只限 `staging` 分支）新增 `ENTITLE_ENABLED=1`、`ENTITLE_JWKS`（演練用一次性金鑰的**公鑰**；私鑰只在 Vercel Sandbox `brickduel-staging-drill` 裡，沒有經過聊天、程式碼或日誌）、`ENTITLE_TEST_ISSUER`。演練完把 `ENTITLE_ENABLED` 改回 0。正式環境沒動。
+- 測試：`entitle` 80 項（多 8 項：演練 after-record → 503、通知留著 → 重送套用並回 `link`；綁定後帶上；演練 deliver → `retry` → 補送那次帶上；不認得的演練不做事；正式站不做演練、測試 issuer 直接拒絕）；`api` 455 項（沒有秘密時第二次 429、下個時段再跑）；`savesync` 53、`security` 61。
+- 檔案：`server/entitle.js`、`server/app.js`、`test/entitle.test.js`、`test/api.test.js`、`test/savesync.test.js`、`docs/DEVLOG.md`。｜刪除：無。
+- 補記：上一條的 commit 為 [`8c3688b`](https://github.com/luffysky/cube2/commit/8c3688b)。

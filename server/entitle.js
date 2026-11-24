@@ -54,7 +54,9 @@ function settings(env) {
   if (env.ENTITLE_JWKS) { try { inline = JSON.parse(env.ENTITLE_JWKS); } catch (e) { return null; } }
   const url = env.ENTITLE_JWKS_URL || JWKS_URL;
   if (!inline && !/^https:\/\//.test(url)) return null;
-  return { iss, subs, inline, url };
+  // drills: only outside production, and only for tokens of the test issuer (never the real payment service)
+  const drills = test && !!env.ENTITLE_TEST_ISSUER && iss === env.ENTITLE_TEST_ISSUER;
+  return { iss, subs, inline, url, drills };
 }
 const enabled = env => !!settings(env);
 
@@ -99,8 +101,11 @@ async function verify(header, s, now) {
   if (body.iss !== s.iss || aud.indexOf(AUD) < 0 || typeof body.jti !== 'string' || !body.jti || !Number.isSafeInteger(body.iat) || !Number.isSafeInteger(body.exp)
     || body.exp <= body.iat || body.exp - body.iat > MAX_LIFE || body.exp + SKEW < sec || body.iat - SKEW > sec || (body.nbf != null && body.nbf - SKEW > sec)) return { ok: false, status: 401, why: 'token' };
   if (s.subs.indexOf(body.sub) < 0 || String(body.scope || '').split(' ').indexOf(SCOPE) < 0) return { ok: false, status: 403, why: 'scope' };
-  return { ok: true, sub: body.sub, jti: body.jti, exp: body.exp };
+  // a staging drill (see settings): the token asks for one step to fail, to show it is made good afterwards
+  const fault = s.drills && FAULTS.indexOf(body.zzFault) >= 0 ? body.zzFault : null;
+  return { ok: true, sub: body.sub, jti: body.jti, exp: body.exp, fault };
 }
+const FAULTS = ['after-record', 'deliver'];
 
 const iso = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(v) && isFinite(Date.parse(v));
 function read(b) {
@@ -155,12 +160,14 @@ async function settleOrder(db, orderId, now) {
   return 'settled';
 }
 // after a notice is recorded: the save is told; a failure here is logged and left to the next pass (reconcile)
-async function deliver(db, ev, now) {
+// Says where the save stands: 'written' (it has it), 'link' (no save linked yet: it gets it on linking),
+// 'nothing' (nothing to hand over, e.g. a product not sold here) or 'retry' (failed; the next pass does it again)
+async function deliver(db, ev, now, fault) {
   try {
-    if (ev.kind === 'membership') await pushMembership(db, ev.platformId, now);
-    else await settleOrder(db, ev.orderId, now);
-    return true;
-  } catch (e) { console.warn('[zz] entitle deliver failed (' + ev.kind + ', ' + ((e && e.code) || (e && e.name) || 'error') + ')'); return false; }
+    if (fault === 'deliver') throw Object.assign(new Error('drill'), { code: 'drill' });
+    const r = ev.kind === 'membership' ? await pushMembership(db, ev.platformId, now) : await settleOrder(db, ev.orderId, now);
+    return r === 'unlinked' ? 'link' : r === 'none' ? 'nothing' : 'written';
+  } catch (e) { console.warn('[zz] entitle deliver failed (' + ev.kind + ', ' + ((e && e.code) || (e && e.name) || 'error') + ')'); return 'retry'; }
 }
 
 // ---------- the notice ----------
@@ -211,21 +218,24 @@ async function apply(db, ev, now) {
   return was && was.result ? 'duplicate:' + was.result : 'stale';
 }
 // a recorded notice, applied if it is not yet, then delivered (both steps safe to repeat)
-async function processOne(db, ev, now) {
+async function processOne(db, ev, now, fault) {
   const e = (await db.query('SELECT applied, result FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
   let result = e && e.applied ? 'duplicate' : await apply(db, ev, now);
   if (result.indexOf('duplicate') === 0) result = 'duplicate';
   else if (result === 'conflict') return { status: 409, body: { ok: false, why: 'order' } };
-  const mine = e && e.applied ? e.result : result;
-  if (mine === 'applied' || result === 'duplicate') await deliver(db, ev, now);
-  return { status: 200, body: { ok: true, result } };
+  const out = { ok: true, result };
+  // a stale notice changes nothing, so there is nothing to hand over; a duplicate is handed over again (harmless)
+  if (result !== 'stale') out.save = await deliver(db, ev, now, fault);
+  return { status: 200, body: out };
 }
-async function handle(db, body, now, jti, exp) {
+async function handle(db, body, now, jti, exp, fault) {
   const ev = read(body);
   if (!ev) return { status: 400, body: { ok: false, why: 'event' } };
   const bad = await record(db, ev, body, jti || crypto.randomUUID(), exp || Math.floor(now / 1000) + 300, now);
   if (bad) return bad;
-  return processOne(db, ev, now);
+  // staging drill: as if the database stopped answering right after the notice was recorded
+  if (fault === 'after-record') throw Object.assign(new Error('drill'), { name: 'TimeoutError' });
+  return processOne(db, ev, now, fault);
 }
 
 // ---------- the pass that puts things right (the daily job, and after each notice) ----------

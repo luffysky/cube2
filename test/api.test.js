@@ -1071,6 +1071,13 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     ok(w && w.adminLog.rows === 2 && w.adminLog.pastKeep === 1 && w.adminLog.keepDays === 180 && /Z$/.test(w.adminLog.oldest) && w.authSessions.expired === 1 && w.authSessions.expiredWithData === 1, 'the daily job reports what is past its time', w);
     eq((await pg.query('SELECT count(*)::int AS n FROM zz.admin_log'))[0].n + (await pg.query('SELECT count(*)::int AS n FROM zz.authsess'))[0].n, 3, 'and deletes none of it');
     delete process.env.CRON_SECRET;
+    // without the secret anyone can reach the address: each kind of run goes through at most once a window
+    const cronWas = now; now += 3600000;
+    const c1 = await call('cron'), c2 = await call('cron'), q1 = await call('cron', { url: '/api/cron?only=sync' }), q2 = await call('cron', { url: '/api/cron?only=sync' });
+    ok(c1.status === 200 && c2.status === 429 && q1.status === 200 && q1.json.quick === true && q2.status === 429, 'with no secret set: a second call within the window only gets "too soon"', [c1.status, c2.status, q1.status, q2.status]);
+    now += 600000;
+    eq((await call('cron')).status, 200, 'and the next window runs again');
+    now = cronWas;
     for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']) delete process.env[k];
   }
 
