@@ -97,6 +97,12 @@ const link = (platformId, pid) => pg.query("INSERT INTO zz.identity (platform_id
   ok((await subOf(A.id)).tier === 'pro', 'now Pro');
   r = await send(mem(P1, 'plus', 'active', now + 30 * DAY, { version: 1 }));
   ok(r.json.result === 'stale' && (await subOf(A.id)).tier === 'pro', 'an older version arriving late changes nothing', r.json);
+  // found on staging (2026-11-24): another notice with the very same version as the record's was answered "applied"
+  r = await send(mem(P1, 'plus', 'expired', now + DAY, { version: dup.version }));
+  ok(r.json.result === 'stale' && (await subOf(A.id)).tier === 'pro', 'a new notice with the same version as the record: stale, nothing changed', r.json);
+  r = await send(ord(P2, 'order_same_v', 'brickduel.look.test', 'succeeded', { version: 4 }));
+  const rs = await send(ord(P2, 'order_same_v', 'brickduel.look.test', 'refunded', { version: 4 }));
+  ok(r.json.result === 'applied' && rs.json.result === 'stale' && (await pg.query("SELECT status FROM zz.orders WHERE order_id = 'order_same_v'"))[0].status === 'succeeded', 'and the same for an order', [r.json, rs.json]);
   eq((await send(mem(P1, 'pro', 'canceled', now + 60 * DAY))).json.result, 'applied', 'cancelled (renewal off)');
   ok((await subOf(A.id)).until === now + 60 * DAY, 'still a member to the end of the period paid for');
   eq((await send(mem(P1, 'pro', 'refunded', now + 60 * DAY))).json.result, 'applied', 'refunded');

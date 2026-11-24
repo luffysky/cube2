@@ -1789,3 +1789,30 @@
 - 測試：`api` 470、`admin` 122、`entitle` 82、`security` 61、其他單元測試全過；瀏覽器 `minipay` 16（小遊戲直接送、地城送出、伺服器不通時留著、轉磚補送）、`dungeon`、`legal` 439 通過。
 - 檔案：`server/db.js`、`server/rules.js`、`server/core.js`、`server/admin.js`、`server/app.js`、`server/entitle.js`、`src/meta.js`、`src/minis.js`、`src/levelmode.js`、`src/rpg.js`、`src/shop.js`、`src/cloud.js`、`games/rewards.js`、`games/dungeon/*`、`legal/src/privacy.*`、建置產物、`test/*`、`tools/drill/*`、`.github/workflows/staging-drill.yml`、`docs/*`。｜資料庫：新表 `zz.plays`（只新增）。｜刪除：無。
 - 補記：上一條的 commit 為 [`580da3a`](https://github.com/luffysky/cube2/commit/580da3a)。
+
+## 2026-11-24 18:57（Asia/Taipei）｜staging 真 HTTP 實測第一輪：P0-A 21/21 PASS；付款通知 24/26，找到「同版本的新通知被回報成已套用」並修正
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 任務「在隔離 staging 使用真實 HTTP 與資料庫驗證」
+- 怎麼跑的：cube2 自己的 GitHub Actions「staging drill」（run 45378657471，commit `7456e20`），打 `https://brickduel-staging.snowrealm.pet`，用 Owner 放的 `STAGING_BYPASS`，先確認 `dbSource: staging` 才開始。
+  - 付款通知那段：工作自己產生一次性金鑰，公鑰用 commit status 公告（`kid=drill-TKsFZPRU2J4D`），我把它放進 staging 的 `ENTITLE_JWKS` 並重新部署 staging（`dpl_3eLLDkan46FQYN7sbLL3BzRnE6TN`），工作看到 staging 認得這把鑰匙才開跑。私鑰只在那台 runner 上。
+  - 中間試過的做法：GitHub 的 annotation 和工作日誌要等整個工作結束才讀得到，所以改用 commit status（commit `a1bec71`、`825c26c`、`7456e20`）。前兩次的工作取消了。
+- 結果（真 HTTP、staging 資料庫）：
+  - **P0-A 21 項全 PASS**：
+    - 沒紀錄的休閒勝利只記戰績、0 金幣；頁面自稱已證明沒用；排位沒紀錄拒絕。
+    - 真紀錄發 84 金幣；同一份重交、別的帳號交都不發；輸說成贏、分數灌水、消行造假都不發。
+    - 兩台裝置同時結算同一場只發一次（帳本只多 1 筆）。
+    - 關卡：沒紀錄、步數不符都拒絕；真紀錄發首通加星數 40；重交、別的帳號交都不發。
+    - 同一場小遊戲送兩次只算一次。
+    - 4 個帳號的帳本加總都等於餘額。
+  - **付款通知 24/26 PASS**：
+    - 驗證 6 種、同一 token 重放 401、同一通知重送 duplicate、同編號換內容 409。
+    - 演練「記下後資料庫逾時」回 503，重送就套用；不重送時每小時補送那次套用（`applied: 1`），之後重送回 duplicate；補送 1 分鐘內再叫回 429。
+    - 演練「寫存檔失敗」回 `retry`；同一通知 5 份同時到只套用 1 次。
+    - 訂單：退款後不會被更晚的成功蓋回（含同時到）；訂單號換帳號 409。
+    - 遊戲錢包沒被動到。
+  - **FAIL 2 項（真的 bug，in-process 測試沒抓到）**：ENT-11、ENT-20。一則**新的**通知帶著跟紀錄**相同的版本號**時，資料沒有被改（版本只往前，這部分是對的），但回應卻說 `applied`。in-process 只測了「較舊的版本」，沒測「一樣的版本」。後果：付款服務會以為改成功了。
+- 修正（`server/entitle.js` `apply`）：改成一個 SQL，「改資料」和「標記結果」寫在一起；只有真的改到才回 `applied`，否則回 `stale`。訂單也一樣：同版本的新通知回 `stale`。
+- 測試：`entitle` 84 項（多 2 項：會員同版本新通知回 stale、訂單同版本新通知回 stale）；`api` 470、`security` 61。
+- 檔案：`server/entitle.js`、`test/entitle.test.js`、`tools/drill/run.txt`、`docs/DEVLOG.md`。｜刪除：無。
+- 補記：上一條的 commit 為 [`67a0193`](https://github.com/luffysky/cube2/commit/67a0193)；之後 drill 調整為 `a1bec71`、`825c26c`、`7456e20`。
+- 下一步：用這個修正重跑 staging（新的一次性金鑰）。

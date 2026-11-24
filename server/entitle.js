@@ -196,27 +196,31 @@ const sorted = v => Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object
 // order is final. Gives 'applied' | 'stale' | 'conflict' (an order id seen for another account or product)
 async function apply(db, ev, now) {
   let res;
+  // one statement: the change, and the notice marked with whether that change really happened (found on staging,
+  // 2026-11-24: a new notice with the same version as the record's was reported applied though nothing changed)
   if (ev.kind === 'membership') {
     res = await db.batch([
-      [`INSERT INTO zz.entitle (platform_id, tier, status, period_end, version, at) VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (platform_id) DO UPDATE SET tier = EXCLUDED.tier, status = EXCLUDED.status, period_end = EXCLUDED.period_end, version = EXCLUDED.version, at = EXCLUDED.at
-        WHERE zz.entitle.version < EXCLUDED.version`, [ev.platformId, ev.tier, ev.status, ev.end, ev.version, now]],
-      [`UPDATE zz.entevents SET applied = $2, result = CASE WHEN EXISTS (SELECT 1 FROM zz.entitle WHERE platform_id = $3 AND version = $4) THEN 'applied' ELSE 'stale' END
-        WHERE event_id = $1 AND applied IS NULL RETURNING result`, [ev.eventId, now, ev.platformId, ev.version]]
+      [`WITH up AS (
+          INSERT INTO zz.entitle (platform_id, tier, status, period_end, version, at) VALUES ($3, $5, $6, $7, $4, $2)
+          ON CONFLICT (platform_id) DO UPDATE SET tier = EXCLUDED.tier, status = EXCLUDED.status, period_end = EXCLUDED.period_end, version = EXCLUDED.version, at = EXCLUDED.at
+          WHERE zz.entitle.version < EXCLUDED.version RETURNING 1)
+        UPDATE zz.entevents SET applied = $2, result = CASE WHEN EXISTS (SELECT 1 FROM up) THEN 'applied' ELSE 'stale' END
+        WHERE event_id = $1 AND applied IS NULL RETURNING result`, [ev.eventId, now, ev.platformId, ev.version, ev.tier, ev.status, ev.end]]
     ]);
   } else {
     res = await db.batch([
-      [`INSERT INTO zz.orders (order_id, platform_id, sku, status, platform, version, at, updated) VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-        ON CONFLICT (order_id) DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version, updated = EXCLUDED.updated
-        WHERE zz.orders.version < EXCLUDED.version AND zz.orders.platform_id = EXCLUDED.platform_id AND zz.orders.sku = EXCLUDED.sku
-          AND zz.orders.status NOT IN ('refunded', 'revoked')`, [ev.orderId, ev.platformId, ev.sku, ev.status, ev.platform, ev.version, now]],
-      [`UPDATE zz.entevents SET applied = $2, result = CASE
+      [`WITH up AS (
+          INSERT INTO zz.orders (order_id, platform_id, sku, status, platform, version, at, updated) VALUES ($3, $4, $5, $7, $8, $6, $2, $2)
+          ON CONFLICT (order_id) DO UPDATE SET status = EXCLUDED.status, version = EXCLUDED.version, updated = EXCLUDED.updated
+          WHERE zz.orders.version < EXCLUDED.version AND zz.orders.platform_id = EXCLUDED.platform_id AND zz.orders.sku = EXCLUDED.sku
+            AND zz.orders.status NOT IN ('refunded', 'revoked') RETURNING 1)
+        UPDATE zz.entevents SET applied = $2, result = CASE
           WHEN EXISTS (SELECT 1 FROM zz.orders WHERE order_id = $3 AND (platform_id <> $4 OR sku <> $5)) THEN 'conflict'
-          WHEN EXISTS (SELECT 1 FROM zz.orders WHERE order_id = $3 AND version = $6 AND status = $7) THEN 'applied' ELSE 'stale' END
-        WHERE event_id = $1 AND applied IS NULL RETURNING result`, [ev.eventId, now, ev.orderId, ev.platformId, ev.sku, ev.version, ev.status]]
+          WHEN EXISTS (SELECT 1 FROM up) THEN 'applied' ELSE 'stale' END
+        WHERE event_id = $1 AND applied IS NULL RETURNING result`, [ev.eventId, now, ev.orderId, ev.platformId, ev.sku, ev.version, ev.status, ev.platform]]
     ]);
   }
-  const mark = res[1] && res[1][0];
+  const mark = res[0] && res[0][0];
   if (mark) return mark.result;
   // already applied (by a notice sent twice at once): its first answer stands
   const was = (await db.query('SELECT result FROM zz.entevents WHERE event_id = $1', [ev.eventId]))[0];
