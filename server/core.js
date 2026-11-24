@@ -95,7 +95,12 @@ async function hello(db, body, ip, now) {
 }
 
 // what else runs once a save has changed (server/savesync.js puts linked saves in its queue); never stops the save
-const hooks = { saved: null };
+const hooks = { saved: null, linked: null };
+// a save was just linked to an account, or came to another device through it (what the account has paid for follows)
+async function onLinked(db, pid, now) {
+  if (!hooks.linked) return;
+  try { await hooks.linked(db, pid, now); } catch (e) { console.warn('[zz] after-link ' + ((e && e.code) || (e && e.name) || 'error')); }
+}
 async function onSaved(db, pid, now) {
   if (!hooks.saved) return;
   try { await hooks.saved(db, pid, now); } catch (e) { console.warn('[zz] after-save ' + ((e && e.code) || (e && e.name) || 'error')); if (process.env.ZZ_DEBUG) console.warn(e); }
@@ -666,6 +671,7 @@ async function idLink(db, cred, claims, now) {
     if (e && e.code === '23505') return fail(409, 'race');      // linked a moment ago from somewhere else
     throw e;
   }
+  await onLinked(db, p.id, now);
   await onSaved(db, p.id, now);            // the first full copy for Games: "the data it had before"
   return good({ linked: true, id: p.id, key: secret, now });
 }
@@ -692,6 +698,9 @@ async function idRecover(db, claims, now, back) {
     if (!u[0]) return fail(410, 'purged');
     await onSaved(db, r[0].id, now);
   }
+  await onLinked(db, r[0].id, now);
+  const fresh = (await db.query('SELECT state, ver FROM zz.players WHERE id = $1', [r[0].id]))[0];
+  if (fresh) { r[0].state = fresh.state; r[0].ver = fresh.ver; }
   const secret = newSecret(), pid = r[0].id;
   await db.batch([
     ['INSERT INTO zz.keys (hash, pid, made) VALUES ($1, $2, $3)', [sha(secret), pid, now]],
@@ -700,4 +709,4 @@ async function idRecover(db, claims, now, back) {
   return good({ id: pid, key: secret, pub: r[0].pub, st: rules.current(r[0].state, now), ver: r[0].ver, now });
 }
 
-module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, hooks, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };
+module.exports = { bump, findPlayer, history, HIST, friends, friendAdd, friendDrop, friendInvite, friendsTidy, FR, restore, idStatus, idLink, idRecover, signOut, hooks, serverOp, adReward, readRoom, readSeat, cleanMail, LIMIT, ROOM, readCred, hello, sync, makeCode, redeem, wipe, board, sha, readCode, roomOpen, roomJoin, roomQuick, roomStill, roomLock, roomExchange, roomClose };

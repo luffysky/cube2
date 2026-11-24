@@ -4446,7 +4446,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       owned: { tile: [], bg: [], theme: [], fx: [], ghost: [], site: [] }, steam: false,
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', ghost: 'line', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
-      sub: { until: 0, demo: true },
+      sub: { until: 0, demo: true, tier: '' },
       custom: { tile: false, bg: false, dim: 45 },
       sign: { m: 0, days: [], paid: [] },
       // ranked against people (真人排位): the rating only the server changes, once both players' records agree
@@ -5077,9 +5077,36 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (r.ok) emit('adFree', []);
     return r;
   };
+  // Products sold for money (through SnowRealm's payment service, server/entitle.js): sku -> { kind, id } of a look
+  // owned for good once paid. None yet: nothing of 轉磚 is for sale.
+  var PAID = {};
+  Meta.PAID = PAID;
   // changes only the server may make: never in Meta.OPS, so a page cannot send them
   var SERVER_RUN = {
     adGrant: function () { return grantAd(); },
+    // membership from SnowRealm's payment service: a[0] until (0: not a member), a[1] tier ('plus' | 'pro' | '')
+    ent: function (a) {
+      var until = Math.max(0, Math.floor(+(a && a[0])) || 0), tier = a && (a[1] === 'plus' || a[1] === 'pro') ? a[1] : '';
+      Meta.data.sub = { until: tier ? until : 0, demo: false, tier: tier };
+      Meta.tidy(); Meta.save();
+      return { ok: true };
+    },
+    // a paid product granted, or taken back after a refund (worn: back to the stock look)
+    paid: function (a) {
+      var p = PAID[a && a[0]];
+      if (!p || !Meta.data.owned[p.kind]) return { ok: false, why: 'sku' };
+      if (Meta.data.owned[p.kind].indexOf(p.id) < 0) Meta.data.owned[p.kind].push(p.id);
+      Meta.save();
+      return { ok: true };
+    },
+    unpaid: function (a) {
+      var p = PAID[a && a[0]];
+      if (!p || !Meta.data.owned[p.kind]) return { ok: false, why: 'sku' };
+      Meta.data.owned[p.kind] = Meta.data.owned[p.kind].filter(function (x) { return x !== p.id; });
+      if (Meta.data.equip[p.kind] === p.id) Meta.data.equip[p.kind] = blank().equip[p.kind];
+      Meta.tidy(); Meta.save();
+      return { ok: true };
+    },
     // a ranked match against a person, settled by the server: a[0] the result (1 win, 0 draw, -1 loss)
     pvp: function (a) {
       var p = Meta.data.pvp, r = a && a[0] > 0 ? 1 : a && a[0] < 0 ? -1 : 0, delta = rpDelta(p.rp, r, 0, 0);
@@ -10905,6 +10932,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'mb.price': ['預計月費 NT${0}、年費 NT${1}', 'Planned price: NT${0} a month, NT${1} a year', '予定価格：月額NT${0}、年額NT${1}', '예정 가격: 월 NT${0}, 연 NT${1}'],
     'mb.demo': ['現在是體驗模式：金流還沒接上，按下去不會收費，會直接開通 30 天。', 'Trial mode: payments are not connected yet. Nothing is charged; this starts 30 days of membership.', '体験モード：決済は未接続です。課金はなく、30日間のメンバーが始まります。', '체험 모드: 결제가 아직 연결되지 않았습니다. 요금 없이 30일 멤버십이 시작됩니다.'],
     'mb.start': ['開通體驗', 'Start trial', '体験を始める', '체험 시작'],
+    'mb.paid': ['你是 {0} 會員，這期還有 {1} 天。續訂、取消和退款都在 SnowRealm 帳號的付款頁處理。', 'You are a {0} member: {1} days left in this period. Renewal, cancelling and refunds are handled on your SnowRealm account\'s payment page.', '{0} メンバーです（今期は残り{1}日）。更新・解約・返金は SnowRealm アカウントの支払いページで行います。', '{0} 멤버입니다(이번 기간 {1}일 남음). 갱신·해지·환불은 SnowRealm 계정의 결제 페이지에서 처리합니다.'],
     'mb.soon': ['會員會透過 SnowRealm 的付款服務開通，現在還沒開放購買。', 'Membership will be bought through SnowRealm\'s payment service. It is not on sale yet.', 'メンバーは SnowRealm の決済サービスで購入できるようになります。現在はまだ販売していません。', '멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다. 아직 판매하지 않습니다.'],
     'mb.active': ['會員到期還有 {0} 天', '{0} days of membership left', 'メンバー期間は残り{0}日', '멤버십 {0}일 남음'],
     'mb.end': ['結束體驗', 'End trial', '体験を終了', '체험 종료'],
@@ -11444,7 +11472,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     // waits for SnowRealm's payment service and nothing here starts it
     var trial = trialHere();
     h = '<div class="plan"><b>' + t('mb.name') + '</b>' + App.ul(['mb.p1', 'mb.p2', 'mb.p3', 'mb.p4']) + '<p>' + t('mb.price', P.month, P.year) + '</p></div><p class="warn">' + t(trial ? 'mb.demo' : 'mb.soon') + '</p>';
-    if (sub) h += '<p class="note"><b>' + t('mb.active', Meta.subDaysLeft()) + '</b></p>';
+    var paid = sub && Meta.data.sub.demo === false, tier = Meta.data.sub.tier === 'pro' ? 'Pro' : 'Plus';
+    if (sub) h += '<p class="note"><b>' + (paid ? t('mb.paid', tier, Meta.subDaysLeft()) : t('mb.active', Meta.subDaysLeft())) + '</b></p>';
     if (trial) h += '<div class="row">' + (sub ? btn('subEnd', 'mb.end') : btn('subStart', 'mb.start', true)) + '</div>';
     h += '<h3>' + t('mb.pics') + '</h3>';
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';

@@ -341,6 +341,32 @@ const SCHEMA = [
    )`,
   'CREATE INDEX IF NOT EXISTS syncs_due ON zz.syncs (due) WHERE due IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS syncs_platform ON zz.syncs (platform_id)',
+  // SnowRealm's payment service (server/entitle.js): membership per account, orders with their latest state, and the
+  // events already taken (each once)
+  `CREATE TABLE IF NOT EXISTS zz.entitle (
+     platform_id uuid PRIMARY KEY,
+     tier text NOT NULL,
+     status text NOT NULL,
+     period_end double precision NOT NULL DEFAULT 0,
+     version bigint NOT NULL,
+     at double precision NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS zz.orders (
+     order_id text PRIMARY KEY,
+     platform_id uuid NOT NULL,
+     sku text NOT NULL,
+     status text NOT NULL,
+     platform text NOT NULL,
+     version bigint NOT NULL,
+     granted boolean NOT NULL DEFAULT false,
+     at double precision NOT NULL,
+     updated double precision NOT NULL
+   )`,
+  'CREATE INDEX IF NOT EXISTS orders_platform ON zz.orders (platform_id)',
+  `CREATE TABLE IF NOT EXISTS zz.entevents (
+     event_id uuid PRIMARY KEY,
+     at double precision NOT NULL
+   )`,
   // outside production only (SAVE_SYNC_KEY=self): the save-sync signing key this server made for itself
   `CREATE TABLE IF NOT EXISTS zz.synckey (
      id smallint PRIMARY KEY CHECK (id = 1),

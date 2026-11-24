@@ -142,6 +142,8 @@ function applyOps(state, srv, ops, now) {
       }
     }
     else if (op.k === 'sub' && !trialOpen()) r = { ok: false, why: 'pay' };
+    // a paid membership ends at SnowRealm's payment service, not from the page
+    else if (op.k === 'unsub' && Meta.data.sub && Meta.data.sub.demo === false) r = { ok: false, why: 'pay' };
     else if (op.srv) { r = Meta.runServer(op.k, op.a); if (op.k === 'pvp' && r && r.ok) mark('prp', Meta.data.pvp.rp); }    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');

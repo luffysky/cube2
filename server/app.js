@@ -23,6 +23,9 @@ const bff = require('./bff.js');
 const retention = require('./retention.js');
 const mail = require('./mail.js');
 const savesync = require('./savesync.js');
+const entitle = require('./entitle.js');
+// what an account has paid for reaches its save when it links (only while the payment service is connected)
+core.hooks.linked = (d, pid, now) => entitle.enabled() ? entitle.linked(d, pid, now) : null;
 // every change to a linked save is queued for SnowRealm Games (does nothing while SAVE_SYNC_ENABLED is off)
 core.hooks.saved = (d, pid, now) => savesync.touch(d, pid, now);
 // sends what the request queued (its own save first, then a couple of others that are due); never fails the request
@@ -104,6 +107,21 @@ const routes = {
     const body = await readBody(req), now = clock(), cred = core.readCred(header(req, 'authorization'));
     const out = await db.run(d => bff.start(d, body, cred, ipTag(req), now, undefined, String(header(req, 'host') || '').toLowerCase()));
     send(res, out.status, out.body, out.cookie ? { 'Set-Cookie': out.cookie } : null);
+  },
+  // SnowRealm's payment service tells the game about memberships and orders (server/entitle.js); server to server
+  async entitle(req, res) {
+    if (req.method !== 'POST') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'POST' });
+    if (req.headers && req.headers.origin) return send(res, 403, { ok: false, why: 'origin' });
+    const s = entitle.settings();
+    if (!s) return send(res, 503, { ok: false, why: 'off' });
+    const now = clock(), v = await entitle.verify(header(req, 'authorization'), s, now);
+    if (!v.ok) return send(res, v.status, { ok: false, why: v.status === 503 ? 'keys' : v.status === 403 ? 'scope' : 'token' }, v.status === 401 ? { 'WWW-Authenticate': 'Bearer' } : null);
+    // each token once
+    const used = await db.run(d => d.query('INSERT INTO zz.idjti (jti, exp) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING RETURNING 1', ['ent:' + v.jti.slice(0, 120), v.exp * 1000]));
+    if (!used[0]) return send(res, 401, { ok: false, why: 'token' });
+    const body = await readBody(req);
+    const out = await db.run(d => entitle.handle(d, body, now));
+    send(res, out.status, out.body);
   },
   // the public key SnowRealm Games checks this game's save-sync tokens with (empty while no key is set)
   async syncJwks(req, res) {

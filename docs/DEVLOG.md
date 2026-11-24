@@ -1680,7 +1680,7 @@
 - 檔案：`server/rules.js`、`src/shop.js`、`test/api.test.js`、`test/r2.js`、建置產物、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無。
 - 補記：上一條的 commit 為 [`b0260d1`](https://github.com/luffysky/cube2/commit/b0260d1)。
 
-## 2026-11-24 12:49（Asia/Taipei）｜P0 資安：跨帳號與偽造的實測套件
+## 2026-11-24 12:48（Asia/Taipei）｜P0 資安：跨帳號與偽造的實測套件
 
 - 專案：cube2｜執行者：Claude｜依據：Owner 任務 P0.3–P0.7
 - 新增 `test/security.test.js`（50 項，走真正的 API 和資料庫）：
@@ -1694,3 +1694,18 @@
 - 其他測試：`api`、`admin`、`cloud` 改用 `MEMBER_TRIAL=1` 測會員功能；全部單元測試通過。
 - 檔案：`test/security.test.js`、`test/run.js`、`test/admin.test.js`、`test/cloud.test.js`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無。
 - 補記：上一條的 commit 為 [`62910c5`](https://github.com/luffysky/cube2/commit/62910c5)。
+
+## 2026-11-24 12:55（Asia/Taipei）｜P1：中央付款與會員權益接收端（開關關著）＋給 cube1 的介面草案
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 任務 P1.1–P1.8
+- 新檔 `server/entitle.js`，路徑 `POST /internal/entitlements/v1/events`（`api/entitle.js`＋`vercel.json` 改寫）：
+  - 只收 cube1 付款服務簽的 Ed25519 JWT（`aud=snowrealm:brickduel:entitlements`、`scope=entitlements:write`、`sub=svc:snowrealm-commerce`、最長 5 分鐘、每個 `jti` 只能用一次、不能帶 Origin）。
+  - 會員：Free／Plus／Pro，`active`、`canceled`（本期內仍有效）、`expired`／`refunded`／`revoked`（立即結束）。由伺服器寫進存檔（`state.sub` 加 `tier`、`demo: false`），所以每日寶箱、轉盤、加成、會員造型、自己的圖片、雲端檔案、免看廣告領獎都由伺服器依它判斷；結束時會員造型自動換回。頁面不能開也不能取消付費會員。
+  - 訂單：待確認、成功、失敗、已退款、已撤銷，每張只發一次貨，退款／撤銷收回並換下；同一則通知重送、舊版本晚到都不會重複發或蓋回退款；同一個訂單號換帳號或商品回 409。目前沒有真錢商品（`Meta.PAID` 空），訂單只記錄不發貨。
+  - 還沒綁定的帳號：先記著，綁定（或換裝置找回）時自動帶上。
+- 資料庫：新表 `zz.entitle`、`zz.orders`、`zz.entevents`（開關關著時不會被用到；第一次用到才建）。
+- 頁面：付費會員顯示「你是 Plus／Pro 會員，這期還有 N 天；續訂、取消、退款在 SnowRealm 帳號的付款頁處理」。
+- 介面草案給 cube1：`docs/handoff/BRICKDUEL_ENTITLEMENTS.md`。
+- 測試：新 `test/entitle.test.js` 56 項（驗證、重放、會員各狀態、降級換回造型、頁面不能取消、未綁定之後綁定、訂單各狀態、重送不重複發、退款收回、舊版本不蓋回、訂單號不能換帳號）；`api` 表數 31；全部單元測試、`flow` 通過。
+- 檔案：`server/entitle.js`、`server/core.js`、`server/app.js`、`server/db.js`、`server/rules.js`、`src/meta.js`、`src/shop.js`、`api/entitle.js`、`vercel.json`、`test/entitle.test.js`、`test/api.test.js`、`test/run.js`、`docs/handoff/BRICKDUEL_ENTITLEMENTS.md`、建置產物、`docs/DEVLOG.md`。｜刪除：無。
+- 補記：上一條的 commit 為 [`e807891`](https://github.com/luffysky/cube2/commit/e807891)。

@@ -47,6 +47,7 @@
     'mb.price': ['預計月費 NT${0}、年費 NT${1}', 'Planned price: NT${0} a month, NT${1} a year', '予定価格：月額NT${0}、年額NT${1}', '예정 가격: 월 NT${0}, 연 NT${1}'],
     'mb.demo': ['現在是體驗模式：金流還沒接上，按下去不會收費，會直接開通 30 天。', 'Trial mode: payments are not connected yet. Nothing is charged; this starts 30 days of membership.', '体験モード：決済は未接続です。課金はなく、30日間のメンバーが始まります。', '체험 모드: 결제가 아직 연결되지 않았습니다. 요금 없이 30일 멤버십이 시작됩니다.'],
     'mb.start': ['開通體驗', 'Start trial', '体験を始める', '체험 시작'],
+    'mb.paid': ['你是 {0} 會員，這期還有 {1} 天。續訂、取消和退款都在 SnowRealm 帳號的付款頁處理。', 'You are a {0} member: {1} days left in this period. Renewal, cancelling and refunds are handled on your SnowRealm account\'s payment page.', '{0} メンバーです（今期は残り{1}日）。更新・解約・返金は SnowRealm アカウントの支払いページで行います。', '{0} 멤버입니다(이번 기간 {1}일 남음). 갱신·해지·환불은 SnowRealm 계정의 결제 페이지에서 처리합니다.'],
     'mb.soon': ['會員會透過 SnowRealm 的付款服務開通，現在還沒開放購買。', 'Membership will be bought through SnowRealm\'s payment service. It is not on sale yet.', 'メンバーは SnowRealm の決済サービスで購入できるようになります。現在はまだ販売していません。', '멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다. 아직 판매하지 않습니다.'],
     'mb.active': ['會員到期還有 {0} 天', '{0} days of membership left', 'メンバー期間は残り{0}日', '멤버십 {0}일 남음'],
     'mb.end': ['結束體驗', 'End trial', '体験を終了', '체험 종료'],
@@ -586,7 +587,8 @@
     // waits for SnowRealm's payment service and nothing here starts it
     var trial = trialHere();
     h = '<div class="plan"><b>' + t('mb.name') + '</b>' + App.ul(['mb.p1', 'mb.p2', 'mb.p3', 'mb.p4']) + '<p>' + t('mb.price', P.month, P.year) + '</p></div><p class="warn">' + t(trial ? 'mb.demo' : 'mb.soon') + '</p>';
-    if (sub) h += '<p class="note"><b>' + t('mb.active', Meta.subDaysLeft()) + '</b></p>';
+    var paid = sub && Meta.data.sub.demo === false, tier = Meta.data.sub.tier === 'pro' ? 'Pro' : 'Plus';
+    if (sub) h += '<p class="note"><b>' + (paid ? t('mb.paid', tier, Meta.subDaysLeft()) : t('mb.active', Meta.subDaysLeft())) + '</b></p>';
     if (trial) h += '<div class="row">' + (sub ? btn('subEnd', 'mb.end') : btn('subStart', 'mb.start', true)) + '</div>';
     h += '<h3>' + t('mb.pics') + '</h3>';
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';

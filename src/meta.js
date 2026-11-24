@@ -411,7 +411,7 @@
       owned: { tile: [], bg: [], theme: [], fx: [], ghost: [], site: [] }, steam: false,
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', ghost: 'line', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
-      sub: { until: 0, demo: true },
+      sub: { until: 0, demo: true, tier: '' },
       custom: { tile: false, bg: false, dim: 45 },
       sign: { m: 0, days: [], paid: [] },
       // ranked against people (真人排位): the rating only the server changes, once both players' records agree
@@ -1042,9 +1042,36 @@
     if (r.ok) emit('adFree', []);
     return r;
   };
+  // Products sold for money (through SnowRealm's payment service, server/entitle.js): sku -> { kind, id } of a look
+  // owned for good once paid. None yet: nothing of 轉磚 is for sale.
+  var PAID = {};
+  Meta.PAID = PAID;
   // changes only the server may make: never in Meta.OPS, so a page cannot send them
   var SERVER_RUN = {
     adGrant: function () { return grantAd(); },
+    // membership from SnowRealm's payment service: a[0] until (0: not a member), a[1] tier ('plus' | 'pro' | '')
+    ent: function (a) {
+      var until = Math.max(0, Math.floor(+(a && a[0])) || 0), tier = a && (a[1] === 'plus' || a[1] === 'pro') ? a[1] : '';
+      Meta.data.sub = { until: tier ? until : 0, demo: false, tier: tier };
+      Meta.tidy(); Meta.save();
+      return { ok: true };
+    },
+    // a paid product granted, or taken back after a refund (worn: back to the stock look)
+    paid: function (a) {
+      var p = PAID[a && a[0]];
+      if (!p || !Meta.data.owned[p.kind]) return { ok: false, why: 'sku' };
+      if (Meta.data.owned[p.kind].indexOf(p.id) < 0) Meta.data.owned[p.kind].push(p.id);
+      Meta.save();
+      return { ok: true };
+    },
+    unpaid: function (a) {
+      var p = PAID[a && a[0]];
+      if (!p || !Meta.data.owned[p.kind]) return { ok: false, why: 'sku' };
+      Meta.data.owned[p.kind] = Meta.data.owned[p.kind].filter(function (x) { return x !== p.id; });
+      if (Meta.data.equip[p.kind] === p.id) Meta.data.equip[p.kind] = blank().equip[p.kind];
+      Meta.tidy(); Meta.save();
+      return { ok: true };
+    },
     // a ranked match against a person, settled by the server: a[0] the result (1 win, 0 draw, -1 loss)
     pvp: function (a) {
       var p = Meta.data.pvp, r = a && a[0] > 0 ? 1 : a && a[0] < 0 ? -1 : 0, delta = rpDelta(p.rp, r, 0, 0);
