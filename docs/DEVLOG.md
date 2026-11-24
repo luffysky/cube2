@@ -1816,3 +1816,15 @@
 - 檔案：`server/entitle.js`、`test/entitle.test.js`、`tools/drill/run.txt`、`docs/DEVLOG.md`。｜刪除：無。
 - 補記：上一條的 commit 為 [`67a0193`](https://github.com/luffysky/cube2/commit/67a0193)；之後 drill 調整為 `a1bec71`、`825c26c`、`7456e20`。
 - 下一步：用這個修正重跑 staging（新的一次性金鑰）。
+
+## 2026-11-24 19:02（Asia/Taipei）｜staging 真 HTTP 實測第二輪：46/46 PASS；staging 付款通知關回；相依套件與機密掃描
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 任務 P0-A、P0-B、P1-A
+- GitHub Actions「staging drill」run 45379508230，staging 部署 `dpl_GGfNcCKkgtPfbhrCNb7UjUHikuZp`（commit `762d376`，`dbSource: staging`），一次性金鑰 `kid=drill-8vcVyTvlG6ZK`（私鑰只在那台 runner 上）。
+  - **P0-A 21/21 PASS**：真紀錄發 91 金幣，其他造假、重交、別的帳號、雙裝置都只發一次或不發；關卡真紀錄發 40；4 個帳號的帳本加總都等於餘額。
+  - **付款通知 26/26 PASS**：上一輪失敗的兩項這次都通過（同版本的新通知回 `stale`；v10、v11 同時到後，新的 v11 回 `stale`、v12 回 `applied`）。
+- 之後：staging 的 `ENTITLE_ENABLED` 改回 `0` 並重新部署（`dpl_EfNPmwSVRj1KsXu1EwwTjVbTLg5h`）。沒有刪任何變數，下次演練改回 `1` 就好。
+- 正式站 `/api/health`（19:02）：`build 762d376`、`entitle: false`（付款通知關著）、`trial: "once"`（免費體驗已開）、`dbSource: main`，沒有 `entitleKids`（演練資訊只在 staging）。
+- `npm audit`：0 個漏洞。
+- 機密掃描：搜尋整個 git 歷史，私鑰、雲端金鑰、連線字串、GitHub／Slack token 都沒找到（測試用的假值除外）。
+- 補記：上一條的 commit 為 [`762d376`](https://github.com/luffysky/cube2/commit/762d376)。
