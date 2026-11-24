@@ -13,6 +13,7 @@ on:
     paths: ['tools/drill/run.txt']
 permissions:
   contents: read
+  statuses: write
 concurrency:
   group: staging-drill
   cancel-in-progress: false
@@ -28,6 +29,7 @@ jobs:
       - name: drill key (public half shown as an annotation)
         env:
           DRILL_STEP: key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node tools/drill/staging-drill.js
       - name: drill
         env:

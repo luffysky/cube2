@@ -207,7 +207,17 @@ async function ent(key) {
 
 (async () => {
   // step one of the job: only make the key and say its public half (an annotation, readable once this step ends)
-  if (process.env.DRILL_STEP === 'key') { makeKey(); return; }
+  if (process.env.DRILL_STEP === 'key') {
+    const k = makeKey(), x = crypto.createPublicKey(k.privateKey).export({ format: 'jwk' }).x;
+    // and as a commit status (readable while the job runs; annotations and the log only appear when it ends)
+    const repo = process.env.GITHUB_REPOSITORY, sha = process.env.GITHUB_SHA, gt = process.env.GITHUB_TOKEN;
+    if (repo && sha && gt) {
+      const r = await fetch('https://api.github.com/repos/' + repo + '/statuses/' + sha, { method: 'POST', headers: { authorization: 'Bearer ' + gt, accept: 'application/vnd.github+json', 'content-type': 'application/json' },
+        body: JSON.stringify({ state: 'pending', context: 'staging-drill/key', description: 'kid=' + k.KID + ' x=' + x }) });
+      console.log('public key posted as a commit status: http ' + r.status);
+    }
+    return;
+  }
   if (!BYPASS) { console.log('STAGING_BYPASS is not set: nothing run'); process.exit(2); }
   // staging builds the same commit this job runs (pushed to main and to staging together): wait for it
   const want = String(process.env.GITHUB_SHA || '').slice(0, 7), t0 = Date.now();
