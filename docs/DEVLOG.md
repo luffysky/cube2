@@ -1659,3 +1659,11 @@
 - 檔案：`server/savesync.js`、`server/db.js`、`server/app.js`、`test/savesync.test.js`、`test/api.test.js`、`docs/DEVLOG.md`。｜刪除：無。
 - 補記：上一條的 commit 為 [`3c1c09f`](https://github.com/luffysky/cube2/commit/3c1c09f)。
 - 補記（02:10）：staging `4ff0090` 已部署，`https://brickduel-staging.snowrealm.pet/.well-known/sync-jwks.json` 從外部（未登入的瀏覽器）可讀到 1 把公鑰（kid `r5kPqgPQhD34xqfluVUty3XILzQG51SON5gGIOe2-wA`，只有公鑰）。cube1 已合併 PR #24（遊戲館把轉磚授權參數存進分頁的 sessionStorage，登入、換語言、重新整理後仍可繼續），正式遊戲館 `7f7044e` 已上線。上一條的 commit 為 [`4ff0090`](https://github.com/luffysky/cube2/commit/4ff0090)。
+
+## 2026-11-24 12:41（Asia/Taipei）｜CI：pwa 的 sitemap 檢查跟上第 11 個頁面（地城小隊）
+
+- 專案：cube2｜執行者：Claude｜依據：Owner「BRICKDUEL｜資安、金流、廣告、上架任務」P0.1
+- 原因：`test/pwa.js` 還寫死 sitemap 有 15 個網址，地城小隊（`/games/dungeon/`）加進 sitemap 後是 16 個，所以 GitHub Actions 的「the pages in Chrome」從那之後一直紅。其他 30 多個瀏覽器測試和伺服器測試都是綠的。
+- 修正：改成 16 個，並檢查地城那頁有列進去。本機 `pwa` 52 項通過。
+- 檔案：`test/pwa.js`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無。
+- 補記：上一條的 commit 為 [`2900111`](https://github.com/luffysky/cube2/commit/2900111)。
