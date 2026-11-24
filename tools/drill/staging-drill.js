@@ -101,10 +101,17 @@ async function p0a() {
 }
 
 // ---------- part 2: payment notices ----------
-async function ent() {
+function makeKey() {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
   const jwk = publicKey.export({ format: 'jwk' }), KID = 'drill-' + crypto.createHash('sha256').update(jwk.x).digest('base64url').slice(0, 12);
-  console.log('DRILL_PUBLIC_JWKS ' + JSON.stringify({ keys: [{ kty: 'OKP', crv: 'Ed25519', x: jwk.x, kid: KID, use: 'sig', alg: 'EdDSA' }] }));
+  const pub = JSON.stringify({ keys: [{ kty: 'OKP', crv: 'Ed25519', x: jwk.x, kid: KID, use: 'sig', alg: 'EdDSA' }] });
+  // the public half only, as an annotation too: annotations can be read while the job is still running (its log cannot)
+  console.log('DRILL_PUBLIC_JWKS ' + pub);
+  console.log('::notice title=DRILL_PUBLIC_JWKS::' + pub);
+  return { privateKey, KID };
+}
+async function ent(key) {
+  const { privateKey, KID } = key;
   const t0 = Date.now();
   for (;;) {
     const h = await call('/api/health?drill=' + Date.now());
@@ -201,8 +208,10 @@ async function ent() {
   }
   console.log('staging ' + JSON.stringify({ status: h.status, build: h.json && h.json.build, dbSource: h.json && h.json.dbSource, entitle: h.json && h.json.entitle, link: h.json && h.json.link }));
   if (h.status !== 200 || !h.json || h.json.dbSource !== 'staging') { console.log('not the staging database: stopped'); process.exit(3); }
+  // the key first, so staging can be set to trust it while part 1 runs
+  const key = PART === 'all' || PART === 'ent' ? makeKey() : null;
   if (PART === 'all' || PART === 'p0a') await p0a();
-  if (PART === 'all' || PART === 'ent') await ent();
+  if (key) await ent(key);
   const pass = results.filter(x => x.result === 'PASS').length, failed = results.length - pass;
   console.log('staging drill (' + (h.json.build || '?') + '): ' + pass + ' PASS, ' + failed + ' FAIL');
   const sum = process.env.GITHUB_STEP_SUMMARY;
