@@ -304,3 +304,50 @@
 **清理**：`zz.admin_log` 的 180 天保存目前只有監控（`/api/cron` 的 `watch`），刪除方案見 `docs/RETENTION_PROPOSAL.md`，等 Owner 核准。
 
 **阻塞（等 cube1）**：機器簽發端、`https://identity.snowrealm.pet/.well-known/admin-jwks.json` 上線，並給一組非正式環境可用的測試 token 來源。上線後 Owner 在 Vercel 設 `BRICKDUEL_ADMIN_SUBJECTS=svc:snowrealm-games-admin` 即開通。
+
+## 9. 遊玩紀錄與 `metrics/plays`（2026-11-24，林董：「數據不要只存個人…都存 db」）
+
+**為什麼**：之前伺服器只有對戰（`zz.matches`）有一場一行的紀錄；關卡、磚之冒險、挑戰大自然只在存檔 JSON 裡留最佳成績，磚塊小遊戲只留最佳分數，地城小隊什麼都沒有。所以後台算不出「每個遊戲有多少人在玩、玩幾場」。
+
+**新表 `zz.plays`**：每玩一場一行，不管哪種遊戲。欄位：`pid`（雲端存檔）、`at`、`game`、`mode`、`ms`、`result`（1 贏、0、−1 輸）、`proven`（只有對戰和關卡有可重播證據時為 true）、`score`、`lv`、`ref`（同一場用 `(pid, ref)` 擋重複）。全部由伺服器依自己套用的結果寫，跟存檔同一個交易寫入；頁面送什麼都不直接進表。存檔被刪時一起刪（`ON DELETE CASCADE`）。第一次建表時把現有 `zz.matches`（一年內）整批帶進來，所以統計不是從 0 開始。
+
+| `game` | 名稱 | 來源 | `mode` |
+|---|---|---|---|
+| `main` | 轉磚對戰 | 對局結算 `fin` | 對戰模式（`ai`、`rank`、`net`、`sprint`…） |
+| `level` | 關卡挑戰 | `lvl`（過關）、`endless`、`custom`、輸掉時的 `play` | `clear`、`endless`、`custom`、`fail` |
+| `rpg` | 磚之冒險 | `rpg`（過關）、輸掉時的 `play` | `win`、`lose` |
+| `wx` | 挑戰大自然 | `wx`、`wxb` | `run`、`practice`、`battle`、`net` |
+| `snake`…`sweep` | 九款磚塊小遊戲 | `mini`（小遊戲頁直接送，或之後轉磚送；同一場只算一次） | `easy`、`normal`、`hard` |
+| `dungeon` | 地城小隊 | 每位玩家自己的頁面在一局結束時送 `play` | `solo1`、`party2`–`party4` |
+
+**新端點 `GET /internal/admin/v1/metrics/plays?from=YYYY-MM-DD&to=YYYY-MM-DD`**（認證、錯誤、稽核與其他端點相同；沒給日期時是最近 14 天，最長 366 天）：
+
+```json
+{
+  "gameId": "brickduel", "apiVersion": "1",
+  "players": { "playedToday": 12, "played7d": 40, "played30d": 95 },
+  "plays": { "last7d": 610, "last30d": 2400, "total": "5100", "since": "2025-11-25T03:00:00.000Z" },
+  "games": [
+    { "id": "main", "name": "轉磚對戰", "kind": "mode",
+      "today": { "plays": 30, "players": 9 },
+      "last7d": { "plays": 300, "players": 28, "minutes": 1500, "wins": 160 },
+      "last30d": { "plays": 1200, "players": 70 },
+      "modes": [ { "mode": "ai", "name": "對電腦", "today": {}, "last7d": {}, "last30d": {} } ] }
+  ],
+  "daily": { "timezone": "UTC", "from": "2026-11-11", "to": "2026-11-24",
+    "items": [ { "date": "2026-11-24", "players": 12, "plays": 80, "playsByGame": { "main": 30, "snake": 10 }, "playersByGame": { "main": 9, "snake": 4 } } ] },
+  "generatedAt": "…"
+}
+```
+
+- 「玩家」是雲端存檔：同一個人在幾台裝置用同一份存檔算一人。
+- `games` 列出所有已知遊戲（沒人玩的是 0，不會不見），依 30 天場數排序；不認得的 `game` 照原樣列出。
+- `minutes` 是頁面回報的時間加總，只供參考（不是證據）。
+- 只有計數，沒有玩家 id、金鑰、IP。
+- `metrics/games` 也加上 `plays7d`、`playPlayers7d`（磚塊小遊戲、磚之冒險、關卡、挑戰大自然、地城小隊），地城小隊的 `source` 從 `null` 改成 `plays`；`overview` 多 `playersPlayed7d`。全部是加欄位，舊欄位不變。
+
+**還沒算到的**：在沒有雲端存檔的瀏覽器上、而且從沒開過轉磚的人，只玩磚塊小遊戲或地城時，紀錄先留在那台瀏覽器，等他打開轉磚才送出。
+
+**保存期限**：等 Owner 決定（建議跟對局紀錄一樣一年後自動刪除）；決定前不刪。
+
+**測試**：`test/admin.test.js` 122 項（`metrics/plays` 各區塊、同一場小遊戲送兩次只算一次、不認得的遊戲不算、不含玩家 id）；`test/api.test.js` 462 項（每種玩法各寫一行、只照伺服器的判斷、重複不算、建表時帶入對局紀錄且只帶一次）；瀏覽器 `minipay` 16 項（小遊戲頁直接送到雲端存檔、地城一局結束送出、伺服器不通時留在瀏覽器、轉磚打開時補送）。

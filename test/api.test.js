@@ -63,7 +63,7 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   ok(r.json.ready === true && typeof r.json.ms === 'number', 'deep health creates the tables on first use and reports a round trip', r.json);
   r = await call('health', { url: '/api/health?deep=1&x=' + Math.random() });
   ok(r.json.ok && r.json.ready === undefined, 'only the exact ?deep=1 goes to the database (other parameters get the plain answer)', r.json);
-  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 31, 'thirty-one tables in their own schema (entitle, orders and entevents the newest)');
+  eq((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'zz'"))[0].n, 32, 'thirty-two tables in their own schema (plays the newest)');
   await dbm.migrate(); await dbm.migrate();
   ok(true, 'creating the tables again is harmless');
 
@@ -270,6 +270,35 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     process.env.MEMBER_TRIAL = '1'; process.env.VERCEL_ENV = 'production';
     j = (await sync(X, [op('sub')])).json;
     ok(j.res[0].ok === false && j.res[0].why === 'pay', 'and in production not even with the test switch on', j.res);
+    // the free trial the Owner opened (C-045, MEMBER_TRIAL=once, allowed in production): once per save, 30 days
+    {
+      process.env.MEMBER_TRIAL = 'once';
+      const T = await newPlayer(null, '203.0.113.95');
+      let k = (await sync(T, [op('sub')])).json;
+      ok(k.res[0].ok && k.st.sub.until === now + 30 * DAY && k.st.sub.demo === true && k.st.sub.tried === now, 'production, trial open: a save starts its 30 days', [k.res, k.st.sub]);
+      const srv1 = (await pg.query('SELECT srv FROM zz.players WHERE id = $1', [T.id]))[0].srv;
+      ok(srv1.trial === now, 'the server keeps when it was started (out of the page\'s reach)', srv1.trial);
+      k = (await sync(T, [op('sub')])).json;
+      ok(k.res[0].ok === false && k.res[0].why === 'used' && k.st.sub.until === now + 30 * DAY, 'not again while it runs (and not made longer)', [k.res, k.st.sub]);
+      k = (await sync(T, [op('unsub'), op('sub')])).json;
+      ok(k.res[0].ok && k.res[1].ok === false && k.res[1].why === 'used' && !(k.st.sub.until > now), 'ended early: it cannot be started again', [k.res, k.st.sub]);
+      // the page forgetting it tried (its own copy says nothing) changes nothing: the server remembers
+      await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{sub}', '{\"until\": 0, \"demo\": true, \"tier\": \"\", \"tried\": 0}'::jsonb) WHERE id = $1", [T.id]);
+      k = (await sync(T, [op('sub')])).json;
+      ok(k.res[0].ok === false && k.res[0].why === 'used', 'a save that lost its "tried" mark still cannot start another', k.res);
+      // someone already on the old trial keeps it, and cannot start another when it ends
+      const U = await newPlayer(null, '203.0.113.96');
+      await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{sub}', $2::jsonb) WHERE id = $1", [U.id, JSON.stringify({ until: now + 10 * DAY, demo: true })]);
+      k = (await sync(U, [op('sub')])).json;
+      ok(k.res[0].ok === false && k.res[0].why === 'used' && k.st.sub.until === now + 10 * DAY, 'an old trial still running is kept as it is', [k.res, k.st.sub]);
+      // a paid member has nothing to try
+      const Pd = await newPlayer(null, '203.0.113.97');
+      await pg.query("UPDATE zz.players SET state = jsonb_set(state, '{sub}', $2::jsonb) WHERE id = $1", [Pd.id, JSON.stringify({ until: now + 10 * DAY, demo: false, tier: 'plus' })]);
+      k = (await sync(Pd, [op('sub')])).json;
+      ok(k.res[0].ok === false && k.res[0].why === 'pay' && k.st.sub.demo === false, 'a paid membership is left alone', k.res);
+      ok((await call('health')).json.trial === 'once', 'health says the trial is open', (await call('health')).json.trial);
+      process.env.MEMBER_TRIAL = '1';
+    }
     const imp = (await rpc({ a: 'hello', st: { coins: 50, sub: { until: now + 20 * DAY, demo: true } } })).json;
     ok(imp.ok && !(imp.st.sub.until > now), 'a membership the device claims is not brought into a new cloud save', imp.st && imp.st.sub);
     delete process.env.VERCEL_ENV;
@@ -1130,6 +1159,46 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   console.error = realErr;
   dbm.use(pg);
   ok((await sync(A3)).json.ok, 'back to normal');
+
+  // ---------- the play log: every kind of game, counted once, only as the server reads it ----------
+  {
+    const V = await newPlayer(null, '203.0.113.91');
+    const plays = async () => pg.query('SELECT game, mode, ms, result, proven, score, lv, ref FROM zz.plays WHERE pid = $1 ORDER BY id', [V.id]);
+    const realFin = TAPE.fin('ai', { seed: 88001, ms: 60000 });
+    let r = await sync(V, [op('fin', realFin), op('fin', [{ mode: 'ai', result: 1, level: 9, ko: 9, ms: 120000, stats: { score: 999999 } }])]);
+    let pl = await plays();
+    ok(pl.length === 2 && pl[0].game === 'main' && pl[0].mode === 'ai' && pl[0].proven === true && pl[0].result === 1 && pl[0].ms === realFin[0].ms && pl[1].proven === false,
+      'matches: one line each, proven or not (the server\'s own reading)', pl);
+    r = await sync(V, [op('lvl', [1, rules.ZZ.Levels.level(1).par]), op('rpg', [0, 30, 'tank']), op('wx', [120, 10, 2000, 1]), op('custom'), op('endless', [3])]);
+    pl = (await plays()).slice(2);
+    ok(pl.some(x => x.game === 'level' && x.mode === 'clear' && x.lv === 1 && x.proven === false) && pl.some(x => x.game === 'wx' && x.mode === 'practice' && x.ms === 120000)
+      && pl.some(x => x.game === 'level' && x.mode === 'custom') && pl.some(x => x.game === 'level' && x.mode === 'endless' && x.lv === 3), 'levels, weather runs, custom and endless levels', [r.json.res, pl]);
+    const before = (await plays()).length;
+    // a brick game sent straight from its page, then again (another change id) when 轉磚 opens: one game
+    r = await sync(V, [op('mini', ['stack', 2, 40, 0, 50000, 'a1b2c3d4e5'])]);
+    const st1 = r.json.st.mini.stack;
+    r = await sync(V, [op('mini', ['stack', 2, 40, 0, 50000, 'a1b2c3d4e5'])]);
+    ok(r.json.res[0].dup === true && JSON.stringify(r.json.st.mini.stack) === JSON.stringify(st1) && (await plays()).length === before + 1, 'the same brick game twice: one game, done once', [r.json.res, (await plays()).length - before]);
+    // a game with no other trace: counted, pays nothing, changes nothing
+    const c0 = r.json.st.coins;
+    r = await sync(V, [op('play', ['dungeon', 'party2', 300000, 1, 'dun0001x']), op('play', ['rpg', 'lose', 40000, -1]), op('play', ['dungeon', 'party2', 300000, 1, 'dun0001x']), op('play', ['hack', 'x', 1, 1]), op('play', ['level', '<b>', 1e12, 9])]);
+    pl = (await plays()).slice(before + 1);
+    ok(r.json.st.coins === c0 && pl.length === 3 && pl[0].game === 'dungeon' && pl[1].mode === 'lose' && pl[1].result === -1 && pl[2].mode === 'play' && pl[2].ms === 4 * 3600000 && pl[2].result === 1,
+      'plays: no coins; a repeat by its id is one; an unknown game is refused; odd values are cleaned', [r.json.res, pl]);
+    ok(r.json.res[3].ok === false && r.json.res[3].why === 'game', 'an unknown game is answered as such', r.json.res[3]);
+    // the first time the play log is made, the match log goes into it
+    const fill = dbm.SCHEMA.find(q => /INSERT INTO zz\.plays/.test(q));
+    await pg.query('ALTER TABLE zz.plays RENAME TO plays_was');
+    await pg.query(dbm.SCHEMA.find(q => /CREATE TABLE IF NOT EXISTS zz\.plays/.test(q)));
+    await pg.query(fill);
+    const [mc] = await pg.query('SELECT count(*)::int AS n FROM zz.matches');
+    const [pc] = await pg.query("SELECT count(*)::int AS n, count(*) FILTER (WHERE ref LIKE 'match:%' AND game = 'main')::int AS m FROM zz.plays");
+    ok(mc.n > 0 && pc.n === mc.n && pc.m === mc.n, 'a new play log starts with the match log already kept', [mc, pc]);
+    await pg.query(fill);
+    eq((await pg.query('SELECT count(*)::int AS n FROM zz.plays'))[0].n, mc.n, 'and only that first time');
+    await pg.query('DROP TABLE zz.plays');
+    await pg.query('ALTER TABLE zz.plays_was RENAME TO plays');
+  }
 
   // ---------- an older database gains what it lacks ----------
   await pg.query('DROP TABLE zz.rate');

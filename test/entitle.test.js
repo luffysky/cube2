@@ -256,7 +256,9 @@ const link = (platformId, pid) => pg.query("INSERT INTO zz.identity (platform_id
     ok(prod.drills === false && vp.ok && vp.fault === null, 'production: no drills, even with the test issuer set (a real token asking for one is just a token)', [prod.drills, vp]);
     const vt = await E0.verify('Bearer ' + token({ iss: TEST_ISS, zzFault: 'deliver' }), prod, now);
     ok(!vt.ok, 'and a test-issuer token is refused outright', vt);
+    ok(JSON.stringify(E0.kids()) === JSON.stringify([KID]) && E0.kids({ ENTITLE_ENABLED: '1', ENTITLE_JWKS: JWKS, ENTITLE_TEST_ISSUER: TEST_ISS, VERCEL_ENV: 'production' }) === null, 'the drill key ids are shown on staging only', E0.kids());
     delete process.env.ENTITLE_TEST_ISSUER;
+    ok(E0.kids() === null, 'and not without the drill issuer');
   }
 
   // ---------- test settings do nothing in production ----------

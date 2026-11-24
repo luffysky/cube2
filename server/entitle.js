@@ -59,6 +59,11 @@ function settings(env) {
   return { iss, subs, inline, url, drills };
 }
 const enabled = env => !!settings(env);
+// staging drills only: which public keys (kids) the receiver trusts right now, so a drill can wait for its own key
+function kids(env) {
+  const s = settings(env);
+  return s && s.drills && s.inline && Array.isArray(s.inline.keys) ? s.inline.keys.map(k => k && k.kid).filter(k => typeof k === 'string') : null;
+}
 
 function readKeys(j) {
   const out = {};
@@ -283,5 +288,5 @@ async function linked(db, pid, now) {
   }
 }
 
-module.exports = { settings, enabled, verify, handle, linked, reconcile, record, apply, processOne, effective, read, SCHEMA, AUD, SCOPE, SERVICE, ISSUER, JWKS_URL,
+module.exports = { settings, enabled, kids, verify, handle, linked, reconcile, record, apply, processOne, effective, read, SCHEMA, AUD, SCOPE, SERVICE, ISSUER, JWKS_URL,
   setFetch(fn) { fetcher = fn; cache = { url: '', at: 0, keys: null }; } };

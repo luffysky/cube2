@@ -87,7 +87,9 @@ function readBody(req, MAX_BODY) {
 const routes = {
   async health(req, res, url) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, why: 'method' }, { Allow: 'GET' });
-    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), admin: admin.configured(), entitle: entitle.enabled(), dbSource: db.source(), build: String(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null, region: process.env.VERCEL_REGION || '', now: clock() };
+    const out = { ok: true, app: 'zhuanzhuan', api: 1, db: db.configured(), ads: ads.configured(), files: files.configured(), mail: mail.configured(), link: bff.enabled(), admin: admin.configured(), entitle: entitle.enabled(), trial: rules.trialMode() || false, dbSource: db.source(), build: String(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null, region: process.env.VERCEL_REGION || '', now: clock() };
+    const ek = entitle.kids();                 // staging drills only (never in production)
+    if (ek) out.entitleKids = ek;
     // only the exact address /api/health?deep=1 reaches the database (cached 15 s), so adding other parameters cannot
     // make every request a database round trip
     if (url.search === '?deep=1' && out.db) {

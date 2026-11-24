@@ -10,6 +10,7 @@
      GET /internal/admin/v1/metrics
      GET /internal/admin/v1/metrics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
      GET /internal/admin/v1/metrics/games   each game inside 轉磚 (match modes, the brick games, 磚之冒險, 地城小隊)
+     GET /internal/admin/v1/metrics/plays   who plays what: every game of every kind from the play log (zz.plays)
 
    Server to server only: no CORS headers, every answer Cache-Control: no-store, GET only, nothing is ever written
    except the audit line of each call. Who may call is decided by one thing: a short-lived Ed25519 JWT from the
@@ -196,6 +197,12 @@ const MODE_NAMES = { ai: '對電腦', battle: '對戰', rank: '排位', net: '�
   terr: '搶地盤', tower: '高塔', sprint: '40 行衝刺', level: '關卡', solo: '單人' };
 const MINI_NAMES = { snake: '磚蛇', breakout: '打磚塊', stack: '疊磚塔', push: '推磚倉庫', merge: '磚塊合成', sort: '分磚', picross: '磚畫謎', pipes: '磚道', sweep: '掃磚' };
 const RPG_STAGES = Meta.RPG.STAGES.length;      // 磚之冒險 chapter one
+// the games in the play log (zz.plays), as the console shows them
+const PLAY_NAMES = Object.assign({ main: '轉磚對戰', level: '關卡挑戰', rpg: '磚之冒險', wx: '挑戰大自然', dungeon: '地城小隊', drill: '技巧練習', opener: '開局練習' }, MINI_NAMES);
+const PLAY_KINDS = Object.assign({ main: 'mode', level: 'levels', rpg: 'adventure', wx: 'weather', dungeon: 'coop', drill: 'practice', opener: 'practice' },
+  Object.keys(MINI_NAMES).reduce((o, k) => { o[k] = 'mini'; return o; }, {}));
+const PLAY_MODE_NAMES = Object.assign({}, MODE_NAMES, { clear: '過關', endless: '無盡', custom: '自訂關卡', fail: '失敗', win: '過關', lose: '失敗', run: '挑戰', practice: '練習',
+  easy: '簡單', normal: '普通', hard: '困難', quit: '中途離開' });
 const H = {
   async overview(db, q, now) {
     const [p] = await db.query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE seen > $1)::int AS a7, count(*) FILTER (WHERE ban)::int AS ban,
@@ -204,7 +211,7 @@ const H = {
     const [o] = await db.query(`SELECT (SELECT count(*)::int FROM zz.rooms WHERE exp > $1) AS rooms, (SELECT count(*)::int FROM zz.queue) AS queue,
       (SELECT COALESCE(sum(jsonb_array_length(boxes)), 0)::int FROM zz.draws WHERE kind = 'box' AND at > $2) AS boxes`, [now, now - 7 * DAY]);
     return { gameId: 'brickduel', apiVersion: '1', players: p.n, playersActive7d: p.a7, bannedPlayers: p.ban, coinsOutstanding: str(p.coins),
-      playerGamesTotal: num(p.games), openRooms: o.rooms, quickQueue: o.queue, boxesOpened7d: o.boxes, generatedAt: iso(now) };
+      playerGamesTotal: num(p.games), playersPlayed7d: (await db.query('SELECT count(DISTINCT pid)::int AS n FROM zz.plays WHERE at >= $1', [now - 7 * DAY]))[0].n, openRooms: o.rooms, quickQueue: o.queue, boxesOpened7d: o.boxes, generatedAt: iso(now) };
   },
   async players(db, q) {
     const limit = limitOf(q), c = cursorOf(q, [isNum, isUuid]);
@@ -288,6 +295,46 @@ const H = {
       day: iso(day0).slice(0, 10), generatedAt: iso(now)
     };
   },
+  // Who plays what (Owner 2026-11-24): the play log, one line per game of every kind. Players are cloud saves (one
+  // person on several devices with one save is one player). The day series runs in UTC like metrics/daily.
+  async plays(db, q, now) {
+    const today = Math.floor(now / DAY) * DAY;
+    const to = q.has('to') ? dayOf(q.get('to')) : today, from = q.has('from') ? dayOf(q.get('from')) : to - 13 * DAY;
+    if (to < from || (to - from) / DAY > 366) throw new Bad();
+    const win = [today, now - 7 * DAY, now - 30 * DAY];
+    const [p] = await db.query(`SELECT count(DISTINCT pid) FILTER (WHERE at >= $1)::int AS d0, count(DISTINCT pid) FILTER (WHERE at >= $2)::int AS d7,
+      count(DISTINCT pid)::int AS d30, count(*) FILTER (WHERE at >= $2)::int AS n7, count(*)::int AS n30 FROM zz.plays WHERE at >= $3`, win);
+    const [all] = await db.query('SELECT count(*)::bigint AS n, count(DISTINCT pid)::int AS who, min(at) AS since FROM zz.plays', []);
+    const sel = `count(*) FILTER (WHERE at >= $1)::int AS n0, count(DISTINCT pid) FILTER (WHERE at >= $1)::int AS p0,
+      count(*) FILTER (WHERE at >= $2)::int AS n7, count(DISTINCT pid) FILTER (WHERE at >= $2)::int AS p7,
+      COALESCE(sum(ms) FILTER (WHERE at >= $2), 0)::bigint AS ms7, count(*)::int AS n30, count(DISTINCT pid)::int AS p30,
+      count(*) FILTER (WHERE at >= $2 AND result > 0)::int AS w7`;
+    const g = await db.query(`SELECT game, ${sel} FROM zz.plays WHERE at >= $3 GROUP BY 1`, win);
+    const gm = await db.query(`SELECT game, mode, ${sel} FROM zz.plays WHERE at >= $3 GROUP BY 1, 2`, win);
+    const block = r => ({ today: { plays: r.n0, players: r.p0 }, last7d: { plays: r.n7, players: r.p7, minutes: Math.round(num(r.ms7) / 60000), wins: r.w7 },
+      last30d: { plays: r.n30, players: r.p30 } });
+    const games = Object.keys(PLAY_NAMES).map(id => {
+      const r = g.find(x => x.game === id) || { n0: 0, p0: 0, n7: 0, p7: 0, ms7: 0, n30: 0, p30: 0, w7: 0 };
+      return Object.assign({ id, name: PLAY_NAMES[id], kind: PLAY_KINDS[id] }, block(r), {
+        modes: gm.filter(x => x.game === id).sort((a, b) => b.n30 - a.n30).map(x => Object.assign({ mode: x.mode, name: PLAY_MODE_NAMES[x.mode] || x.mode }, block(x)))
+      });
+    });
+    // a game id the server knows but this list does not (added later): shown as it is
+    g.forEach(r => { if (!PLAY_NAMES[r.game]) games.push(Object.assign({ id: r.game, name: r.game, kind: null }, block(r), { modes: [] })); });
+    games.sort((a, b) => b.last30d.plays - a.last30d.plays);
+    const end = to + DAY;
+    const dg = await db.query('SELECT floor(at / 86400000)::int AS d, game, count(*)::int AS n, count(DISTINCT pid)::int AS who FROM zz.plays WHERE at >= $1 AND at < $2 GROUP BY 1, 2', [from, end]);
+    const dp = await db.query('SELECT floor(at / 86400000)::int AS d, count(DISTINCT pid)::int AS who, count(*)::int AS n FROM zz.plays WHERE at >= $1 AND at < $2 GROUP BY 1', [from, end]);
+    const items = [];
+    for (let t = from; t <= to; t += DAY) {
+      const d = Math.floor(t / DAY), plays = {}, players = {}, tot = dp.find(x => x.d === d);
+      dg.filter(x => x.d === d).forEach(x => { plays[x.game] = x.n; players[x.game] = x.who; });
+      items.push({ date: iso(t).slice(0, 10), players: tot ? tot.who : 0, plays: tot ? tot.n : 0, playsByGame: plays, playersByGame: players });
+    }
+    return { gameId: 'brickduel', apiVersion: '1',
+      players: { playedToday: p.d0, played7d: p.d7, played30d: p.d30 }, plays: { last7d: p.n7, last30d: p.n30, total: str(all.n), since: all.since != null ? iso(+all.since) : null },
+      games, daily: { timezone: 'UTC', from: iso(from).slice(0, 10), to: iso(to).slice(0, 10), items }, generatedAt: iso(now) };
+  },
   // Each game inside 轉磚, for the console's per-game view (Owner 2026-11-23). Only what the server really records:
   // the match log (kept a year) for the main game's modes, the brick games' best scores (one row per player and board,
   // dated when it last improved), and 磚之冒險's progress inside each save. 地城小隊 keeps nothing on the server (the
@@ -311,8 +358,14 @@ const H = {
     const seen = {};
     minis.forEach(r => { seen[r.game] = 1; games.push({ id: r.game, kind: 'mini', name: MINI_NAMES[r.game] || r.game, source: 'scores', playersWithScore: r.players, playersImproved7d: r.improved7d }); });
     Object.keys(MINI_NAMES).forEach(g => { if (!seen[g]) games.push({ id: g, kind: 'mini', name: MINI_NAMES[g], source: 'scores', playersWithScore: 0, playersImproved7d: 0 }); });
-    games.push({ id: 'rpg', kind: 'adventure', name: '磚之冒險', source: 'saves', playersStarted: rpg.players, playersFinished: rpg.finished, stages: RPG_STAGES, clearsTotal: str(rpg.clears), active7d: null });
-    games.push({ id: 'dungeon', kind: 'coop', name: '地城小隊', source: null });
+    // from the play log (since 2026-11-24): games played and players in the last seven days, for every game
+    const pl = await db.query('SELECT game, count(*)::int AS n, count(DISTINCT pid)::int AS who FROM zz.plays WHERE at >= $1 GROUP BY 1', [d7]);
+    const P = id => { const r = pl.find(x => x.game === id); return { plays7d: r ? r.n : 0, playPlayers7d: r ? r.who : 0 }; };
+    games.forEach(x => { if (x.kind === 'mini') Object.assign(x, P(x.id)); });
+    games.push(Object.assign({ id: 'rpg', kind: 'adventure', name: '磚之冒險', source: 'saves', playersStarted: rpg.players, playersFinished: rpg.finished, stages: RPG_STAGES, clearsTotal: str(rpg.clears), active7d: P('rpg').playPlayers7d }, P('rpg')));
+    games.push(Object.assign({ id: 'level', kind: 'levels', name: '關卡挑戰', source: 'plays' }, P('level')));
+    games.push(Object.assign({ id: 'wx', kind: 'weather', name: '挑戰大自然', source: 'plays' }, P('wx')));
+    games.push(Object.assign({ id: 'dungeon', kind: 'coop', name: '地城小隊', source: 'plays' }, P('dungeon')));
     return { gameId: 'brickduel', apiVersion: '1', games, generatedAt: iso(now) };
   },
   async daily(db, q, now) {
@@ -351,6 +404,7 @@ function route(p) {
   if (p === 'overview' || p === 'players' || p === 'draws' || p === 'matches' || p === 'metrics') return [p];
   if (p === 'metrics/daily') return ['daily'];
   if (p === 'metrics/games') return ['games'];
+  if (p === 'metrics/plays') return ['plays'];
   const m = /^players\/([^/]+)$/.exec(p);
   if (m) return ['player', m[1]];
   return null;

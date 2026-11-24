@@ -11,9 +11,11 @@
     if (!MINI) return;
     var q = MINI.take(), got = 0, capped = false;
     q.forEach(function (r) {
-      var res = Meta.miniDone({ game: r.game, lv: r.lv, value: r.value, stars: r.stars, ms: r.ms });
+      var res = Meta.miniDone({ game: r.game, lv: r.lv, value: r.value, stars: r.stars, ms: r.ms, ref: r.id });
       if (res && res.ok) { got += res.coins; if (!res.coins && r.est) capped = true; }
     });
+    // games other pages played (地城小隊) that could not reach the server from there: they go with this save now
+    if (MINI.takePlays) MINI.takePlays().forEach(function (p) { if (p && typeof p === 'object') Meta.played(p.game, p.mode, p.ms, p.result, p.id); });
     if (got) App.toast(t('mg.paid', got), 3600);
     else if (capped && Meta.data.daily.mini >= MINI.DAY_CAP) App.toast(t('mg.cap', MINI.DAY_CAP), 3600);
     if (q.length && App.refreshMenu) App.refreshMenu();

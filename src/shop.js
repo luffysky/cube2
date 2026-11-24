@@ -45,8 +45,11 @@
     'mb.p3': ['金幣多拿 50%，每日簽到雙倍', '50% more coins, double daily check-in', 'コイン+50%、デイリーボーナス2倍', '코인 +50%, 출석 보상 2배'],
     'mb.p4': ['對戰錄影保留 30 場（一般 5 場）', 'Keeps 30 recorded matches (5 without)', '対戦記録を30戦保存（通常5戦）', '대전 기록 30판 보관 (일반 5판)'],
     'mb.price': ['預計月費 NT${0}、年費 NT${1}', 'Planned price: NT${0} a month, NT${1} a year', '予定価格：月額NT${0}、年額NT${1}', '예정 가격: 월 NT${0}, 연 NT${1}'],
-    'mb.demo': ['現在是體驗模式：金流還沒接上，按下去不會收費，會直接開通 30 天。', 'Trial mode: payments are not connected yet. Nothing is charged; this starts 30 days of membership.', '体験モード：決済は未接続です。課金はなく、30日間のメンバーが始まります。', '체험 모드: 결제가 아직 연결되지 않았습니다. 요금 없이 30일 멤버십이 시작됩니다.'],
-    'mb.start': ['開通體驗', 'Start trial', '体験を始める', '체험 시작'],
+    'mb.demo': ['免費體驗：每份存檔可以開通一次 30 天會員，不收費、到期不會自動續訂。之後會員會透過 SnowRealm 的付款服務購買。', 'Free trial: each save can start 30 days of membership once. Nothing is charged and it does not renew. Membership will later be bought through SnowRealm\'s payment service.', '無料体験：セーブごとに1回、30日間のメンバーを始められます。課金はなく、自動更新もありません。今後メンバーは SnowRealm の決済サービスで購入できるようになります。', '무료 체험: 저장마다 한 번, 30일 멤버십을 시작할 수 있어요. 요금이 없고 자동 갱신되지 않아요. 앞으로 멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다.'],
+    'mb.start': ['開通 30 天免費體驗', 'Start the 30-day free trial', '30日間の無料体験を始める', '30일 무료 체험 시작'],
+    'mb.used': ['這份存檔已經用過免費體驗了。', 'This save has already used its free trial.', 'このセーブは無料体験を使用済みです。', '이 저장은 무료 체험을 이미 사용했어요.'],
+    'mb.endNote': ['提前結束後，這份存檔就不能再開通體驗。', 'Once ended early, this save cannot start the trial again.', '途中で終了すると、このセーブでは再び体験できません。', '일찍 끝내면 이 저장으로는 다시 체험할 수 없어요.'],
+    'mb.cloudNeed': ['免費體驗要先有雲端存檔：打完一場就會自動建立。', 'The free trial needs a cloud save: one is made when you finish a match.', '無料体験にはクラウドセーブが必要です（1試合終えると自動で作成）。', '무료 체험에는 클라우드 저장이 필요해요(한 판을 끝내면 자동으로 만들어져요).'],
     'mb.paid': ['你是 {0} 會員，這期還有 {1} 天。續訂、取消和退款都在 SnowRealm 帳號的付款頁處理。', 'You are a {0} member: {1} days left in this period. Renewal, cancelling and refunds are handled on your SnowRealm account\'s payment page.', '{0} メンバーです（今期は残り{1}日）。更新・解約・返金は SnowRealm アカウントの支払いページで行います。', '{0} 멤버입니다(이번 기간 {1}일 남음). 갱신·해지·환불은 SnowRealm 계정의 결제 페이지에서 처리합니다.'],
     'mb.soon': ['會員會透過 SnowRealm 的付款服務開通，現在還沒開放購買。', 'Membership will be bought through SnowRealm\'s payment service. It is not on sale yet.', 'メンバーは SnowRealm の決済サービスで購入できるようになります。現在はまだ販売していません。', '멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다. 아직 판매하지 않습니다.'],
     'mb.active': ['會員到期還有 {0} 天', '{0} days of membership left', 'メンバー期間は残り{0}日', '멤버십 {0}일 남음'],
@@ -583,13 +586,16 @@
   }
   function memberHtml() {
     var sub = Meta.isSub(), P = Meta.PLAN, h;
-    // the free trial only where it cannot reach a real server's save (a local or test copy); on the site, membership
-    // waits for SnowRealm's payment service and nothing here starts it
+    // the free trial (C-045): on the site only while the server says it is open, and the server holds each save to one;
+    // a local or test copy has it as before. Otherwise membership waits for SnowRealm's payment service.
     var trial = trialHere();
     h = '<div class="plan"><b>' + t('mb.name') + '</b>' + App.ul(['mb.p1', 'mb.p2', 'mb.p3', 'mb.p4']) + '<p>' + t('mb.price', P.month, P.year) + '</p></div><p class="warn">' + t(trial ? 'mb.demo' : 'mb.soon') + '</p>';
     var paid = sub && Meta.data.sub.demo === false, tier = Meta.data.sub.tier === 'pro' ? 'Pro' : 'Plus';
     if (sub) h += '<p class="note"><b>' + (paid ? t('mb.paid', tier, Meta.subDaysLeft()) : t('mb.active', Meta.subDaysLeft())) + '</b></p>';
-    if (trial) h += '<div class="row">' + (sub ? btn('subEnd', 'mb.end') : btn('subStart', 'mb.start', true)) + '</div>';
+    if (trial && sub && !paid) h += '<div class="row">' + btn('subEnd', 'mb.end') + '</div><p class="note">' + t('mb.endNote') + '</p>';
+    else if (trial && !sub && Meta.trialUsed() && !local()) h += '<p class="note">' + t('mb.used') + '</p>';
+    else if (trial && !sub && !local() && !(ZZ.Cloud && ZZ.Cloud.cred)) h += '<p class="note">' + t('mb.cloudNeed') + '</p>';
+    else if (trial && !sub) h += '<div class="row">' + btn('subStart', 'mb.start', true) + '</div>';
     h += '<h3>' + t('mb.pics') + '</h3>';
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';
     h += '<div class="levels">' + picRow('bg', 'mb.wall') + picRow('tile', 'mb.tile') + '</div>' +
@@ -634,8 +640,13 @@
     if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey && ZZ.DevStore) ZZ.DevStore.persist();
       if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
   };
-  function trialHere() { try { return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) || window.location.protocol === 'file:'; } catch (e) { return false; } }
-  App.acts.subStart = function () { if (!trialHere()) return; Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop'); };
+  function local() { try { return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) || window.location.protocol === 'file:'; } catch (e) { return false; } }
+  function trialHere() { return local() || !!(ZZ.Cloud && ZZ.Cloud.trial && ZZ.Cloud.on && !ZZ.Cloud.dead); }
+  App.acts.subStart = function () {
+    if (!trialHere() || Meta.isSub()) return;
+    if (!local() && (Meta.trialUsed() || !(ZZ.Cloud && ZZ.Cloud.cred))) return App.openSheet('shop');
+    Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop');
+  };
   App.acts.subEnd = function () { Meta.cancelSub(); if (ZZ.Replay) ZZ.Replay.trim(5); App.applyLook(); App.openSheet('shop'); };
   App.acts.shopItems = function () { tab = 'items'; App.openSheet('shop'); };
   App.inputs.push(function (el) {

@@ -302,7 +302,7 @@
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
         if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true; Cloud.mail = b.mail === true;      // files: members may upload their own pictures and music (R2)
+        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true; Cloud.mail = b.mail === true; Cloud.trial = b.trial === 'once' || b.trial === 'open';      // files: members may upload their own pictures and music (R2)
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)

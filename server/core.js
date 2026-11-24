@@ -120,6 +120,12 @@ const SAVE = `
     INSERT INTO zz.ledger (pid, key, kind, why, delta, bal, at)
     SELECT u.id, x.key, x.kind, x.why, x.delta, x.bal, x.at FROM u, jsonb_to_recordset($11::jsonb) AS x(key text, kind text, why text, delta integer, bal integer, at float8)
     ON CONFLICT (pid, key) DO NOTHING
+    RETURNING 1  ), g AS (
+    -- the play log (only written with the save itself, so a game is never counted for a save that did not change)
+    INSERT INTO zz.plays (pid, at, game, mode, ms, result, proven, score, lv, ref)
+    SELECT u.id, $9, x.game, x.mode, x.ms, x.result, x.proven, x.score, x.lv, x.ref FROM u, jsonb_to_recordset($12::jsonb)
+      AS x(game text, mode text, ms integer, result smallint, proven boolean, score bigint, lv integer, ref text)
+    ON CONFLICT (pid, ref) DO NOTHING
     RETURNING 1
   )
   SELECT (SELECT count(*)::int FROM u) AS saved`;
@@ -134,7 +140,7 @@ async function adReward(db, tag, tx, now) {
     if (!row) return good({ paid: false, why: 'who' });
     const out = rules.applyOps(row.state, row.srv, [{ i: 'ad:' + tx.slice(0, 60), k: 'adGrant', a: [], srv: true }], now), d = out.state;
     const paid = !!(out.res[0] && out.res[0].ok && !out.res[0].dup);
-    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger), JSON.stringify(out.plays || [])]);
     if (saved[0] && saved[0].saved === 1) {
       await db.query('INSERT INTO zz.adtx (tx, pid, at, paid) VALUES ($1, $2, $3, $4) ON CONFLICT (tx) DO NOTHING', [tx, row.id, now, paid]);
       await onSaved(db, row.id, now);
@@ -170,7 +176,7 @@ async function serverOp(db, pid, key, k, a, now) {
     const row = rows[0];
     if (!row) return false;
     const out = rules.applyOps(row.state, row.srv, [{ i: key.slice(0, 60), k, a, srv: true }], now), d = out.state;
-    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger), JSON.stringify(out.plays || [])]);
     if (saved[0] && saved[0].saved === 1) { await onSaved(db, row.id, now); return true; }
   }
   return false;
@@ -204,7 +210,7 @@ async function sync(db, cred, ops, now) {
     if (!claimed && ops.length) { claimed = await claimTapes(db, row.id, ops, now); ops = claimed; }
     if (!ops.length) return good({ st: rules.current(row.state, now), ver: row.ver, pub: row.pub, res: [], now });
     const out = rules.applyOps(row.state, row.srv, ops, now), d = out.state;
-    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger)]);
+    const saved = await db.query(SAVE, [row.id, row.ver, JSON.stringify(d), JSON.stringify(out.srv), d.name, d.rp, d.season, out.srv.rg, now, JSON.stringify(out.marks), JSON.stringify(out.ledger), JSON.stringify(out.plays || [])]);
     if (saved[0] && saved[0].saved === 1) {
       if (out.matches.length) {
         const put = await db.query('INSERT INTO zz.matches (pid, at, mode, result, proven, room, seats, data) SELECT $1, (x->>\'at\')::float8, x->>\'mode\', (x->>\'result\')::smallint, (x->>\'proven\')::boolean, x->>\'room\', (x->>\'seats\')::smallint, x->\'data\' FROM jsonb_array_elements($2::jsonb) AS x RETURNING id, room, (data->>\'pr\') AS pr', [row.id, JSON.stringify(out.matches)]);

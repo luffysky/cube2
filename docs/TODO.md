@@ -87,7 +87,12 @@
 - [x] 會員改成付款後才開通（`62910c5`；伺服器拒絕頁面自開，權益只從付款服務來）
 - [x] 付款通知接收端改成可補送的流程（記下→套用→送達＋每小時補送，`ENTITLE_ENABLED` 關著）
 - [x] 休閒對局刷金幣：沒有伺服器重播得出來的結果不發金幣（P0-A）
-- [ ] staging 真 HTTP 實測 P0-A 與付款通知（staging 暫開 `ENTITLE_ENABLED`，測完關回）
+- [ ] staging 真 HTTP 實測 P0-A 與付款通知（cube2 GitHub Actions `staging drill`；staging 暫開 `ENTITLE_ENABLED`，測完關回）
+- [x] 所有遊玩記進資料庫 `zz.plays`＋管理 API `metrics/plays`（C-046）
+- [ ] Owner：遊玩紀錄保存多久（建議一年後自動刪，同對局紀錄）
+- [ ] cube1：後台接 `metrics/plays`（規格 §9）
+- [x] 會員免費體驗重新開放：每份存檔一次 30 天（C-045，`MEMBER_TRIAL=once`）
+- [ ] Owner：在 Vercel 加 `CRON_SECRET`（Production、Preview；值不要貼聊天）
 - [ ] 查舊的體驗會員還剩幾個（正式資料庫唯讀查詢，只查不改）
 - [ ] cube1：確認權益介面 v0.2、提供 `commerce-jwks.json` 與各環境 issuer
 - [ ] Owner：Plus 和 Pro 在轉磚各給什麼不同福利（目前完全一樣）；真錢商品與價格（`Meta.PAID` 空）

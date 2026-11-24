@@ -414,7 +414,7 @@
       owned: { tile: [], bg: [], theme: [], fx: [], ghost: [], site: [] }, steam: false,
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', ghost: 'line', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
-      sub: { until: 0, demo: true, tier: '' },
+      sub: { until: 0, demo: true, tier: '', tried: 0 },
       custom: { tile: false, bg: false, dim: 45 },
       sign: { m: 0, days: [], paid: [] },
       // ranked against people (真人排位): the rating only the server changes, once both players' records agree
@@ -738,6 +738,7 @@
   Meta.MINI_INFO = MINI.GAMES;
   Meta.miniDone = function (r) {
     r = r && typeof r === 'object' ? r : {};
+    var r0 = r;
     if (!MINI.GAMES.hasOwnProperty(r.game)) return { ok: false, why: 'game' };
     var d = Meta.data, g = MINI.GAMES[r.game];
     r = { game: r.game, lv: int(r.lv, 0, 2), value: g.kind === 'levels' ? int(r.value, 0, g.count - 1) : int(r.value, 0, 1e9), stars: int(r.stars, 0, 3), ms: int(r.ms, 0, 3600000) };
@@ -750,8 +751,24 @@
     if (c) { d.daily.mini += c; Meta.earn(c); }
     jobEvent('mini', 1);
     Meta.save();
-    emit('mini', [r.game, r.lv, r.value, r.stars, r.ms]);
+    // ref: the result's own id from the brick game's page, so the server counts the game once however it arrives
+    var ref = typeof r0.ref === 'string' && REF.test(r0.ref) ? r0.ref : null;
+    emit('mini', ref ? [r.game, r.lv, r.value, r.stars, r.ms, ref] : [r.game, r.lv, r.value, r.stars, r.ms]);
     return { ok: true, coins: c, best: best };
+  };
+  // A game played that leaves no other trace (a level lost, an adventure stage lost, a dungeon run, a practice): it
+  // pays nothing and changes nothing here; the server writes it in the play log, which is how the console counts who
+  // plays what. game: one of PLAY_GAMES; mode: a short word; ms: how long; result: 1 won, 0 none, -1 lost.
+  var REF = /^[a-z0-9]{6,24}$/, PLAY_GAMES = ['level', 'rpg', 'wx', 'dungeon', 'drill', 'opener', 'main'].concat(Object.keys(MINI.GAMES));
+  Meta.PLAY_GAMES = PLAY_GAMES;
+  Meta.played = function (game, mode, ms, result, ref) {
+    if (PLAY_GAMES.indexOf(game) < 0) return { ok: false, why: 'game' };
+    mode = typeof mode === 'string' && /^[a-z0-9-]{1,16}$/.test(mode) ? mode : 'play';
+    ms = int(ms, 0, 4 * 3600000); result = int(result, -1, 1);
+    var a = [game, mode, ms, result];
+    if (typeof ref === 'string' && REF.test(ref)) a.push(ref);
+    emit('play', a);
+    return { ok: true };
   };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
@@ -796,8 +813,11 @@
   };
   Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
   // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
-  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
-  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); emit('unsub', []); };
+  // The free trial (Owner 2026-11-24, C-045): 30 days, once per save. tried says when this save started it; a save
+  // that had a trial before tried was kept (until set, not paid) counts as having used it too.
+  Meta.trialUsed = function () { var s = Meta.data.sub || {}; return +s.tried > 0 || (s.demo !== false && +s.until > 0); };
+  Meta.subscribe = function () { var s = Meta.data.sub || {}; Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true, tier: '', tried: +s.tried || Meta.now() }; Meta.save(); emit('sub', []); };
+  Meta.cancelSub = function () { var s = Meta.data.sub || {}; Meta.data.sub = { until: 0, demo: true, tier: '', tried: +s.tried || (+s.until > 0 ? Meta.now() : 0) }; Meta.tidy(); Meta.save(); emit('unsub', []); };
   // A name is at most 12 characters, with nothing that could be read as markup.
   // Names everyone can see on the leaderboard. Two kinds are turned away (the name becomes empty, which shows as the
   // player's tag): insults, and names that pretend to speak for the game. The check ignores case, spacing, punctuation
@@ -1062,7 +1082,7 @@
     // membership from SnowRealm's payment service: a[0] until (0: not a member), a[1] tier ('plus' | 'pro' | '')
     ent: function (a) {
       var until = Math.max(0, Math.floor(+(a && a[0])) || 0), tier = a && (a[1] === 'plus' || a[1] === 'pro') ? a[1] : '';
-      Meta.data.sub = { until: tier ? until : 0, demo: false, tier: tier };
+      Meta.data.sub = { until: tier ? until : 0, demo: false, tier: tier, tried: +(Meta.data.sub || {}).tried || 0 };
       Meta.tidy(); Meta.save();
       return { ok: true };
     },
@@ -1365,7 +1385,8 @@
     custom: function () { return Meta.customPlayed(); },
     wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
     wxb: function (a) { return Meta.wxBattle(a[0], a[1] === 1); },
-    mini: function (a) { return Meta.miniDone({ game: a[0], lv: a[1], value: a[2], stars: a[3], ms: a[4] }); },
+    mini: function (a) { return Meta.miniDone({ game: a[0], lv: a[1], value: a[2], stars: a[3], ms: a[4], ref: a[5] }); },
+    play: function (a) { return Meta.played(a[0], a[1], a[2], a[3], a[4]); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },

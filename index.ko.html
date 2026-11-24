@@ -3881,7 +3881,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
      levels  paid once for the first clear of a level, and again for more stars    (push, sort, picross) */
 (function (root) {
   'use strict';
-  var DAY_CAP = 300, QUEUE = 'snowrealm.mini.queue', QUEUE_MAX = 40;
+  var DAY_CAP = 300, QUEUE = 'snowrealm.mini.queue', QUEUE_MAX = 40, PLAYS = 'snowrealm.play.queue', PLAYS_MAX = 60, CLOUD = 'zhuanzhuan.cloud.v1';
   var GAMES = {
     snake: { kind: 'score', per: 40, name: '磚蛇' },
     breakout: { kind: 'score', per: 60, name: '打磚塊' },
@@ -3942,12 +3942,47 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     // results already waiting in the queue count as if paid, so the estimate does not pay the same thing twice
     q.forEach(function (o) { if (o.game === r.game) prev = record(o, prev); });
     // a brick game's result cannot be checked by the server yet, so it pays no coins (the record and stars still count)
-    var c = 0;
-    q.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c });
+    var c = 0, it = { id: newId(), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c };
+    q.push(it);
     var s = store();
     try { if (s) s.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX))); } catch (e) { /* not kept */ }
+    // straight to the player's cloud save as well (when this browser has one), so the game is counted today even if
+    // 轉磚 is not opened; 轉磚 still takes the queue for its own record, and the server knows it is the same game by its id
+    send([{ i: 'm' + it.id, k: 'mini', a: [it.game, it.lv, it.value, it.stars, it.ms, it.id] }]);
     return c;
   }
+  function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  // ---------- the play log (counted on the server, in the player's cloud save) ----------
+  // The save this browser is on, as 轉磚 keeps it (read only: only 轉磚 makes or changes it).
+  function cred() {
+    var s = store();
+    try { var v = JSON.parse((s && s.getItem(CLOUD)) || 'null'); return v && typeof v.id === 'string' && typeof v.key === 'string' && !v.gone ? v : null; } catch (e) { return null; }
+  }
+  // One request with some changes for the save; answers whether the server took it. Nothing happens without a save,
+  // off a website, or offline (the queues keep what 轉磚 sends later).
+  function send(ops) {
+    var c = cred(), f = root.fetch, loc = root.location;
+    if (!c || typeof f !== 'function' || !loc || !/^https?:$/.test(loc.protocol)) return Promise.resolve(false);
+    try {
+      return f.call(root, '/api/rpc', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.id + '.' + c.key },
+        body: JSON.stringify({ a: 'sync', ops: ops }) }).then(function (r) { return !!(r && r.ok); }, function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  }
+  function readPlays() { var s = store(); try { var q = JSON.parse((s && s.getItem(PLAYS)) || '[]'); return Array.isArray(q) ? q : []; } catch (e) { return []; } }
+  function writePlays(q) { var s = store(); try { if (s) { if (q.length) s.setItem(PLAYS, JSON.stringify(q.slice(-PLAYS_MAX))); else s.removeItem(PLAYS); } } catch (e) { /* not kept */ } }
+  // A game played on a page that keeps nothing else (地城小隊): game, mode (a short word), ms, result (1 won, 0, -1 lost).
+  // It waits in this browser until the server has it, so 轉磚 can send it when this page could not.
+  function play(game, mode, ms, result) {
+    var p = { id: newId(), game: String(game || ''), mode: String(mode || 'play').slice(0, 16), ms: Math.round(Math.max(0, +ms || 0)), result: +result > 0 ? 1 : +result < 0 ? -1 : 0, at: Date.now() };
+    writePlays(readPlays().concat([p]));
+    return send([{ i: 'p' + p.id, k: 'play', a: [p.game, p.mode, p.ms, p.result, p.id] }]).then(function (ok) {
+      if (ok) writePlays(readPlays().filter(function (x) { return x.id !== p.id; }));
+      return ok;
+    });
+  }
+  // 轉磚 takes what is still waiting (and empties it) when it opens
+  function takePlays() { var q = readPlays(); writePlays([]); return q; }
   // 轉磚 takes the queue (and empties it) when it opens
   function take() { var q = readQueue(), s = store(); try { if (s) s.removeItem(QUEUE); } catch (e) { /* fine */ } return q; }
   function waiting() { return readQueue().reduce(function (a, o) { return a + (o.est || 0); }, 0); }
@@ -3972,7 +4007,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     String(v || '').split('').forEach(function (c, i) { if (+c > 0) out[i] = +c; });
     return out;
   }
-  var api = { GAMES: GAMES, LV: LV, DAY_CAP: DAY_CAP, QUEUE: QUEUE, coins: coins, record: record, report: report, show: show, stars: stars, take: take, waiting: waiting, balance: balance };
+  var api = { GAMES: GAMES, LV: LV, DAY_CAP: DAY_CAP, QUEUE: QUEUE, PLAYS: PLAYS, coins: coins, record: record, report: report, show: show, stars: stars, take: take, waiting: waiting, balance: balance, play: play, takePlays: takePlays };
   root.SnowRealmMini = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -4451,7 +4486,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       owned: { tile: [], bg: [], theme: [], fx: [], ghost: [], site: [] }, steam: false,
       equip: { tile: 'glaze', bg: 'wall', theme: 'auto', fx: 'shard', ghost: 'line', site: 'default' },
       items: ITEM_PRICE.map(function () { return 0; }), bring: [],
-      sub: { until: 0, demo: true, tier: '' },
+      sub: { until: 0, demo: true, tier: '', tried: 0 },
       custom: { tile: false, bg: false, dim: 45 },
       sign: { m: 0, days: [], paid: [] },
       // ranked against people (真人排位): the rating only the server changes, once both players' records agree
@@ -4775,6 +4810,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   Meta.MINI_INFO = MINI.GAMES;
   Meta.miniDone = function (r) {
     r = r && typeof r === 'object' ? r : {};
+    var r0 = r;
     if (!MINI.GAMES.hasOwnProperty(r.game)) return { ok: false, why: 'game' };
     var d = Meta.data, g = MINI.GAMES[r.game];
     r = { game: r.game, lv: int(r.lv, 0, 2), value: g.kind === 'levels' ? int(r.value, 0, g.count - 1) : int(r.value, 0, 1e9), stars: int(r.stars, 0, 3), ms: int(r.ms, 0, 3600000) };
@@ -4787,8 +4823,24 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (c) { d.daily.mini += c; Meta.earn(c); }
     jobEvent('mini', 1);
     Meta.save();
-    emit('mini', [r.game, r.lv, r.value, r.stars, r.ms]);
+    // ref: the result's own id from the brick game's page, so the server counts the game once however it arrives
+    var ref = typeof r0.ref === 'string' && REF.test(r0.ref) ? r0.ref : null;
+    emit('mini', ref ? [r.game, r.lv, r.value, r.stars, r.ms, ref] : [r.game, r.lv, r.value, r.stars, r.ms]);
     return { ok: true, coins: c, best: best };
+  };
+  // A game played that leaves no other trace (a level lost, an adventure stage lost, a dungeon run, a practice): it
+  // pays nothing and changes nothing here; the server writes it in the play log, which is how the console counts who
+  // plays what. game: one of PLAY_GAMES; mode: a short word; ms: how long; result: 1 won, 0 none, -1 lost.
+  var REF = /^[a-z0-9]{6,24}$/, PLAY_GAMES = ['level', 'rpg', 'wx', 'dungeon', 'drill', 'opener', 'main'].concat(Object.keys(MINI.GAMES));
+  Meta.PLAY_GAMES = PLAY_GAMES;
+  Meta.played = function (game, mode, ms, result, ref) {
+    if (PLAY_GAMES.indexOf(game) < 0) return { ok: false, why: 'game' };
+    mode = typeof mode === 'string' && /^[a-z0-9-]{1,16}$/.test(mode) ? mode : 'play';
+    ms = int(ms, 0, 4 * 3600000); result = int(result, -1, 1);
+    var a = [game, mode, ms, result];
+    if (typeof ref === 'string' && REF.test(ref)) a.push(ref);
+    emit('play', a);
+    return { ok: true };
   };
   Meta.customPlayed = function () { jobEvent('custom', 1); Meta.save(); emit('custom', []); return { ok: true }; };
   // The same claim by the job's name, which still means the same thing if the day has turned over in between.
@@ -4833,8 +4885,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   };
   Meta.subDaysLeft = function () { return Math.max(0, Math.ceil((Meta.data.sub.until - Meta.now()) / DAY)); };
   // No payment is wired up in this build: starting a membership here is a free trial that ends by itself.
-  Meta.subscribe = function () { Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true }; Meta.save(); emit('sub', []); };
-  Meta.cancelSub = function () { Meta.data.sub = { until: 0, demo: true }; Meta.tidy(); Meta.save(); emit('unsub', []); };
+  // The free trial (Owner 2026-11-24, C-045): 30 days, once per save. tried says when this save started it; a save
+  // that had a trial before tried was kept (until set, not paid) counts as having used it too.
+  Meta.trialUsed = function () { var s = Meta.data.sub || {}; return +s.tried > 0 || (s.demo !== false && +s.until > 0); };
+  Meta.subscribe = function () { var s = Meta.data.sub || {}; Meta.data.sub = { until: Meta.now() + SUB_DAYS * DAY, demo: true, tier: '', tried: +s.tried || Meta.now() }; Meta.save(); emit('sub', []); };
+  Meta.cancelSub = function () { var s = Meta.data.sub || {}; Meta.data.sub = { until: 0, demo: true, tier: '', tried: +s.tried || (+s.until > 0 ? Meta.now() : 0) }; Meta.tidy(); Meta.save(); emit('unsub', []); };
   // A name is at most 12 characters, with nothing that could be read as markup.
   // Names everyone can see on the leaderboard. Two kinds are turned away (the name becomes empty, which shows as the
   // player's tag): insults, and names that pretend to speak for the game. The check ignores case, spacing, punctuation
@@ -5099,7 +5154,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     // membership from SnowRealm's payment service: a[0] until (0: not a member), a[1] tier ('plus' | 'pro' | '')
     ent: function (a) {
       var until = Math.max(0, Math.floor(+(a && a[0])) || 0), tier = a && (a[1] === 'plus' || a[1] === 'pro') ? a[1] : '';
-      Meta.data.sub = { until: tier ? until : 0, demo: false, tier: tier };
+      Meta.data.sub = { until: tier ? until : 0, demo: false, tier: tier, tried: +(Meta.data.sub || {}).tried || 0 };
       Meta.tidy(); Meta.save();
       return { ok: true };
     },
@@ -5402,7 +5457,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     custom: function () { return Meta.customPlayed(); },
     wx: function (a) { return Meta.wxDone(a[0], a[1], a[2], a[3] === 1); },
     wxb: function (a) { return Meta.wxBattle(a[0], a[1] === 1); },
-    mini: function (a) { return Meta.miniDone({ game: a[0], lv: a[1], value: a[2], stars: a[3], ms: a[4] }); },
+    mini: function (a) { return Meta.miniDone({ game: a[0], lv: a[1], value: a[2], stars: a[3], ms: a[4], ref: a[5] }); },
+    play: function (a) { return Meta.played(a[0], a[1], a[2], a[3], a[4]); },
     first: function (a) { return yes(Meta.firstClear(str(a[0]), typeof a[1] === 'number' ? a[1] : str(a[1]))); },
     name: function (a) { Meta.setName(typeof a[0] === 'string' ? a[0].slice(0, 64) : ''); return yes(1); },
     sub: function () { Meta.subscribe(); return yes(1); },
@@ -10966,8 +11022,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     'mb.p3': ['金幣多拿 50%，每日簽到雙倍', '50% more coins, double daily check-in', 'コイン+50%、デイリーボーナス2倍', '코인 +50%, 출석 보상 2배'],
     'mb.p4': ['對戰錄影保留 30 場（一般 5 場）', 'Keeps 30 recorded matches (5 without)', '対戦記録を30戦保存（通常5戦）', '대전 기록 30판 보관 (일반 5판)'],
     'mb.price': ['預計月費 NT${0}、年費 NT${1}', 'Planned price: NT${0} a month, NT${1} a year', '予定価格：月額NT${0}、年額NT${1}', '예정 가격: 월 NT${0}, 연 NT${1}'],
-    'mb.demo': ['現在是體驗模式：金流還沒接上，按下去不會收費，會直接開通 30 天。', 'Trial mode: payments are not connected yet. Nothing is charged; this starts 30 days of membership.', '体験モード：決済は未接続です。課金はなく、30日間のメンバーが始まります。', '체험 모드: 결제가 아직 연결되지 않았습니다. 요금 없이 30일 멤버십이 시작됩니다.'],
-    'mb.start': ['開通體驗', 'Start trial', '体験を始める', '체험 시작'],
+    'mb.demo': ['免費體驗：每份存檔可以開通一次 30 天會員，不收費、到期不會自動續訂。之後會員會透過 SnowRealm 的付款服務購買。', 'Free trial: each save can start 30 days of membership once. Nothing is charged and it does not renew. Membership will later be bought through SnowRealm\'s payment service.', '無料体験：セーブごとに1回、30日間のメンバーを始められます。課金はなく、自動更新もありません。今後メンバーは SnowRealm の決済サービスで購入できるようになります。', '무료 체험: 저장마다 한 번, 30일 멤버십을 시작할 수 있어요. 요금이 없고 자동 갱신되지 않아요. 앞으로 멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다.'],
+    'mb.start': ['開通 30 天免費體驗', 'Start the 30-day free trial', '30日間の無料体験を始める', '30일 무료 체험 시작'],
+    'mb.used': ['這份存檔已經用過免費體驗了。', 'This save has already used its free trial.', 'このセーブは無料体験を使用済みです。', '이 저장은 무료 체험을 이미 사용했어요.'],
+    'mb.endNote': ['提前結束後，這份存檔就不能再開通體驗。', 'Once ended early, this save cannot start the trial again.', '途中で終了すると、このセーブでは再び体験できません。', '일찍 끝내면 이 저장으로는 다시 체험할 수 없어요.'],
+    'mb.cloudNeed': ['免費體驗要先有雲端存檔：打完一場就會自動建立。', 'The free trial needs a cloud save: one is made when you finish a match.', '無料体験にはクラウドセーブが必要です（1試合終えると自動で作成）。', '무료 체험에는 클라우드 저장이 필요해요(한 판을 끝내면 자동으로 만들어져요).'],
     'mb.paid': ['你是 {0} 會員，這期還有 {1} 天。續訂、取消和退款都在 SnowRealm 帳號的付款頁處理。', 'You are a {0} member: {1} days left in this period. Renewal, cancelling and refunds are handled on your SnowRealm account\'s payment page.', '{0} メンバーです（今期は残り{1}日）。更新・解約・返金は SnowRealm アカウントの支払いページで行います。', '{0} 멤버입니다(이번 기간 {1}일 남음). 갱신·해지·환불은 SnowRealm 계정의 결제 페이지에서 처리합니다.'],
     'mb.soon': ['會員會透過 SnowRealm 的付款服務開通，現在還沒開放購買。', 'Membership will be bought through SnowRealm\'s payment service. It is not on sale yet.', 'メンバーは SnowRealm の決済サービスで購入できるようになります。現在はまだ販売していません。', '멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다. 아직 판매하지 않습니다.'],
     'mb.active': ['會員到期還有 {0} 天', '{0} days of membership left', 'メンバー期間は残り{0}日', '멤버십 {0}일 남음'],
@@ -11504,13 +11563,16 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
   }
   function memberHtml() {
     var sub = Meta.isSub(), P = Meta.PLAN, h;
-    // the free trial only where it cannot reach a real server's save (a local or test copy); on the site, membership
-    // waits for SnowRealm's payment service and nothing here starts it
+    // the free trial (C-045): on the site only while the server says it is open, and the server holds each save to one;
+    // a local or test copy has it as before. Otherwise membership waits for SnowRealm's payment service.
     var trial = trialHere();
     h = '<div class="plan"><b>' + t('mb.name') + '</b>' + App.ul(['mb.p1', 'mb.p2', 'mb.p3', 'mb.p4']) + '<p>' + t('mb.price', P.month, P.year) + '</p></div><p class="warn">' + t(trial ? 'mb.demo' : 'mb.soon') + '</p>';
     var paid = sub && Meta.data.sub.demo === false, tier = Meta.data.sub.tier === 'pro' ? 'Pro' : 'Plus';
     if (sub) h += '<p class="note"><b>' + (paid ? t('mb.paid', tier, Meta.subDaysLeft()) : t('mb.active', Meta.subDaysLeft())) + '</b></p>';
-    if (trial) h += '<div class="row">' + (sub ? btn('subEnd', 'mb.end') : btn('subStart', 'mb.start', true)) + '</div>';
+    if (trial && sub && !paid) h += '<div class="row">' + btn('subEnd', 'mb.end') + '</div><p class="note">' + t('mb.endNote') + '</p>';
+    else if (trial && !sub && Meta.trialUsed() && !local()) h += '<p class="note">' + t('mb.used') + '</p>';
+    else if (trial && !sub && !local() && !(ZZ.Cloud && ZZ.Cloud.cred)) h += '<p class="note">' + t('mb.cloudNeed') + '</p>';
+    else if (trial && !sub) h += '<div class="row">' + btn('subStart', 'mb.start', true) + '</div>';
     h += '<h3>' + t('mb.pics') + '</h3>';
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';
     h += '<div class="levels">' + picRow('bg', 'mb.wall') + picRow('tile', 'mb.tile') + '</div>' +
@@ -11555,8 +11617,13 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey && ZZ.DevStore) ZZ.DevStore.persist();
       if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
   };
-  function trialHere() { try { return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) || window.location.protocol === 'file:'; } catch (e) { return false; } }
-  App.acts.subStart = function () { if (!trialHere()) return; Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop'); };
+  function local() { try { return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) || window.location.protocol === 'file:'; } catch (e) { return false; } }
+  function trialHere() { return local() || !!(ZZ.Cloud && ZZ.Cloud.trial && ZZ.Cloud.on && !ZZ.Cloud.dead); }
+  App.acts.subStart = function () {
+    if (!trialHere() || Meta.isSub()) return;
+    if (!local() && (Meta.trialUsed() || !(ZZ.Cloud && ZZ.Cloud.cred))) return App.openSheet('shop');
+    Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop');
+  };
   App.acts.subEnd = function () { Meta.cancelSub(); if (ZZ.Replay) ZZ.Replay.trim(5); App.applyLook(); App.openSheet('shop'); };
   App.acts.shopItems = function () { tab = 'items'; App.openSheet('shop'); };
   App.inputs.push(function (el) {
@@ -12155,7 +12222,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       if (r.status === 200 && b && b.app === 'zhuanzhuan') {
         probeFails = 0;
         if (!b.db) { Cloud.on = false; Cloud.nodb = true; nowKnown(); changed(); return false; }   // the API is here but no database is linked: local for this visit
-        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true; Cloud.mail = b.mail === true;      // files: members may upload their own pictures and music (R2)
+        Cloud.on = true; Cloud.nodb = false; Cloud.files = b.files === true; Cloud.link = b.link === true; Cloud.mail = b.mail === true; Cloud.trial = b.trial === 'once' || b.trial === 'open';      // files: members may upload their own pictures and music (R2)
         if (!Cloud.seen) { Cloud.seen = true; persist(); }
         nowKnown();
         changed();   // (the clock is not taken from this answer: it may come from a cache and be a minute old)
@@ -13810,7 +13877,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       S.tape = !o.custom && !o.endless && ZZ.Replay ? new ZZ.Replay.Tape(lv.seed, false) : null;
       S.state = 'play';
     },
-    started: function () { var S = App.S(); S.me.start(); say(); },
+    started: function () { var S = App.S(); S.at0 = Date.now(); S.me.start(); say(); },
     hud: function () {
       var S = App.S(), el = App.el, lv = S.lv;
       el.hudL.innerHTML = '<span class="who">' + esc(lv.custom ? t('lv.custom') : lv.endless ? t('lv.stage', lv.endless) : t('lv.no', lv.n)) + '</span>';
@@ -13853,6 +13920,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       App.sfx.play('lose');
       if (lv.endless) { S.res = Meta.endlessDone(S.o.stage - 1); S.after = function () { App.openSheet('endlessOver'); }; return; }
       if (lv.custom) Meta.customPlayed();
+      // a numbered level not cleared: nothing changes, but it is a game played (the console's play counts)
+      else if (Meta.played) Meta.played('level', 'fail', S.at0 ? Date.now() - S.at0 : 0, -1);
       S.after = function () { App.openSheet('levelFail'); };
     }
   };
@@ -14570,7 +14639,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       S.me = new ZZ.Game({ seed: S.seed, lockDelay: App.set.lock, sdf: App.sdfVal() });
       S.state = 'play';
     },
-    started: function () { App.S().me.start(); draw(); },
+    started: function () { var S = App.S(); S.at0 = Date.now(); S.me.start(); draw(); },
     hud: function () {
       var S = App.S(), R = S.rpg, el = App.el;
       el.hudL.innerHTML = '<span class="who">' + esc(t('rp.c.' + R.cls)) + '</span>';
@@ -14626,6 +14695,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
       if (S.state !== 'play') return;
       S.state = 'wait'; S.wait = 900; S.target = null;
       App.sfx.play('lose');
+      // a stage lost: nothing changes, but it is a game played (the console's play counts)
+      if (Meta.played) Meta.played('rpg', 'lose', S.at0 ? Date.now() - S.at0 : 0, -1);
       S.after = function () { App.openSheet('rpgLose'); };
     }
   };
@@ -14906,9 +14977,11 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 1px 0; 
     if (!MINI) return;
     var q = MINI.take(), got = 0, capped = false;
     q.forEach(function (r) {
-      var res = Meta.miniDone({ game: r.game, lv: r.lv, value: r.value, stars: r.stars, ms: r.ms });
+      var res = Meta.miniDone({ game: r.game, lv: r.lv, value: r.value, stars: r.stars, ms: r.ms, ref: r.id });
       if (res && res.ok) { got += res.coins; if (!res.coins && r.est) capped = true; }
     });
+    // games other pages played (地城小隊) that could not reach the server from there: they go with this save now
+    if (MINI.takePlays) MINI.takePlays().forEach(function (p) { if (p && typeof p === 'object') Meta.played(p.game, p.mode, p.ms, p.result, p.id); });
     if (got) App.toast(t('mg.paid', got), 3600);
     else if (capped && Meta.data.daily.mini >= MINI.DAY_CAP) App.toast(t('mg.cap', MINI.DAY_CAP), 3600);
     if (q.length && App.refreshMenu) App.refreshMenu();

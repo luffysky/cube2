@@ -211,6 +211,32 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS matches_at ON zz.matches (at)',
   'CREATE INDEX IF NOT EXISTS matches_pid ON zz.matches (pid, at)',
   "CREATE INDEX IF NOT EXISTS matches_room ON zz.matches (room, at) WHERE room <> ''",
+  // the play log: one line for every game played, of every kind (轉磚's modes, levels, 磚之冒險, 挑戰大自然, the brick
+  // games, 地城小隊), so the console can count who plays what. game and mode are short words from the server's own
+  // reading; ref is the change's id (or the result's own id), so a game that arrives twice is counted once.
+  `CREATE TABLE IF NOT EXISTS zz.plays (
+     id bigserial PRIMARY KEY,
+     pid uuid NOT NULL REFERENCES zz.players(id) ON DELETE CASCADE,
+     at double precision NOT NULL,
+     game text NOT NULL,
+     mode text NOT NULL DEFAULT '',
+     ms integer,
+     result smallint NOT NULL DEFAULT 0,
+     proven boolean NOT NULL DEFAULT false,
+     score bigint,
+     lv integer,
+     ref text NOT NULL,
+     UNIQUE (pid, ref)
+   )`,
+  'CREATE INDEX IF NOT EXISTS plays_at ON zz.plays (at)',
+  'CREATE INDEX IF NOT EXISTS plays_game ON zz.plays (game, at)',
+  'CREATE INDEX IF NOT EXISTS plays_pid ON zz.plays (pid, at)',
+  // the first time the play log is made, the match log already kept (a year) goes into it, so the counts start full
+  `INSERT INTO zz.plays (pid, at, game, mode, ms, result, proven, score, ref)
+     SELECT m.pid, m.at, 'main', m.mode, CASE WHEN (m.data->>'ms') ~ '^[0-9]{1,9}$' THEN (m.data->>'ms')::int END,
+       sign(m.result)::smallint, m.proven, CASE WHEN (m.data->>'score') ~ '^[0-9]{1,15}$' THEN (m.data->>'score')::bigint END, 'match:' || m.id
+     FROM zz.matches m WHERE NOT EXISTS (SELECT 1 FROM zz.plays)
+     ON CONFLICT (pid, ref) DO NOTHING`,
   // the coin ledger: one line per change to a player's coins, written by the server from what the rules did. key is
   // the change's own id from the page (or sys:<time> for the server's own, such as a new day), so a retried save
   // never writes a line twice.

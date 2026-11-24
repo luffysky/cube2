@@ -1,0 +1,32 @@
+name: staging drill
+# Real HTTP against https://brickduel-staging.snowrealm.pet (tools/drill/staging-drill.js): P0-A coin proof and the
+# P1-A payment-notice receiver. Runs by hand, or when tools/drill/run.txt changes on main. Needs the repository secret
+# STAGING_BYPASS (Vercel's Protection Bypass for Automation); it never reaches the log. Production is never called.
+on:
+  workflow_dispatch:
+    inputs:
+      part:
+        description: 'all, p0a or ent'
+        default: all
+  push:
+    branches: [main]
+    paths: ['tools/drill/run.txt']
+permissions:
+  contents: read
+concurrency:
+  group: staging-drill
+  cancel-in-progress: false
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: drill
+        env:
+          STAGING_BYPASS: ${{ secrets.STAGING_BYPASS }}
+          DRILL_PART: ${{ github.event.inputs.part || 'all' }}
+        run: node tools/drill/staging-drill.js

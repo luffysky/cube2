@@ -106,7 +106,7 @@
       S.tape = !o.custom && !o.endless && ZZ.Replay ? new ZZ.Replay.Tape(lv.seed, false) : null;
       S.state = 'play';
     },
-    started: function () { var S = App.S(); S.me.start(); say(); },
+    started: function () { var S = App.S(); S.at0 = Date.now(); S.me.start(); say(); },
     hud: function () {
       var S = App.S(), el = App.el, lv = S.lv;
       el.hudL.innerHTML = '<span class="who">' + esc(lv.custom ? t('lv.custom') : lv.endless ? t('lv.stage', lv.endless) : t('lv.no', lv.n)) + '</span>';
@@ -149,6 +149,8 @@
       App.sfx.play('lose');
       if (lv.endless) { S.res = Meta.endlessDone(S.o.stage - 1); S.after = function () { App.openSheet('endlessOver'); }; return; }
       if (lv.custom) Meta.customPlayed();
+      // a numbered level not cleared: nothing changes, but it is a game played (the console's play counts)
+      else if (Meta.played) Meta.played('level', 'fail', S.at0 ? Date.now() - S.at0 : 0, -1);
       S.after = function () { App.openSheet('levelFail'); };
     }
   };

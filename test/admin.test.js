@@ -211,9 +211,33 @@ const reset = () => { for (const k of ENV) delete process.env[k]; admin.clearCac
   ok(G['mode:ai'] && G['mode:ai'].name === '對電腦', 'the computer mode is named', G['mode:ai']);
   ok(G.snake.playersWithScore === 2 && G.snake.playersImproved7d === 1 && G.snake.name === '磚蛇', 'a brick game: players with a score, improved this week', G.snake);
   ok(G.push.playersWithScore === 1 && G.sweep && G.sweep.playersWithScore === 0, 'a level game counts too; a game nobody played is 0 (measured), not missing', [G.push, G.sweep]);
-  ok(G.rpg.playersStarted === 1 && G.rpg.clearsTotal === '5' && G.rpg.stages === 10 && G.rpg.active7d === null, '磚之冒險 from the saves; a malformed record counts as nothing', G.rpg);
-  ok(G.dungeon && G.dungeon.source === null && G.dungeon.players === undefined, '地城小隊 has no server record: source null, no zeros', G.dungeon);
+  ok(G.rpg.playersStarted === 1 && G.rpg.clearsTotal === '5' && G.rpg.stages === 10 && G.rpg.active7d === 0, '磚之冒險 from the saves; a malformed record counts as nothing (active7d from the play log)', G.rpg);
+  ok(G.dungeon && G.dungeon.source === 'plays' && G.dungeon.plays7d === 0, '地城小隊 now counted from the play log', G.dungeon);
   ok(JSON.stringify(r.json).indexOf(P1.id) < 0 && JSON.stringify(r.json).indexOf(P1.key) < 0, 'no player ids or keys in the per-game view');
+
+  // ---------- metrics/plays: who plays what, every kind of game ----------
+  {
+    // the three matches above are already in the play log; now a brick game (straight from its page, then again when
+    // 轉磚 opens: one game), a dungeon run, a lost level and a weather practice run
+    await rpc({ a: 'sync', ops: [op('mini', ['snake', 1, 320, 0, 60000, 'q1a2b3c4d5']), op('play', ['dungeon', 'party3', 600000, 1, 'dg1x2y3z4'])] }, P2);
+    await rpc({ a: 'sync', ops: [op('mini', ['snake', 1, 320, 0, 60000, 'q1a2b3c4d5']), op('play', ['level', 'fail', 90000, -1]), op('play', ['nope', 'x', 1, 1])] }, P2);
+    const pr = (await pg.query("SELECT game, mode, ms, result FROM zz.plays WHERE pid = $1 ORDER BY id", [P2.id]));
+    ok(pr.length === 3 && pr[0].game === 'snake' && pr[0].mode === 'normal' && pr[1].game === 'dungeon' && pr[2].game === 'level' && pr[2].mode === 'fail' && pr[2].result === -1,
+      'the play log: one brick game (sent twice), one dungeon run, one lost level; an unknown game is not a game', pr);
+    r = await get('metrics/plays', sign());
+    const Q = r.json, by = {}; (Q.games || []).forEach(x => { by[x.id] = x; });
+    ok(r.status === 200 && Q.players.playedToday === 3 && Q.players.played7d === 3 && Q.plays.last7d === 6, 'players who played and games played, all kinds', [Q.players, Q.plays]);
+    ok(by.main.last7d.plays === 3 && by.main.last7d.players === 2 && by.main.modes.some(m => m.mode === 'rank' && m.name === '排位' && m.last7d.plays === 1), '轉磚對戰 by mode', by.main);
+    ok(by.snake.last7d.plays === 1 && by.snake.last7d.minutes === 1 && by.snake.name === '磚蛇' && by.dungeon.last7d.plays === 1 && by.dungeon.last7d.wins === 1 && by.level.modes[0].mode === 'fail', 'brick games, the dungeon and levels counted too', [by.snake, by.dungeon, by.level]);
+    ok(by.sweep && by.sweep.last30d.plays === 0, 'a game nobody played is 0, not missing', by.sweep);
+    const day = Q.daily.items[Q.daily.items.length - 1];
+    ok(Q.daily.items.length === 14 && day.players === 3 && day.plays === 6 && day.playsByGame.main === 3 && day.playersByGame.main === 2, 'by day (last 14 days by default)', day);
+    eq((await get('metrics/plays?from=2026-11-23&to=2026-11-01', sign())).status, 400, 'from after to is 400');
+    const G2 = {}; (await get('metrics/games', sign())).json.games.forEach(x => { G2[x.id] = x; });
+    ok(G2.dungeon.plays7d === 1 && G2.snake.plays7d === 1 && G2.level.plays7d === 1, 'metrics/games shows the play log too', [G2.dungeon, G2.snake, G2.level]);
+    const text2 = JSON.stringify(Q);
+    ok(text2.indexOf(P2.key) < 0 && text2.indexOf(P2.id) < 0, 'counts only: no player ids or keys');
+  }
 
   // ---------- metrics/daily ----------
   r = await get('metrics/daily?from=2026-11-19&to=2026-11-21', sign());

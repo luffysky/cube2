@@ -15,7 +15,7 @@
      levels  paid once for the first clear of a level, and again for more stars    (push, sort, picross) */
 (function (root) {
   'use strict';
-  var DAY_CAP = 300, QUEUE = 'snowrealm.mini.queue', QUEUE_MAX = 40;
+  var DAY_CAP = 300, QUEUE = 'snowrealm.mini.queue', QUEUE_MAX = 40, PLAYS = 'snowrealm.play.queue', PLAYS_MAX = 60, CLOUD = 'zhuanzhuan.cloud.v1';
   var GAMES = {
     snake: { kind: 'score', per: 40, name: '磚蛇' },
     breakout: { kind: 'score', per: 60, name: '打磚塊' },
@@ -76,12 +76,47 @@
     // results already waiting in the queue count as if paid, so the estimate does not pay the same thing twice
     q.forEach(function (o) { if (o.game === r.game) prev = record(o, prev); });
     // a brick game's result cannot be checked by the server yet, so it pays no coins (the record and stars still count)
-    var c = 0;
-    q.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c });
+    var c = 0, it = { id: newId(), game: r.game, lv: int(r.lv, 0, 2), value: Math.max(0, Math.round(+r.value || 0)), stars: int(r.stars, 0, 3), ms: Math.round(Math.max(0, +r.ms || 0)), at: Date.now(), est: c };
+    q.push(it);
     var s = store();
     try { if (s) s.setItem(QUEUE, JSON.stringify(q.slice(-QUEUE_MAX))); } catch (e) { /* not kept */ }
+    // straight to the player's cloud save as well (when this browser has one), so the game is counted today even if
+    // 轉磚 is not opened; 轉磚 still takes the queue for its own record, and the server knows it is the same game by its id
+    send([{ i: 'm' + it.id, k: 'mini', a: [it.game, it.lv, it.value, it.stars, it.ms, it.id] }]);
     return c;
   }
+  function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  // ---------- the play log (counted on the server, in the player's cloud save) ----------
+  // The save this browser is on, as 轉磚 keeps it (read only: only 轉磚 makes or changes it).
+  function cred() {
+    var s = store();
+    try { var v = JSON.parse((s && s.getItem(CLOUD)) || 'null'); return v && typeof v.id === 'string' && typeof v.key === 'string' && !v.gone ? v : null; } catch (e) { return null; }
+  }
+  // One request with some changes for the save; answers whether the server took it. Nothing happens without a save,
+  // off a website, or offline (the queues keep what 轉磚 sends later).
+  function send(ops) {
+    var c = cred(), f = root.fetch, loc = root.location;
+    if (!c || typeof f !== 'function' || !loc || !/^https?:$/.test(loc.protocol)) return Promise.resolve(false);
+    try {
+      return f.call(root, '/api/rpc', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.id + '.' + c.key },
+        body: JSON.stringify({ a: 'sync', ops: ops }) }).then(function (r) { return !!(r && r.ok); }, function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  }
+  function readPlays() { var s = store(); try { var q = JSON.parse((s && s.getItem(PLAYS)) || '[]'); return Array.isArray(q) ? q : []; } catch (e) { return []; } }
+  function writePlays(q) { var s = store(); try { if (s) { if (q.length) s.setItem(PLAYS, JSON.stringify(q.slice(-PLAYS_MAX))); else s.removeItem(PLAYS); } } catch (e) { /* not kept */ } }
+  // A game played on a page that keeps nothing else (地城小隊): game, mode (a short word), ms, result (1 won, 0, -1 lost).
+  // It waits in this browser until the server has it, so 轉磚 can send it when this page could not.
+  function play(game, mode, ms, result) {
+    var p = { id: newId(), game: String(game || ''), mode: String(mode || 'play').slice(0, 16), ms: Math.round(Math.max(0, +ms || 0)), result: +result > 0 ? 1 : +result < 0 ? -1 : 0, at: Date.now() };
+    writePlays(readPlays().concat([p]));
+    return send([{ i: 'p' + p.id, k: 'play', a: [p.game, p.mode, p.ms, p.result, p.id] }]).then(function (ok) {
+      if (ok) writePlays(readPlays().filter(function (x) { return x.id !== p.id; }));
+      return ok;
+    });
+  }
+  // 轉磚 takes what is still waiting (and empties it) when it opens
+  function takePlays() { var q = readPlays(); writePlays([]); return q; }
   // 轉磚 takes the queue (and empties it) when it opens
   function take() { var q = readQueue(), s = store(); try { if (s) s.removeItem(QUEUE); } catch (e) { /* fine */ } return q; }
   function waiting() { return readQueue().reduce(function (a, o) { return a + (o.est || 0); }, 0); }
@@ -106,7 +141,7 @@
     String(v || '').split('').forEach(function (c, i) { if (+c > 0) out[i] = +c; });
     return out;
   }
-  var api = { GAMES: GAMES, LV: LV, DAY_CAP: DAY_CAP, QUEUE: QUEUE, coins: coins, record: record, report: report, show: show, stars: stars, take: take, waiting: waiting, balance: balance };
+  var api = { GAMES: GAMES, LV: LV, DAY_CAP: DAY_CAP, QUEUE: QUEUE, PLAYS: PLAYS, coins: coins, record: record, report: report, show: show, stars: stars, take: take, waiting: waiting, balance: balance, play: play, takePlays: takePlays };
   root.SnowRealmMini = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

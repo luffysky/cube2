@@ -471,9 +471,16 @@
   }
   function draw() {
     if (!st) return;
-    if (st.ph === 'fight') { if (screen !== 'play') show('play'); drawFight(); }
+    if (st.ph === 'fight') { if (!runAt) runAt = Date.now(); if (screen !== 'play') show('play'); drawFight(); }
     else if (st.ph === 'loot') { if (screen !== 'loot') show('loot'); drawLoot(); }
-    else { ended = true; if (screen !== 'end') show('end'); drawEnd(); }
+    else { if (!ended) counted(); ended = true; if (screen !== 'end') show('end'); drawEnd(); }
+  }
+  // a run is over: it goes in the play log of this player's own save (games/rewards.js), one line per player and run
+  var runAt = 0;
+  function counted() {
+    var M = window.SnowRealmMini, n = st && st.h ? st.h.filter(function (x) { return !x.off; }).length : 1;
+    if (M && M.play) M.play('dungeon', (solo ? 'solo' : 'party') + Math.max(1, Math.min(4, n)), runAt ? Date.now() - runAt : 0, st && st.ph === 'win' ? 1 : -1);
+    runAt = 0;
   }
   function drawStart() { if (!me.n) { me.n = rollName(); keep(); } $('name').value = me.n; clsButtons('clsStart'); }
 

@@ -1763,3 +1763,29 @@
 - 測試：`entitle` 80 項（多 8 項：演練 after-record → 503、通知留著 → 重送套用並回 `link`；綁定後帶上；演練 deliver → `retry` → 補送那次帶上；不認得的演練不做事；正式站不做演練、測試 issuer 直接拒絕）；`api` 455 項（沒有秘密時第二次 429、下個時段再跑）；`savesync` 53、`security` 61。
 - 檔案：`server/entitle.js`、`server/app.js`、`test/entitle.test.js`、`test/api.test.js`、`test/savesync.test.js`、`docs/DEVLOG.md`。｜刪除：無。
 - 補記：上一條的 commit 為 [`8c3688b`](https://github.com/luffysky/cube2/commit/8c3688b)。
+
+## 2026-11-24 18:16（Asia/Taipei）｜所有遊玩都記進資料庫＋後台「多少人玩、玩什麼」；會員免費體驗重新開放（每份存檔一次）；staging 實測改由 cube2 的 GitHub Actions 跑
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 17:35「數據不要只存個人…現在改都存db」（C-046）、18:11「會員現在先開放免費體驗」、18:12「有些人已經在體驗了」（C-045）、18:09 加好 GitHub 密碼 `STAGING_BYPASS`
+- **遊玩紀錄 `zz.plays`**（C-046）：
+  - 以前只有對戰有一場一行的紀錄；關卡、磚之冒險、挑戰大自然、磚塊小遊戲只在存檔裡留最佳成績，地城小隊什麼都沒有，所以後台算不出各遊戲有多少人在玩。
+  - 現在每玩一場就記一行：哪個遊戲、模式、勝負、時間、分數（對戰、過關、無盡、自訂關卡、輸掉的關卡、磚之冒險的勝與敗、挑戰大自然、九款磚塊小遊戲、地城小隊）。由伺服器依自己套用的結果寫，跟存檔同一個交易；頁面亂送的不算。
+  - 磚塊小遊戲：有雲端存檔時，小遊戲頁結束當下就直接送到伺服器（以前要等打開轉磚）；之後轉磚再送一次也只算一場（用那一場自己的編號）。
+  - 地城小隊：每位玩家的頁面在一局結束時送一行；伺服器不通時先留在瀏覽器，打開轉磚時補送。
+  - 第一次建表時，把現有的對局紀錄（一年內）整批帶進來，統計不從 0 開始。
+  - 新 op `play`（不發獎勵、不改存檔）、`mini` 多帶結果編號；`cleanOps` 允許 6 個參數。
+  - 管理 API：新 `GET /internal/admin/v1/metrics/plays`（今天／7 天／30 天各遊戲的場數、人數、分鐘、勝場，各模式，每天趨勢）；`metrics/games` 加上 7 天場數與人數，地城小隊不再是 `null`；`overview` 加 `playersPlayed7d`。規格寫在 `docs/BRICKDUEL_ADMIN_API_ADAPTER_SPEC.md` §9 給 cube1。
+  - 隱私政策（4 種語言、所有地區）加上「遊玩紀錄」一項；保存期限寫「確定後公布」。**保存期限待 Owner 決定，決定前不刪。**
+- **會員免費體驗**（C-045）：
+  - 新模式 `MEMBER_TRIAL=once`，正式站可用：每份雲端存檔一次、30 天、不收費、不自動續訂。伺服器記住開通時間（`srv.trial`，頁面碰不到），所以提前結束、或頁面忘記自己用過，都不能再開。
+  - 已付費會員不會被體驗蓋掉；之前已在體驗的人照原到期日繼續，到期後算用過。
+  - 頁面只在伺服器說開放時顯示「開通 30 天免費體驗」；用過的顯示「已經用過」；沒有雲端存檔時提示先打完一場。
+  - Vercel：Production 與 staging 新增 `MEMBER_TRIAL=once`（拿掉就關）。
+  - 舊的 `MEMBER_TRIAL=1`（無限次）仍然只在測試可用。
+- **staging 實測**：staging 有 Vercel 部署保護，我的測試機進不去；改成 cube2 自己的 GitHub Actions（`.github/workflows/staging-drill.yml`，`tools/drill/staging-drill.js`），用 Owner 放在 GitHub 的 `STAGING_BYPASS`，不經過聊天。
+  - 先確認 staging 用的是 staging 資料庫才開始，絕不打正式站。
+  - 付款通知那段：工作自己產生一次性金鑰，只印公鑰，等 staging 換上這把公鑰才跑，私鑰只在那次工作裡。
+  - `/api/health` 在 staging 演練時多顯示 `entitleKids`（正式站不會有）。
+- 測試：`api` 470、`admin` 122、`entitle` 82、`security` 61、其他單元測試全過；瀏覽器 `minipay` 16（小遊戲直接送、地城送出、伺服器不通時留著、轉磚補送）、`dungeon`、`legal` 439 通過。
+- 檔案：`server/db.js`、`server/rules.js`、`server/core.js`、`server/admin.js`、`server/app.js`、`server/entitle.js`、`src/meta.js`、`src/minis.js`、`src/levelmode.js`、`src/rpg.js`、`src/shop.js`、`src/cloud.js`、`games/rewards.js`、`games/dungeon/*`、`legal/src/privacy.*`、建置產物、`test/*`、`tools/drill/*`、`.github/workflows/staging-drill.yml`、`docs/*`。｜資料庫：新表 `zz.plays`（只新增）。｜刪除：無。
+- 補記：上一條的 commit 為 [`580da3a`](https://github.com/luffysky/cube2/commit/580da3a)。

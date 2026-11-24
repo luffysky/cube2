@@ -69,7 +69,8 @@ function readSrv(srv, now) {
     at: typeof srv.at === 'number' && isFinite(srv.at) ? srv.at : now,
     hw: typeof srv.hw === 'number' ? srv.hw : f.hw, hn: int(srv.hn, 0, 1e9),
     rg: int(srv.rg, 0, 1e9), season: typeof srv.season === 'string' ? srv.season : '',
-    seeds: Array.isArray(srv.seeds) ? srv.seeds.filter(x => typeof x === 'number' || (typeof x === 'string' && x.length <= 40)).slice(-LIMIT.SEEDS_KEPT) : []
+    seeds: Array.isArray(srv.seeds) ? srv.seeds.filter(x => typeof x === 'number' || (typeof x === 'string' && x.length <= 40)).slice(-LIMIT.SEEDS_KEPT) : [],
+    trial: typeof srv.trial === 'number' && isFinite(srv.trial) ? srv.trial : 0    // when this save started its free trial
   };
   // the allowance fills up with real time
   const waited = Math.max(0, now - out.at);
@@ -92,12 +93,17 @@ function applyOps(state, srv, ops, now) {
   const note = (key, kind, why) => { const c = Meta.data.coins; if (c !== bal) { ledger.push({ key, kind, why: why || '', delta: c - bal, bal: c, at: now }); bal = c; } };
   if (before !== null && before !== bal) { ledger.push({ key: 'sys:' + now, kind: 'system', why: 'day', delta: bal - before, bal, at: now }); }
   if (srv.season !== d0.season) { srv.season = d0.season; srv.rg = 0; }   // a new season: ranked games start from none
-  const seen = new Set(srv.ops), res = [], marks = {}, draws = [], matches = [];
+  const seen = new Set(srv.ops), res = [], marks = {}, draws = [], matches = [], plays = [];
   let applied = 0;
   const mark = (board, val) => { if (!(board in marks) || val > marks[board]) marks[board] = val; };
   for (const op of ops) {
     if (seen.has(op.i)) { res.push({ i: op.i, ok: true, dup: true }); continue; }
+    // a brick game's result (or another play) can arrive twice under two change ids: straight from its own page,
+    // and again when 轉磚 opens. Its own id says it is the same game.
+    const rk = refKey(op);
+    if (rk && seen.has(rk)) { seen.add(op.i); srv.ops.push(op.i); res.push({ i: op.i, ok: true, dup: true }); continue; }
     seen.add(op.i); srv.ops.push(op.i);
+    if (rk) { seen.add(rk); srv.ops.push(rk); }
     if (++srv.hn > LIMIT.OPS_PER_HOUR) { res.push({ i: op.i, ok: false, why: 'slow' }); continue; }
     let r;
     if (op.k === 'fin') { r = finish(op.a, srv, mark); if (r.ok) matches.push(Object.assign({ at: now }, r.rec)); }
@@ -142,7 +148,12 @@ function applyOps(state, srv, ops, now) {
         if (r && r.ok) { srv.bud -= cost; miniMark(op.a, ms, mark); }
       }
     }
-    else if (op.k === 'sub' && !trialOpen()) r = { ok: false, why: 'pay' };
+    else if (op.k === 'sub') {
+      const mode = trialMode(), s = Meta.data.sub || {};
+      if (!mode || (s.demo === false && +s.until > now)) r = { ok: false, why: 'pay' };
+      else if (mode === 'once' && (srv.trial > 0 || Meta.trialUsed())) r = { ok: false, why: 'used' };
+      else { r = Meta.run(op.k, op.a); if (r && r.ok) srv.trial = now; }
+    }
     // a paid membership ends at SnowRealm's payment service, not from the page
     else if (op.k === 'unsub' && Meta.data.sub && Meta.data.sub.demo === false) r = { ok: false, why: 'pay' };
     else if (op.srv) { r = Meta.runServer(op.k, op.a); if (op.k === 'pvp' && r && r.ok) mark('prp', Meta.data.pvp.rp); }    // only ever set by the server itself (cleanOps drops it)
@@ -151,12 +162,39 @@ function applyOps(state, srv, ops, now) {
     if (op.k === 'draw' && r && r.ok && r.out && r.out.boxes) draws.push({ at: now, kind: 'box', boxes: r.out.boxes });
     if ((op.k === 'wheel' || op.k === 'slot') && r && r.ok && r.out && r.out.got) draws.push({ at: now, kind: op.k, boxes: [{ grade: r.out.seg || r.out.out, got: r.out.got }] });
     applied++;
+    const pl = playOf(op, r);
+    if (pl) plays.push(Object.assign({ ref: rk || 'op:' + op.i, ms: null, result: 0, proven: false, score: null, lv: null }, pl));
     res.push(r && r.ok ? { i: op.i, ok: true } : { i: op.i, ok: false, why: (r && r.why) || 'no' });
   }
   if (srv.ops.length > LIMIT.OP_IDS_KEPT) srv.ops = srv.ops.slice(-LIMIT.OP_IDS_KEPT);
   const d = Meta.data, list = [];
   for (const board in marks) { list.push({ board, season: d.season, val: marks[board] }, { board, season: 'all', val: marks[board] }); }
-  return { state: clone(d), srv, res, marks: list, draws, matches, ledger, touched: applied > 0 || res.length > 0 };
+  return { state: clone(d), srv, res, marks: list, draws, matches, plays, ledger, touched: applied > 0 || res.length > 0 };
+}
+// ---------- the play log (zz.plays): one line for every game played, whatever kind, for the console's counts ----------
+const REF = /^[a-z0-9]{6,24}$/;
+function refKey(op) {
+  const a = op.a || [], ref = op.k === 'mini' ? a[5] : op.k === 'play' ? a[4] : null;
+  return typeof ref === 'string' && REF.test(ref) ? op.k + ':' + ref : null;
+}
+const nat = (v, hi) => { const n = Math.floor(+v); return Number.isFinite(n) && n > 0 ? Math.min(n, hi) : 0; };
+const LVS = ['easy', 'normal', 'hard'];
+// What one applied change says was played (null: not a game, or not accepted). Only the server's own reading counts.
+function playOf(op, r) {
+  const a = op.a || [], ok = !!(r && r.ok);
+  switch (op.k) {
+    case 'fin': return ok && r.rec ? { game: 'main', mode: r.rec.mode, ms: nat(r.rec.data.ms, 36e5), result: r.rec.result > 0 ? 1 : r.rec.result < 0 ? -1 : 0, proven: !!r.rec.proven, score: nat(r.rec.data.score, 1e12) } : null;
+    // a level cleared (proven: its replay backs it up); one handed in without a replay is still a game played
+    case 'lvl': return ok || (r && r.why === 'proof') ? { game: 'level', mode: 'clear', lv: nat(a[0], 9999), result: 1, proven: ok } : null;
+    case 'rpg': return ok ? { game: 'rpg', mode: 'win', lv: nat(a[0], 999), result: 1 } : null;
+    case 'endless': return ok ? { game: 'level', mode: 'endless', lv: nat(a[0], 999) } : null;
+    case 'custom': return ok ? { game: 'level', mode: 'custom' } : null;
+    case 'wx': return ok ? { game: 'wx', mode: a[3] === 1 ? 'practice' : 'run', ms: nat(a[0], 3600) * 1000, score: nat(a[2], 1e12) } : null;
+    case 'wxb': return ok ? { game: 'wx', mode: a[1] === 1 ? 'net' : 'battle', result: +a[0] > 0 ? 1 : +a[0] < 0 ? -1 : 0 } : null;
+    case 'mini': return ok && Meta.MINI_INFO[a[0]] ? { game: a[0], mode: LVS[Math.max(0, Math.min(2, Math.floor(+a[1]) || 0))], ms: nat(a[4], 36e5), score: nat(a[2], 1e12) } : null;
+    case 'play': return ok ? { game: a[0], mode: typeof a[1] === 'string' && /^[a-z0-9-]{1,16}$/.test(a[1]) ? a[1] : 'play', ms: nat(a[2], 4 * 36e5), result: +a[3] > 0 ? 1 : +a[3] < 0 ? -1 : 0 } : null;
+    default: return null;
+  }
 }
 // The brick games' boards: a score per game and difficulty (no faster than MINI_RATE points a second could be made),
 // a time per game and difficulty (kept as a negative number, so higher is better like every other board), and the
@@ -272,7 +310,7 @@ function importState(raw, now) {
   list(src.bring).forEach(id => { if (id === Math.floor(id) && id >= 1 && id < Meta.ITEM_PRICE.length && d.items[id] > 0 && d.bring.indexOf(id) < 0 && d.bring.length < Meta.BRING_MAX) d.bring.push(id); });
   // a membership the device says it has is not brought in (it is never the page's to grant)
   const until = trialOpen() ? +obj(src.sub).until || 0 : 0;
-  d.sub = { until: until > now ? Math.min(until, now + 30 * DAY) : 0, demo: true };
+  d.sub = { until: until > now ? Math.min(until, now + 30 * DAY) : 0, demo: true, tier: '', tried: 0 };
   const sd = obj(src.daily);
   if (sd.day === today) {
     // the wave the device was on today comes along, or remaking a cloud save would start the day's waves over
@@ -321,7 +359,15 @@ function importState(raw, now) {
 // Membership is never started by the page on a real server: no payment is wired up yet, and the old free 30-day
 // trial (the page's 'sub' op) is turned away. Only a test or local setup can open it (MEMBER_TRIAL=1, never in
 // production). Paid membership will come from SnowRealm's central entitlement service, set by the server only.
-function trialOpen(env) { env = env || process.env; return env.MEMBER_TRIAL === '1' && env.VERCEL_ENV !== 'production'; }
+// The free membership trial. 'once' (Owner 2026-11-24, C-045, any environment): each save may start one 30-day trial,
+// never again after it, and not while it has a paid membership. 'open' (MEMBER_TRIAL=1, tests only, never production):
+// as often as asked. Off otherwise: membership only through SnowRealm's payment service.
+function trialMode(env) {
+  env = env || process.env;
+  if (env.MEMBER_TRIAL === 'once') return 'once';
+  return env.MEMBER_TRIAL === '1' && env.VERCEL_ENV !== 'production' ? 'open' : null;
+}
+function trialOpen(env) { return trialMode(env) === 'open'; }
 
 // ---------- shape checks for what arrives over the wire ----------
 const OP_ID = /^[A-Za-z0-9_-]{6,24}$/;
@@ -330,10 +376,10 @@ function cleanOps(v) {
   if (!Array.isArray(v) || v.length > LIMIT.OPS_PER_CALL) return null;
   const out = [];
   for (const o of v) {
-    if (!o || typeof o !== 'object' || typeof o.i !== 'string' || !OP_ID.test(o.i) || typeof o.k !== 'string' || Meta.OPS.indexOf(o.k) < 0 || !Array.isArray(o.a) || o.a.length > 5) return null;
+    if (!o || typeof o !== 'object' || typeof o.i !== 'string' || !OP_ID.test(o.i) || typeof o.k !== 'string' || Meta.OPS.indexOf(o.k) < 0 || !Array.isArray(o.a) || o.a.length > 6) return null;
     out.push({ i: o.i, k: o.k, a: o.a });
   }
   return out;
 }
 
-module.exports = { ZZ, Meta, LIMIT, trialOpen, applyOps, current, importState, cleanOps, freshSrv, readSrv, seasonOf, clone };
+module.exports = { ZZ, Meta, LIMIT, trialOpen, trialMode, applyOps, current, importState, cleanOps, freshSrv, readSrv, seasonOf, clone };

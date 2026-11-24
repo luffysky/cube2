@@ -133,7 +133,7 @@
       S.me = new ZZ.Game({ seed: S.seed, lockDelay: App.set.lock, sdf: App.sdfVal() });
       S.state = 'play';
     },
-    started: function () { App.S().me.start(); draw(); },
+    started: function () { var S = App.S(); S.at0 = Date.now(); S.me.start(); draw(); },
     hud: function () {
       var S = App.S(), R = S.rpg, el = App.el;
       el.hudL.innerHTML = '<span class="who">' + esc(t('rp.c.' + R.cls)) + '</span>';
@@ -189,6 +189,8 @@
       if (S.state !== 'play') return;
       S.state = 'wait'; S.wait = 900; S.target = null;
       App.sfx.play('lose');
+      // a stage lost: nothing changes, but it is a game played (the console's play counts)
+      if (Meta.played) Meta.played('rpg', 'lose', S.at0 ? Date.now() - S.at0 : 0, -1);
       S.after = function () { App.openSheet('rpgLose'); };
     }
   };
