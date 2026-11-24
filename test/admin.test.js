@@ -12,6 +12,8 @@ const rules = require('../server/rules.js');
 const { make } = require('../tools/pglite-db.js');
 const FIX = require('./fixtures/cube1-brickduel-admin-jwt.json');
 
+// membership here comes from the old free trial, which only a test setup may open (MEMBER_TRIAL=1, never production)
+process.env.MEMBER_TRIAL = '1';
 let pass = 0, fail = 0;
 function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', name, extra !== undefined ? JSON.stringify(extra).slice(0, 500) : ''); } }
 const eq = (a, b, name) => ok(JSON.stringify(a) === JSON.stringify(b), name + ' got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b));

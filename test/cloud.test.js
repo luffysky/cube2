@@ -15,6 +15,8 @@ require('../src/bot.js'); require('../src/drills.js'); require('../src/openers.j
 const M = ZZ.Meta, C = ZZ.Cloud;
 if (M === serverMeta) throw new Error('the page and the server must not share one copy of the rules');
 
+// membership here comes from the old free trial, which only a test setup may open (MEMBER_TRIAL=1, never production)
+process.env.MEMBER_TRIAL = '1';
 let pass = 0, fail = 0;
 function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', name, extra !== undefined ? JSON.stringify(extra).slice(0, 700) : ''); } }
 function eq(a, b, name) { ok(JSON.stringify(a) === JSON.stringify(b), name + ' got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b)); }
