@@ -20,7 +20,7 @@ function wav() {
 (async () => {
   const OUTBOX = path.join(require('os').tmpdir(), 'zz-r2-outbox-' + process.pid + '.jsonl');
   try { require('fs').unlinkSync(OUTBOX); } catch (e) { /* none yet */ }
-  const env = Object.assign({}, process.env, { R2_ACCOUNT_ID: 'acct123', R2_ACCESS_KEY_ID: 'AKIDTEST', R2_SECRET_ACCESS_KEY: 'SECRETTEST', R2_BUCKET: 'zzb',
+  const env = Object.assign({}, process.env, { R2_ACCOUNT_ID: 'acct123', R2_ACCESS_KEY_ID: 'AKIDTEST', R2_SECRET_ACCESS_KEY: 'SECRETTEST', R2_BUCKET: 'zzb', MEMBER_TRIAL: '1',
     RESEND_API_KEY: 're_test', MAIL_FROM: 'test <t@example.com>', ESCROW_KEY: 'e'.repeat(40), MAIL_TEST_OUTBOX: OUTBOX });
   const mails = () => { try { return require('fs').readFileSync(OUTBOX, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (e) { return []; } };
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'dev-server.js'), String(PORT)], { stdio: ['ignore', 'pipe', 'inherit'], env });

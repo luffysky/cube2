@@ -141,6 +141,7 @@ function applyOps(state, srv, ops, now) {
         if (r && r.ok) { srv.bud -= cost; miniMark(op.a, ms, mark); }
       }
     }
+    else if (op.k === 'sub' && !trialOpen()) r = { ok: false, why: 'pay' };
     else if (op.srv) { r = Meta.runServer(op.k, op.a); if (op.k === 'pvp' && r && r.ok) mark('prp', Meta.data.pvp.rp); }    // only ever set by the server itself (cleanOps drops it)
     else r = Meta.run(op.k, op.a);
     note(op.i, op.k, op.k === 'fin' && r && r.rec ? r.rec.mode : op.k === 'buy' || op.k === 'set' || op.k === 'item' || op.k === 'job' ? String(op.a && op.a[0] != null ? op.a[0] : '').slice(0, 20) : '');
@@ -248,7 +249,8 @@ function importState(raw, now) {
   d.items[0] = 0;
   d.bring = [];
   list(src.bring).forEach(id => { if (id === Math.floor(id) && id >= 1 && id < Meta.ITEM_PRICE.length && d.items[id] > 0 && d.bring.indexOf(id) < 0 && d.bring.length < Meta.BRING_MAX) d.bring.push(id); });
-  const until = +obj(src.sub).until || 0;
+  // a membership the device says it has is not brought in (it is never the page's to grant)
+  const until = trialOpen() ? +obj(src.sub).until || 0 : 0;
   d.sub = { until: until > now ? Math.min(until, now + 30 * DAY) : 0, demo: true };
   const sd = obj(src.daily);
   if (sd.day === today) {
@@ -295,6 +297,11 @@ function importState(raw, now) {
   return clone(d);
 }
 
+// Membership is never started by the page on a real server: no payment is wired up yet, and the old free 30-day
+// trial (the page's 'sub' op) is turned away. Only a test or local setup can open it (MEMBER_TRIAL=1, never in
+// production). Paid membership will come from SnowRealm's central entitlement service, set by the server only.
+function trialOpen(env) { env = env || process.env; return env.MEMBER_TRIAL === '1' && env.VERCEL_ENV !== 'production'; }
+
 // ---------- shape checks for what arrives over the wire ----------
 const OP_ID = /^[A-Za-z0-9_-]{6,24}$/;
 function cleanOps(v) {
@@ -308,4 +315,4 @@ function cleanOps(v) {
   return out;
 }
 
-module.exports = { ZZ, Meta, LIMIT, applyOps, current, importState, cleanOps, freshSrv, readSrv, seasonOf, clone };
+module.exports = { ZZ, Meta, LIMIT, trialOpen, applyOps, current, importState, cleanOps, freshSrv, readSrv, seasonOf, clone };

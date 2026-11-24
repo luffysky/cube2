@@ -1660,10 +1660,22 @@
 - 補記：上一條的 commit 為 [`3c1c09f`](https://github.com/luffysky/cube2/commit/3c1c09f)。
 - 補記（02:10）：staging `4ff0090` 已部署，`https://brickduel-staging.snowrealm.pet/.well-known/sync-jwks.json` 從外部（未登入的瀏覽器）可讀到 1 把公鑰（kid `r5kPqgPQhD34xqfluVUty3XILzQG51SON5gGIOe2-wA`，只有公鑰）。cube1 已合併 PR #24（遊戲館把轉磚授權參數存進分頁的 sessionStorage，登入、換語言、重新整理後仍可繼續），正式遊戲館 `7f7044e` 已上線。上一條的 commit 為 [`4ff0090`](https://github.com/luffysky/cube2/commit/4ff0090)。
 
-## 2026-11-24 12:41（Asia/Taipei）｜CI：pwa 的 sitemap 檢查跟上第 11 個頁面（地城小隊）
+## 2026-11-24 12:38（Asia/Taipei）｜CI：pwa 的 sitemap 檢查跟上第 11 個頁面（地城小隊）
 
 - 專案：cube2｜執行者：Claude｜依據：Owner「BRICKDUEL｜資安、金流、廣告、上架任務」P0.1
 - 原因：`test/pwa.js` 還寫死 sitemap 有 15 個網址，地城小隊（`/games/dungeon/`）加進 sitemap 後是 16 個，所以 GitHub Actions 的「the pages in Chrome」從那之後一直紅。其他 30 多個瀏覽器測試和伺服器測試都是綠的。
 - 修正：改成 16 個，並檢查地城那頁有列進去。本機 `pwa` 52 項通過。
 - 檔案：`test/pwa.js`、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無。
 - 補記：上一條的 commit 為 [`2900111`](https://github.com/luffysky/cube2/commit/2900111)。
+
+## 2026-11-24 12:58（Asia/Taipei）｜P1 重大項目：關掉「體驗模式免費開通 30 天會員」
+
+- 專案：cube2｜執行者：Claude｜依據：Owner 任務 P1「正式環境不得繞過付款或受控試用核發會員」
+- 問題：商城會員頁有「開通體驗」，頁面送出 `sub` 操作，伺服器照單全收，任何人都能在正式站免費拿到 30 天會員（每日寶箱 10 次、獎勵 1.5 倍、會員造型、自己的圖片、雲端檔案、免看廣告領獎）。另外，新建雲端存檔時，裝置自稱的會員期限（最多 30 天）也會被帶進來。
+- 修正：
+  - 伺服器（`server/rules.js`）：頁面送來的 `sub` 一律拒絕（`why: pay`）；新建雲端存檔不再帶入裝置自稱的會員。只有測試或本機環境設 `MEMBER_TRIAL=1`、而且不是 production 時才放行，正式站設了也沒用。之後的付費會員由伺服器依 SnowRealm 中央權益服務設定。
+  - 頁面（`src/shop.js`）：正式網域不再顯示「開通體驗」，改成「會員會透過 SnowRealm 的付款服務開通，現在還沒開放購買」。只有 localhost／127.0.0.1／本機檔案才看得到體驗按鈕。
+  - 已經用舊體驗開通的存檔：沒有動（改玩家資料要先問 Owner），最多 30 天內自然到期。
+- 測試：`api` 449 項（多 3 項：沒有試用開關時拒絕、production 設了開關也拒絕、新存檔不帶入會員）；其他測試改用 `MEMBER_TRIAL=1` 才能測會員功能；`r2`、`flow`、`cele` 瀏覽器測試通過；全部單元測試通過。
+- 檔案：`server/rules.js`、`src/shop.js`、`test/api.test.js`、`test/r2.js`、建置產物、`docs/DEVLOG.md`。｜資料庫：沒動。｜刪除：無。
+- 補記：上一條的 commit 為 [`b0260d1`](https://github.com/luffysky/cube2/commit/b0260d1)。

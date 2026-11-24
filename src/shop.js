@@ -47,6 +47,7 @@
     'mb.price': ['預計月費 NT${0}、年費 NT${1}', 'Planned price: NT${0} a month, NT${1} a year', '予定価格：月額NT${0}、年額NT${1}', '예정 가격: 월 NT${0}, 연 NT${1}'],
     'mb.demo': ['現在是體驗模式：金流還沒接上，按下去不會收費，會直接開通 30 天。', 'Trial mode: payments are not connected yet. Nothing is charged; this starts 30 days of membership.', '体験モード：決済は未接続です。課金はなく、30日間のメンバーが始まります。', '체험 모드: 결제가 아직 연결되지 않았습니다. 요금 없이 30일 멤버십이 시작됩니다.'],
     'mb.start': ['開通體驗', 'Start trial', '体験を始める', '체험 시작'],
+    'mb.soon': ['會員會透過 SnowRealm 的付款服務開通，現在還沒開放購買。', 'Membership will be bought through SnowRealm\'s payment service. It is not on sale yet.', 'メンバーは SnowRealm の決済サービスで購入できるようになります。現在はまだ販売していません。', '멤버십은 SnowRealm 결제 서비스로 구매하게 됩니다. 아직 판매하지 않습니다.'],
     'mb.active': ['會員到期還有 {0} 天', '{0} days of membership left', 'メンバー期間は残り{0}日', '멤버십 {0}일 남음'],
     'mb.end': ['結束體驗', 'End trial', '体験を終了', '체험 종료'],
     'mb.pics': ['自己的圖片', 'Your pictures', '自分の画像', '내 사진'],
@@ -581,9 +582,13 @@
   }
   function memberHtml() {
     var sub = Meta.isSub(), P = Meta.PLAN, h;
-    h = '<div class="plan"><b>' + t('mb.name') + '</b>' + App.ul(['mb.p1', 'mb.p2', 'mb.p3', 'mb.p4']) + '<p>' + t('mb.price', P.month, P.year) + '</p></div><p class="warn">' + t('mb.demo') + '</p>';
+    // the free trial only where it cannot reach a real server's save (a local or test copy); on the site, membership
+    // waits for SnowRealm's payment service and nothing here starts it
+    var trial = trialHere();
+    h = '<div class="plan"><b>' + t('mb.name') + '</b>' + App.ul(['mb.p1', 'mb.p2', 'mb.p3', 'mb.p4']) + '<p>' + t('mb.price', P.month, P.year) + '</p></div><p class="warn">' + t(trial ? 'mb.demo' : 'mb.soon') + '</p>';
     if (sub) h += '<p class="note"><b>' + t('mb.active', Meta.subDaysLeft()) + '</b></p>';
-    h += '<div class="row">' + (sub ? btn('subEnd', 'mb.end') : btn('subStart', 'mb.start', true)) + '</div><h3>' + t('mb.pics') + '</h3>';
+    if (trial) h += '<div class="row">' + (sub ? btn('subEnd', 'mb.end') : btn('subStart', 'mb.start', true)) + '</div>';
+    h += '<h3>' + t('mb.pics') + '</h3>';
     if (!sub) return h + '<p>' + t('mb.need') + '</p>';
     h += '<div class="levels">' + picRow('bg', 'mb.wall') + picRow('tile', 'mb.tile') + '</div>' +
       '<div class="field"><label for="cDim">' + t('mb.dim') + '</label><output id="cDimO" for="cDim"></output><input type="range" id="cDim" min="0" max="85" step="5"></div>' +
@@ -627,7 +632,8 @@
     if (file) file.onchange = function () { if (file.files && file.files[0] && pickKey && ZZ.DevStore) ZZ.DevStore.persist();
       if (file.files && file.files[0] && pickKey) takeFile(pickKey, file.files[0]); file.value = ''; };
   };
-  App.acts.subStart = function () { Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop'); };
+  function trialHere() { try { return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) || window.location.protocol === 'file:'; } catch (e) { return false; } }
+  App.acts.subStart = function () { if (!trialHere()) return; Meta.subscribe(); App.applyLook(); App.sfx.play('win'); App.openSheet('shop'); };
   App.acts.subEnd = function () { Meta.cancelSub(); if (ZZ.Replay) ZZ.Replay.trim(5); App.applyLook(); App.openSheet('shop'); };
   App.acts.shopItems = function () { tab = 'items'; App.openSheet('shop'); };
   App.inputs.push(function (el) {

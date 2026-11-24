@@ -7,6 +7,9 @@ const core = require('../server/core.js');
 const rules = require('../server/rules.js');
 const { make } = require('../tools/pglite-db.js');
 
+// membership here comes from the old free trial, which only a test setup may open (MEMBER_TRIAL=1, never production);
+// the checks that it stays shut everywhere else are in the membership section below
+process.env.MEMBER_TRIAL = '1';
 let pass = 0, fail = 0;
 function ok(c, name, extra) { if (c) pass++; else { fail++; console.log('FAIL', name, extra !== undefined ? JSON.stringify(extra).slice(0, 600) : ''); } }
 function eq(a, b, name) { ok(JSON.stringify(a) === JSON.stringify(b), name + ' got ' + JSON.stringify(a) + ' want ' + JSON.stringify(b)); }
@@ -260,6 +263,16 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
     now += DAY;
     j = (await sync(X, [op('draw', [1])])).json;
     ok(j.res[0].ok && j.st.daily.draws === 1, 'a new day brings new draws');
+    // ---------- membership: never started by the page on a real server ----------
+    delete process.env.MEMBER_TRIAL;
+    j = (await sync(X, [op('sub')])).json;
+    ok(j.res[0].ok === false && j.res[0].why === 'pay' && !(j.st.sub.until > now), 'no free trial: the page cannot start a membership (why: pay)', j.res);
+    process.env.MEMBER_TRIAL = '1'; process.env.VERCEL_ENV = 'production';
+    j = (await sync(X, [op('sub')])).json;
+    ok(j.res[0].ok === false && j.res[0].why === 'pay', 'and in production not even with the test switch on', j.res);
+    const imp = (await rpc({ a: 'hello', st: { coins: 50, sub: { until: now + 20 * DAY, demo: true } } })).json;
+    ok(imp.ok && !(imp.st.sub.until > now), 'a membership the device claims is not brought into a new cloud save', imp.st && imp.st.sub);
+    delete process.env.VERCEL_ENV;
     j = (await sync(X, [op('sub'), op('draw', [9])])).json;
     ok(j.res[1].ok && j.st.daily.draws === 10, 'members get ten', j.res);
     // a page cannot pick its own prizes: the server ignores anything but the count
