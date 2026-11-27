@@ -7,7 +7,7 @@ const http = require('http');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 require('fs').mkdirSync(path.join(ROOT, 'shots'), { recursive: true });      // the tests save screenshots here (not in git)
-const ALL = ['flow', 'rwd', 'drawer', 'onehand', 'howto', 'bag', 'cele', 'music', 'skies', 'wxnet', 'legal', 'pwa', 'gameslang', 'cloudui', 'consent', 'sites', 'bricks', 'minipay', 'quick', 'rtc', 'r2', 'authui', 'sound', 'history', 'linkcheck', 'tower', 'royale', 'relay', 'terr', 'rpg', 'dungeon', 'naming', 'friends'];
+const ALL = ['flow', 'inputguard', 'rwd', 'drawer', 'onehand', 'howto', 'bag', 'cele', 'music', 'skies', 'wxnet', 'legal', 'pwa', 'gameslang', 'cloudui', 'consent', 'sites', 'bricks', 'minipay', 'quick', 'rtc', 'r2', 'authui', 'sound', 'history', 'linkcheck', 'tower', 'royale', 'relay', 'terr', 'rpg', 'dungeon', 'naming', 'friends'];
 const list = process.argv.slice(2).length ? process.argv.slice(2) : ALL;
 const up = port => new Promise(res => { const r = http.get({ host: '127.0.0.1', port, path: '/index.html', timeout: 1500 }, s => { s.resume(); res(s.statusCode === 200); }); r.on('error', () => res(false)); r.on('timeout', () => { r.destroy(); res(false); }); });
 (async () => {

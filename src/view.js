@@ -1332,7 +1332,8 @@
         try { self.decode(b64buf(ZZ.SFX[name].d), function (buf) { self.buf[name] = buf; }); } catch (e) { /* synth covers it */ }
       });
     }
-    if (this.mwant && this.mname !== this.mwant) this.music(this.mwant);
+    // music that will not start must never break the tap that woke it (that tap may be a key in a match)
+    if (this.mwant && this.mname !== this.mwant) { try { this.music(this.mwant); } catch (e) { this.mload = ''; } }
   };
   Sound.prototype.resume = function () {
     try {

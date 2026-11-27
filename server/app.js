@@ -319,6 +319,15 @@ const routes = {
         // (during the acceptance before linking opens, the acceptance saves see their own link state)
         out = await db.run(d => core.idStatus(d, cred, identity.enabled(), bff.accepting()));
         break;
+      case 'diag': {
+        // what a page saw when its keys stopped answering, or a script error during a match (src/ui.js health):
+        // only the game's state and a coarse device kind; written to the log, not stored; a few a minute per address
+        if (!diagAllowed(ipTag(req), now)) return send(res, 429, { ok: false, why: 'slow' });
+        const kind = body.kind === 'input' || body.kind === 'jserr' ? body.kind : null;
+        if (!kind || !body.d || typeof body.d !== 'object' || Array.isArray(body.d)) return send(res, 400, { ok: false, why: 'diag' });
+        console.warn('[zz] client-diag ' + kind + ' ' + JSON.stringify(Object.assign({ ua: coarseUa(header(req, 'user-agent')) }, diagClean(body.d))).slice(0, 1600));
+        return send(res, 200, { ok: true });
+      }
       case 'ledger':
         if (!cred) return send(res, 401, { ok: false, why: 'auth' });
         out = await db.run(d => core.ledger(d, cred, body));
@@ -341,6 +350,33 @@ const routes = {
     send(res, out.status, out.body);
   }
 };
+
+// ---------- reports from pages (rpc diag) ----------
+const DIAG_KEYS = ['why', 'mode', 'state', 'screen', 'sheet', 'cap', 'focus', 'cur', 'over', 'fz', 'soft', 'sd', 'dir', 'held', 'net', 'direct', 'touch', 'land', 'vis', 'w', 'h', 'top', 'errs', 'msg'];
+function diagValue(v, deep) {
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.round(v) : null;
+  if (typeof v === 'boolean') return v;
+  // short plain text only (element names, states, error messages): nothing that could carry markup or a long secret
+  if (typeof v === 'string') return v.replace(/[^\w\s.#:@,()'"=+\-\/\u3000-\u9fff]/g, '').slice(0, 160);
+  if (Array.isArray(v) && !deep) return v.slice(0, 6).map(x => diagValue(x, true)).filter(x => typeof x === 'string');
+  return null;
+}
+function diagClean(d) { const out = {}; for (const k of DIAG_KEYS) if (k in d) { const v = diagValue(d[k], false); if (v !== null) out[k] = v; } return out; }
+// the device in a few words (android chrome 131), never the whole user-agent line
+function coarseUa(ua) {
+  ua = String(ua || '');
+  const os = /Android/.test(ua) ? 'android' : /iPhone|iPad|iPod/.test(ua) ? 'ios' : /Windows/.test(ua) ? 'windows' : /Mac OS X/.test(ua) ? 'mac' : /Linux|CrOS/.test(ua) ? 'linux' : 'other';
+  const b = /SamsungBrowser\/(\d+)/.exec(ua) || /EdgA?\/(\d+)/.exec(ua) || /Firefox\/(\d+)/.exec(ua) || /CriOS\/(\d+)/.exec(ua) || /Chrome\/(\d+)/.exec(ua) || /Version\/(\d+).*Safari/.exec(ua);
+  const name = !b ? 'other' : /Samsung/.test(b[0]) ? 'samsung' : /Edg/.test(b[0]) ? 'edge' : /Firefox/.test(b[0]) ? 'firefox' : /Version/.test(b[0]) ? 'safari' : 'chrome';
+  return os + ' ' + name + (b ? ' ' + b[1] : '');
+}
+const diagSeen = new Map();
+function diagAllowed(ip, now) {
+  const slot = Math.floor(now / 60000), k = ip + ':' + slot, n = (diagSeen.get(k) || 0) + 1;
+  diagSeen.set(k, n);
+  if (diagSeen.size > 5000) for (const key of diagSeen.keys()) { if (!key.endsWith(':' + slot)) diagSeen.delete(key); }
+  return n <= 6;
+}
 
 // Log lines say what went wrong and nothing about who asked or how the database is reached.
 function log(where, e) {

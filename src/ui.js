@@ -154,9 +154,98 @@
     if (holdNoN++ < 3) toast(t(why), 1800);
   }
 
+  // Sound never stands between a finger and the game: if waking the audio throws on some phone, the key still works.
+  function wake() { try { sfx.wake(); } catch (e) { health.err(e); } }
+  var ptrs = {};      // touch keys held: pointer id → key
+  var liftAll = function () { /* set in bindInput */ };
+
+  // ---------- input health (2026-11-27: on an Android phone in a friend room, the keys stopped answering for the rest
+  // of a match while the pieces kept falling, with nothing on screen; it could not be made to happen here) ----------
+  // Watches the keys during a match. Taps that land on the keys' area but never reach them (something on top), and keys
+  // that reach the game but change nothing although they could, are counted; four in a row send one report per match
+  // to the server (state only: no name, no save), and every held key is let go. Script errors in a match go too.
+  var health = (function () {
+    var H = { blocked: [], dead: 0, errs: [], sent: 0, errSent: 0, match: null };
+    function live() { return !!S && screen === 'play' && S.state === 'play' && !!S.me && !!S.me.cur && !S.me.over && !(S.freeze && S.freeze.me > 0) && !(S.down && S.down.me > 0) && !(S.relay && !S.relay.active); }
+    function same() { if (H.match !== S) { H.match = S; H.blocked = []; H.dead = 0; } }
+    // on a key itself (not just the keys' strip: held sideways that strip spans the wall, and taps on the wall are fine)
+    function inPad(x, y) {
+      var boxes = [el.pad, el.sideL, el.sideR];
+      for (var i = 0; i < boxes.length; i++) {
+        var b = boxes[i];
+        if (!b || b.hidden || !b.offsetParent) continue;
+        var ks = b.querySelectorAll('.key');
+        for (var j = 0; j < ks.length; j++) { if (ks[j].hidden || !ks[j].offsetParent) continue; var r = ks[j].getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true; }
+      }
+      return false;
+    }
+    function tag(e) { return e ? (e.tagName || '').toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '') : ''; }
+    function snap(why, x, y) {
+      var c = S && S.me && S.me.cur, ae = document.activeElement, stack = [];
+      try { if (x != null && document.elementsFromPoint) stack = document.elementsFromPoint(x, y).slice(0, 5).map(tag); } catch (e) { /* older browsers */ }
+      return { why: why, mode: S ? S.mode || S.kind : '', state: S ? S.state : '', screen: screen, sheet: sheetName, cap: !!App.capture, focus: tag(ae),
+        cur: !!c, over: !!(S && S.me && S.me.over), fz: S && S.freeze ? Math.round(S.freeze.me) : 0, soft: !!(S && S.me && S.me.soft), sd: !!input.sd, dir: input.dir,
+        held: Object.keys(ptrs).length, net: ZZ.Net ? ZZ.Net.state : '', direct: !!(ZZ.Net && ZZ.Net.direct && ZZ.Net.direct()), touch: !!env.touch,
+        land: el.play.classList.contains('land'), vis: document.visibilityState, w: window.innerWidth, h: window.innerHeight, top: stack, errs: H.errs.slice(-3) };
+    }
+    function report(kind, d) {
+      try {
+        if (!window.fetch || !/^https?:$/.test(window.location.protocol)) return;
+        window.fetch('/api/rpc', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ a: 'diag', kind: kind, d: d }) }).then(null, function () { /* best effort */ });
+      } catch (e) { /* best effort */ }
+    }
+    function trouble(why, x, y) {
+      var d = snap(why, x, y);
+      if (H.sent < 2 && H.match === S && !S.diagSent) { S.diagSent = true; H.sent++; report('input', d); }
+      // let go of everything a finger may still be holding, so a stuck key does not last the whole match
+      liftAll(); input.clear();
+      H.blocked = []; H.dead = 0;
+      App.lastTrouble = d;
+    }
+    return {
+      // a finger came down anywhere on the page (capture phase): on the keys' area but not reaching them counts
+      any: function (e) {
+        if (!env.touch || !live()) return;
+        same();
+        var t = e.target, onKeys = (el.pad && el.pad.contains(t)) || (el.sideL && el.sideL.contains(t)) || (el.sideR && el.sideR.contains(t));
+        if (onKeys || !inPad(e.clientX, e.clientY)) return;
+        var now = performance.now();
+        H.blocked = H.blocked.filter(function (b) { return now - b < 4000; }).concat(now);
+        if (H.blocked.length >= 4) trouble('blocked', e.clientX, e.clientY);
+      },
+      reached: function () { H.blocked = []; },
+      // what the falling piece looked like before a key, to tell afterwards whether the key did anything
+      before: function (a) {
+        if (!live() || (a !== 'L' && a !== 'R' && a !== 'HD')) return null;
+        if (S.sky) return null;      // the weather may hold a piece on purpose (挑戰大自然)
+        if (a === 'HD' && performance.now() < (S.guard || 0)) return null;      // a drop held back on purpose just after a lock
+        var c = S.me.cur, d = a === 'L' ? -1 : a === 'R' ? 1 : 0;
+        if (d && !S.me.fits(c.type, c.rot, c.x + d, c.y)) return null;      // it could not have moved: not a miss
+        return { c: c, x: c.x, y: c.y, rot: c.rot };
+      },
+      after: function (a, b4, how) {
+        if (!b4 || !S || !S.me) return;
+        same();
+        var c = S.me.cur;
+        if (c !== b4.c || c.x !== b4.x || c.y !== b4.y || c.rot !== b4.rot) { H.dead = 0; return; }
+        if (++H.dead >= 4) trouble('noeffect-' + how);
+      },
+      err: function (e) {
+        var m = String((e && (e.message || e.reason && e.reason.message)) || e).slice(0, 140) + (e && e.filename ? ' @' + String(e.filename).split('/').pop().split('?')[0] + ':' + (e.lineno || 0) : '');
+        if (H.errs.indexOf(m) >= 0) return;      // the same error again (it may come with every tap): once is enough
+        H.errs.push(m); if (H.errs.length > 5) H.errs.shift();
+        if (S && screen === 'play' && H.errSent < 3) { H.errSent++; report('jserr', { msg: m, mode: S.mode || S.kind, state: S.state, sheet: sheetName }); }
+      }
+    };
+  })();
+  App.health = health;
+  window.addEventListener('error', function (e) { health.err(e); });
+  window.addEventListener('unhandledrejection', function (e) { health.err({ message: 'promise: ' + String(e && e.reason && (e.reason.message || e.reason) || '').slice(0, 120) }); });
+  document.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'mouse') health.any(e); }, true);
+
   function bindInput() {
     window.addEventListener('keydown', function (e) {
-      sfx.wake();
+      wake();
       if (App.capture) { e.preventDefault(); App.capture(e); return; }
       if (sheetName) {
         if (e.code === 'Escape') { e.preventDefault(); sheetDo(sheetName === 'pause' ? 'resume' : 'close'); }
@@ -167,19 +256,19 @@
       var tag = e.target && e.target.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       var k = KEYS[e.code];
-      if (k) { e.preventDefault(); if (!e.repeat) act(k, true); }
+      if (k) { e.preventDefault(); if (!e.repeat) { var b4 = health.before(k); act(k, true); health.after(k, b4, 'key'); } }
     });
     window.addEventListener('keyup', function (e) { var k = KEYS[e.code]; if (k) act(k, false); });
     window.addEventListener('blur', function () { input.clear(); });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { input.clear(); if (!(S && S.mode === 'net')) pause(); }
+      if (document.hidden) { liftAll(); input.clear(); if (!(S && S.mode === 'net')) pause(); }
       sfx.hush(document.hidden);
     });
 
     // Touch keys. A thumb can slide between left and right without lifting; every other key needs its own tap,
     // and a key stays down until the finger lifts even if it drifts off the edge.
     // The keys live in three places: the pad under the wall and the two side strips beside it (hold, item, half turn).
-    var ptrs = {}, SLIDE = { L: 1, R: 1 };
+    var SLIDE = { L: 1, R: 1 };
     // the key under the finger; a tap that lands in the gap between keys, or just off a key's edge, goes to the
     // nearest key within reach (a quick thumb often lands there, and a tap that does nothing feels like a dead key)
     var REACH = 22;
@@ -195,21 +284,29 @@
       }
       return best;
     }
-    function press(k) { k.classList.add('on'); act(k.dataset.k, true); buzz(7); }
+    function press(k) { k.classList.add('on'); var a = k.dataset.k, b4 = health.before(a); act(a, true); health.after(a, b4, 'tap'); buzz(7); }
     function lift(k) { k.classList.remove('on'); act(k.dataset.k, false); }
     function end(e) {
       var cur = ptrs[e.pointerId];
       if (cur) lift(cur);
       delete ptrs[e.pointerId];
-      sfx.wake();
+      wake();
     }
+    // Every key a finger still holds is let go: when no finger is left on the screen at all, when the page is hidden,
+    // and when a match starts. A lift the page never heard (a phone can drop one) would otherwise hold soft drop or a
+    // side key down for the rest of the match.
+    liftAll = function () { for (var id in ptrs) { if (ptrs[id]) lift(ptrs[id]); } ptrs = {}; };
+    document.addEventListener('touchend', function (e) { if (e.touches && e.touches.length === 0) liftAll(); }, { passive: true, capture: true });
+    document.addEventListener('touchcancel', function (e) { if (e.touches && e.touches.length === 0) liftAll(); }, { passive: true, capture: true });
     function bindKeys(root) {
       root.addEventListener('pointerdown', function (e) {
         e.preventDefault();
-        sfx.wake();
+        wake();
+        health.reached(e);
         var k = keyAt(root, e.clientX, e.clientY);
         if (!k) return;
         try { root.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+        if (ptrs[e.pointerId] && ptrs[e.pointerId] !== k) lift(ptrs[e.pointerId]);    // the same finger again: its old key was never let go
         ptrs[e.pointerId] = k;
         press(k);
       });
@@ -223,19 +320,20 @@
       });
       root.addEventListener('pointerup', end);
       root.addEventListener('pointercancel', end);
+      root.addEventListener('lostpointercapture', end);
       root.addEventListener('contextmenu', function (e) { e.preventDefault(); });
       root.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
     }
     bindKeys(el.pad); bindKeys(el.sideL); bindKeys(el.sideR);
     document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
     el.play.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    el.holdBox.addEventListener('click', function () { sfx.wake(); act('HOLD', true); });
-    el.itemBox.addEventListener('click', function () { sfx.wake(); act('ITEM', true); });
-    el.pauseBtn.addEventListener('click', function () { sfx.wake(); sfx.play('ui'); pause(); });
+    el.holdBox.addEventListener('click', function () { wake(); act('HOLD', true); });
+    el.itemBox.addEventListener('click', function () { wake(); act('ITEM', true); });
+    el.pauseBtn.addEventListener('click', function () { wake(); sfx.play('ui'); pause(); });
     el.tools.addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('[data-act]') : null;
       if (!b) return;
-      sfx.wake();
+      wake();
       var a = b.dataset.act;
       if (App.tools[a] && kindOf()) { sfx.play('ui'); App.tools[a](); }
       else if (a === 'undo') undo();
@@ -309,6 +407,7 @@
   function begin(kind, o) {
     o = o || {};
     closeSheet(true);
+    liftAll();
     input.clear();
     banner('');
     el.pops.innerHTML = '';
@@ -1337,6 +1436,7 @@
 
   function openSheet(name) {
     freshSeen(name);
+    if (name !== 'keys') stopCapture();      // a key being set up is given up once another sheet takes its place
     if ((name === 'settings' || name === 'help') && sheetName !== name && sheetName !== 'keys') sheetBack = sheetName === 'pause' ? 'pause' : '';
     var keep = sheetName === name ? el.sheetCard.scrollTop : 0;
     sheetName = name;
@@ -1407,7 +1507,7 @@
     el.sheetCard.addEventListener('click', function (e) {
       var tg = e.target.closest ? e.target.closest('button') : null;
       if (!tg) return;
-      sfx.wake();
+      wake();
       sfx.play('ui');
       var d = tg.dataset, i;
       if (d.do) return sheetDo(d.do, tg);
@@ -1436,7 +1536,7 @@
       if (FIELDS[id]) {
         set[FIELDS[id]] = +e.target.value;
         $(id + 'O').textContent = fieldText(FIELDS[id]);
-        if (id === 'sVol' || id === 'sMvol') { sfx.wake(); sfx.vol(); if (id === 'sVol') sfx.play('tick'); }
+        if (id === 'sVol' || id === 'sMvol') { wake(); sfx.vol(); if (id === 'sVol') sfx.play('tick'); }
       }
       else if (TOGGLES[id]) set[TOGGLES[id]] = e.target.checked;
       else { for (i = 0; i < App.inputs.length; i++) if (App.inputs[i](e.target, e)) return; return; }
@@ -1452,7 +1552,7 @@
     el.menu.addEventListener('click', function (e) {
       var tg = e.target.closest ? e.target.closest('button') : null;
       if (!tg) return;
-      sfx.wake();
+      wake();
       sfx.play('ui');
       if (tg.dataset.sheet) return openSheet(tg.dataset.sheet);
       goTo(tg.dataset.go);
@@ -1951,7 +2051,7 @@
     // Browsers only let sound start from a real user action. On touch screens that is the end of a tap (pointerup,
     // touchend, click), not pointerdown, so waking on pointerdown alone could leave a phone silent until some button
     // that wakes on click was pressed. Wake on all of them.
-    ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { sfx.wake(); }, { passive: true, capture: true }); });
+    ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { wake(); }, { passive: true, capture: true }); });
     window.addEventListener('pageshow', function () { if (!document.hidden) sfx.hush(false); });
     window.addEventListener('focus', function () { if (!document.hidden) sfx.hush(false); });
     // Item marks and labels are drawn with the page fonts; redraw them once the web fonts have arrived.

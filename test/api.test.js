@@ -1160,6 +1160,23 @@ const dump = async () => { let all = ''; for (const t of ['players', 'keys', 'co
   dbm.use(pg);
   ok((await sync(A3)).json.ok, 'back to normal');
 
+  // ---------- reports from pages: keys that stopped answering, script errors in a match (logged, not stored) ----------
+  {
+    const warn = console.warn, lines = []; console.warn = x => lines.push(String(x));
+    let r = await call('rpc', { method: 'POST', body: { a: 'diag', kind: 'input', d: { why: 'blocked', sheet: '', top: ['div#cover<script>', 'footer#pad'], soft: true, w: 412.6, key: 'abc.secretkey', errs: ['x'] } }, ip: '198.51.100.40', headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36' } });
+    console.warn = warn;
+    const line = lines.find(l => /^\[zz\] client-diag input /.test(l)) || '';
+    const j = JSON.parse(line.replace(/^\[zz\] client-diag input /, '') || '{}');
+    ok(r.status === 200 && j.ua === 'android chrome 131' && j.why === 'blocked' && j.soft === true && j.w === 413 && j.top[0] === 'div#coverscript' && !('key' in j) && !/secretkey|Pixel|Mozilla/.test(line),
+      'a report is written to the log: known fields only, no markup, the device in a few words', line);
+    eq((await call('rpc', { method: 'POST', body: { a: 'diag', kind: 'other', d: {} }, ip: '198.51.100.41' })).status, 400, 'an unknown kind of report is refused');
+    console.warn = () => {};
+    const st = [];
+    for (let i = 0; i < 8; i++) st.push((await call('rpc', { method: 'POST', body: { a: 'diag', kind: 'jserr', d: { msg: 'x' } }, ip: '198.51.100.42' })).status);
+    console.warn = warn;
+    ok(st.slice(0, 6).every(x => x === 200) && st[6] === 429, 'six a minute from one address, then "too many"', st);
+  }
+
   // ---------- the play log: every kind of game, counted once, only as the server reads it ----------
   {
     const V = await newPlayer(null, '203.0.113.91');
